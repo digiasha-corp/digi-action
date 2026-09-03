@@ -162,7 +162,7 @@ function dailyPrioritySyncJob() {
     };
   });
 
-  // 7. Simpan Hasil Kalkulasi Kembali ke Spreadsheet (Bulk Update)
+  // 7. Simpan Hasil Kalkulasi Kembali ke Spreadsheet Master (Current Snapshot)
   updateSheetWithCalculations(sheetUnit, evaluatedUnits, [
     "aging_visit_unit", "lifetime_days", "aging_gps_maint", "is_h3_jto", "priority_level", "priority_score", "priority_reason"
   ]);
@@ -170,6 +170,9 @@ function dailyPrioritySyncJob() {
   updateSheetWithCalculations(sheetDealer, evaluatedDealers, [
     "aging_visit_mitra", "urgent_units_count", "priority_level", "priority_score", "priority_reason", "mitra_internal_level"
   ]);
+
+  // 8. Catat Snapshot Historis Harian ke LOG_PRIORITY_DAILY (Time-series untuk Looker Studio)
+  appendDailyPriorityHistory(ss, now, evaluatedDealers, evaluatedUnits);
 
   Logger.log("=== DAILY PRIORITY SYNC JOB SELESAI DENGAN SUKSES ===");
 }
@@ -415,6 +418,95 @@ function updateSheetWithCalculations(sheet, items, targetColumns) {
       });
     }
   });
+}
+
+function appendDailyPriorityHistory(ss, now, dealers, units) {
+  let sheetLog = ss.getSheetByName(CONFIG.SHEETS.PRIORITY_LOG || "LOG_PRIORITY_DAILY");
+  const headers = [
+    "log_id",
+    "log_date",
+    "timestamp",
+    "entity_type",
+    "entity_id",
+    "entity_name",
+    "cabang",
+    "priority_level",
+    "priority_score",
+    "priority_reason",
+    "aging_visit",
+    "lifetime_days",
+    "overdue_days",
+    "gps_status",
+    "is_h3_jto",
+    "urgent_units_count",
+    "active_concern"
+  ];
+
+  if (!sheetLog) {
+    sheetLog = ss.insertSheet(CONFIG.SHEETS.PRIORITY_LOG || "LOG_PRIORITY_DAILY");
+    sheetLog.appendRow(headers);
+    sheetLog.setFrozenRows(1);
+  }
+
+  const dateStr = Utilities.formatDate(now, "Asia/Jakarta", "yyyy-MM-dd");
+  const timeStr = Utilities.formatDate(now, "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
+  const rowsToAppend = [];
+
+  // 1. Record History Mitra Dealer
+  dealers.forEach((d, idx) => {
+    const logId = "LOG-DLR-" + dateStr.replace(/-/g, '') + "-" + String(idx + 1).padStart(3, '0');
+    const concernText = d.dealer_concern ? (typeof d.dealer_concern === 'object' ? d.dealer_concern.note : d.dealer_concern) : "-";
+    rowsToAppend.push([
+      logId,
+      dateStr,
+      timeStr,
+      "DEALER",
+      d.dealer_id || "-",
+      d.dealer_name || "-",
+      d.cabang || "-",
+      d.priority_level || "Normal",
+      d.priority_score || 0,
+      d.priority_reason || "-",
+      d.aging_visit_mitra || 0,
+      "-",
+      "-",
+      "-",
+      "-",
+      d.urgent_units_count || 0,
+      concernText
+    ]);
+  });
+
+  // 2. Record History Unit Fasilitas
+  units.forEach((u, idx) => {
+    const logId = "LOG-UNT-" + dateStr.replace(/-/g, '') + "-" + String(idx + 1).padStart(3, '0');
+    const concernText = u.unit_concern ? (typeof u.unit_concern === 'object' ? u.unit_concern.note : u.unit_concern) : "-";
+    rowsToAppend.push([
+      logId,
+      dateStr,
+      timeStr,
+      "UNIT",
+      u.nopol || "-",
+      (u.unit || "-") + " (" + (u.dealer_name || "-") + ")",
+      u.cabang || "-",
+      u.priority_level || "Normal",
+      u.priority_score || 0,
+      u.priority_reason || "-",
+      u.aging_visit_unit || 0,
+      u.lifetime_days || 0,
+      u.overdue_days || 0,
+      u.gps_status || "Normal",
+      u.is_h3_jto || "FALSE",
+      "-",
+      concernText
+    ]);
+  });
+
+  // 3. Bulk Insert ke Sheet
+  if (rowsToAppend.length > 0) {
+    const startRow = sheetLog.getLastRow() + 1;
+    sheetLog.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
 }
 
 // =========================================================================
