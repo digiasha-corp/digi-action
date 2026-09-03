@@ -1,15 +1,81 @@
 /**
- * CORE LOGIC & ENGINE DIGIASHA APP
+ * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
 const screenCache = {};
-let CURRENT_USER = DUMMY_DB.currentUser;
-let MASTER_DEALER_PRIORITY_DATA = JSON.parse(JSON.stringify(DUMMY_DB.dealers));
-let FAC_GPS_MONITORING_DATA = JSON.parse(JSON.stringify(DUMMY_DB.facGpsMonitoring));
 
-// Helper Pemanggil API Google Apps Script
+// Sesi Pengguna Aktif (Disimpan di localStorage)
+let CURRENT_USER = (() => {
+  try {
+    const saved = localStorage.getItem("DIGIASHA_AUTH_USER");
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+})();
+
+// Hak Akses Modul per Role
+const ROLE_PERMISSIONS = {
+  "Super Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "Supervisor": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "FAC": ["priority", "gps", "fac"],
+  "Field PIC": ["priority", "visit", "onboarding", "gps"]
+};
+
+// Data Kantor untuk Geofencing Presensi
+const OFFICE_LOCATIONS = [
+  { name: "Kantor Utama (Tangsel)", lat: -6.358972, long: 106.716583, maxRadiusMeter: 100 },
+  { name: "Kantor Cabang Tangerang", lat: -6.295218, long: 106.638482, maxRadiusMeter: 100 }
+];
+
+// State Global Aplikasi (Diisi Dinamis dari API)
+let APP_STATE = {
+  dealers: [],
+  units: [],
+  idleGps: [],
+  assignments: [],
+  masterVehiclesGps: {}
+};
+
+let MASTER_DEALER_PRIORITY_DATA = [];
+let FAC_GPS_MONITORING_DATA = [];
+
+let CURRENT_USER_GEO = { lat: -6.295218, long: 106.638482, accuracy: 25, nearestOffice: null, distanceToOffice: 0, isInsideRadius: false };
+let ACTIVE_ABSEN_TYPE = null;
+let CURRENT_ABSEN_SELFIE_BASE64 = null;
+
+let PRIORITY_ACTIVE_FILTER = "ALL";
+let FAC_ACTIVE_CONTRACT_FILTER = "ALL";
+let FAC_SELECTED_STATUS_FILTERS = [];
+
+// State Modul Visit & Onboarding
+let CURRENT_UNIT_INDEX = null;
+let ACTIVE_UNITS_STATE = [];
+let CURRENT_SHOWROOM_PHOTO_BASE64 = null;
+let CURRENT_ONB_SELFIE_BASE64 = null;
+let TEMP_MODAL_PHOTO_BASE64 = null;
+let ONB_DOC_FILES = {};
+
+// State Foto Khusus GPS Maintenance
+let GPS_PHOTO_OLD_BASE64 = null;
+let GPS_PHOTO_NEW_IMEI_BASE64 = null;
+let GPS_PHOTO_POSITION_BASE64 = null;
+
+const STATUS_MAP = {
+  "1": { name: "Tidak Pasang", short: "Tdk Pasang", activeBg: "bg-rose-600 text-white border-rose-600", normalBg: "hover:border-rose-400 text-rose-700 bg-rose-50 border-rose-200" },
+  "2": { name: "Belum Lepas", short: "Blm Lepas", activeBg: "bg-purple-600 text-white border-purple-600", normalBg: "hover:border-purple-400 text-purple-700 bg-purple-50 border-purple-200" },
+  "3": { name: "Belum Pasang", short: "Blm Pasang", activeBg: "bg-amber-500 text-white border-amber-500", normalBg: "hover:border-amber-400 text-amber-700 bg-amber-50 border-amber-200" },
+  "4": { name: "Baterai Lemah", short: "Batt Lemah", activeBg: "bg-yellow-500 text-white border-yellow-500", normalBg: "hover:border-yellow-400 text-yellow-700 bg-yellow-50 border-yellow-200" },
+  "5": { name: "Geser", short: "Geser", activeBg: "bg-blue-600 text-white border-blue-600", normalBg: "hover:border-blue-400 text-blue-700 bg-blue-50 border-blue-200" },
+  "6": { name: "Pelepasan", short: "Pelepasan", activeBg: "bg-orange-600 text-white border-orange-600", normalBg: "hover:border-orange-400 text-orange-700 bg-orange-50 border-orange-200" },
+  "7": { name: "Offline", short: "Offline", activeBg: "bg-slate-800 text-white border-slate-800", normalBg: "hover:border-slate-400 text-slate-800 bg-slate-100 border-slate-200" }
+};
+
+// =========================================================================
+// API CALLER HELPER (GOOGLE APPS SCRIPT WEB APP)
+// =========================================================================
 async function callApi(action, data = {}) {
   if (typeof CONFIG === "undefined" || !CONFIG.USE_ONLINE_DB || !CONFIG.API_URL || CONFIG.API_URL.includes("MASUKKAN_URL")) {
-    return null; // Fallback ke lokal jika offline / demo
+    return { success: false, message: "Mode offline / URL API belum dikonfigurasi." };
   }
 
   try {
@@ -26,94 +92,65 @@ async function callApi(action, data = {}) {
   }
 }
 
-// Sinkronisasi Data Master dari Google Spreadsheet ke State Frontend
+// Sinkronisasi Data Master dari Google Spreadsheet
 async function syncMasterDataFromApi() {
-  if (typeof CONFIG === "undefined" || !CONFIG.USE_ONLINE_DB) return;
   try {
     const res = await callApi("getMasterData");
     if (res && res.success) {
-      if (res.dealers && res.dealers.length > 0) {
-        MASTER_DEALER_PRIORITY_DATA = res.dealers;
-      }
-      if (res.idleGps && res.idleGps.length > 0) {
-        DUMMY_DB.branchIdleImeiList = res.idleGps;
-      }
-      console.log("Master data berhasil disinkronkan dari Google Spreadsheet!");
+      APP_STATE.dealers = res.dealers || [];
+      APP_STATE.units = res.units || [];
+      APP_STATE.idleGps = res.idleGps || [];
+      APP_STATE.assignments = res.assignments || [];
+
+      // Kelompokkan unit per dealer
+      const vehiclesByDealer = {};
+      APP_STATE.dealers.forEach(d => {
+        d.units = APP_STATE.units.filter(u => String(u.dealer_name).trim().toLowerCase() === String(d.dealer_name).trim().toLowerCase());
+        vehiclesByDealer[d.dealer_id] = d.units.map(u => ({
+          nopol: u.nopol,
+          unit: u.unit,
+          contract_status: u.contract_status,
+          gps_status: (u.imei_gps && u.gps_status !== "Tidak Pasang") ? "TERPASANG" : "BELUM_PASANG",
+          imei: u.imei_gps
+        }));
+      });
+      APP_STATE.masterVehiclesGps = vehiclesByDealer;
+      MASTER_DEALER_PRIORITY_DATA = JSON.parse(JSON.stringify(APP_STATE.dealers));
+
+      // Buat list FAC GPS Monitoring
+      FAC_GPS_MONITORING_DATA = APP_STATE.units.map((u, i) => {
+        let codes = [];
+        if (u.gps_status === "Tidak Pasang") codes = ["1"];
+        else if (u.gps_status === "Belum Lepas") codes = ["2"];
+        else if (u.gps_status === "Belum Pasang") codes = ["3"];
+        else if (u.gps_status === "Baterai Lemah") codes = ["4"];
+        else if (u.gps_status === "Geser") codes = ["5"];
+        else if (u.gps_status === "Pelepasan") codes = ["6"];
+        else if (u.gps_status === "Offline") codes = ["7"];
+
+        return {
+          id: `U-${String(i + 1).padStart(2, '0')}`,
+          dealer: u.dealer_name,
+          asset_desc: `${u.unit} (${u.nopol})`,
+          nopol: u.nopol,
+          imei: u.imei_gps,
+          status_kontrak: u.contract_status,
+          gps_installed: !!u.imei_gps,
+          status_codes: codes,
+          catatan: ""
+        };
+      });
+
+      console.log("Data master berhasil disinkronkan dari Google Spreadsheet!");
     }
   } catch (err) {
-    console.warn("Gagal sync master data online, menggunakan data lokal:", err);
+    console.warn("Gagal sync master data online:", err);
   }
 }
 
-// Handler Submit Form Login
-async function handleLoginSubmit(e) {
-  e.preventDefault();
-  const identifier = document.getElementById("login-email")?.value.trim();
-  const password = document.getElementById("login-pass")?.value.trim();
-
-  if (!identifier || !password) {
-    alert("Email/NIP dan Password wajib diisi!");
-    return;
-  }
-
-  // Jika online mode aktif, verifikasi ke Apps Script
-  if (typeof CONFIG !== "undefined" && CONFIG.USE_ONLINE_DB) {
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Memverifikasi...';
-    submitBtn.disabled = true;
-
-    try {
-      const res = await callApi("login", { identifier, password });
-      submitBtn.innerHTML = originalText;
-      submitBtn.disabled = false;
-
-      if (!res || !res.success) {
-        alert("Gagal Login: " + (res?.message || "Koneksi terputus."));
-        return;
-      }
-
-      CURRENT_USER = res.user;
-      await syncMasterDataFromApi();
-      loadScreen("dashboard");
-    } catch (err) {
-      submitBtn.innerHTML = originalText;
-      submitBtn.disabled = false;
-      alert("Error login: " + err.message);
-    }
-  } else {
-    // Mode offline / demo
-    loadScreen("dashboard");
-  }
-}
-
-let CURRENT_USER_GEO = { lat: -6.295218, long: 106.638482, accuracy: 25, nearestOffice: null, distanceToOffice: 0, isInsideRadius: false };
-let ACTIVE_ABSEN_TYPE = null;
-let CURRENT_ABSEN_SELFIE_BASE64 = null;
-
-let PRIORITY_ACTIVE_FILTER = "ALL";
-let FAC_ACTIVE_CONTRACT_FILTER = "ALL";
-let FAC_SELECTED_STATUS_FILTERS = [];
-
-// State modul visit & onboarding
-let CURRENT_UNIT_INDEX = null;
-let ACTIVE_UNITS_STATE = [];
-let CURRENT_SHOWROOM_PHOTO_BASE64 = null;
-let CURRENT_ONB_SELFIE_BASE64 = null;
-let TEMP_MODAL_PHOTO_BASE64 = null;
-let ONB_DOC_FILES = {};
-
-const STATUS_MAP = {
-  "1": { name: "Tidak Pasang", short: "Tdk Pasang", activeBg: "bg-rose-600 text-white border-rose-600", normalBg: "hover:border-rose-400 text-rose-700 bg-rose-50 border-rose-200" },
-  "2": { name: "Belum Lepas", short: "Blm Lepas", activeBg: "bg-purple-600 text-white border-purple-600", normalBg: "hover:border-purple-400 text-purple-700 bg-purple-50 border-purple-200" },
-  "3": { name: "Belum Pasang", short: "Blm Pasang", activeBg: "bg-amber-500 text-white border-amber-500", normalBg: "hover:border-amber-400 text-amber-700 bg-amber-50 border-amber-200" },
-  "4": { name: "Baterai Lemah", short: "Batt Lemah", activeBg: "bg-yellow-500 text-white border-yellow-500", normalBg: "hover:border-yellow-400 text-yellow-700 bg-yellow-50 border-yellow-200" },
-  "5": { name: "Geser", short: "Geser", activeBg: "bg-blue-600 text-white border-blue-600", normalBg: "hover:border-blue-400 text-blue-700 bg-blue-50 border-blue-200" },
-  "6": { name: "Pelepasan", short: "Pelepasan", activeBg: "bg-orange-600 text-white border-orange-600", normalBg: "hover:border-orange-400 text-orange-700 bg-orange-50 border-orange-200" },
-  "7": { name: "Offline", short: "Offline", activeBg: "bg-slate-800 text-white border-slate-800", normalBg: "hover:border-slate-400 text-slate-800 bg-slate-100 border-slate-200" }
-};
-
-// Router Pemanggil Layar Modular
+// =========================================================================
+// ROUTER & SCREEN LOADER
+// =========================================================================
 async function loadScreen(screenName) {
   const container = document.getElementById("main-view-container");
   const topbar = document.getElementById("topbar");
@@ -121,11 +158,16 @@ async function loadScreen(screenName) {
   const title = document.getElementById("topbar-title");
   const sub = document.getElementById("topbar-sub");
 
+  // Auth Guard: Jika belum login dan mencoba buka selain login, redirect ke login
+  if (!CURRENT_USER && screenName !== "login") {
+    screenName = "login";
+  }
+
   if (screenName === "login") {
     topbar.classList.add("hidden");
   } else {
     topbar.classList.remove("hidden");
-    sub.innerText = `${CURRENT_USER.nama} •${CURRENT_USER.role}`;
+    sub.innerText = `${CURRENT_USER.nama} • ${CURRENT_USER.role}`;
     if (screenName === "dashboard") {
       btnBack.classList.add("hidden");
       title.innerText = "Digiasha Monitoring";
@@ -159,7 +201,7 @@ async function loadScreen(screenName) {
     if (screenName === "priority") renderPriorityList();
     if (screenName === "assignment") populateAssignDealerOptions();
     if (screenName === "visit") populateVisitDealerOptions();
-    if (screenName === "gps") populateGpsMaintDealerOptions();
+    if (screenName === "gps") initGpsScreen();
     if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
     if (screenName === "absensi") acquireAbsenLocation();
 
@@ -178,20 +220,71 @@ function triggerCameraInput(inputId) {
   }
 }
 
+// =========================================================================
+// AUTH & SESSION CONTROLLER
+// =========================================================================
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const identifier = document.getElementById("login-email")?.value.trim();
+  const password = document.getElementById("login-pass")?.value.trim();
+
+  if (!identifier || !password) {
+    alert("Email/NIP dan Password wajib diisi!");
+    return;
+  }
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Memverifikasi...';
+  submitBtn.disabled = true;
+
+  try {
+    const res = await callApi("login", { identifier, password });
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+
+    if (!res || !res.success) {
+      alert("Gagal Login: " + (res?.message || "Akun tidak terdaftar atau kata sandi salah."));
+      return;
+    }
+
+    CURRENT_USER = res.user;
+    try {
+      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(res.user));
+    } catch (err) {}
+
+    await syncMasterDataFromApi();
+    loadScreen("dashboard");
+  } catch (err) {
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+    alert("Error login: " + err.message);
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem("DIGIASHA_AUTH_USER");
+  CURRENT_USER = null;
+  loadScreen("login");
+}
+
 // Controller Dashboard
 function initDashboard() {
+  if (!CURRENT_USER) return;
   document.getElementById("dash-user-name").innerText = `Halo, ${CURRENT_USER.nama}!`;
   document.getElementById("dash-user-branch").innerText = `Cabang: ${CURRENT_USER.cabang}`;
   document.getElementById("badge-role").innerText = CURRENT_USER.role;
 
-  const perms = DUMMY_DB.rolePermissions[CURRENT_USER.role] || ["priority", "visit", "onboarding", "gps", "fac", "assignment"];
+  const perms = ROLE_PERMISSIONS[CURRENT_USER.role] || ["priority", "visit", "onboarding", "gps", "fac", "assignment"];
   ["priority", "assignment", "visit", "onboarding", "gps", "fac"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) btn.style.display = perms.includes(key) ? "flex" : "none";
   });
 }
 
-// Geofence & Absensi
+// =========================================================================
+// GEOFENCE & ABSENSI
+// =========================================================================
 function openAbsenChoiceModal() { document.getElementById("modal-absen-choice").classList.remove("hidden"); }
 function closeAbsenChoiceModal() { document.getElementById("modal-absen-choice").classList.add("hidden"); }
 
@@ -243,18 +336,18 @@ function acquireAbsenLocation() {
 
         let nearest = null;
         let minD = Infinity;
-        DUMMY_DB.officeLocations.forEach(o => {
+        OFFICE_LOCATIONS.forEach(o => {
           const d = calculateDistanceMeters(crd.latitude, crd.longitude, o.lat, o.long);
           if (d < minD) { minD = d; nearest = { ...o, distance: d }; }
         });
         CURRENT_USER_GEO.nearestOffice = nearest;
         CURRENT_USER_GEO.distanceToOffice = nearest.distance;
 
-        if (coordsDisplay) coordsDisplay.innerText = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (\u00B1${Math.round(crd.accuracy)}m)`;
+        if (coordsDisplay) coordsDisplay.innerText = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
         if (officeNameDisplay) officeNameDisplay.innerText = nearest.name;
 
         if (ACTIVE_ABSEN_TYPE === "Masuk Kantor") {
-          if (distDisplay) distDisplay.innerText = `${nearest.distance} Meter (Maks${nearest.maxRadiusMeter}m)`;
+          if (distDisplay) distDisplay.innerText = `${nearest.distance} Meter (Maks ${nearest.maxRadiusMeter}m)`;
           if (nearest.distance <= nearest.maxRadiusMeter) {
             CURRENT_USER_GEO.isInsideRadius = true;
             if (badge) { badge.innerText = `Radius Valid (${nearest.name})`; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800"; }
@@ -272,9 +365,9 @@ function acquireAbsenLocation() {
         CURRENT_USER_GEO.long = 106.716583;
         CURRENT_USER_GEO.distanceToOffice = 10;
         CURRENT_USER_GEO.isInsideRadius = true;
-        CURRENT_USER_GEO.nearestOffice = DUMMY_DB.officeLocations[0];
+        CURRENT_USER_GEO.nearestOffice = OFFICE_LOCATIONS[0];
         if (coordsDisplay) coordsDisplay.innerText = "-6.358972, 106.716583 (Default GPS)";
-        if (officeNameDisplay) officeNameDisplay.innerText = DUMMY_DB.officeLocations[0].name;
+        if (officeNameDisplay) officeNameDisplay.innerText = OFFICE_LOCATIONS[0].name;
         if (distDisplay) distDisplay.innerText = "10 Meter (Valid Radius)";
         if (badge) { badge.innerText = "Radius Valid (Testing GPS)"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800"; }
       },
@@ -307,7 +400,7 @@ function handleAbsenSubmit(e) {
     return;
   }
   if (!CURRENT_ABSEN_SELFIE_BASE64) {
-    alert("Wajib mengambil foto selfie kehadiran (kelihatan badan / setengah badan)!");
+    alert("Wajib mengambil foto selfie kehadiran!");
     return;
   }
 
@@ -316,16 +409,18 @@ function handleAbsenSubmit(e) {
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 
-  let waText = `*PRESENSI KEHADIRAN DIGIASHA*\n------------------------------------\n*Jenis Absensi:* ${ACTIVE_ABSEN_TYPE}\n*Nama Karyawan:*${CURRENT_USER.nama}\n*Role / Cabang:* ${CURRENT_USER.role} \u2022${CURRENT_USER.cabang}\n*Waktu Presensi:* ${dateStr} pukul${timeStr} WIB\n\n`;
+  let waText = `*PRESENSI KEHADIRAN DIGIASHA*\n------------------------------------\n*Jenis Absensi:* ${ACTIVE_ABSEN_TYPE}\n*Nama Karyawan:* ${CURRENT_USER.nama}\n*Role / Cabang:* ${CURRENT_USER.role} • ${CURRENT_USER.cabang}\n*Waktu Presensi:* ${dateStr} pukul ${timeStr} WIB\n\n`;
   if (ACTIVE_ABSEN_TYPE === "Masuk Kantor") {
     waText += `*Lokasi Kantor:* ${CURRENT_USER_GEO.nearestOffice?.name || 'Kantor Utama'}\n*Status Geofence:* Radius Valid (${CURRENT_USER_GEO.distanceToOffice} Meter dari Kantor)\n`;
   }
-  waText += `*Koordinat Geotag:* ${CURRENT_USER_GEO.lat.toFixed(6)}, ${CURRENT_USER_GEO.long.toFixed(6)}\n*Catatan Aktivitas:*${catatan}\n\u2022 Foto Selfie: [Kamera Langsung OK (Full Body)]\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+  waText += `*Koordinat Geotag:* ${CURRENT_USER_GEO.lat.toFixed(6)}, ${CURRENT_USER_GEO.long.toFixed(6)}\n*Catatan Aktivitas:* ${catatan}\n• Foto Selfie: [Kamera Langsung OK]\n------------------------------------\n_Dikirim via Digiasha Field App_`;
 
   openSummaryModal("Presensi Berhasil Disimpan!", "Siap diteruskan ke WhatsApp", waText, "bg-teal-700");
 }
 
-// Priority Visit Scoring Engine
+// =========================================================================
+// PRIORITY VISIT SCORING ENGINE
+// =========================================================================
 function calculateUnitUrgency(u) {
   if (u.unit_concern && u.unit_concern.urgency === "Sangat Penting") return { level: "Sangat Penting", score: 3, reason: "Concern 'Sangat Penting'" };
   if (["Pelepasan", "Offline", "Baterai Lemah"].includes(u.gps_status)) return { level: "Sangat Penting", score: 3, reason: `GPS ${u.gps_status}` };
@@ -336,11 +431,10 @@ function calculateUnitUrgency(u) {
   if (["Belum Lepas", "Belum Pasang", "Geser"].includes(u.gps_status)) return { level: "Penting", score: 2, reason: `GPS ${u.gps_status}` };
   if (u.aging_visit_unit > 3 && u.overdue_days > 3) return { level: "Penting", score: 2, reason: "Aging Visit >3 hr & OVD >3" };
   if (u.aging_visit_unit > 5 && u.is_h3_jto) return { level: "Penting", score: 2, reason: "Aging Visit >5 hr & H-3 JTO" };
-  if (u.aging_visit_unit > 21 && u.lifetime_days <= 90) return { level: "Penting", score: 2, reason: "Aging Visit >21 hr & Lifetime \u226490" };
+  if (u.aging_visit_unit > 21 && u.lifetime_days <= 90) return { level: "Penting", score: 2, reason: "Aging Visit >21 hr & Lifetime ≤90" };
 
   if (u.aging_visit_unit > 14) return { level: "Moderat", score: 1, reason: "Aging Visit Unit >14 hr" };
   if (u.unit_concern && u.unit_concern.urgency === "Moderat") return { level: "Moderat", score: 1, reason: "Concern 'Moderat'" };
-  if (u.aging_gps_maint > 30) return { level: "Moderat", score: 1, reason: "Aging GPS Maint >30 hr" };
 
   return { level: "Normal", score: 0, reason: "Normal" };
 }
@@ -428,7 +522,7 @@ function renderPriorityList() {
           <h4 class="font-bold text-xs text-slate-900 truncate">${d.dealer_name}</h4>
           <span class="text-[8px] font-black px-1.5 py-0.2 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
         </div>
-        <p class="text-[10px] text-slate-400 truncate mt-0.5">Cabang: ${d.cabang} \u2022 Aging: <strong>${d.aging_visit_mitra} hr</strong> \u2022${d.units.length} Unit</p>
+        <p class="text-[10px] text-slate-400 truncate mt-0.5">Cabang: ${d.cabang} • Aging: <strong>${d.aging_visit_mitra} hr</strong> • ${d.units ? d.units.length : 0} Unit</p>
       </div>
 
       <div class="flex items-center space-x-1.5 shrink-0">
@@ -474,7 +568,7 @@ function openFacilityDetailModal(dealerId) {
   if (!d) return;
 
   document.getElementById("modal-facility-title").innerText = `Fasilitas: ${d.dealer_name}`;
-  document.getElementById("modal-facility-sub").innerText = `Total ${d.units.length} Unit Terdaftar`;
+  document.getElementById("modal-facility-sub").innerText = `Total ${d.units ? d.units.length : 0} Unit Terdaftar`;
 
   const listContainer = document.getElementById("modal-facility-list");
   listContainer.innerHTML = "";
@@ -486,33 +580,35 @@ function openFacilityDetailModal(dealerId) {
     "Normal": "bg-slate-100 text-slate-600 border-slate-200"
   };
 
-  d.units.forEach(u => {
-    const uEval = calculateUnitUrgency(u);
-    const itemCard = document.createElement("div");
-    itemCard.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5";
+  if (d.units) {
+    d.units.forEach(u => {
+      const uEval = calculateUnitUrgency(u);
+      const itemCard = document.createElement("div");
+      itemCard.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5";
 
-    itemCard.innerHTML = `
-      <div class="flex justify-between items-start">
-        <div class="min-w-0 flex-1">
-          <span class="font-bold text-slate-900 text-xs">${u.nopol}</span>
-          <p class="text-[11px] text-slate-600 truncate">${u.unit}</p>
+      itemCard.innerHTML = `
+        <div class="flex justify-between items-start">
+          <div class="min-w-0 flex-1">
+            <span class="font-bold text-slate-900 text-xs">${u.nopol}</span>
+            <p class="text-[11px] text-slate-600 truncate">${u.unit}</p>
+          </div>
+          <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${urgencyPillStyles[uEval.level]} shrink-0">${uEval.level}</span>
         </div>
-        <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${urgencyPillStyles[uEval.level]} shrink-0">${uEval.level}</span>
-      </div>
 
-      <div class="grid grid-cols-2 gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-        <div>GPS: <strong class="text-slate-700">${u.gps_status}</strong></div>
-        <div>Aging Visit: <strong class="text-slate-700">${u.aging_visit_unit} hr</strong></div>
-        <div>Lifetime: <strong class="text-slate-700">${u.lifetime_days} hr</strong></div>
-        <div>Status: <strong class="text-slate-700">${u.is_h3_jto ? 'H-3 JTO' : u.overdue_days > 0 ? 'OVD ' + u.overdue_days + ' hr' : 'Lancar'}</strong></div>
-      </div>
+        <div class="grid grid-cols-2 gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+          <div>GPS: <strong class="text-slate-700">${u.gps_status}</strong></div>
+          <div>Aging Visit: <strong class="text-slate-700">${u.aging_visit_unit} hr</strong></div>
+          <div>Lifetime: <strong class="text-slate-700">${u.lifetime_days} hr</strong></div>
+          <div>Status: <strong class="text-slate-700">${u.is_h3_jto ? 'H-3 JTO' : u.overdue_days > 0 ? 'OVD ' + u.overdue_days + ' hr' : 'Lancar'}</strong></div>
+        </div>
 
-      <div class="text-[10px] text-amber-900 bg-amber-50 p-1.5 rounded-lg border border-amber-200 font-medium">
-        Pemicu: <strong>${uEval.reason}</strong>${u.unit_concern ? `<br><span class="text-purple-800">Concern: "${u.unit_concern.note}"</span>` : ''}
-      </div>
-    `;
-    listContainer.appendChild(itemCard);
-  });
+        <div class="text-[10px] text-amber-900 bg-amber-50 p-1.5 rounded-lg border border-amber-200 font-medium">
+          Pemicu: <strong>${uEval.reason}</strong>${u.unit_concern ? `<br><span class="text-purple-800">Concern: "${u.unit_concern.note}"</span>` : ''}
+        </div>
+      `;
+      listContainer.appendChild(itemCard);
+    });
+  }
 
   document.getElementById("modal-facility-detail").classList.remove("hidden");
 }
@@ -521,7 +617,9 @@ function closeFacilityModal() { document.getElementById("modal-facility-detail")
 function openParamModal() { document.getElementById("modal-param-info").classList.remove("hidden"); }
 function closeParamModal() { document.getElementById("modal-param-info").classList.add("hidden"); }
 
-// Assign Concern Logic
+// =========================================================================
+// ASSIGN CONCERN
+// =========================================================================
 function populateAssignDealerOptions() {
   const selectDealer = document.getElementById("assign-select-dealer");
   if (!selectDealer) return;
@@ -543,14 +641,16 @@ function onAssignDealerSelected(dealerId) {
   d.units.forEach(u => {
     const opt = document.createElement("option");
     opt.value = u.nopol;
-    opt.innerText = `${u.nopol} -${u.unit}`;
+    opt.innerText = `${u.nopol} - ${u.unit}`;
     selectUnit.appendChild(opt);
   });
 }
 
-function handleAssignConcernSubmit(e) {
+async function handleAssignConcernSubmit(e) {
   e.preventDefault();
   const dealerId = document.getElementById("assign-select-dealer").value;
+  const selectDealer = document.getElementById("assign-select-dealer");
+  const dealerName = selectDealer.options[selectDealer.selectedIndex].text;
   const unitVal = document.getElementById("assign-select-unit").value;
   const concernText = document.getElementById("assign-input-concern").value.trim();
   const urgencyVal = document.querySelector('input[name="assign_urgency"]:checked').value;
@@ -565,11 +665,24 @@ function handleAssignConcernSubmit(e) {
     }
   }
 
+  // Kirim ke backend Spreadsheet jika online
+  callApi("saveAssignment", {
+    assignedByUserId: CURRENT_USER?.nip || "ADM",
+    assignedByUserName: CURRENT_USER?.nama || "Supervisor",
+    dealerName: dealerName,
+    unitFasilitas: unitVal,
+    concernType: "Assign Concern",
+    urgencyLevel: urgencyVal,
+    instruksi: concernText
+  });
+
   alert(`Concern ${urgencyVal} berhasil disimpan ke Priority Visit!`);
   loadScreen('priority');
 }
 
-// Controller Laporan Visit Mitra (Dengan Modal Unit Checklist)
+// =========================================================================
+// LAPORAN VISIT SHOWROOM
+// =========================================================================
 function populateVisitDealerOptions() {
   const sel = document.getElementById("input-dealer");
   if (!sel) return;
@@ -805,7 +918,7 @@ function getPreciseLocation() {
         CURRENT_USER_GEO.lat = crd.latitude;
         CURRENT_USER_GEO.long = crd.longitude;
         CURRENT_USER_GEO.accuracy = crd.accuracy;
-        const locStr = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (\u00B1${Math.round(crd.accuracy)}m)`;
+        const locStr = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
         if (geoDisplay) geoDisplay.innerText = locStr;
         if (onbGeoDisplay) onbGeoDisplay.innerText = locStr;
       },
@@ -837,7 +950,7 @@ function removePhoto() {
   document.getElementById("preview-photo-card").classList.add("hidden");
 }
 
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
   e.preventDefault();
 
   if (ACTIVE_UNITS_STATE.length > 0) {
@@ -878,7 +991,7 @@ function handleFormSubmit(e) {
 
   let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi} (${lokasiDetail})\n*Bertemu Owner:* ${bertemuOwner}${bertemuOwner === 'Tidak' ? '(' + ownerReason + ')' : ''}\n`;
   if (lokasi === "Showroom") {
-    waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:*${sales} Unit\n\n`;
+    waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
   } else {
     waText += `\n`;
   }
@@ -900,10 +1013,31 @@ function handleFormSubmit(e) {
 
   waText += `• Catatan Visit: ${catatanVisit}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)},${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
 
+  // Kirim ke Google Apps Script secara asynchronous
+  callApi("submitVisit", {
+    dealer_name: dealerName,
+    lokasi: lokasi,
+    bertemu_owner: bertemuOwner,
+    owner_reason: ownerReason,
+    stock: stock,
+    sales: sales,
+    issue_digi: issueDigi,
+    issue_internal: issueInternal,
+    issue_komp: issueKomp,
+    catatan_visit: catatanVisit,
+    lat: CURRENT_USER_GEO.lat,
+    long: CURRENT_USER_GEO.long,
+    showroom_photo_base64: CURRENT_SHOWROOM_PHOTO_BASE64,
+    unit_check_list: ACTIVE_UNITS_STATE,
+    currentUser: CURRENT_USER
+  });
+
   openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-emerald-600");
 }
 
-// Controller Visit Calon Mitra (Onboarding)
+// =========================================================================
+// ONBOARDING CALON MITRA
+// =========================================================================
 function toggleDatabaseBaru(isBaru) {
   const boxBaru = document.getElementById("box-segmen-db-baru");
   const boxLama = document.getElementById("box-segmen-db-lama");
@@ -988,7 +1122,7 @@ function handleDocPhotoCaptured(input, docKey, docTitle, cleanKey) {
       ONB_DOC_FILES[docKey] = { title: docTitle, base64: e.target.result };
       const label = document.getElementById(`label-status-${cleanKey}`);
       if (label) {
-        label.innerText = "\u2713 File Terunggah";
+        label.innerText = "✓ File Terunggah";
         label.className = "text-[10px] text-emerald-600 font-bold block";
       }
     };
@@ -1014,7 +1148,7 @@ function removeOnbSelfie() {
   document.getElementById("preview-onb-selfie-card").classList.add("hidden");
 }
 
-function handleOnboardingSubmit(e) {
+async function handleOnboardingSubmit(e) {
   e.preventDefault();
   const actChecked = [];
   document.querySelectorAll('input[name="onb_act_type"]:checked').forEach(c => actChecked.push(c.value));
@@ -1061,94 +1195,291 @@ function handleOnboardingSubmit(e) {
   const docList = docKeys.length > 0 ? docKeys.map(k => `✓ ${ONB_DOC_FILES[k].title}`).join('\n') : '- Tidak ada dokumen fisik yang didapatkan pada visit ini';
   const catatanHasil = document.getElementById("onb-catatan-hasil").value.trim();
 
-  let waText = `*LAPORAN VISIT ONBOARDING CALON MITRA*\n------------------------------------\n*Aktivitas:* ${actChecked.join(' & ')}\n*Status Database:*${isDbBaru === 'Ya' ? 'Database Baru' : 'Database On-Process'}\n*Nama Pemohon:* ${namaPemohon}\n*Nama Usaha:*${namaUsaha}\n`;
+  let waText = `*LAPORAN VISIT ONBOARDING CALON MITRA*\n------------------------------------\n*Aktivitas:* ${actChecked.join(' & ')}\n*Status Database:* ${isDbBaru === 'Ya' ? 'Database Baru' : 'Database On-Process'}\n*Nama Pemohon:* ${namaPemohon}\n*Nama Usaha:* ${namaUsaha}\n`;
   if (isDbBaru === 'Ya') {
     waText += `*Alamat:* ${alamat}\n*Jenis Usaha:* ${jenisUsaha}\n${detailTambahan}\n`;
   }
-  waText += `\n*DOKUMEN DIDAPATKAN:*\n${docList}\n\n*HASIL & CATATAN KUNJUNGAN:*\n${catatanHasil}\n\n• Foto Selfie: [Kamera Langsung OK]\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)},${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+  waText += `\n*DOKUMEN DIDAPATKAN:*\n${docList}\n\n*HASIL & CATATAN KUNJUNGAN:*\n${catatanHasil}\n\n• Foto Selfie: [Kamera Langsung OK]\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+
+  callApi("submitOnboarding", {
+    userId: CURRENT_USER?.nip || CURRENT_USER?.email,
+    aktivitas: actChecked.join(', '),
+    status_db: isDbBaru === 'Ya' ? 'Database Baru' : 'Database On-Process',
+    nama_pemohon: namaPemohon,
+    nama_usaha: namaUsaha,
+    alamat: alamat,
+    jenis_usaha: jenisUsaha,
+    detail_usaha: detailTambahan,
+    dokumen_list: docKeys.map(k => ONB_DOC_FILES[k].title).join(', '),
+    catatan: catatanHasil,
+    lat: CURRENT_USER_GEO.lat,
+    long: CURRENT_USER_GEO.long,
+    selfie_base64: CURRENT_ONB_SELFIE_BASE64
+  });
 
   openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-teal-700");
 }
 
-// Controller GPS Maintenance
-function populateGpsMaintDealerOptions() {
-  const sel = document.getElementById("gps-maint-dealer");
+// =========================================================================
+// GPS MAINTENANCE CONTROLLER
+// =========================================================================
+function initGpsScreen() {
+  populateGpsDealerDropdown();
+  populateIdleImeiOptions();
+  onGpsActivityChange("Ganti GPS");
+}
+
+function populateGpsDealerDropdown() {
+  const sel = document.getElementById("gps-select-dealer");
   if (!sel) return;
-  sel.innerHTML = '<option value="">-- Pilih Showroom --</option>';
+  sel.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
   MASTER_DEALER_PRIORITY_DATA.forEach(d => {
     const opt = document.createElement("option");
-    opt.value = d.dealer_name;
-    opt.innerText = d.dealer_name;
+    opt.value = d.dealer_id;
+    opt.innerText = `${d.dealer_name} (${d.cabang})`;
     sel.appendChild(opt);
   });
 }
 
-function onGpsMaintDealerSelected(dealerName) {
-  const selUnit = document.getElementById("gps-maint-unit");
-  selUnit.innerHTML = '<option value="">-- Pilih Nopol --</option>';
-  const dealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_name === dealerName);
-  if (!dealer || !dealer.units) return;
+function onGpsActivityChange(actType) {
+  const boxOld = document.getElementById("box-gps-old-section");
+  const boxNew = document.getElementById("box-gps-new-section");
+  const dealerVal = document.getElementById("gps-select-dealer")?.value;
 
-  dealer.units.forEach(u => {
+  if (actType === "Ganti GPS") {
+    if (boxOld) boxOld.classList.remove("hidden");
+    if (boxNew) boxNew.classList.remove("hidden");
+  } else if (actType === "Cabut GPS") {
+    if (boxOld) boxOld.classList.remove("hidden");
+    if (boxNew) boxNew.classList.add("hidden");
+  } else if (actType === "Pasang GPS") {
+    if (boxOld) boxOld.classList.add("hidden");
+    if (boxNew) boxNew.classList.remove("hidden");
+  }
+
+  if (dealerVal) {
+    filterVehiclesByActivity(dealerVal, actType);
+  }
+}
+
+function onGpsDealerSelected(dealerId) {
+  const actType = document.querySelector('input[name="gps_act_type"]:checked')?.value || "Ganti GPS";
+  filterVehiclesByActivity(dealerId, actType);
+}
+
+function filterVehiclesByActivity(dealerId, actType) {
+  const selectKendaraan = document.getElementById("gps-select-kendaraan");
+  const infoText = document.getElementById("gps-kendaraan-info");
+  if (!selectKendaraan) return;
+
+  selectKendaraan.innerHTML = '<option value="">-- Pilih Kendaraan --</option>';
+  const inputImeiLama = document.getElementById("gps-input-imei-lama");
+  if (inputImeiLama) inputImeiLama.value = "-";
+
+  const allVehicles = APP_STATE.masterVehiclesGps[dealerId] || [];
+  if (!dealerId || allVehicles.length === 0) {
+    if (infoText) {
+      infoText.innerText = "Mitra belum memiliki data unit terdaftar.";
+      infoText.className = "text-[10px] text-slate-400 mt-1 block";
+    }
+    return;
+  }
+
+  let filtered = [];
+  if (actType === "Ganti GPS") {
+    filtered = allVehicles.filter(v => v.contract_status === "LIVE" && v.gps_status === "TERPASANG");
+  } else if (actType === "Cabut GPS") {
+    filtered = allVehicles.filter(v => (v.contract_status === "LIVE" || v.contract_status === "EXPIRED") && v.gps_status === "TERPASANG");
+  } else if (actType === "Pasang GPS") {
+    filtered = allVehicles.filter(v => (v.contract_status === "LIVE" || v.contract_status === "IN_PROCESS") && v.gps_status === "BELUM_PASANG");
+  }
+
+  if (filtered.length === 0) {
+    selectKendaraan.innerHTML = `<option value="">-- Tidak ada unit yang memenuhi kriteria ${actType} --</option>`;
+    if (infoText) {
+      infoText.innerText = `Tidak ditemukan kendaraan mitra dengan kriteria ${actType}.`;
+      infoText.className = "text-[10px] text-red-500 font-semibold mt-1 block";
+    }
+    return;
+  }
+
+  if (infoText) {
+    infoText.innerText = `Menampilkan ${filtered.length} unit kendaraan yang sesuai kriteria ${actType}.`;
+    infoText.className = "text-[10px] text-emerald-600 font-semibold mt-1 block";
+  }
+
+  filtered.forEach(v => {
     const opt = document.createElement("option");
-    opt.value = u.nopol;
-    opt.innerText = `${u.nopol} -${u.unit}`;
-    selUnit.appendChild(opt);
+    opt.value = v.nopol;
+    opt.setAttribute("data-imei", v.imei || "");
+    opt.setAttribute("data-unit", v.unit || "");
+    opt.setAttribute("data-status", v.contract_status || "");
+    opt.innerText = `${v.nopol} | ${v.unit} (${v.contract_status})`;
+    selectKendaraan.appendChild(opt);
   });
 }
 
-function onGpsMaintUnitSelected(nopol) {
-  let currentImei = "";
-  MASTER_DEALER_PRIORITY_DATA.forEach(d => {
-    const u = d.units?.find(unit => unit.nopol === nopol);
-    if (u) currentImei = u.imei_gps || "";
-  });
-  document.getElementById("gps-imei-lama").value = currentImei || "-";
+function onGpsKendaraanSelected(nopol) {
+  const select = document.getElementById("gps-select-kendaraan");
+  if (!select) return;
+  const selectedOption = select.options[select.selectedIndex];
+  const imeiLama = selectedOption?.getAttribute("data-imei") || "-";
+  const inputImeiLama = document.getElementById("gps-input-imei-lama");
+  if (inputImeiLama) inputImeiLama.value = imeiLama;
 }
 
-function toggleGpsImeiInputs(action) {
-  const boxLama = document.getElementById("box-imei-lama");
-  const boxBaru = document.getElementById("box-imei-baru");
-  const inputBaru = document.getElementById("gps-imei-baru");
+function populateIdleImeiOptions(keyword = "") {
+  const select = document.getElementById("gps-select-imei-baru");
+  if (!select) return;
 
-  if (action === "Cabut GPS") {
-    boxLama.classList.remove("hidden");
-    boxBaru.classList.add("hidden");
-    inputBaru.removeAttribute("required");
-  } else if (action === "Ganti GPS") {
-    boxLama.classList.remove("hidden");
-    boxBaru.classList.remove("hidden");
-    inputBaru.setAttribute("required", "true");
-  } else {
-    boxLama.classList.add("hidden");
-    boxBaru.classList.remove("hidden");
-    inputBaru.setAttribute("required", "true");
+  select.innerHTML = '<option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>';
+  const filtered = APP_STATE.idleGps.filter(item =>
+    item.imei.includes(keyword) || item.tipe.toLowerCase().includes(keyword.toLowerCase())
+  );
+
+  filtered.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = item.imei;
+    opt.innerText = `${item.imei} - ${item.tipe}`;
+    select.appendChild(opt);
+  });
+}
+
+function filterIdleImei(keyword) {
+  populateIdleImeiOptions(keyword);
+}
+
+function onImeiBaruSelected(val) {
+  if (val) {
+    const searchInput = document.getElementById("gps-search-imei");
+    if (searchInput) searchInput.value = val;
   }
 }
 
-function handleGpsMaintenanceSubmit(e) {
+function handleGpsOldPhotoSelected(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      GPS_PHOTO_OLD_BASE64 = e.target.result;
+      document.getElementById("preview-gps-old-photo")?.classList.remove("hidden");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function removeGpsOldPhoto() {
+  const fileInput = document.getElementById("file-gps-photo-old");
+  if (fileInput) fileInput.value = "";
+  GPS_PHOTO_OLD_BASE64 = null;
+  document.getElementById("preview-gps-old-photo")?.classList.add("hidden");
+}
+
+function handleGpsNewImeiPhotoSelected(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      GPS_PHOTO_NEW_IMEI_BASE64 = e.target.result;
+      document.getElementById("preview-gps-new-imei-photo")?.classList.remove("hidden");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function removeGpsNewImeiPhoto() {
+  const fileInput = document.getElementById("file-gps-photo-new-imei");
+  if (fileInput) fileInput.value = "";
+  GPS_PHOTO_NEW_IMEI_BASE64 = null;
+  document.getElementById("preview-gps-new-imei-photo")?.classList.add("hidden");
+}
+
+function handleGpsPositionPhotoSelected(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      GPS_PHOTO_POSITION_BASE64 = e.target.result;
+      document.getElementById("preview-gps-position-photo")?.classList.remove("hidden");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function removeGpsPositionPhoto() {
+  const fileInput = document.getElementById("file-gps-photo-position");
+  if (fileInput) fileInput.value = "";
+  GPS_PHOTO_POSITION_BASE64 = null;
+  document.getElementById("preview-gps-position-photo")?.classList.add("hidden");
+}
+
+async function handleGpsSubmit(e) {
   e.preventDefault();
-  const dealerName = document.getElementById("gps-maint-dealer").value;
-  const nopol = document.getElementById("gps-maint-unit").value;
-  const action = document.getElementById("gps-maint-action").value;
-  const imeiLama = document.getElementById("gps-imei-lama").value;
-  const imeiBaru = document.getElementById("gps-imei-baru").value.trim();
-  const notes = document.getElementById("gps-maint-notes").value.trim();
+  const actType = document.querySelector('input[name="gps_act_type"]:checked').value;
+  const dealerSelect = document.getElementById("gps-select-dealer");
+  const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text;
+  const kendaraanSelect = document.getElementById("gps-select-kendaraan");
 
-  let waText = `*LAPORAN GPS MAINTENANCE*\n------------------------------------\n*Mitra:* ${dealerName}\n*Unit:* ${nopol}\n*Aktivitas:*${action}\n`;
-  if (action === "Ganti GPS") {
-    waText += `*IMEI Lama:* ${imeiLama}\n*IMEI Baru:*${imeiBaru}\n`;
-  } else if (action === "Cabut GPS") {
-    waText += `*IMEI Dicabut:* ${imeiLama}\n`;
-  } else {
-    waText += `*IMEI Terpasang:* ${imeiBaru}\n`;
+  if (!kendaraanSelect.value) {
+    alert("Pilih kendaraan yang akan dimaintenance terlebih dahulu!");
+    return;
   }
-  waText += `*Catatan:* ${notes || '-'}\n------------------------------------`;
+  const nopol = kendaraanSelect.value;
+  const unitDesc = kendaraanSelect.options[kendaraanSelect.selectedIndex].getAttribute("data-unit") || "";
+  const imeiLama = document.getElementById("gps-input-imei-lama").value;
+  const imeiBaru = document.getElementById("gps-select-imei-baru").value || document.getElementById("gps-search-imei").value;
+  const catatanTeknis = document.getElementById("gps-catatan-teknis").value.trim() || "-";
 
-  openSummaryModal("Maintenance GPS Berhasil!", "Status unit & inventaris telah disinkronkan", waText, "bg-emerald-800");
+  if (actType === "Ganti GPS" || actType === "Cabut GPS") {
+    if (!GPS_PHOTO_OLD_BASE64) {
+      alert("Wajib mengambil foto IMEI GPS lama yang dicabut!");
+      return;
+    }
+  }
+
+  if (actType === "Ganti GPS" || actType === "Pasang GPS") {
+    if (!imeiBaru) {
+      alert("Pilih nomor IMEI GPS baru yang terpasang!");
+      return;
+    }
+    if (!GPS_PHOTO_NEW_IMEI_BASE64) {
+      alert("Wajib mengambil foto fisik stiker IMEI GPS baru!");
+      return;
+    }
+    if (!GPS_PHOTO_POSITION_BASE64) {
+      alert("Wajib mengambil foto titik penempatan GPS di kendaraan!");
+      return;
+    }
+  }
+
+  let waText = `*LAPORAN AKTIVITAS GPS MAINTENANCE*\n------------------------------------\n*Aktivitas:* ${actType}\n*Mitra:* ${dealerName}\n*Kendaraan:* ${nopol} - ${unitDesc}\n`;
+  if (actType === "Ganti GPS") {
+    waText += `• IMEI Dicabut: ${imeiLama} [Foto OK]\n• IMEI Baru: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
+  } else if (actType === "Cabut GPS") {
+    waText += `• IMEI Dicabut: ${imeiLama} [Foto IMEI Dicabut OK]\n`;
+  } else if (actType === "Pasang GPS") {
+    waText += `• IMEI Terpasang: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
+  }
+  waText += `• Catatan Teknis: ${catatanTeknis}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+
+  callApi("submitGpsMaintenance", {
+    act_type: actType,
+    dealer_name: dealerName,
+    nopol: nopol,
+    imei_lama: imeiLama,
+    imei_baru: imeiBaru,
+    foto_imei_lama_base64: GPS_PHOTO_OLD_BASE64,
+    foto_imei_baru_base64: GPS_PHOTO_NEW_IMEI_BASE64,
+    foto_posisi_gps_base64: GPS_PHOTO_POSITION_BASE64,
+    catatan_teknis: catatanTeknis,
+    lat: CURRENT_USER_GEO.lat,
+    long: CURRENT_USER_GEO.long,
+    currentUser: CURRENT_USER
+  });
+
+  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-emerald-600");
 }
 
-// Controller Audit GPS (FAC)
+// =========================================================================
+// FAC GPS AUDIT CONTROLLER
+// =========================================================================
 function renderLegendFilters() {
   const container = document.getElementById("legend-filter-container");
   if (!container) return;
@@ -1253,16 +1584,16 @@ function renderFacGpsList(keyword = "") {
 
         <div class="flex items-center space-x-1 shrink-0">
           ${["1", "2", "3", "4", "5", "6", "7"].map(code => {
-      const isSelected = item.status_codes.includes(code);
-      const activeCls = isSelected ? STATUS_MAP[code].activeBg : `bg-slate-50 border-slate-200 ${STATUS_MAP[code].normalBg}`;
-      return `
+            const isSelected = item.status_codes.includes(code);
+            const activeCls = isSelected ? STATUS_MAP[code].activeBg : `bg-slate-50 border-slate-200 ${STATUS_MAP[code].normalBg}`;
+            return `
               <button type="button" 
                       onclick="onFacCodeToggle('${item.id}', '${code}')" 
                       class="w-6 h-6 rounded-lg text-[10px] font-black border flex items-center justify-center transition shadow-xs ${activeCls}">
                 ${code}
               </button>
             `;
-    }).join('')}
+          }).join('')}
         </div>
       </div>
 
@@ -1306,7 +1637,7 @@ function onFacCatatanInput(unitId, text) {
   if (target) target.catatan = text;
 }
 
-function submitFacGpsReport() {
+async function submitFacGpsReport() {
   const missingNotes = FAC_GPS_MONITORING_DATA.filter(u => u.status_codes.length > 0 && (!u.catatan || !u.catatan.trim()));
   if (missingNotes.length > 0) {
     alert(`Peringatan: Terdapat ${missingNotes.length} unit dengan status anomali yang belum diisi keterangannya!`);
@@ -1332,10 +1663,17 @@ function submitFacGpsReport() {
   waText += `*Baterai GPS Lemah*\n${formatList(FAC_GPS_MONITORING_DATA.filter(u => u.status_codes.includes("4")))}\n`;
   waText += `*Unit Tidak Dishowroom*\n${formatList(FAC_GPS_MONITORING_DATA.filter(u => u.status_codes.includes("5")))}`;
 
+  callApi("submitFacGpsReport", {
+    reportList: FAC_GPS_MONITORING_DATA,
+    userId: CURRENT_USER?.nip || CURRENT_USER?.email
+  });
+
   openSummaryModal("Audit GPS Disimpan!", "Format rekap siap untuk WhatsApp", waText, "bg-cyan-800");
 }
 
-// Modal Summary Helper
+// =========================================================================
+// MODAL SUMMARY HELPER
+// =========================================================================
 function openSummaryModal(title, subtitle, text, bgClass = "bg-teal-700") {
   const header = document.getElementById("modal-summary-header");
   header.className = `p-4 text-white flex justify-between items-center ${bgClass}`;
@@ -1359,249 +1697,14 @@ function copyAndOpenWA() {
   window.open(`https://wa.me/?text=${encodeURIComponent(copyText.value)}`, '_blank');
 }
 
-// Start
-document.addEventListener("DOMContentLoaded", () => {
-  loadScreen("dashboard");
+// =========================================================================
+// APP INITIALIZATION
+// =========================================================================
+document.addEventListener("DOMContentLoaded", async () => {
+  if (CURRENT_USER) {
+    await syncMasterDataFromApi();
+    loadScreen("dashboard");
+  } else {
+    loadScreen("login");
+  }
 });
-
-// Variable State Foto Khusus GPS Maintenance
-let GPS_PHOTO_OLD_BASE64 = null;
-let GPS_PHOTO_NEW_IMEI_BASE64 = null;
-let GPS_PHOTO_POSITION_BASE64 = null;
-
-// Dipanggil otomatis saat loadScreen('gps')
-function initGpsScreen() {
-  populateGpsDealerDropdown();
-  populateIdleImeiOptions();
-  onGpsActivityChange("Ganti GPS");
-}
-
-function populateGpsDealerDropdown() {
-  const sel = document.getElementById("gps-select-dealer");
-  if (!sel) return;
-  sel.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
-  DUMMY_DB.dealers.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.dealer_id;
-    opt.innerText = `${d.dealer_name} (${d.cabang})`;
-    sel.appendChild(opt);
-  });
-}
-
-function onGpsActivityChange(actType) {
-  const boxOld = document.getElementById("box-gps-old-section");
-  const boxNew = document.getElementById("box-gps-new-section");
-  const dealerVal = document.getElementById("gps-select-dealer")?.value;
-
-  if (actType === "Ganti GPS") {
-    if (boxOld) boxOld.classList.remove("hidden");
-    if (boxNew) boxNew.classList.remove("hidden");
-  } else if (actType === "Cabut GPS") {
-    if (boxOld) boxOld.classList.remove("hidden");
-    if (boxNew) boxNew.classList.add("hidden");
-  } else if (actType === "Pasang GPS") {
-    if (boxOld) boxOld.classList.add("hidden");
-    if (boxNew) boxNew.classList.remove("hidden");
-  }
-
-  if (dealerVal) {
-    filterVehiclesByActivity(dealerVal, actType);
-  }
-}
-
-function onGpsDealerSelected(dealerId) {
-  const actType = document.querySelector('input[name="gps_act_type"]:checked')?.value || "Ganti GPS";
-  filterVehiclesByActivity(dealerId, actType);
-}
-
-function filterVehiclesByActivity(dealerId, actType) {
-  const selectKendaraan = document.getElementById("gps-select-kendaraan");
-  const infoText = document.getElementById("gps-kendaraan-info");
-  if (!selectKendaraan) return;
-
-  selectKendaraan.innerHTML = '<option value="">-- Pilih Kendaraan --</option>';
-  const inputImeiLama = document.getElementById("gps-input-imei-lama");
-  if (inputImeiLama) inputImeiLama.value = "-";
-
-  const allVehicles = DUMMY_DB.masterVehiclesGps[dealerId];
-  if (!dealerId || !allVehicles) {
-    if (infoText) infoText.classList.add("hidden");
-    return;
-  }
-
-  let filtered = [];
-  if (actType === "Ganti GPS") {
-    filtered = allVehicles.filter(v => v.contract_status === "LIVE" && v.gps_status === "TERPASANG");
-  } else if (actType === "Cabut GPS") {
-    filtered = allVehicles.filter(v => (v.contract_status === "LIVE" || v.contract_status === "EXPIRED") && v.gps_status === "TERPASANG");
-  } else if (actType === "Pasang GPS") {
-    filtered = allVehicles.filter(v => (v.contract_status === "LIVE" || v.contract_status === "IN_PROCESS") && v.gps_status === "BELUM_PASANG");
-  }
-
-  if (filtered.length === 0) {
-    selectKendaraan.innerHTML = `<option value="">-- Tidak ada unit yang memenuhi kriteria ${actType} --</option>`;
-    if (infoText) {
-      infoText.innerText = `Tidak ditemukan kendaraan mitra dengan kriteria ${actType}.`;
-      infoText.className = "text-[10px] text-red-500 font-semibold mt-1 block";
-    }
-    return;
-  }
-
-  if (infoText) {
-    infoText.innerText = `Menampilkan ${filtered.length} unit kendaraan yang sesuai kriteria ${actType}.`;
-    infoText.className = "text-[10px] text-emerald-600 font-semibold mt-1 block";
-  }
-
-  filtered.forEach(v => {
-    const opt = document.createElement("option");
-    opt.value = v.nopol;
-    opt.setAttribute("data-imei", v.imei);
-    opt.setAttribute("data-unit", v.unit);
-    opt.setAttribute("data-status", v.contract_status);
-    opt.innerText = `${v.nopol} | ${v.unit} (${v.contract_status})`;
-    selectKendaraan.appendChild(opt);
-  });
-}
-
-function onGpsKendaraanSelected(nopol) {
-  const select = document.getElementById("gps-select-kendaraan");
-  if (!select) return;
-  const selectedOption = select.options[select.selectedIndex];
-  const imeiLama = selectedOption?.getAttribute("data-imei") || "-";
-  const inputImeiLama = document.getElementById("gps-input-imei-lama");
-  if (inputImeiLama) inputImeiLama.value = imeiLama;
-}
-
-function populateIdleImeiOptions(keyword = "") {
-  const select = document.getElementById("gps-select-imei-baru");
-  if (!select) return;
-
-  select.innerHTML = '<option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>';
-  const filtered = DUMMY_DB.branchIdleImeiList.filter(item =>
-    item.imei.includes(keyword) || item.tipe.toLowerCase().includes(keyword.toLowerCase())
-  );
-
-  filtered.forEach(item => {
-    const opt = document.createElement("option");
-    opt.value = item.imei;
-    opt.innerText = `${item.imei} - ${item.tipe}`;
-    select.appendChild(opt);
-  });
-}
-
-function filterIdleImei(keyword) {
-  populateIdleImeiOptions(keyword);
-}
-
-function onImeiBaruSelected(val) {
-  if (val) {
-    const searchInput = document.getElementById("gps-search-imei");
-    if (searchInput) searchInput.value = val;
-  }
-}
-
-function handleGpsOldPhotoSelected(input) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      GPS_PHOTO_OLD_BASE64 = e.target.result;
-      document.getElementById("preview-gps-old-photo")?.classList.remove("hidden");
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-
-function removeGpsOldPhoto() {
-  const fileInput = document.getElementById("file-gps-photo-old");
-  if (fileInput) fileInput.value = "";
-  GPS_PHOTO_OLD_BASE64 = null;
-  document.getElementById("preview-gps-old-photo")?.classList.add("hidden");
-}
-
-function handleGpsNewImeiPhotoSelected(input) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      GPS_PHOTO_NEW_IMEI_BASE64 = e.target.result;
-      document.getElementById("preview-gps-new-imei-photo")?.classList.remove("hidden");
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-
-function removeGpsNewImeiPhoto() {
-  const fileInput = document.getElementById("file-gps-photo-new-imei");
-  if (fileInput) fileInput.value = "";
-  GPS_PHOTO_NEW_IMEI_BASE64 = null;
-  document.getElementById("preview-gps-new-imei-photo")?.classList.add("hidden");
-}
-
-function handleGpsPositionPhotoSelected(input) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      GPS_PHOTO_POSITION_BASE64 = e.target.result;
-      document.getElementById("preview-gps-position-photo")?.classList.remove("hidden");
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-
-function removeGpsPositionPhoto() {
-  const fileInput = document.getElementById("file-gps-photo-position");
-  if (fileInput) fileInput.value = "";
-  GPS_PHOTO_POSITION_BASE64 = null;
-  document.getElementById("preview-gps-position-photo")?.classList.add("hidden");
-}
-
-function handleGpsSubmit(e) {
-  e.preventDefault();
-  const actType = document.querySelector('input[name="gps_act_type"]:checked').value;
-  const dealerSelect = document.getElementById("gps-select-dealer");
-  const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text;
-  const kendaraanSelect = document.getElementById("gps-select-kendaraan");
-
-  if (!kendaraanSelect.value) {
-    alert("Pilih kendaraan yang akan dimaintenance terlebih dahulu!");
-    return;
-  }
-  const nopol = kendaraanSelect.value;
-  const unitDesc = kendaraanSelect.options[kendaraanSelect.selectedIndex].getAttribute("data-unit") || "";
-  const imeiLama = document.getElementById("gps-input-imei-lama").value;
-  const imeiBaru = document.getElementById("gps-select-imei-baru").value || document.getElementById("gps-search-imei").value;
-  const catatanTeknis = document.getElementById("gps-catatan-teknis").value.trim() || "-";
-
-  if (actType === "Ganti GPS" || actType === "Cabut GPS") {
-    if (!GPS_PHOTO_OLD_BASE64) {
-      alert("Wajib mengambil foto IMEI GPS lama yang dicabut!");
-      return;
-    }
-  }
-
-  if (actType === "Ganti GPS" || actType === "Pasang GPS") {
-    if (!imeiBaru) {
-      alert("Pilih nomor IMEI GPS baru yang terpasang!");
-      return;
-    }
-    if (!GPS_PHOTO_NEW_IMEI_BASE64) {
-      alert("Wajib mengambil foto fisik stiker IMEI GPS baru!");
-      return;
-    }
-    if (!GPS_PHOTO_POSITION_BASE64) {
-      alert("Wajib mengambil foto titik penempatan GPS di kendaraan!");
-      return;
-    }
-  }
-
-  let waText = `*LAPORAN AKTIVITAS GPS MAINTENANCE*\n------------------------------------\n*Aktivitas:* ${actType}\n*Mitra:* ${dealerName}\n*Kendaraan:* ${nopol} - ${unitDesc}\n`;
-  if (actType === "Ganti GPS") {
-    waText += `• IMEI Dicabut: ${imeiLama} [Foto OK]\n• IMEI Baru: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
-  } else if (actType === "Cabut GPS") {
-    waText += `• IMEI Dicabut: ${imeiLama} [Foto IMEI Dicabut OK]\n`;
-  } else if (actType === "Pasang GPS") {
-    waText += `• IMEI Terpasang: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
-  }
-  waText += `• Catatan Teknis: ${catatanTeknis}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
-
-  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-emerald-600");
-}
