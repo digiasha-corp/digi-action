@@ -115,6 +115,24 @@ async function syncMasterDataFromApi() {
         }));
       });
       APP_STATE.masterVehiclesGps = vehiclesByDealer;
+      // Pasangkan active assignments dari Google Spreadsheet ke Dealer & Unit Concern
+      if (APP_STATE.assignments && APP_STATE.assignments.length > 0) {
+        APP_STATE.assignments.forEach(a => {
+          const d = APP_STATE.dealers.find(dlr => String(dlr.dealer_name).trim().toLowerCase() === String(a.dealer_name).trim().toLowerCase());
+          if (d) {
+            const unitFas = String(a.unit_fasilitas || "Umum").trim();
+            if (unitFas === "Umum" || unitFas.toLowerCase().includes("seluruh")) {
+              d.dealer_concern = { urgency: a.urgency_level || "Penting", note: a.instruksi || "-" };
+            } else {
+              const u = d.units?.find(unit => String(unit.nopol).trim().toLowerCase() === unitFas.toLowerCase() || unitFas.toLowerCase().includes(String(unit.nopol).trim().toLowerCase()));
+              if (u) {
+                u.unit_concern = { urgency: a.urgency_level || "Penting", note: a.instruksi || "-" };
+              }
+            }
+          }
+        });
+      }
+
       MASTER_DEALER_PRIORITY_DATA = JSON.parse(JSON.stringify(APP_STATE.dealers));
 
       // Buat list FAC GPS Monitoring
@@ -419,66 +437,207 @@ function handleAbsenSubmit(e) {
 }
 
 // =========================================================================
-// PRIORITY VISIT SCORING ENGINE
+// PRIORITY VISIT SCORING ENGINE (BY UNIT & BY DEALER)
 // =========================================================================
-function calculateUnitUrgency(u) {
-  if (u.unit_concern && u.unit_concern.urgency === "Sangat Penting") return { level: "Sangat Penting", score: 3, reason: "Concern 'Sangat Penting'" };
-  if (["Pelepasan", "Offline", "Baterai Lemah"].includes(u.gps_status)) return { level: "Sangat Penting", score: 3, reason: `GPS ${u.gps_status}` };
-  if (u.aging_visit_unit > 21 && u.lifetime_days > 90) return { level: "Sangat Penting", score: 3, reason: "Aging Visit >21 hr & Lifetime >90" };
-  if (u.aging_visit_unit > 14 && u.is_h3_jto) return { level: "Sangat Penting", score: 3, reason: "Aging Visit >14 hr & H-3 JTO" };
 
-  if (u.unit_concern && u.unit_concern.urgency === "Penting") return { level: "Penting", score: 2, reason: "Concern 'Penting'" };
-  if (["Belum Lepas", "Belum Pasang", "Geser"].includes(u.gps_status)) return { level: "Penting", score: 2, reason: `GPS ${u.gps_status}` };
-  if (u.aging_visit_unit > 3 && u.overdue_days > 3) return { level: "Penting", score: 2, reason: "Aging Visit >3 hr & OVD >3" };
-  if (u.aging_visit_unit > 5 && u.is_h3_jto) return { level: "Penting", score: 2, reason: "Aging Visit >5 hr & H-3 JTO" };
-  if (u.aging_visit_unit > 21 && u.lifetime_days <= 90) return { level: "Penting", score: 2, reason: "Aging Visit >21 hr & Lifetime ≤90" };
-
-  if (u.aging_visit_unit > 14) return { level: "Moderat", score: 1, reason: "Aging Visit Unit >14 hr" };
-  if (u.unit_concern && u.unit_concern.urgency === "Moderat") return { level: "Moderat", score: 1, reason: "Concern 'Moderat'" };
-
-  return { level: "Normal", score: 0, reason: "Normal" };
+// Helper pengecekan kondisi mendekati jatuh tempo (H-3 JTO)
+function isUnitNearJTO(u) {
+  if (u.is_h3_jto === true) return true;
+  if (!u.jto_date) return false;
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let jtoDate = null;
+    if (typeof u.jto_date === "string") {
+      if (u.jto_date.includes("-")) {
+        jtoDate = new Date(u.jto_date);
+      } else if (u.jto_date.includes("/")) {
+        const parts = u.jto_date.split("/");
+        jtoDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+    } else if (u.jto_date instanceof Date) {
+      jtoDate = u.jto_date;
+    }
+    if (jtoDate && !isNaN(jtoDate.getTime())) {
+      jtoDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((jtoDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return (diffDays >= 0 && diffDays <= 3);
+    }
+  } catch (e) {}
+  return false;
 }
 
+/**
+ * 1. ATURAN SKORING LEVEL KENDARAAN (PRIORITY BY UNIT)
+ * Mengembalikan objek: { level: 'Sangat Penting' | 'Penting' | 'Moderat' | 'Normal', score: number, reason: string }
+ */
+function calculateUnitUrgency(u) {
+  const agingVisit = Number(u.aging_visit_unit || u.aging_visit_days || 0);
+  const lifetime = Number(u.lifetime_days || 0);
+  const overdue = Number(u.overdue_days || 0);
+  const agingGpsMaint = Number(u.aging_gps_maint || 0);
+  const gpsStatus = String(u.gps_status || "Normal").trim();
+  const nearJto = isUnitNearJTO(u);
+
+  // Normalisasi Concern Unit
+  let concernUrgency = "";
+  let concernNote = "";
+  if (u.unit_concern) {
+    if (typeof u.unit_concern === "string") {
+      concernUrgency = u.unit_concern;
+    } else if (typeof u.unit_concern === "object") {
+      concernUrgency = u.unit_concern.urgency || "";
+      concernNote = u.unit_concern.note || u.unit_concern.instruksi || "";
+    }
+  }
+
+  // -------------------------------------------------------------
+  // LEVEL 1: SANGAT PENTING (Score: 3)
+  // -------------------------------------------------------------
+  if (concernUrgency === "Sangat Penting") {
+    return { level: "Sangat Penting", score: 3, reason: `Assign Concern '${concernNote || "Sangat Penting"}'` };
+  }
+  if (["Pelepasan", "Offline", "Baterai Lemah"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
+    return { level: "Sangat Penting", score: 3, reason: `Status GPS: ${gpsStatus}` };
+  }
+  if (agingVisit > 21 && lifetime > 90) {
+    return { level: "Sangat Penting", score: 3, reason: `Aging Visit > 21 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)` };
+  }
+  if (agingVisit > 14 && nearJto) {
+    return { level: "Sangat Penting", score: 3, reason: `Aging Visit > 14 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
+  }
+
+  // -------------------------------------------------------------
+  // LEVEL 2: PENTING (Score: 2)
+  // -------------------------------------------------------------
+  if (concernUrgency === "Penting") {
+    return { level: "Penting", score: 2, reason: `Assign Concern '${concernNote || "Penting"}'` };
+  }
+  if (["Belum Lepas", "Belum Pasang", "Geser"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
+    return { level: "Penting", score: 2, reason: `Status GPS: ${gpsStatus}` };
+  }
+  if (agingVisit > 3 && overdue > 3) {
+    return { level: "Penting", score: 2, reason: `Aging Visit > 3 hr (${agingVisit} hr) & Overdue > 3 hr (${overdue} hr)` };
+  }
+  if (agingVisit > 5 && nearJto) {
+    return { level: "Penting", score: 2, reason: `Aging Visit > 5 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
+  }
+  if (agingVisit > 21 && lifetime <= 90) {
+    return { level: "Penting", score: 2, reason: `Aging Visit > 21 hr (${agingVisit} hr) & Lifetime ≤ 90 hr (${lifetime} hr)` };
+  }
+
+  // -------------------------------------------------------------
+  // LEVEL 3: MODERAT (Score: 1)
+  // -------------------------------------------------------------
+  if (agingVisit > 14) {
+    return { level: "Moderat", score: 1, reason: `Aging Visit Unit > 14 hr (${agingVisit} hr)` };
+  }
+  if (concernUrgency === "Moderat") {
+    return { level: "Moderat", score: 1, reason: `Assign Concern '${concernNote || "Moderat"}'` };
+  }
+  if (agingGpsMaint > 30) {
+    return { level: "Moderat", score: 1, reason: `Aging Maintenance GPS > 30 hr (${agingGpsMaint} hr)` };
+  }
+
+  // -------------------------------------------------------------
+  // LEVEL 4: NORMAL (Score: 0)
+  // -------------------------------------------------------------
+  return { level: "Normal", score: 0, reason: "Kondisi Normal / Terjadwal Baik" };
+}
+
+/**
+ * 2. ATURAN SKORING LEVEL MITRA / SHOWROOM (PRIORITY BY DEALER)
+ * Mengembalikan objek: { level, score, mitraLevel, mitraScore, mitraReason, urgentUnitsCount }
+ */
 function calculateMitraUrgency(dealer) {
-  let highestScore = 0;
-  let finalLevel = "Normal";
+  const agingMitra = Number(dealer.aging_visit_mitra || dealer.aging_visit_days || 0);
+
+  // Normalisasi Concern Dealer (Non-Fasilitas/Umum)
+  let concernUrgency = "";
+  let concernNote = "";
+  if (dealer.dealer_concern) {
+    if (typeof dealer.dealer_concern === "string") {
+      concernUrgency = dealer.dealer_concern;
+    } else if (typeof dealer.dealer_concern === "object") {
+      concernUrgency = dealer.dealer_concern.urgency || "";
+      concernNote = dealer.dealer_concern.note || dealer.dealer_concern.instruksi || "";
+    }
+  }
+
+  // A. Evaluasi Internal Dealer (Mitra Score)
   let mitraScore = 0;
   let mitraLevel = "Normal";
+  let mitraReason = "Normal";
 
-  if (dealer.dealer_concern && dealer.dealer_concern.urgency === "Sangat Penting") { mitraScore = 3; mitraLevel = "Sangat Penting"; }
-  else if (dealer.aging_visit_mitra > 60) { mitraScore = 3; mitraLevel = "Sangat Penting"; }
-  else if (dealer.dealer_concern && dealer.dealer_concern.urgency === "Penting") { mitraScore = 2; mitraLevel = "Penting"; }
-  else if (dealer.aging_visit_mitra > 30) { mitraScore = 2; mitraLevel = "Penting"; }
-  else if (dealer.dealer_concern && dealer.dealer_concern.urgency === "Moderat") { mitraScore = 1; mitraLevel = "Moderat"; }
-  else if (dealer.aging_visit_mitra > 20) { mitraScore = 1; mitraLevel = "Moderat"; }
+  if (concernUrgency === "Sangat Penting") {
+    mitraScore = 3;
+    mitraLevel = "Sangat Penting";
+    mitraReason = `Concern Mitra: '${concernNote || "Sangat Penting"}'`;
+  } else if (agingMitra > 60) {
+    mitraScore = 3;
+    mitraLevel = "Sangat Penting";
+    mitraReason = `Aging Visit Mitra > 60 hr (${agingMitra} hr)`;
+  } else if (concernUrgency === "Penting") {
+    mitraScore = 2;
+    mitraLevel = "Penting";
+    mitraReason = `Concern Mitra: '${concernNote || "Penting"}'`;
+  } else if (agingMitra > 30) {
+    mitraScore = 2;
+    mitraLevel = "Penting";
+    mitraReason = `Aging Visit Mitra > 30 hr (${agingMitra} hr)`;
+  } else if (concernUrgency === "Moderat") {
+    mitraScore = 1;
+    mitraLevel = "Moderat";
+    mitraReason = `Concern Mitra: '${concernNote || "Moderat"}'`;
+  } else if (agingMitra > 20) {
+    mitraScore = 1;
+    mitraLevel = "Moderat";
+    mitraReason = `Aging Visit Mitra > 20 hr (${agingMitra} hr)`;
+  }
 
-  highestScore = mitraScore;
-  finalLevel = mitraLevel;
-
+  // B. Agregasi Unit Kendaraan (Highest Severity)
+  let highestUnitScore = 0;
   let urgentUnitsCount = 0;
+
   if (dealer.units && dealer.units.length > 0) {
     dealer.units.forEach(u => {
-      const uRes = calculateUnitUrgency(u);
-      if (uRes.score > 0) urgentUnitsCount++;
-      if (uRes.score > highestScore) {
-        highestScore = uRes.score;
-        finalLevel = uRes.level;
+      const uEval = calculateUnitUrgency(u);
+      if (uEval.score > 0) {
+        urgentUnitsCount++;
+      }
+      if (uEval.score > highestUnitScore) {
+        highestUnitScore = uEval.score;
       }
     });
   }
 
-  return { level: finalLevel, score: highestScore, mitraLevel, mitraScore, urgentUnitsCount };
+  // Level Akhir Mitra: Nilai Maksimal antara mitraScore dan highestUnitScore
+  const finalScore = Math.max(mitraScore, highestUnitScore);
+  const scoreToLevel = { 3: "Sangat Penting", 2: "Penting", 1: "Moderat", 0: "Normal" };
+  const finalLevel = scoreToLevel[finalScore] || "Normal";
+
+  return {
+    level: finalLevel,
+    score: finalScore,
+    mitraLevel: mitraLevel,
+    mitraScore: mitraScore,
+    mitraReason: mitraReason,
+    urgentUnitsCount: urgentUnitsCount
+  };
 }
 
+// -------------------------------------------------------------------------
+// FILTER & UI RENDERER
+// -------------------------------------------------------------------------
 function setPriorityFilter(lvl) {
   PRIORITY_ACTIVE_FILTER = lvl;
   document.querySelectorAll('#p-filter-all, #p-filter-sp, #p-filter-p, #p-filter-m').forEach(b => {
-    b.className = "flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold";
+    b.className = "flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold transition";
   });
 
   const btnMap = { 'ALL': 'p-filter-all', 'Sangat Penting': 'p-filter-sp', 'Penting': 'p-filter-p', 'Moderat': 'p-filter-m' };
   const activeBtn = document.getElementById(btnMap[lvl]);
-  if (activeBtn) activeBtn.className = "flex-1 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs";
+  if (activeBtn) activeBtn.className = "flex-1 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs transition";
 
   renderPriorityList();
 }
@@ -488,15 +647,31 @@ function renderPriorityList() {
   if (!container) return;
   container.innerHTML = "";
 
-  let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => ({ ...d, ...calculateMitraUrgency(d) }));
-  computedList.sort((a, b) => b.score - a.score);
+  // Kalkulasi evaluasi urgensi untuk semua dealer
+  let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => ({
+    ...d,
+    ...calculateMitraUrgency(d)
+  }));
 
+  // Sorting: Prioritas tertinggi (Score DESC) -> Aging Visit tertinggi (Aging DESC)
+  computedList.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return (Number(b.aging_visit_mitra || 0)) - (Number(a.aging_visit_mitra || 0));
+  });
+
+  // Filter Tab
   if (PRIORITY_ACTIVE_FILTER !== "ALL") {
     computedList = computedList.filter(d => d.level === PRIORITY_ACTIVE_FILTER);
   }
 
   if (computedList.length === 0) {
-    container.innerHTML = `<div class="p-6 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">Tidak ada mitra dalam kategori ini.</div>`;
+    container.innerHTML = `
+      <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-1">
+        <i class="fa-solid fa-clipboard-check text-2xl text-slate-300 block"></i>
+        <p class="font-semibold text-slate-600">Tidak ada mitra dalam kategori "${PRIORITY_ACTIVE_FILTER}"</p>
+        <p class="text-[10px]">Semua showroom terkelola dengan baik sesuai jadwal.</p>
+      </div>
+    `;
     return;
   }
 
@@ -509,7 +684,7 @@ function renderPriorityList() {
 
   computedList.forEach(d => {
     const card = document.createElement("div");
-    card.className = "bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2";
+    card.className = "bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2 hover:border-slate-300 transition";
 
     const hasMitraUrgency = d.mitraScore > 0 || !!d.dealer_concern;
     const houseBtnClass = hasMitraUrgency ? `${urgencyPillStyles[d.mitraLevel]} shadow-xs` : 'bg-slate-100 text-slate-400 border border-slate-200';
@@ -522,7 +697,7 @@ function renderPriorityList() {
           <h4 class="font-bold text-xs text-slate-900 truncate">${d.dealer_name}</h4>
           <span class="text-[8px] font-black px-1.5 py-0.2 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
         </div>
-        <p class="text-[10px] text-slate-400 truncate mt-0.5">Cabang: ${d.cabang} • Aging: <strong>${d.aging_visit_mitra} hr</strong> • ${d.units ? d.units.length : 0} Unit</p>
+        <p class="text-[10px] text-slate-400 truncate mt-0.5">Cabang: ${d.cabang || "-"} • Aging Visit: <strong>${d.aging_visit_mitra || 0} hr</strong> • ${d.units ? d.units.length : 0} Unit Terdaftar</p>
       </div>
 
       <div class="flex items-center space-x-1.5 shrink-0">
@@ -531,7 +706,7 @@ function renderPriorityList() {
         </button>
         <button type="button" onclick="openFacilityDetailModal('${d.dealer_id}')" title="Pemicu Urgensi Fasilitas" class="w-8 h-8 rounded-xl flex items-center justify-center text-xs transition active:scale-95 relative ${carBtnClass}">
           <i class="fa-solid fa-car"></i>
-          ${d.urgentUnitsCount > 0 ? `<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center border border-white">${d.urgentUnitsCount}</span>` : ''}
+          ${d.urgentUnitsCount > 0 ? `<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center border border-white shadow-xs">${d.urgentUnitsCount}</span>` : ''}
         </button>
       </div>
     `;
@@ -545,16 +720,18 @@ function openMitraDetailModal(dealerId) {
 
   const evalRes = calculateMitraUrgency(d);
   document.getElementById("dtl-mitra-name").innerText = d.dealer_name;
-  document.getElementById("dtl-mitra-aging").innerText = `${d.aging_visit_mitra} Hari Terakhir Visit`;
+  document.getElementById("dtl-mitra-aging").innerText = `${d.aging_visit_mitra || 0} Hari Sejak Kunjungan Terakhir`;
 
   const badge = document.getElementById("dtl-mitra-urgency-badge");
   badge.innerText = evalRes.mitraLevel.toUpperCase();
-  badge.className = evalRes.mitraLevel === "Sangat Penting" ? "font-bold px-2 py-0.5 rounded text-[10px] bg-red-600 text-white" : evalRes.mitraLevel === "Penting" ? "font-bold px-2 py-0.5 rounded text-[10px] bg-orange-600 text-white" : "font-bold px-2 py-0.5 rounded text-[10px] bg-amber-500 text-white";
+  badge.className = evalRes.mitraLevel === "Sangat Penting" ? "font-bold px-2 py-0.5 rounded text-[10px] bg-red-600 text-white" : evalRes.mitraLevel === "Penting" ? "font-bold px-2 py-0.5 rounded text-[10px] bg-orange-600 text-white" : evalRes.mitraLevel === "Moderat" ? "font-bold px-2 py-0.5 rounded text-[10px] bg-amber-500 text-white" : "font-bold px-2 py-0.5 rounded text-[10px] bg-slate-200 text-slate-700";
 
   const boxConcern = document.getElementById("box-dtl-mitra-concern");
   if (d.dealer_concern) {
     boxConcern.classList.remove("hidden");
-    document.getElementById("dtl-mitra-concern-text").innerText = `"${d.dealer_concern.note}" (Urgensi: ${d.dealer_concern.urgency})`;
+    const note = typeof d.dealer_concern === "object" ? d.dealer_concern.note : d.dealer_concern;
+    const urg = typeof d.dealer_concern === "object" ? d.dealer_concern.urgency : "Penting";
+    document.getElementById("dtl-mitra-concern-text").innerText = `"${note}" (Urgensi: ${urg})`;
   } else {
     boxConcern.classList.add("hidden");
   }
@@ -568,7 +745,7 @@ function openFacilityDetailModal(dealerId) {
   if (!d) return;
 
   document.getElementById("modal-facility-title").innerText = `Fasilitas: ${d.dealer_name}`;
-  document.getElementById("modal-facility-sub").innerText = `Total ${d.units ? d.units.length : 0} Unit Terdaftar`;
+  document.getElementById("modal-facility-sub").innerText = `Total ${d.units ? d.units.length : 0} Unit Terdaftar (${d.cabang || "-"})`;
 
   const listContainer = document.getElementById("modal-facility-list");
   listContainer.innerHTML = "";
@@ -580,7 +757,9 @@ function openFacilityDetailModal(dealerId) {
     "Normal": "bg-slate-100 text-slate-600 border-slate-200"
   };
 
-  if (d.units) {
+  if (!d.units || d.units.length === 0) {
+    listContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Tidak ada unit kendaraan fasilitas terdaftar pada mitra ini.</div>`;
+  } else {
     d.units.forEach(u => {
       const uEval = calculateUnitUrgency(u);
       const itemCard = document.createElement("div");
@@ -596,14 +775,14 @@ function openFacilityDetailModal(dealerId) {
         </div>
 
         <div class="grid grid-cols-2 gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-          <div>GPS: <strong class="text-slate-700">${u.gps_status}</strong></div>
-          <div>Aging Visit: <strong class="text-slate-700">${u.aging_visit_unit} hr</strong></div>
-          <div>Lifetime: <strong class="text-slate-700">${u.lifetime_days} hr</strong></div>
-          <div>Status: <strong class="text-slate-700">${u.is_h3_jto ? 'H-3 JTO' : u.overdue_days > 0 ? 'OVD ' + u.overdue_days + ' hr' : 'Lancar'}</strong></div>
+          <div>GPS: <strong class="text-slate-700">${u.gps_status || "Normal"}</strong></div>
+          <div>Aging Visit: <strong class="text-slate-700">${u.aging_visit_unit || 0} hr</strong></div>
+          <div>Lifetime: <strong class="text-slate-700">${u.lifetime_days || 0} hr</strong></div>
+          <div>Status OVD: <strong class="text-slate-700">${isUnitNearJTO(u) ? 'H-3 JTO' : (Number(u.overdue_days || 0) > 0 ? 'OVD ' + u.overdue_days + ' hr' : 'Lancar')}</strong></div>
         </div>
 
         <div class="text-[10px] text-amber-900 bg-amber-50 p-1.5 rounded-lg border border-amber-200 font-medium">
-          Pemicu: <strong>${uEval.reason}</strong>${u.unit_concern ? `<br><span class="text-purple-800">Concern: "${u.unit_concern.note}"</span>` : ''}
+          Pemicu: <strong>${uEval.reason}</strong>${u.unit_concern ? `<br><span class="text-purple-800">Concern: "${typeof u.unit_concern === 'object' ? u.unit_concern.note : u.unit_concern}"</span>` : ''}
         </div>
       `;
       listContainer.appendChild(itemCard);
