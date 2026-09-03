@@ -1,0 +1,55 @@
+<div class="space-y-3.5">
+  <div class="bg-purple-50 border border-purple-200 p-3 rounded-xl flex items-start space-x-2 text-xs text-purple-900">
+    <i class="fa-solid fa-bullhorn text-purple-600 mt-0.5 text-sm"></i>
+    <div>
+      <span class="font-bold block">Assign Concern Visit</span>
+      <span class="text-[10px] text-purple-700">Tandai concern kunjungan mitra atau unit tertentu.</span>
+    </div>
+  </div>
+
+  <form onsubmit="handleAssignConcernSubmit(event)" class="space-y-3.5">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Mitra Dealer <span class="text-red-500">*</span></label>
+        <select id="assign-select-dealer" onchange="onAssignDealerSelected(this.value)" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-purple-700">
+          <option value="">-- Pilih Partner Dealer --</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Fasilitas Terkait (Opsional)</label>
+        <select id="assign-select-unit" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-purple-700">
+          <option value="Umum">-- Umum (Seluruh Showroom / Non-Fasilitas) --</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Concern Kunjungan (Free Text) <span class="text-red-500">*</span></label>
+        <textarea id="assign-input-concern" required rows="3" placeholder="Tuliskan catatan concern atau instruksi visit..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-purple-700"></textarea>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Level Urgensi <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-3 gap-1.5">
+          <label class="border border-amber-300 bg-amber-50/50 rounded-xl p-2.5 text-center text-xs font-bold text-amber-900 block cursor-pointer has-[:checked]:bg-amber-500 has-[:checked]:text-white transition shadow-xs">
+            <input type="radio" name="assign_urgency" value="Moderat" checked class="hidden" />
+            <div class="text-[11px]">Moderat</div>
+          </label>
+          <label class="border border-orange-300 bg-orange-50/50 rounded-xl p-2.5 text-center text-xs font-bold text-orange-900 block cursor-pointer has-[:checked]:bg-orange-600 has-[:checked]:text-white transition shadow-xs">
+            <input type="radio" name="assign_urgency" value="Penting" class="hidden" />
+            <div class="text-[11px]">Penting</div>
+          </label>
+          <label class="border border-red-300 bg-red-50/50 rounded-xl p-2.5 text-center text-xs font-bold text-red-900 block cursor-pointer has-[:checked]:bg-red-600 has-[:checked]:text-white transition shadow-xs">
+            <input type="radio" name="assign_urgency" value="Sangat Penting" class="hidden" />
+            <div class="text-[11px]">Sangat Penting</div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="w-full py-3.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-2xl text-sm shadow-md flex items-center justify-center space-x-2 transition">
+      <i class="fa-solid fa-bookmark"></i>
+      <span>Simpan Concern Visit</span>
+    </button>
+  </form>
+</div>

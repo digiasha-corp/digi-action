@@ -1,0 +1,137 @@
+<div class="space-y-3.5">
+  <form id="form-visit" onsubmit="handleFormSubmit(event)" class="space-y-3.5">
+    <!-- Segmen 1 -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+        <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+        <h3 class="text-xs font-bold text-slate-800 uppercase">Identitas Kunjungan & Pertemuan Owner</h3>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Partner Dealer <span class="text-red-500">*</span></label>
+        <select id="input-dealer" onchange="onDealerSelected(this.value)" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold">
+          <option value="">-- Pilih Partner Dealer --</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Lokasi Kunjungan <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="border border-slate-300 rounded-xl p-2 text-center text-xs font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+            <input type="radio" name="lokasi_visit" value="Showroom" checked onchange="onLokasiVisitChanged(this.value)" class="hidden" /> Showroom
+          </label>
+          <label class="border border-slate-300 rounded-xl p-2 text-center text-xs font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+            <input type="radio" name="lokasi_visit" value="Tempat Lainnya" onchange="onLokasiVisitChanged(this.value)" class="hidden" /> Tempat Lainnya
+          </label>
+        </div>
+      </div>
+      <div id="box-lokasi-lain" class="hidden">
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Keterangan Lokasi Lain <span class="text-red-500">*</span></label>
+        <input type="text" id="input-lokasi-lain" placeholder="Contoh: Rumah Owner / Restoran" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs" />
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Bertemu dengan Owner? <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="border border-slate-300 rounded-xl p-2 text-center text-xs font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+            <input type="radio" name="bertemu_owner" value="Ya" checked onchange="toggleOwnerReason(false)" class="hidden" /> Ya, Bertemu
+          </label>
+          <label class="border border-slate-300 rounded-xl p-2 text-center text-xs font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+            <input type="radio" name="bertemu_owner" value="Tidak" onchange="toggleOwnerReason(true)" class="hidden" /> Tidak Bertemu
+          </label>
+        </div>
+      </div>
+      <div id="box-owner-reason" class="hidden">
+        <label class="block text-[11px] font-semibold text-amber-900 mb-1">Owner Kemana: <span class="text-red-500">*</span></label>
+        <input type="text" id="input-owner-reason" placeholder="Contoh: Sedang ke luar kota" class="w-full bg-amber-50/50 border border-amber-300 rounded-xl p-2.5 text-xs" />
+      </div>
+    </div>
+
+    <!-- Segmen 2 -->
+    <div id="segment-2-container" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+        <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">2</span>
+        <h3 class="text-xs font-bold text-slate-800 uppercase">Kondisi Showroom & Wawancara</h3>
+      </div>
+      <div class="grid grid-cols-2 gap-2.5">
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Jumlah Stock Unit <span class="text-red-500">*</span></label>
+          <input type="number" id="input-stock-unit" min="0" placeholder="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Penjualan Bulan Ini <span class="text-red-500">*</span></label>
+          <input type="number" id="input-sales-unit" min="0" placeholder="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Digiasha</label>
+        <textarea id="input-issue-digiasha" rows="2" placeholder="Masukan layanan, admin, GPS, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Internal Dealer</label>
+        <textarea id="input-issue-internal" rows="2" placeholder="Kendala cashflow, sengketa, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Kompetitor</label>
+        <textarea id="input-issue-kompetitor" rows="2" placeholder="Program leasing / fintech lain" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
+      </div>
+    </div>
+
+    <!-- Segmen 3 -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <div class="flex items-center space-x-2">
+          <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">3</span>
+          <h3 class="text-xs font-bold text-slate-800 uppercase">Fasilitas Aktif Berjalan</h3>
+        </div>
+        <span id="unit-count-badge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">0 Unit</span>
+      </div>
+      <div id="box-empty-facility" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs text-slate-500">
+        Pilih partner dealer di Segmen 1 untuk memuat data fasilitas aktif.
+      </div>
+      <div id="container-unit-list" class="hidden space-y-2"></div>
+    </div>
+
+    <!-- Segmen 4 -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+        <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">4</span>
+        <h3 class="text-xs font-bold text-slate-800 uppercase">Bukti Lapangan</h3>
+      </div>
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <span class="text-xs font-bold text-slate-800">Geotag Presisi</span>
+          <span id="geo-location-display" class="text-[10px] text-slate-500 block truncate mt-0.5">-6.29520, 106.63857</span>
+        </div>
+        <button type="button" onclick="getPreciseLocation()" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold shrink-0">
+          <i class="fa-solid fa-location-crosshairs mr-1"></i> Refresh
+        </button>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Foto Fisik Kunjungan <span class="text-red-500">* (Kamera)</span></label>
+        <div onclick="triggerCameraInput('file-visit-photo')" class="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
+          <i class="fa-solid fa-camera text-2xl text-slate-400 mb-1"></i>
+          <p class="text-xs text-slate-700 font-semibold">Buka Kamera & Ambil Foto</p>
+          <input type="file" id="file-visit-photo" accept="image/*" capture="environment" class="hidden" onchange="handleShowroomPhotoSelected(this)" />
+        </div>
+        <div id="preview-photo-card" class="hidden mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+          <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto Siap</span>
+          <button type="button" onclick="removePhoto()" class="text-red-500 font-bold text-[11px]">Hapus</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Segmen 5 -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+        <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">5</span>
+        <h3 class="text-xs font-bold text-slate-800 uppercase">Catatan Tambahan Visit</h3>
+      </div>
+      <div>
+        <textarea id="input-catatan-visit" rows="3" placeholder="Tuliskan poin penting lainnya..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs"></textarea>
+      </div>
+    </div>
+
+    <button type="submit" id="btn-submit-visit-btn" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm shadow-md flex items-center justify-center space-x-2 transition">
+      <i class="fa-solid fa-paper-plane"></i>
+      <span>Kirim Laporan Visit</span>
+    </button>
+  </form>
+</div>

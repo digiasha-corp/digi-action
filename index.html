@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digiasha Monitoring</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    html, body { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; overflow-x: hidden !important; box-sizing: border-box; }
+    *, ::before, ::after { box-sizing: border-box; }
+    .tap-highlight-transparent { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen font-sans flex flex-col tap-highlight-transparent">
+
+  <!-- TOP BAR -->
+  <header id="topbar" class="bg-slate-900 text-white px-3 py-3 sticky top-0 z-40 shadow w-full">
+    <div class="max-w-2xl mx-auto flex justify-between items-center w-full">
+      <div class="flex items-center space-x-2 min-w-0">
+        <button id="btn-back-home" onclick="loadScreen('dashboard')" class="hidden text-slate-300 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-chevron-left text-base"></i>
+        </button>
+        <div class="truncate">
+          <h2 id="topbar-title" class="font-bold text-xs sm:text-sm leading-tight truncate">Digiasha Monitoring</h2>
+          <p id="topbar-sub" class="text-[10px] sm:text-xs text-emerald-400 truncate">-</p>
+        </div>
+      </div>
+      <button onclick="loadScreen('login')" class="text-slate-300 hover:text-red-400 text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 flex items-center space-x-1 shrink-0 ml-2">
+        <i class="fa-solid fa-power-off"></i>
+        <span class="hidden sm:inline">Keluar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTAINER DINAMIS TEMPAT LAYAR DIMUAT -->
+  <main id="main-view-container" class="w-full flex-1 px-3 py-4 max-w-2xl mx-auto"></main>
+
+  <!-- ================= MODALS GLOBAL ================= -->
+
+  <!-- MODAL ABSENSI -->
+  <div id="modal-absen-choice" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4">
+      <div class="text-center">
+        <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center text-xl mx-auto mb-2">
+          <i class="fa-solid fa-fingerprint"></i>
+        </div>
+        <h4 class="font-bold text-sm text-slate-900">Pilih Jenis Absensi</h4>
+        <p class="text-[11px] text-slate-400 mt-0.5">Tentukan kehadiran Anda saat ini</p>
+      </div>
+      <div class="grid grid-cols-1 gap-2.5">
+        <button type="button" onclick="selectAbsenType('Masuk Kantor')" class="p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+            <i class="fa-solid fa-building text-emerald-400"></i>
+          </div>
+          <div class="min-w-0">
+            <span class="font-bold text-xs block">Masuk Kantor</span>
+            <span class="text-[10px] text-slate-300">Wajib radius 100m dari kantor terdaftar</span>
+          </div>
+        </button>
+        <button type="button" onclick="selectAbsenType('Mulai Aktivitas')" class="p-3.5 bg-teal-700 hover:bg-teal-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+            <i class="fa-solid fa-route text-teal-200"></i>
+          </div>
+          <div class="min-w-0">
+            <span class="font-bold text-xs block">Mulai Aktivitas</span>
+            <span class="text-[10px] text-teal-100">Kunci geotag langsung dari lokasi</span>
+          </div>
+        </button>
+      </div>
+      <button type="button" onclick="closeAbsenChoiceModal()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs">Batal</button>
+    </div>
+  </div>
+
+  <!-- MODAL MITRA DETAIL -->
+  <div id="modal-mitra-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-3.5 bg-slate-900 text-white flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-house text-emerald-400"></i>
+          <h4 class="font-bold text-xs">Detail Pemicu Mitra</h4>
+        </div>
+        <button onclick="closeMitraModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+      <div class="p-4 space-y-2.5 text-xs">
+        <div>
+          <span class="text-[10px] text-slate-400 block">Mitra Dealer:</span>
+          <span id="dtl-mitra-name" class="font-bold text-slate-800 text-xs">-</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block">Status Urgensi Mitra:</span>
+          <span id="dtl-mitra-urgency-badge" class="font-bold px-2 py-0.5 rounded text-[10px] inline-block mt-0.5">-</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block">Aging Kunjungan Mitra:</span>
+          <span id="dtl-mitra-aging" class="font-semibold text-slate-700">- Hari</span>
+        </div>
+        <div id="box-dtl-mitra-concern" class="hidden">
+          <span class="text-[10px] text-slate-400 block">Catatan Assign Concern:</span>
+          <div id="dtl-mitra-concern-text" class="p-2 bg-purple-50 border border-purple-200 rounded-xl text-[11px] text-purple-900 mt-1 font-medium">-</div>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button onclick="closeMitraModal()" class="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl text-xs">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FASILITAS DETAIL -->
+  <div id="modal-facility-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-car text-amber-400"></i>
+          <div>
+            <h4 class="font-bold text-xs" id="modal-facility-title">Pemicu Fasilitas / Unit</h4>
+            <p class="text-[10px] text-slate-300" id="modal-facility-sub">-</p>
+          </div>
+        </div>
+        <button onclick="closeFacilityModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+      <div class="p-4 overflow-y-auto space-y-2 text-xs flex-1" id="modal-facility-list"></div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
+        <button onclick="closeFacilityModal()" class="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl text-xs">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARAMETER URGENSI -->
+  <div id="modal-param-info" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-3.5 bg-amber-600 text-white flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-scale-balanced text-lg"></i>
+          <h4 class="font-bold text-xs">Parameter & Kriteria Urgensi Visit</h4>
+        </div>
+        <button onclick="closeParamModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+      <div class="p-4 overflow-y-auto space-y-3.5 text-xs flex-1">
+        <div class="space-y-1.5">
+          <h5 class="font-bold text-slate-900 uppercase text-[11px] flex items-center space-x-1">
+            <i class="fa-solid fa-car text-amber-600"></i>
+            <span>1. Kriteria Fasilitas / Unit</span>
+          </h5>
+          <div class="space-y-1 text-[11px] text-slate-600">
+            <p class="p-1.5 bg-red-50 border border-red-200 rounded-lg"><strong class="text-red-700">Sangat Penting:</strong> Concern 'Sangat Penting' | GPS Pelepasan/Offline/Batt Lemah | Aging Visit >21 hr (Lifetime >90) | Aging Visit >14 hr (H-3 JTO).</p>
+            <p class="p-1.5 bg-orange-50 border border-orange-200 rounded-lg"><strong class="text-orange-700">Penting:</strong> Concern 'Penting' | GPS Blm Lepas/Blm Pasang/Geser | Aging Visit >3 hr (OVD >3) | Aging Visit >5 hr (H-3 JTO) | Aging Visit >21 hr (Lifetime &le;90).</p>
+            <p class="p-1.5 bg-amber-50 border border-amber-200 rounded-lg"><strong class="text-amber-700">Moderat:</strong> Aging Visit >14 hr | Concern 'Moderat' | Aging Pasang/Ganti GPS >30 hr.</p>
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          <h5 class="font-bold text-slate-900 uppercase text-[11px] flex items-center space-x-1">
+            <i class="fa-solid fa-store text-amber-600"></i>
+            <span>2. Kriteria Mitra / Showroom</span>
+          </h5>
+          <div class="space-y-1 text-[11px] text-slate-600">
+            <p class="p-1.5 bg-red-50 border border-red-200 rounded-lg"><strong class="text-red-700">Sangat Penting:</strong> Concern Non-Fasilitas 'Sangat Penting' | Aging Visit Mitra >60 hr.</p>
+            <p class="p-1.5 bg-orange-50 border border-orange-200 rounded-lg"><strong class="text-orange-700">Penting:</strong> Concern Non-Fasilitas 'Penting' | Aging Visit Mitra >30 hr.</p>
+            <p class="p-1.5 bg-amber-50 border border-amber-200 rounded-lg"><strong class="text-amber-700">Moderat:</strong> Concern Non-Fasilitas 'Moderat' | Aging Visit Mitra >20 hr.</p>
+          </div>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button onclick="closeParamModal()" class="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl text-xs">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL UNIT CHECKLIST (VISIT SHOWROOM) -->
+  <div id="modal-unit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-4 py-3 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div>
+          <div class="flex items-center space-x-2">
+            <h4 id="modal-unit-nopol" class="font-bold text-sm leading-tight">-</h4>
+            <span id="modal-unit-badge" class="text-[9px] px-1.5 py-0.2 rounded font-bold">-</span>
+          </div>
+          <p id="modal-unit-desc" class="text-[11px] text-slate-300">-</p>
+        </div>
+        <button type="button" onclick="closeUnitModal()" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3.5 overflow-y-auto flex-1 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Apakah Unit Terlihat di Lokasi?</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+              <input type="radio" name="modal_unit_ada" value="Ya" checked onchange="toggleUnitAdaUI(true)" class="hidden" /> Ya, Terlihat
+            </label>
+            <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+              <input type="radio" name="modal_unit_ada" value="Tidak" onchange="toggleUnitAdaUI(false)" class="hidden" /> Tidak Terlihat
+            </label>
+          </div>
+        </div>
+        <div id="modal-box-foto-unit" class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <label class="block font-bold text-slate-800 text-[11px]">Foto Fisik Kendaraan <span class="text-red-500">* (Kamera)</span></label>
+          <div onclick="triggerCameraInput('file-modal-unit-photo')" class="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center cursor-pointer hover:bg-white transition bg-white">
+            <i class="fa-solid fa-camera text-xl text-slate-400 mb-1"></i>
+            <p class="text-[11px] text-slate-700 font-semibold">Ambil Foto Fisik Kendaraan</p>
+            <input type="file" id="file-modal-unit-photo" accept="image/*" capture="environment" class="hidden" onchange="handleModalUnitPhotoSelected(this)" />
+          </div>
+          <div id="modal-unit-photo-preview" class="hidden p-2 bg-emerald-100/70 border border-emerald-300 rounded-lg flex items-center justify-between">
+            <span class="text-emerald-800 font-bold text-[10px]"><i class="fa-solid fa-camera-retro mr-1"></i> Foto Kendaraan Siap</span>
+            <button type="button" onclick="removeModalUnitPhoto()" class="text-red-600 font-bold text-[10px]">Ambil Ulang</button>
+          </div>
+        </div>
+        <div id="modal-box-indikasi" class="hidden">
+          <label class="block font-semibold text-amber-900 mb-1">Indikasi Keberadaan Unit:</label>
+          <input type="text" id="modal-input-indikasi" placeholder="Contoh: Unit dipinjam owner / test drive" class="w-full bg-amber-50 border border-amber-300 rounded-xl p-2.5" />
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Titik GPS Sesuai Lokasi Visit?</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+              <input type="radio" name="modal_gps_match" value="Ya" checked class="hidden" /> Ya, Sesuai
+            </label>
+            <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+              <input type="radio" name="modal_gps_match" value="Tidak" class="hidden" /> Tidak Sesuai
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1.5">Info Status Unit (Bisa Pilih >1):</label>
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Plan Perpanjang" class="rounded text-slate-900" /> <span>Plan Perpanjang</span></label>
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Plan Pelunasan" class="rounded text-slate-900" /> <span>Plan Pelunasan</span></label>
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Ada Calon Pembeli" class="rounded text-slate-900" /> <span>Ada Calon Pembeli</span></label>
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Proses Kredit" class="rounded text-slate-900" /> <span>Proses Kredit</span></label>
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Unit Cash Tempo" class="rounded text-slate-900" /> <span>Unit Cash Tempo</span></label>
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Unit Milik Orang Lain" class="rounded text-slate-900" /> <span>Milik Orang Lain</span></label>
+          </div>
+        </div>
+        <div id="modal-box-overdue-container" class="hidden space-y-3 pt-2 border-t border-red-100">
+          <div class="p-2.5 bg-red-50 rounded-xl border border-red-200 space-y-1">
+            <label class="block font-bold text-red-900 text-[11px]">Plan Penyelesaian Overdue:</label>
+            <textarea id="modal-input-ovd-plan" rows="2" placeholder="Rencana penanganan pelunasan" class="w-full bg-white border border-red-300 rounded-lg p-2 text-xs"></textarea>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Komitmen Pembayaran:</label>
+            <select id="modal-select-komitmen" onchange="onModalKomitmenChange(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold">
+              <option value="Tidak Ada">Tidak Ada Komitmen</option>
+              <option value="Sudah Bayar">Sudah Bayar</option>
+              <option value="Bayar">Bayar</option>
+              <option value="Serahkan Unit">Serahkan Unit</option>
+            </select>
+          </div>
+          <div id="modal-box-tgl-komitmen" class="hidden">
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Komitmen:</label>
+            <input type="date" id="modal-input-tgl-komitmen" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2" />
+          </div>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex space-x-2 shrink-0">
+        <button type="button" onclick="closeUnitModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">Batal</button>
+        <button type="button" onclick="saveUnitChecklist()" class="w-2/3 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs shadow">Simpan Hasil Unit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL WHATSAPP SUMMARY -->
+  <div id="modal-summary" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div id="modal-summary-header" class="p-4 bg-teal-700 text-white flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-circle-check text-xl"></i>
+          <div>
+            <h4 class="font-bold text-sm leading-tight" id="modal-summary-title">Laporan Berhasil Disimpan!</h4>
+            <p class="text-[10px] text-teal-100" id="modal-summary-subtitle">Siap disalin ke WhatsApp</p>
+          </div>
+        </div>
+        <button onclick="closeSummaryModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-4 flex-1 overflow-y-auto space-y-3">
+        <label class="block text-xs font-semibold text-slate-600">Format Rekap WhatsApp:</label>
+        <textarea id="text-wa-summary" readonly rows="12" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[11px] font-mono leading-relaxed select-all"></textarea>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex space-x-2">
+        <button onclick="closeSummaryModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">Tutup</button>
+        <button onclick="copyAndOpenWA()" class="w-2/3 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5">
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+          <span>Salin & Kirim WA</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD SCRIPT LOKAL & CONFIG -->
+  <script src="config.js?v=3"></script>
+  <script src="dummy-data.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+</body>
+</html>

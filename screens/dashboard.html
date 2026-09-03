@@ -1,0 +1,92 @@
+<div class="space-y-4">
+  <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-4 shadow-sm border border-slate-700 flex justify-between items-center gap-2">
+    <div class="min-w-0">
+      <span id="badge-role" class="px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">-</span>
+      <h3 id="dash-user-name" class="text-sm sm:text-base font-bold mt-1 leading-tight truncate">-</h3>
+      <p id="dash-user-branch" class="text-[11px] text-slate-300 truncate">-</p>
+    </div>
+    <div class="bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 text-right shrink-0">
+      <span class="text-[9px] text-slate-400 block">Status Sesi</span>
+      <div class="text-sm font-bold text-emerald-400">Aktif</div>
+    </div>
+  </div>
+
+  <!-- Banner Presensi Cepat -->
+  <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between gap-2">
+    <div class="min-w-0">
+      <span class="text-[10px] text-emerald-100 uppercase tracking-wider font-bold block">Kehadiran Hari Ini</span>
+      <h4 class="text-xs font-bold truncate">Absensi Lapangan / Kantor</h4>
+    </div>
+    <button type="button" onclick="openAbsenChoiceModal()" class="px-3.5 py-2 bg-white text-teal-800 hover:bg-emerald-50 rounded-xl text-xs font-bold shrink-0 shadow flex items-center space-x-1.5 transition">
+      <i class="fa-solid fa-fingerprint text-emerald-600"></i>
+      <span>Buka Absen</span>
+    </button>
+  </div>
+
+  <div>
+    <h4 class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">Pilih Modul Aktivitas</h4>
+    <div class="grid grid-cols-2 gap-2.5" id="main-menu-grid">
+      
+      <button id="menu-btn-priority" onclick="loadScreen('priority')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
+        <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Priority Visit</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Scorecard & prioritas mitra</div>
+        </div>
+      </button>
+
+      <button id="menu-btn-assignment" onclick="loadScreen('assignment')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
+        <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-bullhorn"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Assign Concern</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Tandai concern visit mitra</div>
+        </div>
+      </button>
+
+      <button id="menu-btn-visit" onclick="loadScreen('visit')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
+        <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-clipboard-check"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Laporan Visit Mitra</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Input regular & unit OVD</div>
+        </div>
+      </button>
+
+      <button id="menu-btn-onboarding" onclick="loadScreen('onboarding')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
+        <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Visit Calon Mitra</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Onboarding & verifikasi data</div>
+        </div>
+      </button>
+
+      <button id="menu-btn-gps" onclick="loadScreen('gps')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
+        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-satellite-dish"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">GPS Maintenance</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Pasang / ganti / cabut GPS</div>
+        </div>
+      </button>
+
+      <button id="menu-btn-fac" onclick="loadScreen('fac')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
+        <div class="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-tower-broadcast"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Laporan GPS (FAC)</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Monitoring sinyal harian</div>
+        </div>
+      </button>
+
+    </div>
+  </div>
+</div>

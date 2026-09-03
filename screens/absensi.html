@@ -1,0 +1,68 @@
+<div class="space-y-3.5">
+  <div id="absen-type-banner" class="p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-slate-900">
+    <div>
+      <span class="text-[10px] uppercase font-bold opacity-80 block">Formulir Presensi</span>
+      <h3 class="text-sm font-bold" id="absen-type-title">Masuk Kantor</h3>
+    </div>
+    <i id="absen-type-icon" class="fa-solid fa-building text-2xl text-emerald-400"></i>
+  </div>
+
+  <form onsubmit="handleAbsenSubmit(event)" class="space-y-3.5">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2.5">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <span class="text-xs font-bold text-slate-800 uppercase">Verifikasi Lokasi & Geotag</span>
+        <span id="absen-geofence-badge" class="text-[9px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-600">Mengecek Lokasi...</span>
+      </div>
+
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+        <div class="flex justify-between text-xs">
+          <span class="text-slate-500">Koordinat Anda:</span>
+          <span id="absen-coords-display" class="font-mono font-bold text-slate-800">-</span>
+        </div>
+        <div id="box-distance-office" class="text-xs pt-1.5 border-t border-slate-200 space-y-1">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Kantor Terdekat:</span>
+            <span id="absen-office-name" class="font-bold text-slate-800">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Jarak ke Kantor:</span>
+            <span id="absen-distance-display" class="font-bold text-slate-800">- Meter (Maks 100m)</span>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" onclick="acquireAbsenLocation()" class="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center space-x-1">
+        <i class="fa-solid fa-location-crosshairs"></i>
+        <span>Perbarui Titik GPS</span>
+      </button>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2.5">
+      <div class="border-b border-slate-100 pb-2">
+        <span class="text-xs font-bold text-slate-800 uppercase block">Foto Selfie Kehadiran <span class="text-red-500">*</span></span>
+        <p class="text-[10px] text-amber-700 font-semibold mt-0.5"><i class="fa-solid fa-circle-exclamation mr-1"></i>Ambil foto selfie kelihatan badan / setengah badan (Bukan close-up wajah).</p>
+      </div>
+
+      <div onclick="triggerCameraInput('file-absen-selfie')" class="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
+        <i class="fa-solid fa-camera text-2xl text-slate-400 mb-1"></i>
+        <p class="text-xs text-slate-700 font-semibold">Buka Kamera Selfie</p>
+        <input type="file" id="file-absen-selfie" accept="image/*" capture="user" class="hidden" onchange="handleAbsenSelfieSelected(this)" />
+      </div>
+
+      <div id="preview-absen-selfie-card" class="hidden p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+        <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto Selfie Siap</span>
+        <button type="button" onclick="removeAbsenSelfie()" class="text-red-500 font-bold text-[11px]">Ambil Ulang</button>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Catatan Kehadiran (Opsional)</label>
+        <input type="text" id="absen-input-catatan" placeholder="Contoh: Menuju meeting showroom" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-slate-900" />
+      </div>
+    </div>
+
+    <button type="submit" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm shadow-md flex items-center justify-center space-x-2 transition">
+      <i class="fa-solid fa-paper-plane"></i>
+      <span>Kirim Rekap Absensi</span>
+    </button>
+  </form>
+</div>
