@@ -422,21 +422,52 @@ function removeAbsenSelfie() {
   if (previewCard) previewCard.classList.add("hidden");
 }
 
+// Helper Toast Notification Auto-Close
+function showToast(message, type = "success", durationMs = 1500) {
+  let toast = document.getElementById("global-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "global-toast";
+    document.body.appendChild(toast);
+  }
+
+  const bgStyles = {
+    success: "bg-emerald-600 text-white shadow-emerald-600/30",
+    error: "bg-rose-600 text-white shadow-rose-600/30",
+    warning: "bg-amber-500 text-white shadow-amber-500/30",
+    info: "bg-slate-900 text-white shadow-slate-900/30"
+  };
+
+  const iconMap = {
+    success: '<i class="fa-solid fa-circle-check text-sm"></i>',
+    error: '<i class="fa-solid fa-triangle-exclamation text-sm"></i>',
+    warning: '<i class="fa-solid fa-circle-exclamation text-sm"></i>',
+    info: '<i class="fa-solid fa-circle-info text-sm"></i>'
+  };
+
+  toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-100 translate-y-0 ${bgStyles[type] || bgStyles.info}`;
+  toast.innerHTML = `${iconMap[type] || ''} <span>${message}</span>`;
+
+  setTimeout(() => {
+    toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-0 translate-y-[-10px] ${bgStyles[type] || bgStyles.info}`;
+  }, durationMs);
+}
+
 async function handleAbsenSubmit(e) {
   e.preventDefault();
   if (ACTIVE_ABSEN_TYPE === "Masuk Kantor" && !CURRENT_USER_GEO.isInsideRadius) {
-    alert(`Gagal: Lokasi Anda berada ${CURRENT_USER_GEO.distanceToOffice} meter dari kantor. Wajib dalam radius 100 meter.`);
+    showToast(`Lokasi di luar radius (${CURRENT_USER_GEO.distanceToOffice}m / Maks 100m)`, "error", 2500);
     return;
   }
   if (!CURRENT_ABSEN_SELFIE_BASE64) {
-    alert("Wajib mengambil foto selfie kehadiran!");
+    showToast("Wajib mengambil foto selfie kehadiran!", "warning", 2000);
     return;
   }
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   const originalText = submitBtn ? submitBtn.innerHTML : "Kirim Presensi Sekarang";
   if (submitBtn) {
-    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan Presensi...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Menyimpan Presensi...';
     submitBtn.disabled = true;
   }
 
@@ -468,19 +499,16 @@ async function handleAbsenSubmit(e) {
     const inputCatatan = document.getElementById("absen-input-catatan");
     if (inputCatatan) inputCatatan.value = "";
 
-    if (res && res.success) {
-      alert(`Presensi kehadiran "${ACTIVE_ABSEN_TYPE || 'Masuk Kantor'}" berhasil disimpan ke sistem!`);
-    } else {
-      alert(`Presensi tersimpan (Respon Server: ${res?.message || 'OK'}).`);
-    }
-    loadScreen("dashboard");
+    showToast(`Presensi "${ACTIVE_ABSEN_TYPE || 'Masuk Kantor'}" Berhasil Disimpan!`, "success", 1200);
+    setTimeout(() => {
+      loadScreen("dashboard");
+    }, 1000);
   } catch (err) {
     if (submitBtn) {
       submitBtn.innerHTML = originalText;
       submitBtn.disabled = false;
     }
-    alert("Koneksi pengiriman: " + err.message);
-    loadScreen("dashboard");
+    showToast("Gagal kirim presensi: " + err.message, "error", 2000);
   }
 }
 
