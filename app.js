@@ -399,16 +399,27 @@ function handleAbsenSelfieSelected(input) {
     const reader = new FileReader();
     reader.onload = e => {
       CURRENT_ABSEN_SELFIE_BASE64 = e.target.result;
-      document.getElementById("preview-absen-selfie-card").classList.remove("hidden");
+      const imgPreview = document.getElementById("img-absen-selfie-preview");
+      if (imgPreview) imgPreview.src = e.target.result;
+
+      const triggerBtn = document.getElementById("btn-trigger-absen-selfie");
+      const previewCard = document.getElementById("preview-absen-selfie-card");
+      if (triggerBtn) triggerBtn.classList.add("hidden");
+      if (previewCard) previewCard.classList.remove("hidden");
     };
     reader.readAsDataURL(input.files[0]);
   }
 }
 
 function removeAbsenSelfie() {
-  document.getElementById("file-absen-selfie").value = "";
+  const fileInput = document.getElementById("file-absen-selfie");
+  if (fileInput) fileInput.value = "";
   CURRENT_ABSEN_SELFIE_BASE64 = null;
-  document.getElementById("preview-absen-selfie-card").classList.add("hidden");
+
+  const triggerBtn = document.getElementById("btn-trigger-absen-selfie");
+  const previewCard = document.getElementById("preview-absen-selfie-card");
+  if (triggerBtn) triggerBtn.classList.remove("hidden");
+  if (previewCard) previewCard.classList.add("hidden");
 }
 
 async function handleAbsenSubmit(e) {
