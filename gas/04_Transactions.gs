@@ -215,9 +215,9 @@ function handleSubmitAbsensi(data) {
     selfieUrl = uploadBase64ToDrive(data.selfie_base64, CONFIG.DRIVE_FOLDERS.ONBOARDING_ID || CONFIG.DRIVE_FOLDERS.VISIT_FOTO_ID, "ABSEN_" + (data.nama || "USER").replace(/[^a-zA-Z0-9]/g, '_'));
   }
 
-  let sheet = ss.getSheetByName("TR_PRESENSI_LOG");
+  let sheet = ss.getSheetByName(CONFIG.SHEETS.ABSENSI || "TR_ABSENSI_LOG");
   if (!sheet) {
-    sheet = ss.insertSheet("TR_PRESENSI_LOG");
+    sheet = ss.insertSheet(CONFIG.SHEETS.ABSENSI || "TR_ABSENSI_LOG");
     sheet.appendRow(["absen_id", "timestamp", "nip", "nama", "role", "cabang", "jenis_absen", "lokasi_kantor", "distance_meters", "lat", "long", "catatan", "selfie_url"]);
     sheet.setFrozenRows(1);
   }
