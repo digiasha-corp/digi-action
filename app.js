@@ -411,7 +411,7 @@ function removeAbsenSelfie() {
   document.getElementById("preview-absen-selfie-card").classList.add("hidden");
 }
 
-function handleAbsenSubmit(e) {
+async function handleAbsenSubmit(e) {
   e.preventDefault();
   if (ACTIVE_ABSEN_TYPE === "Masuk Kantor" && !CURRENT_USER_GEO.isInsideRadius) {
     alert(`Gagal: Lokasi Anda berada ${CURRENT_USER_GEO.distanceToOffice} meter dari kantor. Wajib dalam radius 100 meter.`);
@@ -422,30 +422,55 @@ function handleAbsenSubmit(e) {
     return;
   }
 
-  const catatan = document.getElementById("absen-input-catatan").value.trim() || "-";
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn ? submitBtn.innerHTML : "Kirim Presensi Sekarang";
+  if (submitBtn) {
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan Presensi...';
+    submitBtn.disabled = true;
+  }
 
-  // Kirim data absensi ke backend Apps Script secara asynchronous
-  callApi("submitAbsensi", {
-    nip: CURRENT_USER?.nip || "-",
-    nama: CURRENT_USER?.nama || "-",
-    role: CURRENT_USER?.role || "-",
-    cabang: CURRENT_USER?.cabang || "-",
-    jenis_absen: ACTIVE_ABSEN_TYPE,
-    lokasi_kantor: CURRENT_USER_GEO.nearestOffice?.name || "Kantor Utama",
-    distance_meters: CURRENT_USER_GEO.distanceToOffice || 0,
-    lat: CURRENT_USER_GEO.lat,
-    long: CURRENT_USER_GEO.long,
-    catatan: catatan,
-    selfie_base64: CURRENT_ABSEN_SELFIE_BASE64
-  });
+  const catatan = document.getElementById("absen-input-catatan")?.value.trim() || "-";
+  const selfieData = CURRENT_ABSEN_SELFIE_BASE64;
 
-  // Reset state absensi
-  removeAbsenSelfie();
-  const inputCatatan = document.getElementById("absen-input-catatan");
-  if (inputCatatan) inputCatatan.value = "";
+  try {
+    const res = await callApi("submitAbsensi", {
+      nip: CURRENT_USER?.nip || "-",
+      nama: CURRENT_USER?.nama || "-",
+      role: CURRENT_USER?.role || "-",
+      cabang: CURRENT_USER?.cabang || "-",
+      jenis_absen: ACTIVE_ABSEN_TYPE || "Masuk Kantor",
+      lokasi_kantor: CURRENT_USER_GEO.nearestOffice?.name || "Kantor Utama",
+      distance_meters: CURRENT_USER_GEO.distanceToOffice || 0,
+      lat: CURRENT_USER_GEO.lat || 0,
+      long: CURRENT_USER_GEO.long || 0,
+      catatan: catatan,
+      selfie_base64: selfieData
+    });
 
-  alert(`Presensi kehadiran "${ACTIVE_ABSEN_TYPE}" berhasil disimpan!`);
-  loadScreen("dashboard");
+    if (submitBtn) {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+
+    // Reset state absensi
+    removeAbsenSelfie();
+    const inputCatatan = document.getElementById("absen-input-catatan");
+    if (inputCatatan) inputCatatan.value = "";
+
+    if (res && res.success) {
+      alert(`Presensi kehadiran "${ACTIVE_ABSEN_TYPE || 'Masuk Kantor'}" berhasil disimpan ke sistem!`);
+    } else {
+      alert(`Presensi tersimpan (Respon Server: ${res?.message || 'OK'}).`);
+    }
+    loadScreen("dashboard");
+  } catch (err) {
+    if (submitBtn) {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+    alert("Koneksi pengiriman: " + err.message);
+    loadScreen("dashboard");
+  }
 }
 
 // =========================================================================
