@@ -25,6 +25,7 @@ const CONFIG = {
 
   DRIVE_FOLDERS: {
     ONBOARDING_ID: "1Damd9YO6LqJyxbTZMxz_UZDWWuOU7AvJ",
-    VISIT_FOTO_ID: "18VPAgr14_kkf3Y3nBBp9d-e4Vcn-fcDK"
+    VISIT_FOTO_ID: "18VPAgr14_kkf3Y3nBBp9d-e4Vcn-fcDK",
+    ABSENSI_ID: "1O3fuqC9zIv6zlIqkH76ae3shMOKodCUV"
   }
 };
