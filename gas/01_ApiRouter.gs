@@ -49,6 +49,10 @@ function doPost(e) {
         result = handleSaveAssignment(body);
         break;
 
+      case "submitAbsensi":
+        result = handleSubmitAbsensi(body);
+        break;
+
       case "runPrioritySyncNow":
         dailyPrioritySyncJob();
         result = { success: true, message: "Sinkronisasi kalkulasi prioritas berhasil dijalankan!" };

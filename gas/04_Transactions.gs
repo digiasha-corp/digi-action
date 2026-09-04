@@ -204,3 +204,40 @@ function handleSaveAssignment(data) {
 
   return { success: true, assignId: assignId, message: "Penugasan concern berhasil disimpan." };
 }
+
+function handleSubmitAbsensi(data) {
+  const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID);
+  const now = new Date();
+  const absenId = "ABS-" + Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd-HHmmss");
+
+  let selfieUrl = "";
+  if (data.selfie_base64) {
+    selfieUrl = uploadBase64ToDrive(data.selfie_base64, CONFIG.DRIVE_FOLDERS.ONBOARDING_ID || CONFIG.DRIVE_FOLDERS.VISIT_FOTO_ID, "ABSEN_" + (data.nama || "USER").replace(/[^a-zA-Z0-9]/g, '_'));
+  }
+
+  let sheet = ss.getSheetByName("TR_PRESENSI_LOG");
+  if (!sheet) {
+    sheet = ss.insertSheet("TR_PRESENSI_LOG");
+    sheet.appendRow(["absen_id", "timestamp", "nip", "nama", "role", "cabang", "jenis_absen", "lokasi_kantor", "distance_meters", "lat", "long", "catatan", "selfie_url"]);
+    sheet.setFrozenRows(1);
+  }
+
+  sheet.appendRow([
+    absenId,
+    now,
+    data.nip || "-",
+    data.nama || "-",
+    data.role || "-",
+    data.cabang || "-",
+    data.jenis_absen || "Masuk Kantor",
+    data.lokasi_kantor || "-",
+    data.distance_meters || 0,
+    data.lat || 0,
+    data.long || 0,
+    data.catatan || "-",
+    selfieUrl
+  ]);
+
+  return { success: true, absenId: absenId, message: "Presensi berhasil dicatat." };
+}
+

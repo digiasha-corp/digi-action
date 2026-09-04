@@ -423,17 +423,29 @@ function handleAbsenSubmit(e) {
   }
 
   const catatan = document.getElementById("absen-input-catatan").value.trim() || "-";
-  const now = new Date();
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 
-  let waText = `*PRESENSI KEHADIRAN DIGIASHA*\n------------------------------------\n*Jenis Absensi:* ${ACTIVE_ABSEN_TYPE}\n*Nama Karyawan:* ${CURRENT_USER.nama}\n*Role / Cabang:* ${CURRENT_USER.role} • ${CURRENT_USER.cabang}\n*Waktu Presensi:* ${dateStr} pukul ${timeStr} WIB\n\n`;
-  if (ACTIVE_ABSEN_TYPE === "Masuk Kantor") {
-    waText += `*Lokasi Kantor:* ${CURRENT_USER_GEO.nearestOffice?.name || 'Kantor Utama'}\n*Status Geofence:* Radius Valid (${CURRENT_USER_GEO.distanceToOffice} Meter dari Kantor)\n`;
-  }
-  waText += `*Koordinat Geotag:* ${CURRENT_USER_GEO.lat.toFixed(6)}, ${CURRENT_USER_GEO.long.toFixed(6)}\n*Catatan Aktivitas:* ${catatan}\n• Foto Selfie: [Kamera Langsung OK]\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+  // Kirim data absensi ke backend Apps Script secara asynchronous
+  callApi("submitAbsensi", {
+    nip: CURRENT_USER?.nip || "-",
+    nama: CURRENT_USER?.nama || "-",
+    role: CURRENT_USER?.role || "-",
+    cabang: CURRENT_USER?.cabang || "-",
+    jenis_absen: ACTIVE_ABSEN_TYPE,
+    lokasi_kantor: CURRENT_USER_GEO.nearestOffice?.name || "Kantor Utama",
+    distance_meters: CURRENT_USER_GEO.distanceToOffice || 0,
+    lat: CURRENT_USER_GEO.lat,
+    long: CURRENT_USER_GEO.long,
+    catatan: catatan,
+    selfie_base64: CURRENT_ABSEN_SELFIE_BASE64
+  });
 
-  openSummaryModal("Presensi Berhasil Disimpan!", "Siap diteruskan ke WhatsApp", waText, "bg-teal-700");
+  // Reset state absensi
+  removeAbsenSelfie();
+  const inputCatatan = document.getElementById("absen-input-catatan");
+  if (inputCatatan) inputCatatan.value = "";
+
+  alert(`Presensi kehadiran "${ACTIVE_ABSEN_TYPE}" berhasil disimpan!`);
+  loadScreen("dashboard");
 }
 
 // =========================================================================
