@@ -1,4 +1,4 @@
-j/**
+/**
  * 00_Config.gs - DIGIASHA FIELD MONITORING SYSTEM
  * File Konfigurasi Global Spreadsheet, GID Sumber, Folder Google Drive & Helper
  */
@@ -85,7 +85,7 @@ function setupAllDatabaseSheetHeaders() {
   
   const schema = {
     [CONFIG.SHEETS.EMPLOYEE]: [
-      "nip", "nama_lengkap", "email", "password", "role", "cabang", "area_cover", "status"
+      "nip", "email", "nama_lengkap", "jabatan", "cabang", "area_cover", "password", "status_ganti_pass", "role_id", "status_aktif"
     ],
     [CONFIG.SHEETS.DEALER]: [
       "dealer_id", "dealer_name", "owner_name", "cabang", "area_cover", "productivity", "status", "tanggal_kerjasama", "last_visit_date", "aging_visit_mitra", "urgent_units_count", "priority_level", "priority_score", "priority_reason"
@@ -150,7 +150,7 @@ function fixAndStandardizeSheetHeaders() {
   
   const schema = {
     [CONFIG.SHEETS.EMPLOYEE]: [
-      "nip", "nama_lengkap", "email", "password", "role", "cabang", "area_cover", "status"
+      "nip", "email", "nama_lengkap", "jabatan", "cabang", "area_cover", "password", "status_ganti_pass", "role_id", "status_aktif"
     ],
     [CONFIG.SHEETS.DEALER]: [
       "dealer_id", "dealer_name", "owner_name", "cabang", "area_cover", "productivity", "status", "tanggal_kerjasama", "last_visit_date", "aging_visit_mitra", "urgent_units_count", "priority_level", "priority_score", "priority_reason"

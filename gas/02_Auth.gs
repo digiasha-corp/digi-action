@@ -31,10 +31,10 @@ function handleLogin(identifier, password) {
   const idxPass = headers.findIndex(h => h.includes("pass") || h.includes("sandi"));
   const idxNama = headers.findIndex(h => h.includes("nama"));
   const idxJabatan = headers.findIndex(h => h.includes("jabatan"));
-  const idxRole = headers.findIndex(h => h.includes("role"));
+  const idxRole = headers.findIndex(h => h === "role_id" || h.includes("role"));
   const idxCabang = headers.findIndex(h => h.includes("branch") || h.includes("cabang"));
   const idxAreaCover = headers.findIndex(h => h.includes("area_cover") || h.includes("area"));
-  const idxStatus = headers.findIndex(h => h.includes("status"));
+  const idxStatus = headers.findIndex(h => h.includes("status_aktif") || h === "status");
 
   const cleanId = String(identifier).trim().toLowerCase();
   const cleanPass = String(password).trim();
@@ -77,7 +77,10 @@ function handleLogin(identifier, password) {
     const pass = idxPass !== -1 ? String(row[idxPass] || "").trim() : "";
     const rawStatus = idxStatus !== -1 ? String(row[idxStatus] || "Active").trim().toLowerCase() : "active";
 
-    if ((email === cleanId || nip === cleanId) && pass === cleanPass) {
+    const isNipMatch = (nip === cleanId) || (nip.replace(/^0+/, '') === cleanId.replace(/^0+/, '') && cleanId.length >= 4);
+    const isEmailMatch = (email === cleanId);
+
+    if ((isEmailMatch || isNipMatch) && pass === cleanPass) {
       if (rawStatus === "inactive" || rawStatus === "non-active" || rawStatus === "nonaktif" || rawStatus === "tidak aktif") {
         return { success: false, message: "Akun Anda berstatus non-aktif. Hubungi Administrator." };
       }
