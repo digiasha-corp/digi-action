@@ -1115,36 +1115,20 @@ function openFacilityDetailModal(dealerId) {
     "Normal": "bg-slate-100 text-slate-600 border-slate-200"
   };
 
-  // Filter unit yang ditampilkan: HANYA unit LIVE atau EXPIRED yang memiliki concern / anomali aktif
+  // Filter unit yang ditampilkan: HANYA unit yang memiliki flag prioritas / concern aktif (Score > 0)
   const eligibleUnits = (d.units || []).filter(u => {
-    const uContract = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
-    const isLive = uContract.includes("LIVE");
-    const uImei = String(u.imei_gps || u.imei || "").trim();
-    const uHasImei = hasValidImei(uImei);
-    const gpsStatus = String(u.gps_status || "").trim();
-    const hasGpsAnomaly = gpsStatus === "Belum Lepas" || gpsStatus === "Pelepasan" || gpsStatus === "Offline" || gpsStatus === "Geser" || gpsStatus === "Baterai Lemah" || gpsStatus === "Belum Pasang";
     const uEval = calculateUnitUrgency(u);
-    const hasConcern = !!u.unit_concern || uEval.score > 0;
-
-    // Jika LIVE, tampilkan
-    if (isLive) return true;
-
-    // Jika EXPIRED, hanya tampilkan jika ada concern / anomali aktif
-    if (hasConcern || (uHasImei && gpsStatus !== "Sudah Lepas" && gpsStatus !== "Tidak Pasang") || hasGpsAnomaly) {
-      return true;
-    }
-
-    return false;
+    return uEval.score > 0;
   });
 
   document.getElementById("modal-facility-title").innerText = `Fasilitas: ${d.dealer_name}`;
-  document.getElementById("modal-facility-sub").innerText = `Total ${eligibleUnits.length} Unit Aktif/Concern (${d.cabang || "-"})`;
+  document.getElementById("modal-facility-sub").innerText = `Total ${eligibleUnits.length} Unit Prioritas/Concern (${d.cabang || "-"})`;
 
   const listContainer = document.getElementById("modal-facility-list");
   listContainer.innerHTML = "";
 
   if (eligibleUnits.length === 0) {
-    listContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Tidak ada unit LIVE atau concern fasilitas aktif pada mitra ini.</div>`;
+    listContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Tidak ada unit dengan status prioritas atau concern aktif pada mitra ini.</div>`;
   } else {
     // Sorting: Unit urgent (Score tertinggi) di atas
     eligibleUnits.sort((a, b) => {
