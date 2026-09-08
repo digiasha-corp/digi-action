@@ -1352,19 +1352,24 @@ function onDealerSelected(dealerId) {
     }
   }
 
-  // 2. Render Checklist Fasilitas Unit Aktif
-  if (!dealerId || !dealer || !dealer.units || dealer.units.length === 0) {
-    emptyBox.innerText = dealerId ? "Mitra ini tidak memiliki fasilitas unit aktif." : "Pilih partner dealer di Segmen 1.";
+  // 2. Render Checklist Fasilitas Unit Aktif (HANYA UNIT DENGAN STATUS LIVE)
+  const rawUnits = dealer && dealer.units ? dealer.units : [];
+  const units = rawUnits.filter(u => {
+    const uContract = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
+    return uContract.includes("LIVE");
+  });
+
+  if (!dealerId || !dealer || units.length === 0) {
+    emptyBox.innerText = dealerId ? "Mitra ini tidak memiliki fasilitas unit LIVE aktif." : "Pilih partner dealer di Segmen 1 untuk memuat data fasilitas aktif.";
     emptyBox.classList.remove("hidden");
     container.classList.add("hidden");
-    countBadge.innerText = "0 Unit";
+    countBadge.innerText = "0 Unit Aktif";
     return;
   }
 
   emptyBox.classList.add("hidden");
   container.classList.remove("hidden");
 
-  const units = dealer.units;
   countBadge.innerText = `${units.length} Unit Aktif`;
 
   units.forEach((u, idx) => {
