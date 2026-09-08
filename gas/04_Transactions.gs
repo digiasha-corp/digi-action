@@ -20,12 +20,24 @@ function submitLaporanVisitServer(headerData, unitCheckList, currentUser) {
 
     const visitId = "VST-" + Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd") + "-" + Utilities.getUuid().slice(0, 6).toUpperCase();
 
-    // 1. Simpan Header Visit
+    const userNip = currentUser ? (currentUser.nip || currentUser.email) : (headerData.nip || "PIC-FIELD");
+    const cleanNip = String(userNip).replace(/[/\\?%*:|"<>]/g, "").trim();
+    const cleanDealer = String(headerData.dealer_name || "MITRA").replace(/[/\\?%*:|"<>]/g, "").trim();
+
+    // 1. Upload Foto Kunjungan / Selfie Showroom (Format: visit_id-nip-dealer_name.jpg)
+    let showroomPhotoUrl = headerData.showroom_photo_url || "";
+    if (!showroomPhotoUrl && headerData.showroom_photo_base64 && typeof uploadVisitPhotoWithCustomName === "function") {
+      const showroomFileName = `${visitId}-${cleanNip}-${cleanDealer}.jpg`;
+      const upRes = uploadVisitPhotoWithCustomName(showroomFileName, headerData.showroom_photo_base64);
+      if (upRes && upRes.success) showroomPhotoUrl = upRes.url;
+    }
+
+    // 1. Simpan Header Visit (18 Kolom Sempurna)
     const totalUnits = (unitCheckList && unitCheckList.length) ? unitCheckList.length : 0;
     visitSheet.appendRow([
       visitId,
       timestampStr,
-      currentUser ? (currentUser.nip || currentUser.email) : (headerData.nip || "PIC-FIELD"),
+      userNip,
       headerData.dealer_name || "",
       headerData.lokasi || "Showroom",
       headerData.bertemu_owner || "Ya",
@@ -39,17 +51,26 @@ function submitLaporanVisitServer(headerData, unitCheckList, currentUser) {
       headerData.catatan_visit || "",
       Number(headerData.lat || 0),
       Number(headerData.long || 0),
-      headerData.showroom_photo_url || "",
+      showroomPhotoUrl,
       headerData.tindak_lanjut_concern || "-"
     ]);
 
-    // 2. Simpan Detail Unit (Flat Rows - 1 Baris Per Unit)
+    // 2. Simpan Detail Unit (Flat Rows - 1 Baris Per Unit, Kolom foto_unit_url)
     const validSeenUnitsNopol = new Set();
     if (unitCheckList && unitCheckList.length > 0) {
       const unitRows = [];
       unitCheckList.forEach((u, idx) => {
         const checkId = "CHK-" + Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd") + "-" + String(idx + 1).padStart(3, '0');
-        const statusKeberadaan = String(u.terlihat || u.status_keberadaan || "Ada di Showroom").trim();
+        const statusKeberadaan = String(u.terlihat || u.status_keberadaan || "Ya").trim();
+        const cleanNopol = String(u.nopol || "NONOPOL").replace(/[/\\?%*:|"<> ]/g, "").trim();
+
+        // Upload Foto Fisik Unit (Format: visit_id-nip-nopol-dealer_name.jpg)
+        let unitPhotoUrl = "";
+        if (u.foto_unit && typeof uploadVisitPhotoWithCustomName === "function") {
+          const unitFileName = `${visitId}-${cleanNip}-${cleanNopol}-${cleanDealer}.jpg`;
+          const upRes = uploadVisitPhotoWithCustomName(unitFileName, u.foto_unit);
+          if (upRes && upRes.success) unitPhotoUrl = upRes.url;
+        }
 
         unitRows.push([
           checkId,
@@ -60,9 +81,9 @@ function submitLaporanVisitServer(headerData, unitCheckList, currentUser) {
           u.nopol || "",
           u.unit || u.unit_desc || "",
           statusKeberadaan,
-          u.kondisi_unit || (u.terlihat === "Ya" ? "Terlihat Fisik" : (u.indikasi || "Tidak Terlihat")),
-          u.odometer || "-",
-          u.catatan_unit || (u.info_unit ? u.info_unit.join(", ") : "")
+          u.kondisi_unit || (statusKeberadaan === "Ya" ? "Terlihat Fisik" : (u.indikasi || "Tidak Terlihat")),
+          unitPhotoUrl,
+          u.catatan_unit || (u.info_unit ? (Array.isArray(u.info_unit) ? u.info_unit.join(", ") : u.info_unit) : "")
         ]);
 
         if (statusKeberadaan.toLowerCase() === "ya" || statusKeberadaan.toLowerCase() === "ada di showroom" || statusKeberadaan.toLowerCase() === "terlihat") {
@@ -141,12 +162,6 @@ function submitLaporanVisitServer(headerData, unitCheckList, currentUser) {
 
 // Alias Handler Visit
 function handleSubmitVisit(data) {
-  let photoUrl = "";
-  if (data.showroom_photo_base64 && typeof uploadVisitPhoto === "function") {
-    const upRes = uploadVisitPhoto(data.dealer_name || "MITRA", "SHOWROOM", data.showroom_photo_base64);
-    if (upRes && upRes.success) photoUrl = upRes.url;
-  }
-  data.showroom_photo_url = photoUrl;
   return submitLaporanVisitServer(data, data.unit_check_list || [], data.currentUser);
 }
 

@@ -1,4 +1,4 @@
-/**
+j/**
  * 00_Config.gs - DIGIASHA FIELD MONITORING SYSTEM
  * File Konfigurasi Global Spreadsheet, GID Sumber, Folder Google Drive & Helper
  */
@@ -103,7 +103,7 @@ function setupAllDatabaseSheetHeaders() {
       "visit_id", "timestamp", "nip", "dealer_name", "lokasi", "bertemu_owner", "owner_reason", "stock", "sales", "issue_digi", "issue_internal", "issue_komp", "total_unit", "catatan_visit", "lat", "long", "showroom_photo_url", "tindak_lanjut_concern"
     ],
     [CONFIG.SHEETS.VISIT_UNIT]: [
-      "check_id", "visit_id", "timestamp", "dealer_name", "no_fasilitas", "nopol", "unit", "status_keberadaan", "odometer", "kondisi_fisik", "alasan_tidak_ada", "lokasi_unit_lain", "catatan_unit", "foto_unit_url", "foto_odometer_url"
+      "check_id", "visit_id", "timestamp", "dealer_name", "no_fasilitas", "nopol", "unit_desc", "status_keberadaan", "kondisi_unit", "foto_unit_url", "catatan_unit"
     ],
     [CONFIG.SHEETS.GPS_MAINTENANCE]: [
       "maint_id", "timestamp", "nip", "no_fasilitas", "nopol", "dealer_name", "act_type", "imei_lama", "imei_baru", "alasan_cabut", "status_kondisi_gps", "keterangan", "lat", "long", "foto_gps_url"
@@ -168,7 +168,7 @@ function fixAndStandardizeSheetHeaders() {
       "visit_id", "timestamp", "nip", "dealer_name", "lokasi", "bertemu_owner", "owner_reason", "stock", "sales", "issue_digi", "issue_internal", "issue_komp", "total_unit", "catatan_visit", "lat", "long", "showroom_photo_url", "tindak_lanjut_concern"
     ],
     [CONFIG.SHEETS.VISIT_UNIT]: [
-      "check_id", "visit_id", "timestamp", "dealer_name", "no_fasilitas", "nopol", "unit", "status_keberadaan", "kondisi_fisik", "odometer", "catatan_unit"
+      "check_id", "visit_id", "timestamp", "dealer_name", "no_fasilitas", "nopol", "unit_desc", "status_keberadaan", "kondisi_unit", "foto_unit_url", "catatan_unit"
     ],
     [CONFIG.SHEETS.GPS_MAINTENANCE]: [
       "maint_id", "timestamp", "nip", "no_fasilitas", "nopol", "dealer_name", "act_type", "imei_lama", "imei_baru", "alasan_cabut", "status_kondisi_gps", "keterangan", "lat", "long", "foto_gps_url"

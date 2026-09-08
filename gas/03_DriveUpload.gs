@@ -6,31 +6,37 @@
 // =========================================================================
 // 1. UPLOAD FOTO KUNJUNGAN / VISIT SHOWROOM & GPS
 // =========================================================================
-function uploadVisitPhoto(partnerName, photoType, base64Data) {
+function uploadVisitPhotoWithCustomName(customFileName, base64Data) {
   try {
-    if (!base64Data || base64Data.indexOf(",") === -1) {
+    if (!base64Data || typeof base64Data !== "string" || base64Data.indexOf(",") === -1) {
       return { success: false, message: "Data base64 tidak valid." };
     }
     const folderId = (typeof FOLDER_ID_VISIT_FOTO !== "undefined" ? FOLDER_ID_VISIT_FOTO : null) || (CONFIG.DRIVE_FOLDERS && CONFIG.DRIVE_FOLDERS.VISIT_FOTO_ID) || "18VPAgr14_kkf3Y3nBBp9d-e4Vcn-fcDK";
     const targetFolder = DriveApp.getFolderById(folderId);
-    const now = new Date();
-    const timeFormatted = Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd-HHmmss");
-    
-    const cleanPartner = String(partnerName).replace(/[/\\?%*:|"<>]/g, "");
-    const cleanType = String(photoType).replace(/[/\\?%*:|"<>]/g, "");
-    const finalFileName = cleanType + "-" + cleanPartner + "-" + timeFormatted + ".jpg";
+
+    // Bersihkan karakter terlarang pada nama file
+    const cleanFileName = String(customFileName).replace(/[/\\?%*:|"<>]/g, "-").replace(/\s+/g, " ") + (customFileName.toLowerCase().endsWith(".jpg") || customFileName.toLowerCase().endsWith(".png") ? "" : ".jpg");
 
     const contentType = base64Data.substring(5, base64Data.indexOf(';'));
     const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
-    const blob = Utilities.newBlob(bytes, contentType, finalFileName);
+    const blob = Utilities.newBlob(bytes, contentType, cleanFileName);
 
     const uploadedFile = targetFolder.createFile(blob);
     uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return { success: true, url: uploadedFile.getUrl(), name: finalFileName };
+    return { success: true, url: uploadedFile.getUrl(), name: cleanFileName };
   } catch (err) {
-    Logger.log("Gagal Upload Visit Photo: " + err.toString());
+    Logger.log("Gagal Upload Visit Photo (" + customFileName + "): " + err.toString());
     return { success: false, message: err.toString() };
   }
+}
+
+function uploadVisitPhoto(partnerName, photoType, base64Data) {
+  const cleanPartner = String(partnerName).replace(/[/\\?%*:|"<>]/g, "");
+  const cleanType = String(photoType).replace(/[/\\?%*:|"<>]/g, "");
+  const now = new Date();
+  const timeFormatted = Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd-HHmmss");
+  const fileName = cleanType + "-" + cleanPartner + "-" + timeFormatted + ".jpg";
+  return uploadVisitPhotoWithCustomName(fileName, base64Data);
 }
 
 // =========================================================================
