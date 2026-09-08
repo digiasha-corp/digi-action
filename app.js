@@ -4012,14 +4012,82 @@ function renderGpsSettingsList(list) {
             Posisi: <strong class="text-slate-700">${g.posisi_stock || 'Kantor Pusat'}</strong>
           </div>
         </div>
+        <button type="button" onclick="openTransferGpsModal('${g.imei}')" class="px-2.5 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-cyan-200 transition">
+          <i class="fa-solid fa-arrows-turn-to-dots"></i>
+          <span>Pindah Lokasi</span>
+        </button>
       </div>
     `;
   }).join("");
 }
 
+let SETTINGS_SELECTED_TRANSFER_IMEI = null;
+
+function openTransferGpsModal(imei) {
+  const g = SETTINGS_GPS_DATA.find(item => item.imei === imei);
+  if (!g) return;
+
+  SETTINGS_SELECTED_TRANSFER_IMEI = imei;
+  document.getElementById("modal-transfer-imei-display").innerText = g.imei;
+  document.getElementById("modal-transfer-pos-current").innerText = g.posisi_stock || "Kantor Pusat";
+
+  const selectLoc = document.getElementById("modal-transfer-select-location");
+  if (selectLoc) {
+    selectLoc.innerHTML = OFFICE_LOCATIONS.map(o => {
+      const isSelected = (g.posisi_stock || "").toLowerCase() === (o.name || "").toLowerCase();
+      return `<option value="${o.name}" ${isSelected ? 'selected' : ''}>${o.name}</option>`;
+    }).join("");
+  }
+
+  const selectStatus = document.getElementById("modal-transfer-select-status");
+  if (selectStatus) {
+    const isIdle = String(g.status_device || "").toUpperCase() === "TERSEDIA";
+    selectStatus.value = isIdle ? "TERSEDIA" : (g.status_device || "TERSEDIA");
+  }
+
+  document.getElementById("modal-gps-transfer").classList.remove("hidden");
+}
+
+function closeTransferGpsModal() {
+  document.getElementById("modal-gps-transfer").classList.add("hidden");
+  SETTINGS_SELECTED_TRANSFER_IMEI = null;
+}
+
+async function saveTransferGpsLocation() {
+  if (!SETTINGS_SELECTED_TRANSFER_IMEI) return;
+  const targetLocation = document.getElementById("modal-transfer-select-location").value;
+  const targetStatus = document.getElementById("modal-transfer-select-status").value;
+
+  try {
+    const client = supabaseClient || getSupabaseClient();
+    if (client) {
+      const { error } = await client
+        .from("m_gps_device")
+        .update({
+          posisi_stock: targetLocation,
+          status_device: targetStatus,
+          last_updated: new Date().toISOString()
+        })
+        .eq("imei", SETTINGS_SELECTED_TRANSFER_IMEI);
+
+      if (error) throw error;
+    }
+
+    showToast(`Posisi IMEI ${SETTINGS_SELECTED_TRANSFER_IMEI} dipindahkan ke ${targetLocation}!`, "success", 1800);
+    closeTransferGpsModal();
+    await loadGpsInventoryForSettings();
+    await syncMasterDataFromApi();
+  } catch (err) {
+    alert("Gagal memindahkan posisi stok GPS: " + err.message);
+  }
+}
+
 function openAddGpsModal() {
   document.getElementById("gps-input-imei").value = "";
-  document.getElementById("gps-input-posisi").value = "Kantor Pusat";
+  const posSelect = document.getElementById("gps-input-posisi");
+  if (posSelect && OFFICE_LOCATIONS.length > 0) {
+    posSelect.innerHTML = OFFICE_LOCATIONS.map(o => `<option value="${o.name}">${o.name}</option>`).join("");
+  }
   document.getElementById("modal-gps-add").classList.remove("hidden");
 }
 
@@ -4037,8 +4105,9 @@ async function saveNewGpsDevice() {
   }
 
   try {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
+    const client = supabaseClient || getSupabaseClient();
+    if (client) {
+      const { error } = await client
         .from("m_gps_device")
         .upsert({
           imei: imei,
