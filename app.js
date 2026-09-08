@@ -1029,10 +1029,14 @@ function renderPriorityList() {
     const houseBtnClass = hasMitraUrgency ? `${urgencyPillStyles[d.mitraLevel]} shadow-xs` : 'bg-slate-100 text-slate-400 border border-slate-200';
     const hasUnitUrgency = d.urgentUnitsCount > 0;
     const carBtnClass = hasUnitUrgency ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400 border border-slate-200';
+    const isPriorityUrgent = (d.score > 0) || (d.level && d.level !== "Normal");
 
-    const statusPill = d.visitedToday
-      ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-circle-check mr-1 text-[7px]"></i> Selesai Hari Ini</span>`
-      : `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-clock mr-1 text-[7px]"></i> Perlu Dikunjungi</span>`;
+    let statusPill = "";
+    if (d.visitedToday) {
+      statusPill = `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-circle-check mr-1 text-[7px]"></i> Selesai Hari Ini</span>`;
+    } else if (isPriorityUrgent) {
+      statusPill = `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-clock mr-1 text-[7px]"></i> Perlu Dikunjungi</span>`;
+    }
 
     const visitActionBtn = d.visitedToday
       ? `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Kunjungi Ulang Showroom Ini" class="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition flex items-center space-x-1">
