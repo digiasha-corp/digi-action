@@ -9,11 +9,42 @@
 
   <form onsubmit="handleAssignConcernSubmit(event)" class="space-y-3.5">
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-      <div>
+      <div class="relative" id="assign-dealer-search-wrapper">
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Mitra Dealer <span class="text-red-500">*</span></label>
-        <select id="assign-select-dealer" onchange="onAssignDealerSelected(this.value)" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-purple-700">
+        <select id="assign-select-dealer" onchange="onAssignDealerSelected(this.value)" required class="sr-only">
           <option value="">-- Pilih Partner Dealer --</option>
         </select>
+
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+            <input
+              type="text"
+              id="assign-dealer-search-input"
+              placeholder="Ketik untuk cari partner dealer / cabang..."
+              autocomplete="off"
+              onfocus="openAssignDealerSearchDropdown()"
+              oninput="filterAssignDealerSearchOptions(this.value)"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-purple-700 focus:ring-1 focus:ring-purple-700 transition outline-none"
+            />
+            <button
+              type="button"
+              id="assign-dealer-search-clear-btn"
+              onclick="clearAssignDealerSearchSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="assign-dealer-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="assign-dealer-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown items rendered via JS -->
+          </div>
+        </div>
       </div>
 
       <div>
