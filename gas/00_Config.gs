@@ -131,7 +131,7 @@ function setupAllDatabaseSheetHeaders() {
       sheet = ss.insertSheet(sheetName);
     }
     const headers = schema[sheetName];
-    // Hanya tulis header jika sheet masih kosong (baris <= 1)
+    // Tulis header jika sheet masih kosong
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.setFrozenRows(1);
@@ -139,4 +139,68 @@ function setupAllDatabaseSheetHeaders() {
   });
 
   Logger.log("Inisialisasi & Verifikasi Header Database Selesai!");
+}
+
+/**
+ * Paksa perbaiki dan perbarui baris 1 (Header) seluruh sheet database
+ * Jalankan fungsi ini di Apps Script Editor untuk menyelaraskan seluruh kolom header
+ */
+function fixAndStandardizeSheetHeaders() {
+  const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
+  
+  const schema = {
+    [CONFIG.SHEETS.EMPLOYEE]: [
+      "nip", "nama_lengkap", "email", "password", "role", "cabang", "area_cover", "status"
+    ],
+    [CONFIG.SHEETS.DEALER]: [
+      "dealer_id", "dealer_name", "owner_name", "cabang", "area_cover", "productivity", "status", "tanggal_kerjasama", "last_visit_date", "aging_visit_mitra", "urgent_units_count", "priority_level", "priority_score", "priority_reason"
+    ],
+    [CONFIG.SHEETS.FACILITY_UNIT]: [
+      "no_fasilitas", "dealer_name", "nopol", "unit", "contract_status", "jto_date", "overdue_days", "lifetime_days", "imei_gps", "gps_status", "last_visit_date", "aging_visit_unit", "aging_gps_maint", "priority_level", "priority_score", "priority_reason", "is_h3_jto"
+    ],
+    [CONFIG.SHEETS.GPS_DEVICE]: [
+      "imei", "tipe_perangkat", "status_device", "posisi_stock", "last_updated"
+    ],
+    [CONFIG.SHEETS.ASSIGNMENT]: [
+      "assignment_id", "created_at", "supervisor_nip", "assigned_to_nip", "dealer_name", "unit_fasilitas", "urgency_level", "instruksi", "status", "resolved_at", "resolved_by"
+    ],
+    [CONFIG.SHEETS.VISIT_HEADER]: [
+      "visit_id", "timestamp", "nip", "dealer_name", "lokasi", "bertemu_owner", "owner_reason", "stock", "sales", "issue_digi", "issue_internal", "issue_komp", "total_unit", "catatan_visit", "lat", "long", "showroom_photo_url", "tindak_lanjut_concern"
+    ],
+    [CONFIG.SHEETS.VISIT_UNIT]: [
+      "check_id", "visit_id", "timestamp", "dealer_name", "no_fasilitas", "nopol", "unit", "status_keberadaan", "kondisi_fisik", "odometer", "catatan_unit"
+    ],
+    [CONFIG.SHEETS.GPS_MAINTENANCE]: [
+      "maint_id", "timestamp", "nip", "no_fasilitas", "nopol", "dealer_name", "act_type", "imei_lama", "imei_baru", "alasan_cabut", "status_kondisi_gps", "keterangan", "lat", "long", "foto_gps_url"
+    ],
+    [CONFIG.SHEETS.ONBOARDING]: [
+      "onboarding_id", "timestamp", "nip", "dealer_name", "owner_name", "lokasi_lat", "lokasi_long", "survei_kelayakan", "catatan_survey", "foto_ktp_url", "foto_showroom_url", "doc_legalitas_url"
+    ],
+    [CONFIG.SHEETS.FAC_AUDIT]: [
+      "check_id", "timestamp", "user_id", "no_fasilitas", "imei", "status_gps", "keterangan"
+    ],
+    [CONFIG.SHEETS.ABSENSI]: [
+      "absen_id", "timestamp", "nip", "nama_karyawan", "tipe_absen", "office_name", "lat", "long", "distance_meter", "selfie_photo_url", "status_presensi"
+    ],
+    [CONFIG.SHEETS.PRIORITY_LOG]: [
+      "log_id", "log_date", "log_time", "entity_type", "entity_id", "entity_name", "cabang", "priority_level", "priority_score", "priority_reason", "aging_visit", "lifetime_days", "overdue_days", "gps_status", "is_h3_jto", "urgent_units_count", "concern_notes"
+    ],
+    [CONFIG.SHEETS.AUDIT_TRAIL]: [
+      "log_id", "timestamp", "user_id", "action", "detail_info", "device_info"
+    ]
+  };
+
+  Object.keys(schema).forEach(sheetName => {
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+    }
+    const headers = schema[sheetName];
+    // Paksa update Baris 1
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#0f172a").setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+  });
+
+  Logger.log("Seluruh Header Database Berhasil Diperbaiki dan Diselaraskan!");
 }
