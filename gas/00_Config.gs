@@ -94,7 +94,7 @@ function setupAllDatabaseSheetHeaders() {
       "no_fasilitas", "dealer_name", "nopol", "unit", "contract_status", "jto_date", "overdue_days", "lifetime_days", "imei_gps", "gps_status", "last_visit_date", "aging_visit_unit", "aging_gps_maint", "priority_level", "priority_score", "priority_reason", "is_h3_jto"
     ],
     [CONFIG.SHEETS.GPS_DEVICE]: [
-      "imei", "tipe_perangkat", "status_device", "posisi_stock", "last_updated"
+      "imei", "status_device", "posisi_stock", "last_updated"
     ],
     [CONFIG.SHEETS.ASSIGNMENT]: [
       "assignment_id", "created_at", "supervisor_nip", "assigned_to_nip", "dealer_name", "unit_fasilitas", "urgency_level", "instruksi", "status", "resolved_at", "resolved_by"
@@ -159,7 +159,7 @@ function fixAndStandardizeSheetHeaders() {
       "no_fasilitas", "dealer_name", "nopol", "unit", "contract_status", "jto_date", "overdue_days", "lifetime_days", "imei_gps", "gps_status", "last_visit_date", "aging_visit_unit", "aging_gps_maint", "priority_level", "priority_score", "priority_reason", "is_h3_jto"
     ],
     [CONFIG.SHEETS.GPS_DEVICE]: [
-      "imei", "tipe_perangkat", "status_device", "posisi_stock", "last_updated"
+      "imei", "status_device", "posisi_stock", "last_updated"
     ],
     [CONFIG.SHEETS.ASSIGNMENT]: [
       "assignment_id", "created_at", "supervisor_nip", "assigned_to_nip", "dealer_name", "unit_fasilitas", "urgency_level", "instruksi", "status", "resolved_at", "resolved_by"

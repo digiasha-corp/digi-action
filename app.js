@@ -2529,14 +2529,19 @@ function populateIdleImeiOptions(keyword = "") {
   if (!select) return;
 
   select.innerHTML = '<option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>';
-  const filtered = APP_STATE.idleGps.filter(item =>
-    item.imei.includes(keyword) || item.tipe.toLowerCase().includes(keyword.toLowerCase())
-  );
+  const kw = String(keyword || "").trim().toLowerCase();
+  const filtered = (APP_STATE.idleGps || []).filter(item => {
+    if (!kw) return true;
+    const imei = String(item.imei || "").toLowerCase();
+    const pos = String(item.posisi_stock || item.tipe || "").toLowerCase();
+    return imei.includes(kw) || pos.includes(kw);
+  });
 
   filtered.forEach(item => {
     const opt = document.createElement("option");
     opt.value = item.imei;
-    opt.innerText = `${item.imei} - ${item.tipe}`;
+    const loc = item.posisi_stock || item.tipe || "Stok Cabang";
+    opt.innerText = `${item.imei} (${loc})`;
     select.appendChild(opt);
   });
 }

@@ -234,18 +234,22 @@ function submitGpsMaintenanceServer(data, currentUser) {
           if (String(devData[j][0] || "").trim() === imeiBaru) {
             devSheet.getRange(j + 1, 2).setValue("Terpasang");
             devSheet.getRange(j + 1, 3).setValue(`Terpasang di ${targetNopol}`);
+            devSheet.getRange(j + 1, 4).setValue(timestampStr);
             found = true;
             break;
           }
         }
-        if (!found) devSheet.appendRow([imeiBaru, "Terpasang", `Terpasang di ${targetNopol}`]);
+        if (!found) devSheet.appendRow([imeiBaru, "Terpasang", `Terpasang di ${targetNopol}`, timestampStr]);
       }
 
       if (imeiLama && (aktivitas === "Cabut GPS" || aktivitas === "Ganti GPS")) {
         for (let k = 1; k < devData.length; k++) {
           if (String(devData[k][0] || "").trim() === imeiLama) {
             // Karena GPS Portable, unit lama yang ditarik/swap kembali berstatus TERSEDIA (untuk dicas & rotasi)
+            const branchName = currentUser ? (currentUser.cabang || "Stok Cabang") : "Stok Cabang";
             devSheet.getRange(k + 1, 2).setValue("TERSEDIA");
+            devSheet.getRange(k + 1, 3).setValue(branchName);
+            devSheet.getRange(k + 1, 4).setValue(timestampStr);
             break;
           }
         }

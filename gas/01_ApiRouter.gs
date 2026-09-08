@@ -341,18 +341,20 @@ function getMasterDataForFrontend() {
       const gHeaders = devRows[0].map(h => String(h).trim().toLowerCase());
       const idxGImei = gHeaders.findIndex(h => h.includes("imei"));
       const idxGStatus = gHeaders.findIndex(h => h.includes("status"));
-      const idxGPos = gHeaders.findIndex(h => h.includes("posisi") || h.includes("stock") || h.includes("tipe"));
+      const idxGPos = gHeaders.findIndex(h => h.includes("posisi") || h.includes("stock") || h.includes("cabang") || h.includes("lokasi") || h.includes("tipe"));
 
       for (let i = 1; i < devRows.length; i++) {
         const gRow = devRows[i];
         const imeiVal = String(gRow[idxGImei !== -1 ? idxGImei : 0] || "").trim();
         const stVal = String(gRow[idxGStatus !== -1 ? idxGStatus : 1] || "").trim().toUpperCase();
+        const posVal = String(gRow[idxGPos !== -1 ? idxGPos : 2] || "Stok Cabang").trim();
+
         if (imeiVal && (stVal.includes("TERSEDIA") || stVal.includes("READY") || stVal.includes("IDLE") || stVal.includes("STOK"))) {
           idleGps.push({
             imei: imeiVal,
-            tipe: String(gRow[idxGPos !== -1 ? idxGPos : 2] || "Stok Cabang"),
+            tipe: posVal || "Stok Cabang",
             status_device: stVal,
-            posisi_stock: String(gRow[idxGPos !== -1 ? idxGPos : 2] || "Stok Cabang")
+            posisi_stock: posVal || "Stok Cabang"
           });
         }
       }
