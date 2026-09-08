@@ -1684,9 +1684,12 @@ function openUnitModal(index) {
   toggleUnitAdaUI(u.terlihat === "Ya");
 
   TEMP_MODAL_PHOTO_BASE64 = u.foto_unit || null;
+  const imgUnitPreview = document.getElementById("img-modal-unit-photo");
   if (TEMP_MODAL_PHOTO_BASE64) {
+    if (imgUnitPreview) imgUnitPreview.src = TEMP_MODAL_PHOTO_BASE64;
     document.getElementById("modal-unit-photo-preview").classList.remove("hidden");
   } else {
+    if (imgUnitPreview) imgUnitPreview.src = "";
     document.getElementById("modal-unit-photo-preview").classList.add("hidden");
   }
 
@@ -1736,6 +1739,8 @@ async function handleModalUnitPhotoSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     TEMP_MODAL_PHOTO_BASE64 = compressed;
+    const imgUnitPreview = document.getElementById("img-modal-unit-photo");
+    if (imgUnitPreview) imgUnitPreview.src = compressed;
     const previewBox = document.getElementById("modal-unit-photo-preview");
     if (previewBox) previewBox.classList.remove("hidden");
   }
@@ -1744,6 +1749,8 @@ async function handleModalUnitPhotoSelected(input) {
 function removeModalUnitPhoto() {
   document.getElementById("file-modal-unit-photo").value = "";
   TEMP_MODAL_PHOTO_BASE64 = null;
+  const imgUnitPreview = document.getElementById("img-modal-unit-photo");
+  if (imgUnitPreview) imgUnitPreview.src = "";
   document.getElementById("modal-unit-photo-preview").classList.add("hidden");
 }
 
@@ -1814,6 +1821,8 @@ async function handleShowroomPhotoSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     CURRENT_SHOWROOM_PHOTO_BASE64 = compressed;
+    const imgPreview = document.getElementById("img-visit-showroom-preview");
+    if (imgPreview) imgPreview.src = compressed;
     document.getElementById("preview-photo-card").classList.remove("hidden");
   }
 }
@@ -1821,6 +1830,8 @@ async function handleShowroomPhotoSelected(input) {
 function removePhoto() {
   document.getElementById("file-visit-photo").value = "";
   CURRENT_SHOWROOM_PHOTO_BASE64 = null;
+  const imgPreview = document.getElementById("img-visit-showroom-preview");
+  if (imgPreview) imgPreview.src = "";
   document.getElementById("preview-photo-card").classList.add("hidden");
 }
 
@@ -2036,6 +2047,8 @@ async function handleOnbSelfieSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     CURRENT_ONB_SELFIE_BASE64 = compressed;
+    const imgPreview = document.getElementById("img-onb-selfie-preview");
+    if (imgPreview) imgPreview.src = compressed;
     document.getElementById("preview-onb-selfie-card").classList.remove("hidden");
   }
 }
@@ -2043,6 +2056,8 @@ async function handleOnbSelfieSelected(input) {
 function removeOnbSelfie() {
   document.getElementById("file-onb-selfie").value = "";
   CURRENT_ONB_SELFIE_BASE64 = null;
+  const imgPreview = document.getElementById("img-onb-selfie-preview");
+  if (imgPreview) imgPreview.src = "";
   document.getElementById("preview-onb-selfie-card").classList.add("hidden");
 }
 
@@ -2259,6 +2274,8 @@ async function handleGpsOldPhotoSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     GPS_PHOTO_OLD_BASE64 = compressed;
+    const imgPreview = document.getElementById("img-gps-old-preview");
+    if (imgPreview) imgPreview.src = compressed;
     document.getElementById("preview-gps-old-photo")?.classList.remove("hidden");
   }
 }
@@ -2267,6 +2284,8 @@ function removeGpsOldPhoto() {
   const fileInput = document.getElementById("file-gps-photo-old");
   if (fileInput) fileInput.value = "";
   GPS_PHOTO_OLD_BASE64 = null;
+  const imgPreview = document.getElementById("img-gps-old-preview");
+  if (imgPreview) imgPreview.src = "";
   document.getElementById("preview-gps-old-photo")?.classList.add("hidden");
 }
 
@@ -2274,6 +2293,8 @@ async function handleGpsNewImeiPhotoSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     GPS_PHOTO_NEW_IMEI_BASE64 = compressed;
+    const imgPreview = document.getElementById("img-gps-new-imei-preview");
+    if (imgPreview) imgPreview.src = compressed;
     document.getElementById("preview-gps-new-imei-photo")?.classList.remove("hidden");
   }
 }
@@ -2282,6 +2303,8 @@ function removeGpsNewImeiPhoto() {
   const fileInput = document.getElementById("file-gps-photo-new-imei");
   if (fileInput) fileInput.value = "";
   GPS_PHOTO_NEW_IMEI_BASE64 = null;
+  const imgPreview = document.getElementById("img-gps-new-imei-preview");
+  if (imgPreview) imgPreview.src = "";
   document.getElementById("preview-gps-new-imei-photo")?.classList.add("hidden");
 }
 
@@ -2289,6 +2312,8 @@ async function handleGpsPositionPhotoSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     GPS_PHOTO_POSITION_BASE64 = compressed;
+    const imgPreview = document.getElementById("img-gps-position-preview");
+    if (imgPreview) imgPreview.src = compressed;
     document.getElementById("preview-gps-position-photo")?.classList.remove("hidden");
   }
 }
@@ -2297,6 +2322,8 @@ function removeGpsPositionPhoto() {
   const fileInput = document.getElementById("file-gps-photo-position");
   if (fileInput) fileInput.value = "";
   GPS_PHOTO_POSITION_BASE64 = null;
+  const imgPreview = document.getElementById("img-gps-position-preview");
+  if (imgPreview) imgPreview.src = "";
   document.getElementById("preview-gps-position-photo")?.classList.add("hidden");
 }
 

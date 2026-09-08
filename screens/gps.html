@@ -84,10 +84,19 @@
             onchange="handleGpsOldPhotoSelected(this)" />
         </div>
         <div id="preview-gps-old-photo"
-          class="hidden mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-          <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto
-            IMEI Dicabut Siap</span>
-          <button type="button" onclick="removeGpsOldPhoto()" class="text-red-500 font-bold text-[11px]">Hapus</button>
+          class="hidden mt-2 space-y-2">
+          <div class="relative rounded-2xl overflow-hidden border border-slate-300 bg-slate-900 shadow-sm flex items-center justify-center">
+            <img id="img-gps-old-preview" src="" alt="Foto IMEI Dicabut" class="w-full h-44 object-cover" />
+            <div class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center">
+              <i class="fa-solid fa-camera mr-1 text-amber-400"></i> IMEI Dicabut Tersimpan
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-1">
+            <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto Siap</span>
+            <button type="button" onclick="removeGpsOldPhoto()" class="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 transition">
+              <i class="fa-solid fa-rotate-right mr-1 text-[10px]"></i> Ambil Ulang
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -126,11 +135,19 @@
             onchange="handleGpsNewImeiPhotoSelected(this)" />
         </div>
         <div id="preview-gps-new-imei-photo"
-          class="hidden mt-1.5 p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-          <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto
-            IMEI Baru Siap</span>
-          <button type="button" onclick="removeGpsNewImeiPhoto()"
-            class="text-red-500 font-bold text-[11px]">Hapus</button>
+          class="hidden mt-2 space-y-2">
+          <div class="relative rounded-2xl overflow-hidden border border-slate-300 bg-slate-900 shadow-sm flex items-center justify-center">
+            <img id="img-gps-new-imei-preview" src="" alt="Foto IMEI GPS Baru" class="w-full h-44 object-cover" />
+            <div class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center">
+              <i class="fa-solid fa-camera mr-1 text-emerald-400"></i> IMEI Baru Tersimpan
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-1">
+            <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto Siap</span>
+            <button type="button" onclick="removeGpsNewImeiPhoto()" class="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 transition">
+              <i class="fa-solid fa-rotate-right mr-1 text-[10px]"></i> Ambil Ulang
+            </button>
+          </div>
         </div>
       </div>
 
@@ -145,11 +162,19 @@
             onchange="handleGpsPositionPhotoSelected(this)" />
         </div>
         <div id="preview-gps-position-photo"
-          class="hidden mt-1.5 p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-          <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto
-            Posisi Pasang Siap</span>
-          <button type="button" onclick="removeGpsPositionPhoto()"
-            class="text-red-500 font-bold text-[11px]">Hapus</button>
+          class="hidden mt-2 space-y-2">
+          <div class="relative rounded-2xl overflow-hidden border border-slate-300 bg-slate-900 shadow-sm flex items-center justify-center">
+            <img id="img-gps-position-preview" src="" alt="Foto Posisi Pasang GPS" class="w-full h-44 object-cover" />
+            <div class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center">
+              <i class="fa-solid fa-car-tunnel mr-1 text-emerald-400"></i> Posisi Pasang Tersimpan
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-1">
+            <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto Siap</span>
+            <button type="button" onclick="removeGpsPositionPhoto()" class="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 transition">
+              <i class="fa-solid fa-rotate-right mr-1 text-[10px]"></i> Ambil Ulang
+            </button>
+          </div>
         </div>
       </div>
     </div>

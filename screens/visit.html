@@ -157,9 +157,19 @@
           <p class="text-xs text-slate-700 font-semibold">Buka Kamera & Ambil Foto</p>
           <input type="file" id="file-visit-photo" accept="image/*" capture="environment" class="hidden" onchange="handleShowroomPhotoSelected(this)" />
         </div>
-        <div id="preview-photo-card" class="hidden mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-          <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-circle-check mr-1"></i> Foto Siap</span>
-          <button type="button" onclick="removePhoto()" class="text-red-500 font-bold text-[11px]">Hapus</button>
+        <div id="preview-photo-card" class="hidden mt-2 space-y-2">
+          <div class="relative rounded-2xl overflow-hidden border border-slate-300 bg-slate-900 shadow-sm flex items-center justify-center">
+            <img id="img-visit-showroom-preview" src="" alt="Foto Showroom" class="w-full h-48 object-cover" />
+            <div class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center">
+              <i class="fa-solid fa-camera mr-1 text-emerald-400"></i> Foto Kunjungan Tersimpan
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-1">
+            <span class="text-[11px] text-emerald-700 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i> Foto Kunjungan Siap</span>
+            <button type="button" onclick="removePhoto()" class="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 transition">
+              <i class="fa-solid fa-rotate-right mr-1 text-[10px]"></i> Ambil Ulang
+            </button>
+          </div>
         </div>
       </div>
     </div>
