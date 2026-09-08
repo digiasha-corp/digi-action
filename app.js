@@ -3467,6 +3467,9 @@ function copySummaryText() {
     }, 2000);
   }
 
+  showToast("Format rekap berhasil disalin ke clipboard!", "success", 1800);
+}
+
 // =========================================================================
 // IN-APP MANAGEMENT / SETTINGS CONTROLLER (SUPER ADMIN)
 // =========================================================================
