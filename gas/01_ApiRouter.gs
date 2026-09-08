@@ -64,13 +64,6 @@ function doPost(e) {
 
     // --- B. TRANSAKSI LAPANGAN ---
     else if (action === "submitVisit") {
-      let photoUrl = "";
-      if (payload.showroom_photo_base64 && typeof uploadVisitPhoto === "function") {
-        const upRes = uploadVisitPhoto(payload.dealer_name || "MITRA", "SHOWROOM", payload.showroom_photo_base64);
-        if (upRes && upRes.success) photoUrl = upRes.url;
-      }
-      payload.showroom_photo_url = photoUrl;
-
       if (typeof submitLaporanVisitServer === "function") {
         result = submitLaporanVisitServer(payload, payload.unit_check_list || [], payload.currentUser);
       } else if (typeof handleSubmitVisit === "function") {
