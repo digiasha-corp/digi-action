@@ -15,9 +15,9 @@ let CURRENT_USER = (() => {
 
 // Hak Akses Modul per Role (Mendukung ID DB R-01 s/d R-04 dan Dynamic DB Permissions)
 const ROLE_PERMISSIONS = {
-  "Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
-  "R-01": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
-  "Super Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"],
+  "R-01": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"],
+  "Super Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"],
   "Supervisor": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
   "Branch Manager": ["priority", "assignment", "visit", "onboarding", "gps"],
   "R-02": ["priority", "assignment", "visit", "onboarding", "gps"],
@@ -665,7 +665,8 @@ async function loadScreen(screenName) {
         priority: "Priority Visit",
         assignment: "Assign Concern Visit",
         fac: "Laporan GPS (FAC)",
-        absensi: "Presensi Kehadiran"
+        absensi: "Presensi Kehadiran",
+        settings: "In-App Management"
       };
       title.innerText = titles[screenName] || "Monitoring";
     }
@@ -695,6 +696,7 @@ async function loadScreen(screenName) {
     if (screenName === "gps") initGpsScreen();
     if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
     if (screenName === "absensi") acquireAbsenLocation();
+    if (screenName === "settings") initSettingsScreen();
 
     window.scrollTo(0, 0);
   } catch (err) {
@@ -781,9 +783,9 @@ function initDashboard() {
 
   const perms = (Array.isArray(CURRENT_USER.permissions) && CURRENT_USER.permissions.length > 0)
     ? CURRENT_USER.permissions
-    : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac"]);
+    : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"]);
 
-  ["priority", "assignment", "visit", "onboarding", "gps", "fac"].forEach(key => {
+  ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) btn.style.display = perms.includes(key) ? "flex" : "none";
   });
@@ -3455,12 +3457,596 @@ function copySummaryText() {
     }, 2000);
   }
 
-  showToast("Format rekap berhasil disalin ke clipboard!", "success", 1800);
+// =========================================================================
+// IN-APP MANAGEMENT / SETTINGS CONTROLLER (SUPER ADMIN)
+// =========================================================================
+let SETTINGS_EMPLOYEES_DATA = [];
+let SETTINGS_GPS_DATA = [];
+let SETTINGS_CURRENT_DEALER_ID = null;
+let SETTINGS_CURRENT_OFFICE_ID = null;
+
+function initSettingsScreen() {
+  switchSettingsTab("emp");
+  loadEmployeesForSettings();
+  loadDealerSettings();
+  loadOfficeLocationsForSettings();
+  loadGpsInventoryForSettings();
 }
 
-function copyAndOpenWA() {
-  copySummaryText();
+function switchSettingsTab(tab) {
+  const tabs = ["emp", "dealer", "office", "gps"];
+  tabs.forEach(t => {
+    const el = document.getElementById(`settings-tab-${t}`);
+    const btn = document.getElementById(`tab-btn-${t}`);
+    if (el) {
+      if (t === tab) el.classList.remove("hidden");
+      else el.classList.add("hidden");
+    }
+    if (btn) {
+      if (t === tab) {
+        btn.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm font-bold";
+      } else {
+        btn.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold";
+      }
+    }
+  });
 }
+
+// ---------------- TAB 1: KARYAWAN & AKUN ----------------
+async function loadEmployeesForSettings() {
+  const container = document.getElementById("emp-list-container");
+  if (!container) return;
+
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("m_employee")
+        .select("*")
+        .order("nama_lengkap");
+
+      if (!error && data) {
+        SETTINGS_EMPLOYEES_DATA = data;
+        renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Error load employees from supabase:", e);
+    }
+  }
+
+  container.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">Tidak dapat memuat data karyawan.</div>';
+}
+
+function filterEmployeeList(keyword = "") {
+  const q = String(keyword || "").trim().toLowerCase();
+  const filtered = SETTINGS_EMPLOYEES_DATA.filter(e => {
+    if (!q) return true;
+    return String(e.nip || "").toLowerCase().includes(q) ||
+      String(e.nama_lengkap || "").toLowerCase().includes(q) ||
+      String(e.cabang || "").toLowerCase().includes(q) ||
+      String(e.role_id || "").toLowerCase().includes(q) ||
+      String(e.area_cover || "").toLowerCase().includes(q);
+  });
+  renderEmployeeList(filtered);
+}
+
+function renderEmployeeList(list) {
+  const container = document.getElementById("emp-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200"><i class="fa-solid fa-user-slash text-base mb-1 block text-slate-300"></i>Tidak ada karyawan yang cocok</div>';
+    return;
+  }
+
+  const roleStyles = {
+    "R-01": "bg-indigo-100 text-indigo-800 border-indigo-200",
+    "R-02": "bg-amber-100 text-amber-800 border-amber-200",
+    "R-03": "bg-cyan-100 text-cyan-800 border-cyan-200",
+    "R-04": "bg-emerald-100 text-emerald-800 border-emerald-200"
+  };
+
+  const roleNames = {
+    "R-01": "Super Admin",
+    "R-02": "Branch Manager",
+    "R-03": "FAC Officer",
+    "R-04": "Field PIC"
+  };
+
+  container.innerHTML = list.map(emp => {
+    const rId = emp.role_id || "R-04";
+    const rBadge = roleStyles[rId] || "bg-slate-100 text-slate-700 border-slate-200";
+    const rName = roleNames[rId] || rId;
+    const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
+
+    return `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+            <span class="font-mono text-xs font-bold text-slate-900">${emp.nip}</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${rBadge} uppercase">${rName}</span>
+            ${isAktif ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">AKTIF</span>' : '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-red-50 text-red-700 border border-red-200">NONAKTIF</span>'}
+          </div>
+          <h4 class="font-bold text-xs text-slate-800 mt-1 truncate">${emp.nama_lengkap}</h4>
+          <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
+            <span>${emp.cabang || "-"}</span>
+            <span>•</span>
+            <span>Area: <strong class="text-indigo-900">${emp.area_cover || 'Semua Area'}</strong></span>
+          </div>
+        </div>
+        <button type="button" onclick="openEditEmployeeModal('${emp.nip}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddEmployeeModal() {
+  document.getElementById("modal-emp-title").innerText = "Tambah Karyawan Baru";
+  document.getElementById("emp-input-nip").value = "";
+  document.getElementById("emp-input-nip").disabled = false;
+  document.getElementById("emp-input-nama").value = "";
+  document.getElementById("emp-input-email").value = "";
+  document.getElementById("emp-input-cabang").value = "Head Office";
+  document.getElementById("emp-input-role").value = "R-04";
+  document.getElementById("emp-input-area").value = "";
+  document.getElementById("emp-input-password").value = "Password123!";
+  document.getElementById("emp-input-status").value = "AKTIF";
+  document.getElementById("modal-employee-edit").classList.remove("hidden");
+}
+
+function openEditEmployeeModal(nip) {
+  const emp = SETTINGS_EMPLOYEES_DATA.find(e => e.nip === nip);
+  if (!emp) return;
+
+  document.getElementById("modal-emp-title").innerText = `Edit Karyawan: ${emp.nama_lengkap}`;
+  const nipInput = document.getElementById("emp-input-nip");
+  nipInput.value = emp.nip;
+  nipInput.disabled = true;
+  document.getElementById("emp-input-nama").value = emp.nama_lengkap || "";
+  document.getElementById("emp-input-email").value = emp.email || "";
+  document.getElementById("emp-input-cabang").value = emp.cabang || "";
+  document.getElementById("emp-input-role").value = emp.role_id || "R-04";
+  document.getElementById("emp-input-area").value = emp.area_cover || "";
+  document.getElementById("emp-input-password").value = "";
+  document.getElementById("emp-input-status").value = (emp.status_aktif === "AKTIF" || emp.status_aktif === true) ? "AKTIF" : "NONAKTIF";
+  document.getElementById("modal-employee-edit").classList.remove("hidden");
+}
+
+function closeEmployeeModal() {
+  document.getElementById("modal-employee-edit").classList.add("hidden");
+}
+
+function setEmpDefaultPass() {
+  document.getElementById("emp-input-password").value = "Password123!";
+}
+
+async function handleSaveEmployee(e) {
+  e.preventDefault();
+  const nip = document.getElementById("emp-input-nip").value.trim();
+  const nama = document.getElementById("emp-input-nama").value.trim();
+  const email = document.getElementById("emp-input-email").value.trim();
+  const cabang = document.getElementById("emp-input-cabang").value.trim();
+  const roleId = document.getElementById("emp-input-role").value;
+  const areaCover = document.getElementById("emp-input-area").value.trim();
+  const pass = document.getElementById("emp-input-password").value.trim();
+  const status = document.getElementById("emp-input-status").value;
+
+  const btn = document.getElementById("btn-save-emp");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    const payload = {
+      nip: nip,
+      nama_lengkap: nama,
+      email: email || `${nip}@digiasha.com`,
+      cabang: cabang,
+      role_id: roleId,
+      area_cover: areaCover,
+      status_aktif: status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (pass) {
+      payload.password_hash = pass;
+    }
+
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_employee")
+        .upsert(payload, { onConflict: "nip" });
+
+      if (error) throw error;
+    }
+
+    showToast("Data karyawan berhasil disimpan!", "success", 1500);
+    closeEmployeeModal();
+    await loadEmployeesForSettings();
+  } catch (err) {
+    alert("Gagal menyimpan data karyawan: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ---------------- TAB 2: AREA COVER DEALER ----------------
+function loadDealerSettings() {
+  const branchSelect = document.getElementById("dealer-branch-filter");
+  if (branchSelect) {
+    const branches = new Set();
+    APP_STATE.dealers.forEach(d => { if (d.cabang) branches.add(d.cabang); });
+    branchSelect.innerHTML = '<option value="ALL">Semua Cabang</option>' + 
+      Array.from(branches).map(b => `<option value="${b}">${b}</option>`).join("");
+  }
+  filterDealerSettingsList();
+}
+
+function filterDealerSettingsList() {
+  const q = String(document.getElementById("dealer-settings-search")?.value || "").trim().toLowerCase();
+  const bFilter = document.getElementById("dealer-branch-filter")?.value || "ALL";
+
+  const filtered = APP_STATE.dealers.filter(d => {
+    const matchQ = !q || String(d.dealer_name || "").toLowerCase().includes(q) || String(d.area_cover || "").toLowerCase().includes(q);
+    const matchB = bFilter === "ALL" || d.cabang === bFilter;
+    return matchQ && matchB;
+  });
+
+  renderDealerSettingsList(filtered);
+}
+
+function renderDealerSettingsList(list) {
+  const container = document.getElementById("dealer-settings-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200"><i class="fa-solid fa-store-slash text-base mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(d => {
+    return `
+      <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2 hover:border-amber-300 transition">
+        <div class="min-w-0 flex-1">
+          <h4 class="font-bold text-xs text-slate-900 truncate">${d.dealer_name}</h4>
+          <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-1.5 flex-wrap">
+            <span>${d.cabang || "-"}</span>
+            <span>•</span>
+            <span>Area: <strong class="text-amber-700 font-bold font-mono">${d.area_cover || 'Belum diatur'}</strong></span>
+          </div>
+        </div>
+        <button type="button" onclick="openEditDealerAreaModal('${d.dealer_id}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-amber-200 transition">
+          <i class="fa-solid fa-map-location-dot"></i>
+          <span>Ubah Area</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openEditDealerAreaModal(dealerId) {
+  const d = APP_STATE.dealers.find(item => item.dealer_id === dealerId);
+  if (!d) return;
+
+  SETTINGS_CURRENT_DEALER_ID = dealerId;
+  document.getElementById("modal-dealer-name-display").innerText = d.dealer_name;
+  document.getElementById("modal-dealer-branch-display").innerText = `Cabang: ${d.cabang || '-'}`;
+  document.getElementById("modal-dealer-input-area").value = d.area_cover || "";
+  document.getElementById("modal-dealer-area-edit").classList.remove("hidden");
+}
+
+function closeDealerAreaModal() {
+  document.getElementById("modal-dealer-area-edit").classList.add("hidden");
+  SETTINGS_CURRENT_DEALER_ID = null;
+}
+
+async function saveDealerAreaCover() {
+  if (!SETTINGS_CURRENT_DEALER_ID) return;
+  const newArea = document.getElementById("modal-dealer-input-area").value.trim();
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_dealer")
+        .update({ area_cover: newArea, updated_at: new Date().toISOString() })
+        .eq("dealer_id", SETTINGS_CURRENT_DEALER_ID);
+
+      if (error) throw error;
+    }
+
+    const d = APP_STATE.dealers.find(item => item.dealer_id === SETTINGS_CURRENT_DEALER_ID);
+    if (d) d.area_cover = newArea;
+
+    showToast("Area cover dealer berhasil diperbarui!", "success", 1500);
+    closeDealerAreaModal();
+    filterDealerSettingsList();
+  } catch (err) {
+    alert("Gagal memperbarui area dealer: " + err.message);
+  }
+}
+
+// ---------------- TAB 3: LOKASI KANTOR GEOFENCE ----------------
+async function loadOfficeLocationsForSettings() {
+  const container = document.getElementById("office-list-container");
+  if (!container) return;
+
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("m_work_location")
+        .select("*")
+        .order("name");
+
+      if (!error && data) {
+        OFFICE_LOCATIONS = data.map(l => ({
+          location_id: l.location_id,
+          name: l.name || l.location_name,
+          lat: parseFloat(l.lat || l.latitude),
+          long: parseFloat(l.long || l.longitude),
+          maxRadiusMeter: parseInt(l.max_radius_meter || l.radius_meter || 100),
+          address: l.address || l.alamat || ""
+        }));
+        renderOfficeLocationsList(OFFICE_LOCATIONS);
+        return;
+      }
+    } catch (e) {
+      console.warn("Error load work locations from supabase:", e);
+    }
+  }
+
+  renderOfficeLocationsList(OFFICE_LOCATIONS);
+}
+
+function renderOfficeLocationsList(list) {
+  const container = document.getElementById("office-list-container");
+  if (!container) return;
+
+  container.innerHTML = list.map(o => {
+    return `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2 hover:border-emerald-300 transition">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-mono text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">${o.location_id}</span>
+            <h4 class="font-bold text-xs text-slate-900 truncate">${o.name}</h4>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1 font-mono">
+            ${o.lat.toFixed(6)}, ${o.long.toFixed(6)} • Radius ${o.maxRadiusMeter}m
+          </div>
+          <p class="text-[10px] text-slate-400 truncate mt-0.5">${o.address || '-'}</p>
+        </div>
+        <button type="button" onclick="openEditOfficeModal('${o.location_id}')" class="px-2.5 py-2 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddOfficeModal() {
+  document.getElementById("modal-office-title").innerText = "Tambah Lokasi Kantor";
+  const idInput = document.getElementById("office-input-id");
+  idInput.value = "";
+  idInput.disabled = false;
+  document.getElementById("office-input-name").value = "";
+  document.getElementById("office-input-lat").value = "";
+  document.getElementById("office-input-long").value = "";
+  document.getElementById("office-input-radius").value = "100";
+  document.getElementById("office-input-address").value = "";
+  document.getElementById("modal-office-edit").classList.remove("hidden");
+}
+
+function openEditOfficeModal(locId) {
+  const o = OFFICE_LOCATIONS.find(item => item.location_id === locId);
+  if (!o) return;
+
+  document.getElementById("modal-office-title").innerText = `Edit Lokasi: ${o.name}`;
+  const idInput = document.getElementById("office-input-id");
+  idInput.value = o.location_id;
+  idInput.disabled = true;
+  document.getElementById("office-input-name").value = o.name || "";
+  document.getElementById("office-input-lat").value = o.lat || "";
+  document.getElementById("office-input-long").value = o.long || "";
+  document.getElementById("office-input-radius").value = o.maxRadiusMeter || 100;
+  document.getElementById("office-input-address").value = o.address || "";
+  document.getElementById("modal-office-edit").classList.remove("hidden");
+}
+
+function closeOfficeModal() {
+  document.getElementById("modal-office-edit").classList.add("hidden");
+}
+
+function captureCurrentGpsForOffice() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        document.getElementById("office-input-lat").value = pos.coords.latitude.toFixed(7);
+        document.getElementById("office-input-long").value = pos.coords.longitude.toFixed(7);
+        showToast("Koordinat GPS berhasil diperoleh!", "success", 1200);
+      },
+      err => {
+        alert("Gagal mendapatkan sinyal GPS: " + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  } else {
+    alert("Perangkat Anda tidak mendukung geolokasi.");
+  }
+}
+
+async function handleSaveOffice(e) {
+  e.preventDefault();
+  const locId = document.getElementById("office-input-id").value.trim();
+  const name = document.getElementById("office-input-name").value.trim();
+  const lat = parseFloat(document.getElementById("office-input-lat").value);
+  const long = parseFloat(document.getElementById("office-input-long").value);
+  const radius = parseInt(document.getElementById("office-input-radius").value) || 100;
+  const address = document.getElementById("office-input-address").value.trim();
+
+  const btn = document.getElementById("btn-save-office");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    const payload = {
+      location_id: locId,
+      name: name,
+      lat: lat,
+      long: long,
+      max_radius_meter: radius,
+      address: address,
+      updated_at: new Date().toISOString()
+    };
+
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_work_location")
+        .upsert(payload, { onConflict: "location_id" });
+
+      if (error) throw error;
+    }
+
+    showToast("Lokasi kantor berhasil disimpan!", "success", 1500);
+    closeOfficeModal();
+    await loadOfficeLocationsForSettings();
+  } catch (err) {
+    alert("Gagal menyimpan lokasi kantor: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ---------------- TAB 4: INVENTORI STOK GPS ----------------
+async function loadGpsInventoryForSettings() {
+  const container = document.getElementById("gps-settings-list-container");
+  if (!container) return;
+
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("m_gps_device")
+        .select("*")
+        .order("last_updated", { ascending: false });
+
+      if (!error && data) {
+        SETTINGS_GPS_DATA = data;
+        updateGpsStats(SETTINGS_GPS_DATA);
+        renderGpsSettingsList(SETTINGS_GPS_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Error load GPS from supabase:", e);
+    }
+  }
+
+  container.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">Tidak dapat memuat stok GPS.</div>';
+}
+
+function updateGpsStats(list) {
+  const totalEl = document.getElementById("gps-stat-total");
+  const idleEl = document.getElementById("gps-stat-idle");
+  const installedEl = document.getElementById("gps-stat-installed");
+
+  const total = list.length;
+  const idle = list.filter(g => String(g.status_device || "").toUpperCase() === "TERSEDIA").length;
+  const installed = total - idle;
+
+  if (totalEl) totalEl.innerText = total;
+  if (idleEl) idleEl.innerText = idle;
+  if (installedEl) installedEl.innerText = installed;
+}
+
+function filterGpsSettingsList(keyword = "") {
+  const q = String(keyword || "").trim().toLowerCase();
+  const filtered = SETTINGS_GPS_DATA.filter(g => {
+    if (!q) return true;
+    return String(g.imei || "").toLowerCase().includes(q) ||
+      String(g.posisi_stock || "").toLowerCase().includes(q) ||
+      String(g.status_device || "").toLowerCase().includes(q);
+  });
+  renderGpsSettingsList(filtered);
+}
+
+function renderGpsSettingsList(list) {
+  const container = document.getElementById("gps-settings-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200"><i class="fa-solid fa-satellite-dish text-base mb-1 block text-slate-300"></i>Tidak ada data IMEI GPS</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(g => {
+    const isIdle = String(g.status_device || "").toUpperCase() === "TERSEDIA";
+    const badgeCls = isIdle 
+      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+      : "bg-cyan-100 text-cyan-800 border-cyan-200";
+
+    return `
+      <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2 hover:border-cyan-300 transition">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-mono text-xs font-bold text-slate-900">${g.imei}</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.2 rounded border ${badgeCls} uppercase">${g.status_device || 'TERSEDIA'}</span>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-0.5">
+            Posisi: <strong class="text-slate-700">${g.posisi_stock || 'Kantor Pusat'}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddGpsModal() {
+  document.getElementById("gps-input-imei").value = "";
+  document.getElementById("gps-input-posisi").value = "Kantor Pusat";
+  document.getElementById("modal-gps-add").classList.remove("hidden");
+}
+
+function closeAddGpsModal() {
+  document.getElementById("modal-gps-add").classList.add("hidden");
+}
+
+async function saveNewGpsDevice() {
+  const imei = document.getElementById("gps-input-imei").value.trim();
+  const posisi = document.getElementById("gps-input-posisi").value;
+
+  if (!imei) {
+    alert("Nomor IMEI GPS wajib diisi!");
+    return;
+  }
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_gps_device")
+        .upsert({
+          imei: imei,
+          status_device: "TERSEDIA",
+          posisi_stock: posisi,
+          last_updated: new Date().toISOString()
+        }, { onConflict: "imei" });
+
+      if (error) throw error;
+    }
+
+    showToast("IMEI GPS baru berhasil disimpan!", "success", 1500);
+    closeAddGpsModal();
+    await loadGpsInventoryForSettings();
+    await syncMasterDataFromApi();
+  } catch (err) {
+    alert("Gagal menambahkan IMEI GPS: " + err.message);
+  }
+}
+
+
 
 // =========================================================================
 // APP INITIALIZATION & GLOBAL EVENT LISTENERS
