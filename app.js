@@ -2778,10 +2778,11 @@ async function handleGpsSubmit(e) {
     catatan_teknis: catatanTeknis,
     lat: CURRENT_USER_GEO.lat,
     long: CURRENT_USER_GEO.long,
+    work_location_name: (CURRENT_USER_GEO && CURRENT_USER_GEO.nearestOffice) ? CURRENT_USER_GEO.nearestOffice.name : "",
     currentUser: CURRENT_USER
   });
 
-  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-emerald-600");
+  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke clipboard", waText, "bg-emerald-600");
 }
 
 // =========================================================================

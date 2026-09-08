@@ -243,12 +243,13 @@ function submitGpsMaintenanceServer(data, currentUser) {
       }
 
       if (imeiLama && (aktivitas === "Cabut GPS" || aktivitas === "Ganti GPS")) {
+        // Tentukan location_name dari M_WORK_LOCATION (bukan branch_name)
+        const workLocationName = getWorkLocationNameForPic(currentUser, data.lat, data.long, data.work_location_name);
         for (let k = 1; k < devData.length; k++) {
           if (String(devData[k][0] || "").trim() === imeiLama) {
-            // Karena GPS Portable, unit lama yang ditarik/swap kembali berstatus TERSEDIA (untuk dicas & rotasi)
-            const branchName = currentUser ? (currentUser.cabang || "Stok Cabang") : "Stok Cabang";
+            // Karena GPS Portable, unit lama yang ditarik/swap kembali berstatus TERSEDIA di work location terkait
             devSheet.getRange(k + 1, 2).setValue("TERSEDIA");
-            devSheet.getRange(k + 1, 3).setValue(branchName);
+            devSheet.getRange(k + 1, 3).setValue(workLocationName);
             devSheet.getRange(k + 1, 4).setValue(timestampStr);
             break;
           }
@@ -264,6 +265,99 @@ function submitGpsMaintenanceServer(data, currentUser) {
   } catch (err) {
     Logger.log("Error submitGpsMaintenanceServer: " + err.toString());
     return { success: false, message: err.toString() };
+  }
+}
+
+// Helper menentukan Location Name dari M_WORK_LOCATION
+function getWorkLocationNameForPic(currentUser, lat, long, providedLocName) {
+  try {
+    if (providedLocName && String(providedLocName).trim() !== "") {
+      return String(providedLocName).trim();
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
+    const locSheet = ss.getSheetByName(CONFIG.SHEETS.WORK_LOCATION || "M_WORK_LOCATION") || ss.getSheetByName("WORK_LOCATION") || ss.getSheetByName("LOKASI");
+    
+    let workLocations = [];
+    if (locSheet) {
+      const locData = locSheet.getDataRange().getValues();
+      if (locData.length > 1) {
+        const lHeaders = locData[0].map(h => String(h).trim().toLowerCase());
+        const idxLName = lHeaders.findIndex(h => h.includes("location_name") || h.includes("nama") || h.includes("name"));
+        const idxLat = lHeaders.findIndex(h => h.includes("latitude") || h.includes("lat"));
+        const idxLong = lHeaders.findIndex(h => h.includes("longitude") || h.includes("long") || h.includes("lng"));
+        const idxBranch = lHeaders.findIndex(h => h.includes("cabang") || h.includes("branch") || h.includes("area"));
+
+        for (let i = 1; i < locData.length; i++) {
+          const row = locData[i];
+          const name = String(row[idxLName !== -1 ? idxLName : 1] || "").trim();
+          const lLat = parseFloat(String(row[idxLat !== -1 ? idxLat : 2] || "").replace(",", "."));
+          const lLong = parseFloat(String(row[idxLong !== -1 ? idxLong : 3] || "").replace(",", "."));
+          const branchHint = String(idxBranch !== -1 ? row[idxBranch] : "").trim();
+          if (name) {
+            workLocations.push({ name, lat: lLat, long: lLong, branch: branchHint });
+          }
+        }
+      }
+    }
+
+    // 1. Cek Geotag terdekat jika ada koordinat
+    const numLat = parseFloat(lat);
+    const numLong = parseFloat(long);
+    if (!isNaN(numLat) && !isNaN(numLong) && Math.abs(numLat) > 0 && workLocations.length > 0) {
+      let nearestLoc = null;
+      let minDistance = Infinity;
+      workLocations.forEach(loc => {
+        if (!isNaN(loc.lat) && !isNaN(loc.long)) {
+          const R = 6371e3;
+          const phi1 = numLat * Math.PI / 180;
+          const phi2 = loc.lat * Math.PI / 180;
+          const deltaPhi = (loc.lat - numLat) * Math.PI / 180;
+          const deltaLambda = (loc.long - numLong) * Math.PI / 180;
+          const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+          const d = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+          if (d < minDistance) {
+            minDistance = d;
+            nearestLoc = loc.name;
+          }
+        }
+      });
+      if (nearestLoc && minDistance < 150000) {
+        return nearestLoc;
+      }
+    }
+
+    // 2. Pemetaan cabang / area user ke M_WORK_LOCATION
+    const userBranch = String((currentUser && currentUser.cabang) || "").trim().toLowerCase();
+    const userArea = String((currentUser && currentUser.area_cover) || "").trim().toLowerCase();
+
+    for (let loc of workLocations) {
+      const locLower = loc.name.toLowerCase();
+      if (userBranch && (locLower.includes(userBranch) || (loc.branch && loc.branch.toLowerCase().includes(userBranch)))) {
+        return loc.name;
+      }
+      if (userArea && (locLower.includes(userArea) || (loc.branch && loc.branch.toLowerCase().includes(userArea)))) {
+        return loc.name;
+      }
+    }
+
+    // 3. Fallback umum: Tangerang / HO -> Kantor Pusat, Makassar -> Kantor Makassar, Balikpapan -> Kantor Balikpapan
+    if (userBranch.includes("tangerang") || userBranch.includes("head") || userBranch.includes("ho") || userBranch.includes("jakarta")) {
+      const hoLoc = workLocations.find(l => l.name.toLowerCase().includes("pusat") || l.name.toLowerCase().includes("ho"));
+      return hoLoc ? hoLoc.name : "Kantor Pusat";
+    }
+    if (userBranch.includes("makassar") || userBranch.includes("mks")) {
+      const mksLoc = workLocations.find(l => l.name.toLowerCase().includes("makassar"));
+      return mksLoc ? mksLoc.name : "Kantor Makassar";
+    }
+    if (userBranch.includes("balikpapan") || userBranch.includes("bpp") || userBranch.includes("samarinda")) {
+      const bppLoc = workLocations.find(l => l.name.toLowerCase().includes("balikpapan"));
+      return bppLoc ? bppLoc.name : "Kantor Balikpapan";
+    }
+
+    return (workLocations[0] && workLocations[0].name) ? workLocations[0].name : "Kantor Pusat";
+  } catch (err) {
+    return "Kantor Pusat";
   }
 }
 
