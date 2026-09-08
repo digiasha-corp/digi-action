@@ -172,19 +172,44 @@
         <h3 class="text-xs font-bold text-slate-800 uppercase">Pemasangan GPS Baru (Stok Idle Cabang)</h3>
       </div>
 
-      <div>
+      <!-- Searchable IMEI GPS Idle -->
+      <div class="relative" id="gps-imei-search-wrapper">
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Cari / Pilih IMEI GPS Idle <span
             class="text-red-500">*</span></label>
-        <div class="relative">
-          <input type="text" id="gps-search-imei" oninput="filterIdleImei(this.value)"
-            placeholder="Ketik nomor IMEI untuk mencari stok idle..."
-            class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pl-8 text-xs font-mono font-semibold focus:ring-2 focus:ring-emerald-700" />
-          <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-3 text-slate-400 text-xs"></i>
-        </div>
-        <select id="gps-select-imei-baru" onchange="onImeiBaruSelected(this.value)"
-          class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-semibold mt-2 focus:ring-2 focus:ring-emerald-700">
+        <select id="gps-select-imei-baru" onchange="onImeiBaruSelected(this.value)" required class="sr-only">
           <option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>
         </select>
+
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-satellite text-slate-400 text-xs absolute left-3 pointer-events-none"></i>
+            <input
+              type="text"
+              id="gps-search-imei"
+              placeholder="Ketik nomor IMEI atau cabang..."
+              autocomplete="off"
+              onfocus="openGpsImeiSearchDropdown()"
+              oninput="filterIdleImeiSearchOptions(this.value)"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-mono font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition outline-none"
+            />
+            <button
+              type="button"
+              id="gps-imei-search-clear-btn"
+              onclick="clearGpsImeiSearchSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="gps-imei-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="gps-imei-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown items rendered via JS -->
+          </div>
+        </div>
       </div>
 
       <div>

@@ -2524,37 +2524,138 @@ function onGpsKendaraanSelected(nopol) {
   if (inputImeiLama) inputImeiLama.value = imeiLama;
 }
 
-function populateIdleImeiOptions(keyword = "") {
+function populateIdleImeiOptions() {
   const select = document.getElementById("gps-select-imei-baru");
-  if (!select) return;
+  if (select) {
+    select.innerHTML = '<option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>';
+    (APP_STATE.idleGps || []).forEach(item => {
+      const opt = document.createElement("option");
+      opt.value = item.imei;
+      const loc = item.posisi_stock || item.tipe || "Stok Cabang";
+      opt.innerText = `${item.imei} (${loc})`;
+      select.appendChild(opt);
+    });
+  }
+  renderGpsImeiSearchDropdown("");
+}
 
-  select.innerHTML = '<option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>';
-  const kw = String(keyword || "").trim().toLowerCase();
+function renderGpsImeiSearchDropdown(query = "") {
+  const dropdown = document.getElementById("gps-imei-search-dropdown");
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
   const filtered = (APP_STATE.idleGps || []).filter(item => {
-    if (!kw) return true;
+    if (!q) return true;
     const imei = String(item.imei || "").toLowerCase();
     const pos = String(item.posisi_stock || item.tipe || "").toLowerCase();
-    return imei.includes(kw) || pos.includes(kw);
+    return imei.includes(q) || pos.includes(q);
   });
 
+  dropdown.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "p-3 text-center text-xs text-slate-400";
+    emptyDiv.innerHTML = '<i class="fa-solid fa-box-open mb-1 block text-slate-300"></i>Tidak ada stok GPS idle yang cocok';
+    dropdown.appendChild(emptyDiv);
+    return;
+  }
+
   filtered.forEach(item => {
-    const opt = document.createElement("option");
-    opt.value = item.imei;
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-emerald-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectGpsImeiFromSearch(item.imei);
+    };
+
     const loc = item.posisi_stock || item.tipe || "Stok Cabang";
-    opt.innerText = `${item.imei} (${loc})`;
-    select.appendChild(opt);
+
+    el.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-900 font-mono text-xs">${item.imei}</div>
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+          <i class="fa-solid fa-location-dot text-[9px] text-emerald-600"></i>
+          <span>${loc}</span>
+        </div>
+      </div>
+      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 uppercase">READY</span>
+    `;
+    dropdown.appendChild(el);
   });
+}
+
+function openGpsImeiSearchDropdown() {
+  const dropdown = document.getElementById("gps-imei-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("gps-search-imei");
+    renderGpsImeiSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeGpsImeiSearchDropdown() {
+  const dropdown = document.getElementById("gps-imei-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterIdleImeiSearchOptions(query) {
+  openGpsImeiSearchDropdown();
+  renderGpsImeiSearchDropdown(query);
+
+  const clearBtn = document.getElementById("gps-imei-search-clear-btn");
+  const chevron = document.getElementById("gps-imei-search-chevron");
+  if (query && query.trim() !== "") {
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+  } else {
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  }
+}
+
+function selectGpsImeiFromSearch(imei) {
+  const item = (APP_STATE.idleGps || []).find(g => g.imei === imei);
+  const input = document.getElementById("gps-search-imei");
+  const sel = document.getElementById("gps-select-imei-baru");
+  const clearBtn = document.getElementById("gps-imei-search-clear-btn");
+  const chevron = document.getElementById("gps-imei-search-chevron");
+
+  if (item && input && sel) {
+    const loc = item.posisi_stock || item.tipe || "Stok Cabang";
+    input.value = `${item.imei} (${loc})`;
+    sel.value = item.imei;
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+    closeGpsImeiSearchDropdown();
+    onImeiBaruSelected(item.imei);
+  }
+}
+
+function clearGpsImeiSearchSelection() {
+  const input = document.getElementById("gps-search-imei");
+  const sel = document.getElementById("gps-select-imei-baru");
+  const clearBtn = document.getElementById("gps-imei-search-clear-btn");
+  const chevron = document.getElementById("gps-imei-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (sel) sel.value = "";
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  onImeiBaruSelected("");
+  openGpsImeiSearchDropdown();
 }
 
 function filterIdleImei(keyword) {
-  populateIdleImeiOptions(keyword);
+  filterIdleImeiSearchOptions(keyword);
 }
 
 function onImeiBaruSelected(val) {
-  if (val) {
-    const searchInput = document.getElementById("gps-search-imei");
-    if (searchInput) searchInput.value = val;
-  }
+  // Callback when new IMEI is selected
 }
 
 async function handleGpsOldPhotoSelected(input) {
@@ -2926,6 +3027,11 @@ document.addEventListener("click", (e) => {
   const gpsKendaraanWrapper = document.getElementById("gps-kendaraan-search-wrapper");
   if (gpsKendaraanWrapper && !gpsKendaraanWrapper.contains(e.target)) {
     closeGpsKendaraanSearchDropdown();
+  }
+  // Close GPS IMEI Search if click outside
+  const gpsImeiWrapper = document.getElementById("gps-imei-search-wrapper");
+  if (gpsImeiWrapper && !gpsImeiWrapper.contains(e.target)) {
+    closeGpsImeiSearchDropdown();
   }
 });
 
