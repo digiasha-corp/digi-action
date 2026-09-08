@@ -17,7 +17,14 @@ const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbzd9S7BBb4aaHWjam_EiUmupSiPGICqYwrfolLm_IpO67qt6ajdvExGB2rxQkXes9m0aw/exec"
 };
 
-// Inisialisasi Supabase JS Client Global
-const supabaseClient = (window.supabase && typeof window.supabase.createClient === "function")
-  ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
-  : null;
+// Inisialisasi Supabase JS Client Global Helper
+function getSupabaseClient() {
+  if (window._supabaseInstance) return window._supabaseInstance;
+  if (window.supabase && typeof window.supabase.createClient === "function") {
+    window._supabaseInstance = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    return window._supabaseInstance;
+  }
+  return null;
+}
+
+let supabaseClient = getSupabaseClient();

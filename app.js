@@ -651,8 +651,10 @@ async function loadScreen(screenName) {
     topbar.classList.add("hidden");
   } else {
     topbar.classList.remove("hidden");
-    const areaSuffix = CURRENT_USER.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
-    sub.innerText = `${CURRENT_USER.nama} • ${CURRENT_USER.role}${areaSuffix}`;
+    const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || CURRENT_USER?.email || "Pengguna";
+    const uRole = CURRENT_USER?.role || CURRENT_USER?.role_id || "Karyawan";
+    const areaSuffix = CURRENT_USER?.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
+    if (sub) sub.innerText = `${uName} • ${uRole}${areaSuffix}`;
     if (screenName === "dashboard") {
       btnBack.classList.add("hidden");
       title.innerText = "Digiasha Monitoring";
@@ -758,8 +760,8 @@ async function handleLoginSubmit(e) {
       localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(res.user));
     } catch (err) {}
 
-    await syncMasterDataFromApi();
     loadScreen("dashboard");
+    syncMasterDataFromApi();
   } catch (err) {
     submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
@@ -776,14 +778,22 @@ function handleLogout() {
 // Controller Dashboard
 function initDashboard() {
   if (!CURRENT_USER) return;
-  document.getElementById("dash-user-name").innerText = `Halo, ${CURRENT_USER.nama}!`;
+  const uName = CURRENT_USER.nama || CURRENT_USER.nama_lengkap || CURRENT_USER.email || "Pengguna";
+  const uRole = CURRENT_USER.role || CURRENT_USER.role_id || "Karyawan";
+
+  const nameEl = document.getElementById("dash-user-name");
+  if (nameEl) nameEl.innerText = `Halo, ${uName}!`;
+
   const areaInfo = CURRENT_USER.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
-  document.getElementById("dash-user-branch").innerText = `Cabang: ${CURRENT_USER.cabang}${areaInfo}`;
-  document.getElementById("badge-role").innerText = CURRENT_USER.role || CURRENT_USER.role_id || "Karyawan";
+  const branchEl = document.getElementById("dash-user-branch");
+  if (branchEl) branchEl.innerText = `Cabang: ${CURRENT_USER.cabang || '-'}${areaInfo}`;
+
+  const roleEl = document.getElementById("badge-role");
+  if (roleEl) roleEl.innerText = uRole;
 
   const perms = (Array.isArray(CURRENT_USER.permissions) && CURRENT_USER.permissions.length > 0)
     ? CURRENT_USER.permissions
-    : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"]);
+    : (ROLE_PERMISSIONS[uRole] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"]);
 
   ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
@@ -4080,10 +4090,15 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (CURRENT_USER) {
-    await syncMasterDataFromApi();
-    loadScreen("dashboard");
-  } else {
+  try {
+    if (CURRENT_USER) {
+      loadScreen("dashboard");
+      syncMasterDataFromApi();
+    } else {
+      loadScreen("login");
+    }
+  } catch (err) {
+    console.error("Initialization error:", err);
     loadScreen("login");
   }
 });
