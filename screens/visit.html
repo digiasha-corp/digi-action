@@ -6,11 +6,42 @@
         <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">1</span>
         <h3 class="text-xs font-bold text-slate-800 uppercase">Identitas Kunjungan & Pertemuan Owner</h3>
       </div>
-      <div>
+      <div class="relative" id="dealer-search-wrapper">
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Partner Dealer <span class="text-red-500">*</span></label>
-        <select id="input-dealer" onchange="onDealerSelected(this.value)" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold">
+        <select id="input-dealer" onchange="onDealerSelected(this.value)" required class="sr-only">
           <option value="">-- Pilih Partner Dealer --</option>
         </select>
+        
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+            <input
+              type="text"
+              id="dealer-search-input"
+              placeholder="Ketik untuk cari partner dealer / cabang..."
+              autocomplete="off"
+              onfocus="openDealerSearchDropdown()"
+              oninput="filterDealerSearchOptions(this.value)"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none"
+            />
+            <button
+              type="button"
+              id="dealer-search-clear-btn"
+              onclick="clearDealerSearchSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="dealer-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="dealer-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown items rendered via JS -->
+          </div>
+        </div>
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Lokasi Kunjungan <span class="text-red-500">*</span></label>

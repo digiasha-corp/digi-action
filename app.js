@@ -912,12 +912,8 @@ function isDealerVisitedToday(d) {
 function startVisitForDealer(dealerId) {
   loadScreen('visit');
   setTimeout(() => {
-    const sel = document.getElementById("input-dealer");
-    if (sel) {
-      sel.value = dealerId;
-      onDealerSelected(dealerId);
-    }
-  }, 100);
+    selectDealerFromSearch(dealerId);
+  }, 120);
 }
 
 async function refreshPriorityData(btn) {
@@ -1246,9 +1242,142 @@ function populateVisitDealerOptions() {
   MASTER_DEALER_PRIORITY_DATA.forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.dealer_id;
-    opt.innerText = `${d.dealer_name} (${d.cabang})`;
+    opt.innerText = `${d.dealer_name} (${d.cabang || "-"})`;
     sel.appendChild(opt);
   });
+
+  renderDealerSearchDropdown("");
+
+  // Setup click outside listener to auto-close dropdown
+  if (!window._dealerSearchClickAttached) {
+    window._dealerSearchClickAttached = true;
+    document.addEventListener("click", (e) => {
+      const wrapper = document.getElementById("dealer-search-wrapper");
+      const dropdown = document.getElementById("dealer-search-dropdown");
+      if (dropdown && wrapper && !wrapper.contains(e.target)) {
+        dropdown.classList.add("hidden");
+      }
+    });
+  }
+}
+
+function renderDealerSearchDropdown(query = "") {
+  const dropdown = document.getElementById("dealer-search-dropdown");
+  if (!dropdown) return;
+  
+  const q = String(query || "").trim().toLowerCase();
+  const filtered = MASTER_DEALER_PRIORITY_DATA.filter(d => {
+    if (!q) return true;
+    const name = String(d.dealer_name || "").toLowerCase();
+    const branch = String(d.cabang || "").toLowerCase();
+    return name.includes(q) || branch.includes(q);
+  });
+
+  dropdown.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "p-3 text-center text-xs text-slate-400";
+    emptyDiv.innerHTML = '<i class="fa-solid fa-store-slash mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok';
+    dropdown.appendChild(emptyDiv);
+    return;
+  }
+
+  const urgencyBadgeStyles = {
+    "Sangat Penting": "bg-red-100 text-red-700 border-red-200",
+    "Penting": "bg-orange-100 text-orange-700 border-orange-200",
+    "Moderat": "bg-amber-100 text-amber-700 border-amber-200",
+    "Normal": "bg-slate-100 text-slate-600 border-slate-200"
+  };
+
+  filtered.forEach(d => {
+    const item = document.createElement("div");
+    item.className = "p-2.5 hover:bg-slate-100 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      selectDealerFromSearch(d.dealer_id);
+    };
+
+    const lvl = d.priority_level || d.level || "Normal";
+    const badgeClass = urgencyBadgeStyles[lvl] || urgencyBadgeStyles["Normal"];
+
+    item.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-900 truncate">${d.dealer_name}</div>
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+          <span>${d.cabang || "-"}</span>
+          <span>•</span>
+          <span>Aging Visit: ${d.aging_visit_mitra || 0} hr</span>
+        </div>
+      </div>
+      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeClass} shrink-0 uppercase">${lvl}</span>
+    `;
+    dropdown.appendChild(item);
+  });
+}
+
+function openDealerSearchDropdown() {
+  const dropdown = document.getElementById("dealer-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("dealer-search-input");
+    renderDealerSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeDealerSearchDropdown() {
+  const dropdown = document.getElementById("dealer-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterDealerSearchOptions(query) {
+  openDealerSearchDropdown();
+  renderDealerSearchDropdown(query);
+
+  const clearBtn = document.getElementById("dealer-search-clear-btn");
+  const chevron = document.getElementById("dealer-search-chevron");
+  if (query && query.trim() !== "") {
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+  } else {
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  }
+}
+
+function selectDealerFromSearch(dealerId) {
+  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
+  const input = document.getElementById("dealer-search-input");
+  const sel = document.getElementById("input-dealer");
+  const clearBtn = document.getElementById("dealer-search-clear-btn");
+  const chevron = document.getElementById("dealer-search-chevron");
+
+  if (d && input && sel) {
+    input.value = `${d.dealer_name} (${d.cabang || "-"})`;
+    sel.value = d.dealer_id;
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+    closeDealerSearchDropdown();
+    onDealerSelected(dealerId);
+  }
+}
+
+function clearDealerSearchSelection() {
+  const input = document.getElementById("dealer-search-input");
+  const sel = document.getElementById("input-dealer");
+  const clearBtn = document.getElementById("dealer-search-clear-btn");
+  const chevron = document.getElementById("dealer-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (sel) sel.value = "";
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  onDealerSelected("");
+  openDealerSearchDropdown();
 }
 
 function onLokasiVisitChanged(val) {
