@@ -9,43 +9,116 @@ function handleLogin(identifier, password) {
   }
 
   const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(CONFIG.SHEETS.EMPLOYEE);
-  if (!sheet) return { success: false, message: "Sheet M_EMPLOYEE tidak ditemukan." };
+  
+  // Cari sheet user (M_USERS, M_EMPLOYEE, USERS, EMPLOYEE)
+  let sheetUser = ss.getSheetByName(CONFIG.SHEETS.EMPLOYEE) || 
+                 ss.getSheetByName("M_USERS") || 
+                 ss.getSheetByName("USERS") || 
+                 ss.getSheetByName("EMPLOYEE");
+                 
+  if (!sheetUser) return { success: false, message: "Sheet data user/karyawan tidak ditemukan di Spreadsheet." };
 
-  const data = sheet.getDataRange().getValues();
+  const data = sheetUser.getDataRange().getValues();
+  if (data.length < 2) return { success: false, message: "Data user masih kosong." };
+  
   const headers = data[0].map(h => String(h).trim().toLowerCase());
 
   const idxEmail = headers.indexOf("email");
   const idxNip = headers.indexOf("nip");
-  const idxPass = headers.indexOf("password");
-  const idxNama = headers.indexOf("nama_lengkap");
-  const idxRole = headers.indexOf("role");
-  const idxCabang = headers.indexOf("cabang");
-  const idxStatus = headers.indexOf("status");
+  const idxPass = headers.findIndex(h => h.includes("pass") || h.includes("sandi"));
+  const idxNama = headers.findIndex(h => h.includes("nama"));
+  const idxJabatan = headers.findIndex(h => h.includes("jabatan"));
+  const idxRole = headers.findIndex(h => h.includes("role"));
+  const idxCabang = headers.findIndex(h => h.includes("branch") || h.includes("cabang"));
+  const idxAreaCover = headers.findIndex(h => h.includes("area_cover") || h.includes("area"));
+  const idxStatus = headers.findIndex(h => h.includes("status"));
 
   const cleanId = String(identifier).trim().toLowerCase();
   const cleanPass = String(password).trim();
 
+  // Load Master Roles jika ada sheet M_ROLES / ROLES
+  let sheetRoles = ss.getSheetByName("M_ROLES") || ss.getSheetByName("ROLES") || ss.getSheetByName("ROLE");
+  let rolesMap = {};
+  if (sheetRoles) {
+    const roleData = sheetRoles.getDataRange().getValues();
+    if (roleData.length > 1) {
+      const rHeaders = roleData[0].map(h => String(h).trim().toLowerCase());
+      const rIdxId = rHeaders.findIndex(h => h.includes("role_id") || h === "id");
+      const rIdxName = rHeaders.findIndex(h => h.includes("role_name") || h.includes("nama") || h.includes("name"));
+      const rIdxPerms = rHeaders.findIndex(h => h.includes("permission") || h.includes("akses"));
+
+      for (let r = 1; r < roleData.length; r++) {
+        const rRow = roleData[r];
+        const rId = String(rRow[rIdxId !== -1 ? rIdxId : 0] || "").trim();
+        const rName = String(rRow[rIdxName !== -1 ? rIdxName : 1] || "").trim();
+        let rPerms = [];
+        if (rIdxPerms !== -1 && rRow[rIdxPerms]) {
+          try {
+            rPerms = typeof rRow[rIdxPerms] === "string" && rRow[rIdxPerms].startsWith("[") ? JSON.parse(rRow[rIdxPerms]) : String(rRow[rIdxPerms]).split(",").map(p => p.trim());
+          } catch(e) {
+            rPerms = String(rRow[rIdxPerms]).replace(/[\[\]"]/g, "").split(",").map(p => p.trim());
+          }
+        }
+        if (rId) {
+          rolesMap[rId] = { role_name: rName || rId, permissions: rPerms };
+          if (rName) rolesMap[rName] = { role_name: rName, permissions: rPerms };
+        }
+      }
+    }
+  }
+
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const email = String(row[idxEmail] || "").trim().toLowerCase();
-    const nip = String(row[idxNip] || "").trim().toLowerCase();
-    const pass = String(row[idxPass] || "").trim();
-    const status = String(row[idxStatus] || "Active").trim().toLowerCase();
+    const email = idxEmail !== -1 ? String(row[idxEmail] || "").trim().toLowerCase() : "";
+    const nip = idxNip !== -1 ? String(row[idxNip] || "").trim().toLowerCase() : "";
+    const pass = idxPass !== -1 ? String(row[idxPass] || "").trim() : "";
+    const rawStatus = idxStatus !== -1 ? String(row[idxStatus] || "Active").trim().toLowerCase() : "active";
 
     if ((email === cleanId || nip === cleanId) && pass === cleanPass) {
-      if (status === "inactive" || status === "non-active") {
+      if (rawStatus === "inactive" || rawStatus === "non-active" || rawStatus === "nonaktif" || rawStatus === "tidak aktif") {
         return { success: false, message: "Akun Anda berstatus non-aktif. Hubungi Administrator." };
+      }
+
+      const areaCoverVal = idxAreaCover !== -1 ? String(row[idxAreaCover] || "").trim() : "";
+      const rawRoleId = idxRole !== -1 ? String(row[idxRole] || "").trim() : "";
+      const jabatanVal = idxJabatan !== -1 ? String(row[idxJabatan] || "").trim() : "";
+
+      let resolvedRoleName = rawRoleId;
+      let resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+
+      if (rolesMap[rawRoleId]) {
+        resolvedRoleName = rolesMap[rawRoleId].role_name || rawRoleId;
+        if (rolesMap[rawRoleId].permissions && rolesMap[rawRoleId].permissions.length > 0) {
+          resolvedPerms = rolesMap[rawRoleId].permissions;
+        }
+      } else if (rawRoleId === "R-01" || rawRoleId.toLowerCase().includes("admin")) {
+        resolvedRoleName = "Admin";
+        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+      } else if (rawRoleId === "R-02" || rawRoleId.toLowerCase().includes("branch manager") || rawRoleId.toLowerCase().includes("bm")) {
+        resolvedRoleName = "Branch Manager";
+        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps"];
+      } else if (rawRoleId === "R-03" || rawRoleId.toLowerCase().includes("fac")) {
+        resolvedRoleName = "FAC";
+        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+      } else if (rawRoleId === "R-04" || rawRoleId.toLowerCase().includes("other")) {
+        resolvedRoleName = "Other";
+        resolvedPerms = ["priority"];
+      } else if (!rawRoleId) {
+        resolvedRoleName = jabatanVal || "Field PIC";
       }
 
       return {
         success: true,
         user: {
-          nip: row[idxNip] || "-",
-          nama: row[idxNama] || "Karyawan Digiasha",
-          email: row[idxEmail] || "",
-          role: row[idxRole] || "Field PIC",
-          cabang: row[idxCabang] || "Kantor Pusat"
+          nip: (idxNip !== -1 ? row[idxNip] : "") || "-",
+          nama: (idxNama !== -1 ? row[idxNama] : "") || "Karyawan Digiasha",
+          email: (idxEmail !== -1 ? row[idxEmail] : "") || "",
+          jabatan: jabatanVal,
+          role_id: rawRoleId,
+          role: resolvedRoleName,
+          permissions: resolvedPerms,
+          cabang: (idxCabang !== -1 ? row[idxCabang] : "") || "HEAD OFFICE",
+          area_cover: areaCoverVal
         }
       };
     }
@@ -67,9 +140,14 @@ function handleGetMasterData() {
   const gpsDevices = sheetGps ? getTableObjects(sheetGps) : [];
   const assignments = sheetAssign ? getTableObjects(sheetAssign).filter(a => String(a.status || "").toUpperCase() !== "RESOLVED") : [];
 
-  const idleGps = gpsDevices.filter(g => String(g.status || "").toLowerCase().includes("idle") || String(g.status || "").toLowerCase().includes("ready")).map(g => ({
+  const idleGps = gpsDevices.filter(g => {
+    const st = String(g.status_device || g.status || "").toLowerCase();
+    return st.includes("tersedia") || st.includes("ready") || st.includes("idle") || st.includes("stok");
+  }).map(g => ({
     imei: String(g.imei || ""),
-    tipe: String(g.tipe_gps || g.tipe || "GPS Tracker")
+    tipe: String(g.posisi_stock || g.tipe_perangkat || g.tipe || "Stok Cabang"),
+    status_device: String(g.status_device || g.status || "TERSEDIA"),
+    posisi_stock: String(g.posisi_stock || "Stok Cabang")
   }));
 
   return {

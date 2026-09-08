@@ -13,18 +13,26 @@ let CURRENT_USER = (() => {
   }
 })();
 
-// Hak Akses Modul per Role
+// Hak Akses Modul per Role (Mendukung ID DB R-01 s/d R-04 dan Dynamic DB Permissions)
 const ROLE_PERMISSIONS = {
+  "Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "R-01": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
   "Super Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
   "Supervisor": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
-  "FAC": ["priority", "gps", "fac"],
+  "Branch Manager": ["priority", "assignment", "visit", "onboarding", "gps"],
+  "R-02": ["priority", "assignment", "visit", "onboarding", "gps"],
+  "FAC": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "R-03": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "Other": ["priority"],
+  "R-04": ["priority"],
   "Field PIC": ["priority", "visit", "onboarding", "gps"]
 };
 
-// Data Kantor untuk Geofencing Presensi
-const OFFICE_LOCATIONS = [
-  { name: "Kantor Utama (Tangsel)", lat: -6.358972, long: 106.716583, maxRadiusMeter: 100 },
-  { name: "Kantor Cabang Tangerang", lat: -6.295218, long: 106.638482, maxRadiusMeter: 100 }
+// Data Kantor untuk Geofencing Presensi (Sinkron Dinamis dengan Sheet M_WORK_LOCATION)
+let OFFICE_LOCATIONS = [
+  { location_id: "LOC-HO", name: "Kantor Pusat", lat: -6.295216911, long: 106.6385914, maxRadiusMeter: 100, address: "Ruko District 91 Blo B No 10" },
+  { location_id: "LOC-MKS", name: "Kantor Makassar", lat: -5.20284262, long: 119.4691989, maxRadiusMeter: 100, address: "Ruko Citra Garden Blok B 20, Jl. Yusuf Bauty, Batangkaluku, Gowa, Sulawesi Selatan" },
+  { location_id: "LOC-BPP", name: "Kantor Balikpapan", lat: -1.274603726, long: 116.8371567, maxRadiusMeter: 100, address: "Jl. APT Pranoto No.10, Gunungsari Ilir, Balikpapan Tengah, Kalimantan Timur" }
 ];
 
 // State Global Aplikasi (Diisi Dinamis dari API)
@@ -44,6 +52,7 @@ let ACTIVE_ABSEN_TYPE = null;
 let CURRENT_ABSEN_SELFIE_BASE64 = null;
 
 let PRIORITY_ACTIVE_FILTER = "ALL";
+let PRIORITY_VISIT_STATUS_FILTER = "ALL";
 let FAC_ACTIVE_CONTRACT_FILTER = "ALL";
 let FAC_SELECTED_STATUS_FILTERS = [];
 
@@ -97,10 +106,35 @@ async function syncMasterDataFromApi() {
   try {
     const res = await callApi("getMasterData");
     if (res && res.success) {
-      APP_STATE.dealers = res.dealers || [];
-      APP_STATE.units = res.units || [];
+      let rawDealers = res.dealers || [];
+      let rawUnits = res.units || [];
+      let rawAssignments = res.assignments || [];
+
+      // Hak Akses Berdasarkan Coverage Area:
+      // Jika user Super Admin atau area_cover bernilai kosong / 'ALL' / '*', user dapat mengakses seluruh mitra.
+      // Jika memiliki area_cover spesifik (mendukung multi-area dengan koma, misal: 'TNG-1, TNG-2'), lakukan filter scoping.
+      if (CURRENT_USER && CURRENT_USER.role !== "Super Admin" && CURRENT_USER.area_cover && CURRENT_USER.area_cover.trim() !== "" && CURRENT_USER.area_cover.trim().toUpperCase() !== "ALL" && CURRENT_USER.area_cover.trim() !== "*") {
+        const userAreas = CURRENT_USER.area_cover.split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+        if (userAreas.length > 0) {
+          rawDealers = rawDealers.filter(d => {
+            const dArea = String(d.area_cover || "").trim().toLowerCase();
+            return dArea && userAreas.includes(dArea);
+          });
+          const allowedDealerNames = new Set(rawDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
+          rawUnits = rawUnits.filter(u => allowedDealerNames.has(String(u.dealer_name).trim().toLowerCase()));
+          rawAssignments = rawAssignments.filter(a => allowedDealerNames.has(String(a.dealer_name).trim().toLowerCase()));
+        }
+      }
+
+      APP_STATE.dealers = rawDealers;
+      APP_STATE.units = rawUnits;
       APP_STATE.idleGps = res.idleGps || [];
-      APP_STATE.assignments = res.assignments || [];
+      APP_STATE.assignments = rawAssignments;
+
+      // Sinkronkan daftar lokasi kantor geofence jika ada dari API
+      if (res.workLocations && Array.isArray(res.workLocations) && res.workLocations.length > 0) {
+        OFFICE_LOCATIONS = res.workLocations;
+      }
 
       // Kelompokkan unit per dealer
       const vehiclesByDealer = {};
@@ -148,6 +182,7 @@ async function syncMasterDataFromApi() {
 
         return {
           id: `U-${String(i + 1).padStart(2, '0')}`,
+          no_fasilitas: u.no_fasilitas || "",
           dealer: u.dealer_name,
           asset_desc: `${u.unit} (${u.nopol})`,
           nopol: u.nopol,
@@ -185,7 +220,8 @@ async function loadScreen(screenName) {
     topbar.classList.add("hidden");
   } else {
     topbar.classList.remove("hidden");
-    sub.innerText = `${CURRENT_USER.nama} • ${CURRENT_USER.role}`;
+    const areaSuffix = CURRENT_USER.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
+    sub.innerText = `${CURRENT_USER.nama} • ${CURRENT_USER.role}${areaSuffix}`;
     if (screenName === "dashboard") {
       btnBack.classList.add("hidden");
       title.innerText = "Digiasha Monitoring";
@@ -216,7 +252,13 @@ async function loadScreen(screenName) {
 
     // Inisialisasi controller tiap modul
     if (screenName === "dashboard") initDashboard();
-    if (screenName === "priority") renderPriorityList();
+    if (screenName === "priority") {
+      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
+        syncMasterDataFromApi().then(() => renderPriorityList());
+      } else {
+        renderPriorityList();
+      }
+    }
     if (screenName === "assignment") populateAssignDealerOptions();
     if (screenName === "visit") populateVisitDealerOptions();
     if (screenName === "gps") initGpsScreen();
@@ -290,10 +332,14 @@ function handleLogout() {
 function initDashboard() {
   if (!CURRENT_USER) return;
   document.getElementById("dash-user-name").innerText = `Halo, ${CURRENT_USER.nama}!`;
-  document.getElementById("dash-user-branch").innerText = `Cabang: ${CURRENT_USER.cabang}`;
-  document.getElementById("badge-role").innerText = CURRENT_USER.role;
+  const areaInfo = CURRENT_USER.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
+  document.getElementById("dash-user-branch").innerText = `Cabang: ${CURRENT_USER.cabang}${areaInfo}`;
+  document.getElementById("badge-role").innerText = CURRENT_USER.role || CURRENT_USER.role_id || "Karyawan";
 
-  const perms = ROLE_PERMISSIONS[CURRENT_USER.role] || ["priority", "visit", "onboarding", "gps", "fac", "assignment"];
+  const perms = (Array.isArray(CURRENT_USER.permissions) && CURRENT_USER.permissions.length > 0)
+    ? CURRENT_USER.permissions
+    : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac"]);
+
   ["priority", "assignment", "visit", "onboarding", "gps", "fac"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) btn.style.display = perms.includes(key) ? "flex" : "none";
@@ -379,15 +425,16 @@ function acquireAbsenLocation() {
         }
       },
       () => {
-        CURRENT_USER_GEO.lat = -6.358972;
-        CURRENT_USER_GEO.long = 106.716583;
+        const defaultOffice = OFFICE_LOCATIONS[0] || { name: "Kantor Pusat", lat: -6.295217, long: 106.638591, maxRadiusMeter: 100 };
+        CURRENT_USER_GEO.lat = defaultOffice.lat;
+        CURRENT_USER_GEO.long = defaultOffice.long;
         CURRENT_USER_GEO.distanceToOffice = 10;
         CURRENT_USER_GEO.isInsideRadius = true;
-        CURRENT_USER_GEO.nearestOffice = OFFICE_LOCATIONS[0];
-        if (coordsDisplay) coordsDisplay.innerText = "-6.358972, 106.716583 (Default GPS)";
-        if (officeNameDisplay) officeNameDisplay.innerText = OFFICE_LOCATIONS[0].name;
+        CURRENT_USER_GEO.nearestOffice = defaultOffice;
+        if (coordsDisplay) coordsDisplay.innerText = `${defaultOffice.lat.toFixed(6)}, ${defaultOffice.long.toFixed(6)} (Default GPS)`;
+        if (officeNameDisplay) officeNameDisplay.innerText = defaultOffice.name;
         if (distDisplay) distDisplay.innerText = "10 Meter (Valid Radius)";
-        if (badge) { badge.innerText = "Radius Valid (Testing GPS)"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800"; }
+        if (badge) { badge.innerText = `Radius Valid (${defaultOffice.name})`; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800"; }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
@@ -514,7 +561,7 @@ async function handleAbsenSubmit(e) {
       role: CURRENT_USER?.role || "-",
       cabang: CURRENT_USER?.cabang || "-",
       jenis_absen: ACTIVE_ABSEN_TYPE || "Masuk Kantor",
-      lokasi_kantor: CURRENT_USER_GEO.nearestOffice?.name || "Kantor Utama",
+      lokasi_kantor: CURRENT_USER_GEO.nearestOffice?.name || "Kantor Pusat",
       distance_meters: CURRENT_USER_GEO.distanceToOffice || 0,
       lat: CURRENT_USER_GEO.lat || 0,
       long: CURRENT_USER_GEO.long || 0,
@@ -576,6 +623,21 @@ function isUnitNearJTO(u) {
   return false;
 }
 
+// =========================================================================
+// HELPER VALIDASI IMEI GPS
+// =========================================================================
+function hasValidImei(imeiVal) {
+  if (!imeiVal) return false;
+  const s = String(imeiVal).trim();
+  if (!s || s === "-" || s === "0" || s === "null" || s === "undefined") return false;
+  const lower = s.toLowerCase();
+  if (lower === "n/a" || lower === "na" || lower === "none" || lower === "tidak ada" || lower === "belum pasang" || lower === "tidak terpasang") {
+    return false;
+  }
+  const digits = s.replace(/\D/g, '');
+  return digits.length >= 6;
+}
+
 /**
  * 1. ATURAN SKORING LEVEL KENDARAAN (PRIORITY BY UNIT)
  * Mengembalikan objek: { level: 'Sangat Penting' | 'Penting' | 'Moderat' | 'Normal', score: number, reason: string }
@@ -600,6 +662,19 @@ function calculateUnitUrgency(u) {
     }
   }
 
+  // Pengecekan Kelayakan Status Kontrak Unit:
+  // HANYA proses jika status LIVE, atau status EXPIRED tetapi memiliki nomor IMEI GPS valid
+  const contractStatus = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
+  const rawImei = String(u.imei_gps || u.imei || "").trim();
+  const hasImei = hasValidImei(rawImei);
+  const isLive = contractStatus === "LIVE" || contractStatus.indexOf("LIVE") !== -1;
+  const isExpiredWithImei = contractStatus.indexOf("EXPIRED") !== -1 && hasImei;
+  const isEligibleContract = isLive || isExpiredWithImei;
+
+  if (!isEligibleContract && !concernUrgency) {
+    return { level: "Normal", score: 0, reason: `Status Kontrak Non-Eligible (${contractStatus || "Non-Live"})` };
+  }
+
   // -------------------------------------------------------------
   // LEVEL 1: SANGAT PENTING (Score: 3)
   // -------------------------------------------------------------
@@ -609,11 +684,11 @@ function calculateUnitUrgency(u) {
   if (["Pelepasan", "Offline", "Baterai Lemah"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
     return { level: "Sangat Penting", score: 3, reason: `Status GPS: ${gpsStatus}` };
   }
-  if (agingVisit > 21 && lifetime > 90) {
-    return { level: "Sangat Penting", score: 3, reason: `Aging Visit > 21 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)` };
+  if (agingVisit >= 22 && lifetime > 90) {
+    return { level: "Sangat Penting", score: 3, reason: `Aging Visit >= 22 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)` };
   }
-  if (agingVisit > 14 && nearJto) {
-    return { level: "Sangat Penting", score: 3, reason: `Aging Visit > 14 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
+  if (agingVisit >= 15 && nearJto) {
+    return { level: "Sangat Penting", score: 3, reason: `Aging Visit >= 15 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
   }
 
   // -------------------------------------------------------------
@@ -625,21 +700,21 @@ function calculateUnitUrgency(u) {
   if (["Belum Lepas", "Belum Pasang", "Geser"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
     return { level: "Penting", score: 2, reason: `Status GPS: ${gpsStatus}` };
   }
-  if (agingVisit > 3 && overdue > 3) {
-    return { level: "Penting", score: 2, reason: `Aging Visit > 3 hr (${agingVisit} hr) & Overdue > 3 hr (${overdue} hr)` };
+  if (agingVisit >= 3 && overdue >= 3) {
+    return { level: "Penting", score: 2, reason: `Aging Visit >= 3 hr (${agingVisit} hr) & Overdue >= 3 hr (${overdue} hr)` };
   }
-  if (agingVisit > 5 && nearJto) {
-    return { level: "Penting", score: 2, reason: `Aging Visit > 5 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
+  if (agingVisit >= 5 && nearJto) {
+    return { level: "Penting", score: 2, reason: `Aging Visit >= 5 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
   }
-  if (agingVisit > 21 && lifetime <= 90) {
-    return { level: "Penting", score: 2, reason: `Aging Visit > 21 hr (${agingVisit} hr) & Lifetime ≤ 90 hr (${lifetime} hr)` };
+  if (agingVisit >= 22) {
+    return { level: "Penting", score: 2, reason: `Aging Visit Unit >= 22 hr (${agingVisit} hr)` };
   }
 
   // -------------------------------------------------------------
   // LEVEL 3: MODERAT (Score: 1)
   // -------------------------------------------------------------
-  if (agingVisit > 14) {
-    return { level: "Moderat", score: 1, reason: `Aging Visit Unit > 14 hr (${agingVisit} hr)` };
+  if (agingVisit >= 15) {
+    return { level: "Moderat", score: 1, reason: `Aging Visit Unit >= 15 hr (${agingVisit} hr)` };
   }
   if (concernUrgency === "Moderat") {
     return { level: "Moderat", score: 1, reason: `Assign Concern '${concernNote || "Moderat"}'` };
@@ -659,7 +734,20 @@ function calculateUnitUrgency(u) {
  * Mengembalikan objek: { level, score, mitraLevel, mitraScore, mitraReason, urgentUnitsCount }
  */
 function calculateMitraUrgency(dealer) {
-  const agingMitra = Number(dealer.aging_visit_mitra || dealer.aging_visit_days || 0);
+  let agingMitra = Number(dealer.aging_visit_mitra || dealer.aging_visit_days || 0);
+
+  // Jika belum pernah dikunjungi, hitung aging sejak tanggal kerjasama
+  if (!agingMitra && !dealer.last_visit_date && dealer.tanggal_kerjasama) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const joinDate = new Date(dealer.tanggal_kerjasama);
+      if (!isNaN(joinDate.getTime())) {
+        joinDate.setHours(0, 0, 0, 0);
+        agingMitra = Math.max(0, Math.round((today.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+    } catch (e) {}
+  }
 
   // Normalisasi Concern Dealer (Non-Fasilitas/Umum)
   let concernUrgency = "";
@@ -673,35 +761,41 @@ function calculateMitraUrgency(dealer) {
     }
   }
 
+  // Status Closed / Dormant
+  const rawProd = String(dealer.productivity || "").trim().toLowerCase();
+  const rawStatus = String(dealer.status || "").trim().toLowerCase();
+  const isClosedOrDormant = rawProd.includes("closed") || rawProd.includes("cloesed") || rawProd.includes("dormant") || rawProd.includes("7.closed") || rawProd.includes("5.dormant") || rawStatus.includes("closed") || rawStatus.includes("dormant");
+  const isAgingAllowed = !isClosedOrDormant;
+
   // A. Evaluasi Internal Dealer (Mitra Score)
   let mitraScore = 0;
   let mitraLevel = "Normal";
-  let mitraReason = "Normal";
+  let mitraReason = isClosedOrDormant ? "Mitra Closed / Dormant" : "Kondisi Normal";
 
   if (concernUrgency === "Sangat Penting") {
     mitraScore = 3;
     mitraLevel = "Sangat Penting";
     mitraReason = `Concern Mitra: '${concernNote || "Sangat Penting"}'`;
-  } else if (agingMitra > 60) {
+  } else if (isAgingAllowed && agingMitra >= 61) {
     mitraScore = 3;
     mitraLevel = "Sangat Penting";
-    mitraReason = `Aging Visit Mitra > 60 hr (${agingMitra} hr)`;
+    mitraReason = `Aging Visit Mitra >= 61 hr (${agingMitra} hr)`;
   } else if (concernUrgency === "Penting") {
     mitraScore = 2;
     mitraLevel = "Penting";
     mitraReason = `Concern Mitra: '${concernNote || "Penting"}'`;
-  } else if (agingMitra > 30) {
+  } else if (isAgingAllowed && agingMitra >= 31) {
     mitraScore = 2;
     mitraLevel = "Penting";
-    mitraReason = `Aging Visit Mitra > 30 hr (${agingMitra} hr)`;
+    mitraReason = `Aging Visit Mitra >= 31 hr (${agingMitra} hr)`;
   } else if (concernUrgency === "Moderat") {
     mitraScore = 1;
     mitraLevel = "Moderat";
     mitraReason = `Concern Mitra: '${concernNote || "Moderat"}'`;
-  } else if (agingMitra > 20) {
+  } else if (isAgingAllowed && agingMitra >= 21) {
     mitraScore = 1;
     mitraLevel = "Moderat";
-    mitraReason = `Aging Visit Mitra > 20 hr (${agingMitra} hr)`;
+    mitraReason = `Aging Visit Mitra >= 21 hr (${agingMitra} hr)`;
   }
 
   // B. Agregasi Unit Kendaraan (Highest Severity)
@@ -710,6 +804,22 @@ function calculateMitraUrgency(dealer) {
 
   if (dealer.units && dealer.units.length > 0) {
     dealer.units.forEach(u => {
+      const uContract = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
+      const uImei = String(u.imei_gps || u.imei || "").trim();
+      const uHasImei = hasValidImei(uImei);
+      const isULive = uContract === "LIVE" || uContract.indexOf("LIVE") !== -1;
+      const isUExpiredWithImei = uContract.indexOf("EXPIRED") !== -1 && uHasImei;
+      
+      // Lewati unit jika tidak eligible
+      if (!isULive && !isUExpiredWithImei && !u.unit_concern) {
+        return;
+      }
+
+      // Jika mitra berstatus Closed/Dormant, HANYA terima pemicu jika ada unit LIVE dengan concern atau anomali
+      if (isClosedOrDormant && !isULive && !u.unit_concern) {
+        return;
+      }
+
       const uEval = calculateUnitUrgency(u);
       if (uEval.score > 0) {
         urgentUnitsCount++;
@@ -718,6 +828,18 @@ function calculateMitraUrgency(dealer) {
         highestUnitScore = uEval.score;
       }
     });
+  }
+
+  // Jika mitra Closed/Dormant dan tidak ada concern khusus dealer dan tidak ada unit LIVE yang urgent
+  if (isClosedOrDormant && !concernUrgency && highestUnitScore === 0) {
+    return {
+      level: "Normal",
+      score: 0,
+      mitraLevel: "Normal",
+      mitraScore: 0,
+      mitraReason: "Mitra Closed / Dormant",
+      urgentUnitsCount: urgentUnitsCount
+    };
   }
 
   // Level Akhir Mitra: Nilai Maksimal antara mitraScore dan highestUnitScore
@@ -738,6 +860,19 @@ function calculateMitraUrgency(dealer) {
 // -------------------------------------------------------------------------
 // FILTER & UI RENDERER
 // -------------------------------------------------------------------------
+function setVisitStatusFilter(st) {
+  PRIORITY_VISIT_STATUS_FILTER = st;
+  document.querySelectorAll('#p-status-all, #p-status-pending, #p-status-done').forEach(b => {
+    b.className = "flex-1 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 transition text-center flex items-center justify-center space-x-1 text-xs font-bold";
+  });
+
+  const btnMap = { 'ALL': 'p-status-all', 'PENDING': 'p-status-pending', 'DONE': 'p-status-done' };
+  const activeBtn = document.getElementById(btnMap[st]);
+  if (activeBtn) activeBtn.className = "flex-1 py-1.5 rounded-xl bg-slate-900 text-white shadow-xs transition text-center flex items-center justify-center space-x-1 text-xs font-bold";
+
+  renderPriorityList();
+}
+
 function setPriorityFilter(lvl) {
   PRIORITY_ACTIVE_FILTER = lvl;
   document.querySelectorAll('#p-filter-all, #p-filter-sp, #p-filter-p, #p-filter-m').forEach(b => {
@@ -751,34 +886,117 @@ function setPriorityFilter(lvl) {
   renderPriorityList();
 }
 
+function isDealerVisitedToday(d) {
+  if (d.is_visited_today === true) return true;
+  if (!d.last_visit_date) return false;
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const parts = todayStr.split("-");
+  const todaySlash = `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const lastV = String(d.last_visit_date).trim();
+  return lastV.startsWith(todayStr) || lastV.startsWith(todaySlash);
+}
+
+function startVisitForDealer(dealerId) {
+  loadScreen('visit');
+  setTimeout(() => {
+    const sel = document.getElementById("input-dealer");
+    if (sel) {
+      sel.value = dealerId;
+      onDealerSelected(dealerId);
+    }
+  }, 100);
+}
+
+async function refreshPriorityData(btn) {
+  const container = document.getElementById("priority-list-container");
+  if (container) {
+    container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-800"></i>Menyinkronkan data mitra dari Spreadsheet...</div>';
+  }
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+    btn.disabled = true;
+  }
+  await syncMasterDataFromApi();
+  renderPriorityList();
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
+    btn.disabled = false;
+  }
+}
+
 function renderPriorityList() {
   const container = document.getElementById("priority-list-container");
   if (!container) return;
   container.innerHTML = "";
 
   // Kalkulasi evaluasi urgensi untuk semua dealer
-  let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => ({
-    ...d,
-    ...calculateMitraUrgency(d)
-  }));
+  let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => {
+    const hasDbLevel = d.priority_level && d.priority_level.trim() !== "" && d.priority_level !== "undefined";
+    const clientCalc = calculateMitraUrgency(d);
 
-  // Sorting: Prioritas tertinggi (Score DESC) -> Aging Visit tertinggi (Aging DESC)
+    const level = hasDbLevel ? d.priority_level : clientCalc.level;
+    const score = (d.priority_score !== undefined && d.priority_score !== null && !isNaN(Number(d.priority_score))) ? Number(d.priority_score) : clientCalc.score;
+    const reason = (d.priority_reason && d.priority_reason.trim() !== "" && d.priority_reason !== "-") ? d.priority_reason : clientCalc.mitraReason;
+    const urgentUnits = (d.urgent_units_count !== undefined && d.urgent_units_count !== null && !isNaN(Number(d.urgent_units_count))) ? Number(d.urgent_units_count) : clientCalc.urgentUnitsCount;
+
+    // Evaluasi apakah urgensi berasal dari internal mitra (aging/concern) atau pemicu unit
+    let isMitraUrgent = false;
+    let mitraLevel = "Normal";
+    if (score > 0) {
+      if (reason && reason.startsWith("Pemicu Unit")) {
+        isMitraUrgent = false;
+        mitraLevel = "Normal";
+      } else {
+        isMitraUrgent = true;
+        mitraLevel = level;
+      }
+    }
+
+    return {
+      ...d,
+      ...clientCalc,
+      level: level,
+      score: score,
+      priority_level: level,
+      priority_score: score,
+      priority_reason: reason,
+      mitraLevel: mitraLevel,
+      mitraScore: isMitraUrgent ? score : 0,
+      urgentUnitsCount: urgentUnits,
+      visitedToday: isDealerVisitedToday(d)
+    };
+  });
+
+  // Sorting: Pending First -> Prioritas tertinggi (Score DESC) -> Aging Visit tertinggi (Aging DESC)
   computedList.sort((a, b) => {
+    if (a.visitedToday !== b.visitedToday) return a.visitedToday ? 1 : -1;
     if (b.score !== a.score) return b.score - a.score;
     return (Number(b.aging_visit_mitra || 0)) - (Number(a.aging_visit_mitra || 0));
   });
 
-  // Filter Tab
+  // 1. Filter Status Visit (ALL | PENDING | DONE)
+  if (PRIORITY_VISIT_STATUS_FILTER === "PENDING") {
+    computedList = computedList.filter(d => !d.visitedToday);
+  } else if (PRIORITY_VISIT_STATUS_FILTER === "DONE") {
+    computedList = computedList.filter(d => d.visitedToday);
+  }
+
+  // 2. Filter Level Urgensi
   if (PRIORITY_ACTIVE_FILTER !== "ALL") {
     computedList = computedList.filter(d => d.level === PRIORITY_ACTIVE_FILTER);
   }
 
   if (computedList.length === 0) {
     container.innerHTML = `
-      <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-1">
+      <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-2">
         <i class="fa-solid fa-clipboard-check text-2xl text-slate-300 block"></i>
-        <p class="font-semibold text-slate-600">Tidak ada mitra dalam kategori "${PRIORITY_ACTIVE_FILTER}"</p>
-        <p class="text-[10px]">Semua showroom terkelola dengan baik sesuai jadwal.</p>
+        <p class="font-semibold text-slate-700">Tidak ada data mitra untuk filter "${PRIORITY_ACTIVE_FILTER}"</p>
+        <p class="text-[11px] text-slate-400">Jika sheet baru saja diisi atau diperbarui, muat ulang data master:</p>
+        <button type="button" onclick="refreshPriorityData()" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>Muat Ulang Data dari Sheet</span>
+        </button>
       </div>
     `;
     return;
@@ -793,30 +1011,47 @@ function renderPriorityList() {
 
   computedList.forEach(d => {
     const card = document.createElement("div");
-    card.className = "bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2 hover:border-slate-300 transition";
+    card.className = "bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2.5 hover:border-slate-300 transition";
 
     const hasMitraUrgency = d.mitraScore > 0 || !!d.dealer_concern;
     const houseBtnClass = hasMitraUrgency ? `${urgencyPillStyles[d.mitraLevel]} shadow-xs` : 'bg-slate-100 text-slate-400 border border-slate-200';
     const hasUnitUrgency = d.urgentUnitsCount > 0;
     const carBtnClass = hasUnitUrgency ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400 border border-slate-200';
 
+    const statusPill = d.visitedToday
+      ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-circle-check mr-1 text-[7px]"></i> Selesai Hari Ini</span>`
+      : `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-clock mr-1 text-[7px]"></i> Perlu Dikunjungi</span>`;
+
+    const visitActionBtn = d.visitedToday
+      ? `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Kunjungi Ulang Showroom Ini" class="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition flex items-center space-x-1">
+          <i class="fa-solid fa-rotate-right text-[9px]"></i>
+          <span>Re-visit</span>
+        </button>`
+      : `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Lakukan Visit Sekarang" class="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
+          <i class="fa-solid fa-location-arrow text-[9px]"></i>
+          <span>Visit</span>
+        </button>`;
+
     card.innerHTML = `
       <div class="min-w-0 flex-1">
-        <div class="flex items-center space-x-1.5">
-          <h4 class="font-bold text-xs text-slate-900 truncate">${d.dealer_name}</h4>
-          <span class="text-[8px] font-black px-1.5 py-0.2 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
+        <h4 class="font-bold text-xs sm:text-sm text-slate-900 truncate leading-tight">${d.dealer_name}</h4>
+        <div class="flex items-center space-x-1.5 flex-wrap gap-y-1 mt-1">
+          <span class="text-[10px] text-slate-500 font-medium">${d.cabang || "-"}</span>
+          <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
+          ${statusPill}
+          ${d.units && d.units.length > 0 ? `<span class="text-[9px] text-slate-400 font-medium">• ${d.units.length} Unit</span>` : ''}
         </div>
-        <p class="text-[10px] text-slate-400 truncate mt-0.5">Cabang: ${d.cabang || "-"} • Aging Visit: <strong>${d.aging_visit_mitra || 0} hr</strong> • ${d.units ? d.units.length : 0} Unit Terdaftar</p>
       </div>
 
       <div class="flex items-center space-x-1.5 shrink-0">
-        <button type="button" onclick="openMitraDetailModal('${d.dealer_id}')" title="Pemicu Urgensi Mitra" class="w-8 h-8 rounded-xl flex items-center justify-center text-xs transition active:scale-95 ${houseBtnClass}">
-          <i class="fa-solid fa-house"></i>
+        <button type="button" onclick="openMitraDetailModal('${d.dealer_id}')" title="Pemicu Urgensi Mitra" class="w-7 h-7 rounded-xl flex items-center justify-center text-xs transition active:scale-95 ${houseBtnClass}">
+          <i class="fa-solid fa-house text-[10px]"></i>
         </button>
-        <button type="button" onclick="openFacilityDetailModal('${d.dealer_id}')" title="Pemicu Urgensi Fasilitas" class="w-8 h-8 rounded-xl flex items-center justify-center text-xs transition active:scale-95 relative ${carBtnClass}">
-          <i class="fa-solid fa-car"></i>
-          ${d.urgentUnitsCount > 0 ? `<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center border border-white shadow-xs">${d.urgentUnitsCount}</span>` : ''}
+        <button type="button" onclick="openFacilityDetailModal('${d.dealer_id}')" title="Pemicu Urgensi Fasilitas" class="w-7 h-7 rounded-xl flex items-center justify-center text-xs transition active:scale-95 relative ${carBtnClass}">
+          <i class="fa-solid fa-car text-[10px]"></i>
+          ${d.urgentUnitsCount > 0 ? `<span class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[7px] font-black flex items-center justify-center border border-white shadow-xs">${d.urgentUnitsCount}</span>` : ''}
         </button>
+        ${visitActionBtn}
       </div>
     `;
     container.appendChild(card);
@@ -1021,12 +1256,70 @@ function onDealerSelected(dealerId) {
   const container = document.getElementById("container-unit-list");
   const emptyBox = document.getElementById("box-empty-facility");
   const countBadge = document.getElementById("unit-count-badge");
+  const boxConcern = document.getElementById("box-concern-prioritas");
+  const textConcern = document.getElementById("text-concern-display");
+  const inputTindakLanjut = document.getElementById("input-tindak-lanjut-concern");
 
   container.innerHTML = "";
   ACTIVE_UNITS_STATE = [];
 
   const dealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId);
 
+  // 1. Evaluasi & Tampilkan Dynamic Concern Prioritas Box
+  if (boxConcern && textConcern) {
+    if (dealer) {
+      const concernList = [];
+
+      // A. Supervisor Assignment Concern
+      if (dealer.dealer_concern) {
+        const note = typeof dealer.dealer_concern === "object" ? dealer.dealer_concern.note : dealer.dealer_concern;
+        const urg = typeof dealer.dealer_concern === "object" ? (dealer.dealer_concern.urgency || "Penting") : "Penting";
+        concernList.push(`📌 <strong>Instruksi Khusus Supervisor (${urg}):</strong>\n"${note}"`);
+      }
+
+      // B. Unit Specific Concerns & Critical Issues
+      if (dealer.units && dealer.units.length > 0) {
+        dealer.units.forEach(u => {
+          if (u.unit_concern) {
+            const uNote = typeof u.unit_concern === "object" ? u.unit_concern.note : u.unit_concern;
+            const uUrg = typeof u.unit_concern === "object" ? (u.unit_concern.urgency || "Penting") : "Penting";
+            concernList.push(`🚗 <strong>Concern Unit ${u.nopol} (${uUrg}):</strong>\n"${uNote}"`);
+          }
+          const uEval = calculateUnitUrgency(u);
+          if (uEval.score >= 2 && !u.unit_concern) {
+            concernList.push(`⚠️ <strong>Isu Kritis Unit ${u.nopol}:</strong> ${uEval.reason}`);
+          }
+        });
+      }
+
+      // C. Mitra Level Triggers (Aging > 20 hari / Priority Score tinggi)
+      const evalMitra = calculateMitraUrgency(dealer);
+      if (evalMitra.mitraScore >= 2 && !dealer.dealer_concern) {
+        concernList.push(`⚠️ <strong>Pemicu Sistem Mitra:</strong> ${evalMitra.mitraReason}`);
+      }
+
+      // Tampilkan atau sembunyikan kotak concern
+      if (concernList.length > 0) {
+        textConcern.innerHTML = concernList.join("\n\n");
+        boxConcern.classList.remove("hidden");
+        if (inputTindakLanjut) inputTindakLanjut.required = true;
+      } else {
+        boxConcern.classList.add("hidden");
+        if (inputTindakLanjut) {
+          inputTindakLanjut.required = false;
+          inputTindakLanjut.value = "";
+        }
+      }
+    } else {
+      boxConcern.classList.add("hidden");
+      if (inputTindakLanjut) {
+        inputTindakLanjut.required = false;
+        inputTindakLanjut.value = "";
+      }
+    }
+  }
+
+  // 2. Render Checklist Fasilitas Unit Aktif
   if (!dealerId || !dealer || !dealer.units || dealer.units.length === 0) {
     emptyBox.innerText = dealerId ? "Mitra ini tidak memiliki fasilitas unit aktif." : "Pilih partner dealer di Segmen 1.";
     emptyBox.classList.remove("hidden");
@@ -1139,15 +1432,12 @@ function toggleUnitAdaUI(isAda) {
   }
 }
 
-function handleModalUnitPhotoSelected(input) {
+async function handleModalUnitPhotoSelected(input) {
   if (input.files && input.files[0]) {
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = e => {
-      TEMP_MODAL_PHOTO_BASE64 = e.target.result;
-      document.getElementById("modal-unit-photo-preview").classList.remove("hidden");
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    TEMP_MODAL_PHOTO_BASE64 = compressed;
+    const previewBox = document.getElementById("modal-unit-photo-preview");
+    if (previewBox) previewBox.classList.remove("hidden");
   }
 }
 
@@ -1220,15 +1510,11 @@ function getPreciseLocation() {
   }
 }
 
-function handleShowroomPhotoSelected(input) {
+async function handleShowroomPhotoSelected(input) {
   if (input.files && input.files[0]) {
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = e => {
-      CURRENT_SHOWROOM_PHOTO_BASE64 = e.target.result;
-      document.getElementById("preview-photo-card").classList.remove("hidden");
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    CURRENT_SHOWROOM_PHOTO_BASE64 = compressed;
+    document.getElementById("preview-photo-card").classList.remove("hidden");
   }
 }
 
@@ -1255,11 +1541,23 @@ async function handleFormSubmit(e) {
   }
 
   const dealerSelect = document.getElementById("input-dealer");
+  const dealerId = dealerSelect.value;
   const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text;
   const lokasi = document.querySelector('input[name="lokasi_visit"]:checked').value;
   const lokasiDetail = (lokasi === "Tempat Lainnya") ? document.getElementById("input-lokasi-lain").value : "Showroom";
   const bertemuOwner = document.querySelector('input[name="bertemu_owner"]:checked').value;
   const ownerReason = (bertemuOwner === "Tidak") ? document.getElementById("input-owner-reason").value : "-";
+
+  // Tangkap Nilai Tindak Lanjut Concern Prioritas
+  const boxConcern = document.getElementById("box-concern-prioritas");
+  const tindakLanjutConcern = (!boxConcern || boxConcern.classList.contains("hidden")) 
+    ? "-" 
+    : (document.getElementById("input-tindak-lanjut-concern")?.value.trim() || "-");
+
+  if (boxConcern && !boxConcern.classList.contains("hidden") && tindakLanjutConcern === "-") {
+    alert("Wajib mengisi Tindak Lanjut / Hasil Pengecekan atas Concern Prioritas!");
+    return;
+  }
 
   let stock = "-";
   let sales = "-";
@@ -1278,6 +1576,11 @@ async function handleFormSubmit(e) {
   const catatanVisit = document.getElementById("input-catatan-visit").value.trim() || "-";
 
   let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi} (${lokasiDetail})\n*Bertemu Owner:* ${bertemuOwner}${bertemuOwner === 'Tidak' ? '(' + ownerReason + ')' : ''}\n`;
+  
+  if (tindakLanjutConcern !== "-") {
+    waText += `*TINDAK LANJUT CONCERN PRIORITAS:*\n${tindakLanjutConcern}\n\n`;
+  }
+
   if (lokasi === "Showroom") {
     waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
   } else {
@@ -1301,6 +1604,20 @@ async function handleFormSubmit(e) {
 
   waText += `• Catatan Visit: ${catatanVisit}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)},${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
 
+  // Update State Lokal Secara Optimistis (Real-time Closed Loop)
+  const targetDealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId || d.dealer_name === dealerName);
+  if (targetDealer) {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    targetDealer.is_visited_today = true;
+    targetDealer.last_visit_date = todayStr;
+    targetDealer.aging_visit_mitra = 0;
+    targetDealer.dealer_concern = null;
+    if (targetDealer.units) {
+      targetDealer.units.forEach(u => u.unit_concern = null);
+    }
+  }
+
   // Kirim ke Google Apps Script secara asynchronous
   callApi("submitVisit", {
     dealer_name: dealerName,
@@ -1313,6 +1630,7 @@ async function handleFormSubmit(e) {
     issue_internal: issueInternal,
     issue_komp: issueKomp,
     catatan_visit: catatanVisit,
+    tindak_lanjut_concern: tindakLanjutConcern,
     lat: CURRENT_USER_GEO.lat,
     long: CURRENT_USER_GEO.long,
     showroom_photo_base64: CURRENT_SHOWROOM_PHOTO_BASE64,
@@ -1402,31 +1720,23 @@ function toggleDocUploadRow(checkbox, docKey) {
   }
 }
 
-function handleDocPhotoCaptured(input, docKey, docTitle, cleanKey) {
+async function handleDocPhotoCaptured(input, docKey, docTitle, cleanKey) {
   if (input.files && input.files[0]) {
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = e => {
-      ONB_DOC_FILES[docKey] = { title: docTitle, base64: e.target.result };
-      const label = document.getElementById(`label-status-${cleanKey}`);
-      if (label) {
-        label.innerText = "✓ File Terunggah";
-        label.className = "text-[10px] text-emerald-600 font-bold block";
-      }
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    ONB_DOC_FILES[docKey] = { title: docTitle, base64: compressed };
+    const label = document.getElementById(`label-status-${cleanKey}`);
+    if (label) {
+      label.innerText = "✓ File Terunggah";
+      label.className = "text-[10px] text-emerald-600 font-bold block";
+    }
   }
 }
 
-function handleOnbSelfieSelected(input) {
+async function handleOnbSelfieSelected(input) {
   if (input.files && input.files[0]) {
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = e => {
-      CURRENT_ONB_SELFIE_BASE64 = e.target.result;
-      document.getElementById("preview-onb-selfie-card").classList.remove("hidden");
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    CURRENT_ONB_SELFIE_BASE64 = compressed;
+    document.getElementById("preview-onb-selfie-card").classList.remove("hidden");
   }
 }
 
@@ -1599,10 +1909,11 @@ function filterVehiclesByActivity(dealerId, actType) {
   filtered.forEach(v => {
     const opt = document.createElement("option");
     opt.value = v.nopol;
-    opt.setAttribute("data-imei", v.imei || "");
+    opt.setAttribute("data-fasilitas", v.no_fasilitas || "");
+    opt.setAttribute("data-imei", v.imei || v.imei_gps || "");
     opt.setAttribute("data-unit", v.unit || "");
     opt.setAttribute("data-status", v.contract_status || "");
-    opt.innerText = `${v.nopol} | ${v.unit} (${v.contract_status})`;
+    opt.innerText = `${v.no_fasilitas ? v.no_fasilitas + ' | ' : ''}${v.nopol} | ${v.unit} (${v.contract_status})`;
     selectKendaraan.appendChild(opt);
   });
 }
@@ -1644,14 +1955,11 @@ function onImeiBaruSelected(val) {
   }
 }
 
-function handleGpsOldPhotoSelected(input) {
+async function handleGpsOldPhotoSelected(input) {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      GPS_PHOTO_OLD_BASE64 = e.target.result;
-      document.getElementById("preview-gps-old-photo")?.classList.remove("hidden");
-    };
-    reader.readAsDataURL(input.files[0]);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    GPS_PHOTO_OLD_BASE64 = compressed;
+    document.getElementById("preview-gps-old-photo")?.classList.remove("hidden");
   }
 }
 
@@ -1662,14 +1970,11 @@ function removeGpsOldPhoto() {
   document.getElementById("preview-gps-old-photo")?.classList.add("hidden");
 }
 
-function handleGpsNewImeiPhotoSelected(input) {
+async function handleGpsNewImeiPhotoSelected(input) {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      GPS_PHOTO_NEW_IMEI_BASE64 = e.target.result;
-      document.getElementById("preview-gps-new-imei-photo")?.classList.remove("hidden");
-    };
-    reader.readAsDataURL(input.files[0]);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    GPS_PHOTO_NEW_IMEI_BASE64 = compressed;
+    document.getElementById("preview-gps-new-imei-photo")?.classList.remove("hidden");
   }
 }
 
@@ -1680,14 +1985,11 @@ function removeGpsNewImeiPhoto() {
   document.getElementById("preview-gps-new-imei-photo")?.classList.add("hidden");
 }
 
-function handleGpsPositionPhotoSelected(input) {
+async function handleGpsPositionPhotoSelected(input) {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      GPS_PHOTO_POSITION_BASE64 = e.target.result;
-      document.getElementById("preview-gps-position-photo")?.classList.remove("hidden");
-    };
-    reader.readAsDataURL(input.files[0]);
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+    GPS_PHOTO_POSITION_BASE64 = compressed;
+    document.getElementById("preview-gps-position-photo")?.classList.remove("hidden");
   }
 }
 
@@ -1710,6 +2012,7 @@ async function handleGpsSubmit(e) {
     return;
   }
   const nopol = kendaraanSelect.value;
+  const noFasilitas = kendaraanSelect.options[kendaraanSelect.selectedIndex].getAttribute("data-fasilitas") || "";
   const unitDesc = kendaraanSelect.options[kendaraanSelect.selectedIndex].getAttribute("data-unit") || "";
   const imeiLama = document.getElementById("gps-input-imei-lama").value;
   const imeiBaru = document.getElementById("gps-select-imei-baru").value || document.getElementById("gps-search-imei").value;
@@ -1737,7 +2040,7 @@ async function handleGpsSubmit(e) {
     }
   }
 
-  let waText = `*LAPORAN AKTIVITAS GPS MAINTENANCE*\n------------------------------------\n*Aktivitas:* ${actType}\n*Mitra:* ${dealerName}\n*Kendaraan:* ${nopol} - ${unitDesc}\n`;
+  let waText = `*LAPORAN AKTIVITAS GPS MAINTENANCE*\n------------------------------------\n*Aktivitas:* ${actType}\n*Mitra:* ${dealerName}\n*No Fasilitas:* ${noFasilitas || '-'}\n*Kendaraan:* ${nopol} - ${unitDesc}\n`;
   if (actType === "Ganti GPS") {
     waText += `• IMEI Dicabut: ${imeiLama} [Foto OK]\n• IMEI Baru: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
   } else if (actType === "Cabut GPS") {
@@ -1750,6 +2053,7 @@ async function handleGpsSubmit(e) {
   callApi("submitGpsMaintenance", {
     act_type: actType,
     dealer_name: dealerName,
+    no_fasilitas: noFasilitas,
     nopol: nopol,
     imei_lama: imeiLama,
     imei_baru: imeiBaru,

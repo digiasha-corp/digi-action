@@ -2,16 +2,35 @@
   <div class="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center justify-between gap-2">
     <div class="min-w-0">
       <span class="text-xs font-bold text-amber-900 block leading-tight">Daftar Prioritas Kunjungan</span>
-      <span class="text-[10px] text-amber-700">Klik ikon <strong>Rumah</strong> (Mitra) atau <strong>Mobil</strong> (Unit) untuk detail.</span>
+      <span class="text-[10px] text-amber-700">Real-time Closed-Loop Priority Action Monitoring</span>
     </div>
-    <button type="button" onclick="openParamModal()" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-bold shrink-0 shadow flex items-center space-x-1">
-      <i class="fa-solid fa-circle-question"></i>
-      <span>Kriteria</span>
+    <div class="flex items-center space-x-1.5 shrink-0">
+      <button type="button" onclick="refreshPriorityData(this)" title="Sinkronkan Ulang Data" class="w-8 h-8 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold flex items-center justify-center shadow-xs transition">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </button>
+      <button type="button" onclick="openParamModal()" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-bold shadow flex items-center space-x-1">
+        <i class="fa-solid fa-circle-question"></i>
+        <span>Kriteria</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Status Kunjungan Hari Ini -->
+  <div class="flex space-x-1.5 text-xs font-bold bg-slate-100 p-1 rounded-2xl">
+    <button type="button" onclick="setVisitStatusFilter('ALL')" id="p-status-all" class="flex-1 py-1.5 rounded-xl bg-slate-900 text-white shadow-xs transition text-center">Semua Target</button>
+    <button type="button" onclick="setVisitStatusFilter('PENDING')" id="p-status-pending" class="flex-1 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 transition text-center flex items-center justify-center space-x-1">
+      <span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+      <span>Perlu Dikunjungi</span>
+    </button>
+    <button type="button" onclick="setVisitStatusFilter('DONE')" id="p-status-done" class="flex-1 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 transition text-center flex items-center justify-center space-x-1">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+      <span>Selesai Hari Ini</span>
     </button>
   </div>
 
+  <!-- Filter Level Urgensi -->
   <div class="flex space-x-1.5 text-xs font-bold">
-    <button type="button" onclick="setPriorityFilter('ALL')" id="p-filter-all" class="flex-1 py-1.5 rounded-xl bg-slate-900 text-white shadow-xs">Semua</button>
+    <button type="button" onclick="setPriorityFilter('ALL')" id="p-filter-all" class="flex-1 py-1.5 rounded-xl bg-slate-900 text-white shadow-xs">Semua Level</button>
     <button type="button" onclick="setPriorityFilter('Sangat Penting')" id="p-filter-sp" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700">Sangat Penting</button>
     <button type="button" onclick="setPriorityFilter('Penting')" id="p-filter-p" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700">Penting</button>
     <button type="button" onclick="setPriorityFilter('Moderat')" id="p-filter-m" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700">Moderat</button>

@@ -44,6 +44,21 @@
       </div>
     </div>
 
+    <!-- Dynamic Concern Prioritas Box (Otomatis Muncul Hanya Jika Ada Concern / Pemicu Prioritas Aktif) -->
+    <div id="box-concern-prioritas" class="hidden bg-amber-50 border border-amber-300 p-4 rounded-2xl shadow-xs space-y-2.5">
+      <div class="flex items-center space-x-2 border-b border-amber-200/60 pb-2">
+        <span class="w-5 h-5 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </span>
+        <h3 class="text-xs font-bold text-amber-950 uppercase">Instruksi & Pemicu Prioritas Kunjungan</h3>
+      </div>
+      <div id="text-concern-display" class="text-xs text-amber-950 bg-white/90 p-3 rounded-xl border border-amber-200 font-medium leading-relaxed whitespace-pre-line"></div>
+      <div>
+        <label class="block text-[11px] font-bold text-amber-950 mb-1">Tindak Lanjut / Hasil Pengecekan Lapangan <span class="text-red-500">*</span></label>
+        <textarea id="input-tindak-lanjut-concern" rows="2" placeholder="Tuliskan temuan atau hasil tindak lanjut atas concern di atas..." class="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-medium focus:ring-2 focus:ring-amber-500"></textarea>
+      </div>
+    </div>
+
     <!-- Segmen 2 -->
     <div id="segment-2-container" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
       <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
