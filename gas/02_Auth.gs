@@ -4,22 +4,25 @@
  */
 
 function handleLogin(identifier, password) {
-  if (!identifier || !password) {
-    return { success: false, message: "Email/NIP dan Password wajib diisi." };
-  }
+  try {
+    if (!identifier || !password) {
+      return { success: false, message: "Email/NIP dan Password wajib diisi." };
+    }
 
-  const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID);
-  
-  // Cari sheet user (M_USERS, M_EMPLOYEE, USERS, EMPLOYEE)
-  let sheetUser = ss.getSheetByName(CONFIG.SHEETS.EMPLOYEE) || 
-                 ss.getSheetByName("M_USERS") || 
-                 ss.getSheetByName("USERS") || 
-                 ss.getSheetByName("EMPLOYEE");
-                 
-  if (!sheetUser) return { success: false, message: "Sheet data user/karyawan tidak ditemukan di Spreadsheet." };
+    const ssId = (typeof CONFIG !== "undefined" && CONFIG.MAIN_SPREADSHEET_ID) || (typeof SPREADSHEET_DB_ID !== "undefined" ? SPREADSHEET_DB_ID : "1JbCMIePpNfPRfev7UIjyO763BfmJqzgtrLDMA0oFqVI");
+    const ss = SpreadsheetApp.openById(ssId);
+    
+    // Cari sheet user (M_USERS, M_EMPLOYEE, USERS, EMPLOYEE)
+    const empSheetName = (typeof CONFIG !== "undefined" && CONFIG.SHEETS && CONFIG.SHEETS.EMPLOYEE) || "M_EMPLOYEE";
+    let sheetUser = ss.getSheetByName(empSheetName) || 
+                   ss.getSheetByName("M_USERS") || 
+                   ss.getSheetByName("USERS") || 
+                   ss.getSheetByName("EMPLOYEE");
+                   
+    if (!sheetUser) return { success: false, message: "Sheet data user/karyawan tidak ditemukan di Spreadsheet." };
 
-  const data = sheetUser.getDataRange().getValues();
-  if (data.length < 2) return { success: false, message: "Data user masih kosong." };
+    const data = sheetUser.getDataRange().getValues();
+    if (data.length < 2) return { success: false, message: "Data user masih kosong." };
   
   const headers = data[0].map(h => String(h).trim().toLowerCase());
 
@@ -125,6 +128,14 @@ function handleLogin(identifier, password) {
   }
 
   return { success: false, message: "Email/NIP atau kata sandi tidak sesuai." };
+  } catch (err) {
+    Logger.log("Error handleLogin: " + err.toString());
+    return { success: false, message: "Terjadi kesalahan login server: " + err.toString() };
+  }
+}
+
+function verifyUserLogin(identifier, password) {
+  return handleLogin(identifier, password);
 }
 
 function handleGetMasterData() {
