@@ -1102,12 +1102,6 @@ function openFacilityDetailModal(dealerId) {
   const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
   if (!d) return;
 
-  document.getElementById("modal-facility-title").innerText = `Fasilitas: ${d.dealer_name}`;
-  document.getElementById("modal-facility-sub").innerText = `Total ${d.units ? d.units.length : 0} Unit Terdaftar (${d.cabang || "-"})`;
-
-  const listContainer = document.getElementById("modal-facility-list");
-  listContainer.innerHTML = "";
-
   const urgencyPillStyles = {
     "Sangat Penting": "bg-red-100 text-red-700 border-red-200",
     "Penting": "bg-orange-100 text-orange-700 border-orange-200",
@@ -1115,10 +1109,45 @@ function openFacilityDetailModal(dealerId) {
     "Normal": "bg-slate-100 text-slate-600 border-slate-200"
   };
 
-  if (!d.units || d.units.length === 0) {
-    listContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Tidak ada unit kendaraan fasilitas terdaftar pada mitra ini.</div>`;
+  // Filter unit yang ditampilkan: HANYA unit LIVE atau EXPIRED yang memiliki concern / anomali aktif
+  const eligibleUnits = (d.units || []).filter(u => {
+    const uContract = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
+    const isLive = uContract.includes("LIVE");
+    const uImei = String(u.imei_gps || u.imei || "").trim();
+    const uHasImei = hasValidImei(uImei);
+    const gpsStatus = String(u.gps_status || "").trim();
+    const hasGpsAnomaly = gpsStatus === "Belum Lepas" || gpsStatus === "Pelepasan" || gpsStatus === "Offline" || gpsStatus === "Geser" || gpsStatus === "Baterai Lemah" || gpsStatus === "Belum Pasang";
+    const uEval = calculateUnitUrgency(u);
+    const hasConcern = !!u.unit_concern || uEval.score > 0;
+
+    // Jika LIVE, tampilkan
+    if (isLive) return true;
+
+    // Jika EXPIRED, hanya tampilkan jika ada concern / anomali aktif
+    if (hasConcern || (uHasImei && gpsStatus !== "Sudah Lepas" && gpsStatus !== "Tidak Pasang") || hasGpsAnomaly) {
+      return true;
+    }
+
+    return false;
+  });
+
+  document.getElementById("modal-facility-title").innerText = `Fasilitas: ${d.dealer_name}`;
+  document.getElementById("modal-facility-sub").innerText = `Total ${eligibleUnits.length} Unit Aktif/Concern (${d.cabang || "-"})`;
+
+  const listContainer = document.getElementById("modal-facility-list");
+  listContainer.innerHTML = "";
+
+  if (eligibleUnits.length === 0) {
+    listContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Tidak ada unit LIVE atau concern fasilitas aktif pada mitra ini.</div>`;
   } else {
-    d.units.forEach(u => {
+    // Sorting: Unit urgent (Score tertinggi) di atas
+    eligibleUnits.sort((a, b) => {
+      const scoreA = calculateUnitUrgency(a).score;
+      const scoreB = calculateUnitUrgency(b).score;
+      return scoreB - scoreA;
+    });
+
+    eligibleUnits.forEach(u => {
       const uEval = calculateUnitUrgency(u);
       const itemCard = document.createElement("div");
       itemCard.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5";
