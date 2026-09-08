@@ -80,25 +80,455 @@ const STATUS_MAP = {
 };
 
 // =========================================================================
-// API CALLER HELPER (GOOGLE APPS SCRIPT WEB APP)
+// SUPABASE STORAGE & DATABASE SERVICE HELPER
 // =========================================================================
-async function callApi(action, data = {}) {
-  if (typeof CONFIG === "undefined" || !CONFIG.USE_ONLINE_DB || !CONFIG.API_URL || CONFIG.API_URL.includes("MASUKKAN_URL")) {
-    return { success: false, message: "Mode offline / URL API belum dikonfigurasi." };
+function base64ToBlob(base64Data) {
+  if (!base64Data || typeof base64Data !== "string") return null;
+  const parts = base64Data.split(';base64,');
+  const contentType = (parts[0] && parts[0].split(':')[1]) ? parts[0].split(':')[1] : 'image/jpeg';
+  const raw = window.atob(parts[1] || parts[0]);
+  const rawLength = raw.length;
+  const uInt8Array = new Uint8Array(rawLength);
+  for (let i = 0; i < rawLength; ++i) {
+    uInt8Array[i] = raw.charCodeAt(i);
+  }
+  return new Blob([uInt8Array], { type: contentType });
+}
+
+async function uploadToSupabaseStorage(base64Data, folder, prefix = "IMG") {
+  if (!base64Data || !supabaseClient) return "";
+  try {
+    const blob = base64ToBlob(base64Data);
+    if (!blob) return "";
+    const ext = "jpg";
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').substring(0, 14);
+    const random = Math.floor(Math.random() * 10000);
+    const filePath = `${folder}/${prefix}-${timestamp}-${random}.${ext}`;
+
+    const { data, error } = await supabaseClient.storage
+      .from(CONFIG.MEDIA_BUCKET || "digiasha-media")
+      .upload(filePath, blob, {
+        contentType: "image/jpeg",
+        upsert: true
+      });
+
+    if (error) {
+      console.warn("Storage upload warning:", error);
+      return "";
+    }
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from(CONFIG.MEDIA_BUCKET || "digiasha-media")
+      .getPublicUrl(filePath);
+
+    return publicUrlData?.publicUrl || "";
+  } catch (err) {
+    console.error("Storage upload exception:", err);
+    return "";
+  }
+}
+
+async function supabaseLogin(identifier, password) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+  
+  const idTrim = String(identifier).trim();
+  const passTrim = String(password).trim();
+
+  const { data: users, error } = await supabaseClient
+    .from("m_employee")
+    .select("*")
+    .or(`nip.eq.${idTrim},email.eq.${idTrim}`)
+    .limit(1);
+
+  if (error || !users || users.length === 0) {
+    return { success: false, message: "Akun tidak ditemukan. Periksa NIP atau Email Anda." };
   }
 
-  try {
-    const payload = { action, ...data };
-    const res = await fetch(CONFIG.API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    });
-    return await res.json();
-  } catch (err) {
-    console.error("API Call Error:", err);
-    return { success: false, message: "Koneksi API Gagal: " + err.message };
+  const user = users[0];
+  if (user.password_hash !== passTrim) {
+    return { success: false, message: "Kata sandi yang Anda masukkan salah." };
   }
+
+  if (user.status_aktif && user.status_aktif !== "AKTIF" && user.status_aktif !== true) {
+    return { success: false, message: "Akun Anda saat ini berstatus NONAKTIF. Hubungi Administrator." };
+  }
+
+  let permissions = ROLE_PERMISSIONS[user.role_id] || ROLE_PERMISSIONS[user.jabatan] || ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+  try {
+    const { data: rolePerms } = await supabaseClient
+      .from("m_role_permission")
+      .select("permission_keys")
+      .eq("role_id", user.role_id)
+      .limit(1);
+    if (rolePerms && rolePerms.length > 0 && Array.isArray(rolePerms[0].permission_keys)) {
+      permissions = rolePerms[0].permission_keys;
+    }
+  } catch (e) {}
+
+  const roleNameMap = {
+    "R-01": "Super Admin",
+    "R-02": "Branch Manager",
+    "R-03": "FAC",
+    "R-04": "Field PIC"
+  };
+
+  return {
+    success: true,
+    user: {
+      nip: user.nip,
+      email: user.email,
+      nama: user.nama_lengkap,
+      jabatan: user.jabatan,
+      cabang: user.cabang,
+      area_cover: user.area_cover || "",
+      role: roleNameMap[user.role_id] || user.role_id || "Field PIC",
+      role_id: user.role_id,
+      status_ganti_pass: user.status_ganti_pass,
+      permissions: permissions
+    }
+  };
+}
+
+async function supabaseGetMasterData() {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const [resLoc, resDlr, resFac, resGps, resAssign] = await Promise.all([
+    supabaseClient.from("m_work_location").select("*"),
+    supabaseClient.from("m_dealer").select("*").order("dealer_name"),
+    supabaseClient.from("m_facility_unit").select("*").order("dealer_name"),
+    supabaseClient.from("m_gps_device").select("*"),
+    supabaseClient.from("t_assignment").select("*").eq("status", "OPEN")
+  ]);
+
+  const workLocations = (resLoc.data || []).map(l => ({
+    location_id: l.location_id,
+    name: l.name || l.location_name,
+    lat: parseFloat(l.lat || l.latitude),
+    long: parseFloat(l.long || l.longitude),
+    maxRadiusMeter: parseInt(l.max_radius_meter || l.radius_meter || 100),
+    address: l.address || l.alamat || ""
+  }));
+
+  const now = new Date();
+  const dealers = (resDlr.data || []).map(d => {
+    let agingMitra = d.aging_visit_mitra || 0;
+    if (d.last_visit_date) {
+      const diffMs = now.getTime() - new Date(d.last_visit_date).getTime();
+      agingMitra = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    } else if (d.tanggal_kerjasama) {
+      const diffMs = now.getTime() - new Date(d.tanggal_kerjasama).getTime();
+      agingMitra = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    return {
+      dealer_id: d.dealer_id,
+      dealer_name: d.dealer_name,
+      owner_name: d.owner_name,
+      cabang: d.cabang,
+      area_cover: d.area_cover || "",
+      productivity: d.productivity || "Normal",
+      status: d.status || "AKTIF",
+      tanggal_kerjasama: d.tanggal_kerjasama,
+      last_visit_date: d.last_visit_date,
+      aging_visit_mitra: agingMitra,
+      urgent_units_count: d.urgent_units_count || 0,
+      priority_level: d.priority_level || "NORMAL",
+      priority_score: d.priority_score || 0,
+      priority_reason: d.priority_reason || ""
+    };
+  });
+
+  const units = (resFac.data || []).map(u => {
+    let agingUnit = u.aging_visit_unit || 0;
+    if (u.last_visit_date) {
+      const diffMs = now.getTime() - new Date(u.last_visit_date).getTime();
+      agingUnit = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    return {
+      no_fasilitas: u.no_fasilitas,
+      dealer_name: u.dealer_name,
+      nopol: u.nopol,
+      unit: u.unit,
+      contract_status: u.contract_status || "LIVE",
+      jto_date: u.jto_date,
+      overdue_days: u.overdue_days || 0,
+      lifetime_days: u.lifetime_days || 0,
+      imei_gps: u.imei_gps,
+      gps_status: u.gps_status || "Normal",
+      last_visit_date: u.last_visit_date,
+      aging_visit_unit: agingUnit,
+      aging_gps_maint: u.aging_gps_maint || 0,
+      priority_level: u.priority_level || "NORMAL",
+      priority_score: u.priority_score || 0,
+      priority_reason: u.priority_reason || ""
+    };
+  });
+
+  const idleGps = (resGps.data || []).filter(g => {
+    const s = String(g.status_device || "").toUpperCase();
+    return s === "TERSEDIA" || s === "IDLE" || s === "READY";
+  });
+
+  const assignments = resAssign.data || [];
+
+  return {
+    success: true,
+    dealers,
+    units,
+    idleGps,
+    assignments,
+    workLocations
+  };
+}
+
+async function supabaseSubmitVisit(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+  
+  const visitId = `VST-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  const showroomPhotoUrl = data.showroom_photo_base64 
+    ? await uploadToSupabaseStorage(data.showroom_photo_base64, "visits", `VST-${data.currentUser?.nip || 'PIC'}`)
+    : "";
+
+  await supabaseClient.from("tr_laporan_visit").insert([{
+    visit_id: visitId,
+    nip: data.currentUser?.nip || null,
+    dealer_name: data.dealer_name,
+    lokasi: data.lokasi || "Showroom",
+    bertemu_owner: data.bertemu_owner,
+    owner_reason: data.owner_reason,
+    stock: parseInt(data.stock) || 0,
+    sales: parseInt(data.sales) || 0,
+    issue_digi: data.issue_digi,
+    issue_internal: data.issue_internal,
+    issue_komp: data.issue_komp,
+    catatan_visit: data.catatan_visit,
+    tindak_lanjut_concern: data.tindak_lanjut_concern,
+    lat: data.lat,
+    long: data.long,
+    showroom_photo_url: showroomPhotoUrl
+  }]);
+
+  if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
+    const checkedRows = [];
+    for (let i = 0; i < data.unit_check_list.length; i++) {
+      const u = data.unit_check_list[i];
+      let unitPhotoUrl = "";
+      if (u.foto_unit) {
+        unitPhotoUrl = await uploadToSupabaseStorage(u.foto_unit, "units", `UNIT-${u.nopol}`);
+      }
+      checkedRows.push({
+        check_id: `CHK-${Date.now()}-${i}`,
+        visit_id: visitId,
+        dealer_name: data.dealer_name,
+        no_fasilitas: u.no_fasilitas || "",
+        nopol: u.nopol,
+        unit_desc: u.unit,
+        status_keberadaan: u.terlihat,
+        kondisi_unit: u.gps_match || "Normal",
+        foto_unit_url: unitPhotoUrl,
+        catatan_unit: `Indikasi: ${u.indikasi || '-'}; Info: ${(u.info_unit || []).join(', ')}; Plan: ${u.ovd_plan || '-'}; Komitmen: ${u.komitmen || '-'}`
+      });
+
+      if (u.no_fasilitas) {
+        await supabaseClient.from("m_facility_unit")
+          .update({ last_visit_date: new Date().toISOString().slice(0, 10) })
+          .eq("no_fasilitas", u.no_fasilitas);
+      }
+    }
+
+    if (checkedRows.length > 0) {
+      await supabaseClient.from("tr_visit_unit_check").insert(checkedRows);
+    }
+  }
+
+  await supabaseClient.from("m_dealer")
+    .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_mitra: 0 })
+    .eq("dealer_name", data.dealer_name);
+
+  return { success: true, visitId };
+}
+
+async function supabaseSubmitGpsMaintenance(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const maintId = `GPSM-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  
+  const [fotoOldUrl, fotoNewUrl, fotoPosUrl] = await Promise.all([
+    data.foto_imei_lama_base64 ? uploadToSupabaseStorage(data.foto_imei_lama_base64, "gps", `GPS-OLD-${data.imei_lama}`) : Promise.resolve(""),
+    data.foto_imei_baru_base64 ? uploadToSupabaseStorage(data.foto_imei_baru_base64, "gps", `GPS-NEW-${data.imei_baru}`) : Promise.resolve(""),
+    data.foto_posisi_gps_base64 ? uploadToSupabaseStorage(data.foto_posisi_gps_base64, "gps", `GPS-POS-${data.nopol}`) : Promise.resolve("")
+  ]);
+
+  await supabaseClient.from("tr_gps_maintenance").insert([{
+    maint_id: maintId,
+    nip: data.currentUser?.nip || null,
+    dealer_name: data.dealer_name,
+    no_fasilitas: data.no_fasilitas,
+    nopol: data.nopol,
+    act_type: data.act_type,
+    imei_lama: data.imei_lama || "",
+    imei_baru: data.imei_baru || "",
+    foto_imei_lama_url: fotoOldUrl,
+    foto_imei_baru_url: fotoNewUrl,
+    foto_posisi_gps_url: fotoPosUrl,
+    catatan_teknis: data.catatan_teknis,
+    lat: data.lat,
+    long: data.long
+  }]);
+
+  if (data.no_fasilitas) {
+    if (data.act_type === "Ganti GPS" || data.act_type === "Pasang GPS") {
+      await supabaseClient.from("m_facility_unit")
+        .update({
+          imei_gps: data.imei_baru,
+          gps_status: "Normal",
+          last_visit_date: new Date().toISOString().slice(0, 10)
+        })
+        .eq("no_fasilitas", data.no_fasilitas);
+    } else if (data.act_type === "Cabut GPS") {
+      await supabaseClient.from("m_facility_unit")
+        .update({
+          imei_gps: "",
+          gps_status: "Tidak Pasang",
+          last_visit_date: new Date().toISOString().slice(0, 10)
+        })
+        .eq("no_fasilitas", data.no_fasilitas);
+    }
+  }
+
+  const officeStockLoc = data.work_location_name || "Kantor Pusat";
+  if (data.act_type === "Ganti GPS") {
+    if (data.imei_lama && data.imei_lama !== "-") {
+      await supabaseClient.from("m_gps_device")
+        .upsert({ imei: data.imei_lama, status_device: "TERSEDIA", posisi_stock: officeStockLoc, last_updated: new Date().toISOString() });
+    }
+    if (data.imei_baru) {
+      await supabaseClient.from("m_gps_device")
+        .upsert({ imei: data.imei_baru, status_device: `Terpasang di ${data.nopol}`, posisi_stock: data.dealer_name, last_updated: new Date().toISOString() });
+    }
+  } else if (data.act_type === "Cabut GPS") {
+    if (data.imei_lama && data.imei_lama !== "-") {
+      await supabaseClient.from("m_gps_device")
+        .upsert({ imei: data.imei_lama, status_device: "TERSEDIA", posisi_stock: officeStockLoc, last_updated: new Date().toISOString() });
+    }
+  } else if (data.act_type === "Pasang GPS") {
+    if (data.imei_baru) {
+      await supabaseClient.from("m_gps_device")
+        .upsert({ imei: data.imei_baru, status_device: `Terpasang di ${data.nopol}`, posisi_stock: data.dealer_name, last_updated: new Date().toISOString() });
+    }
+  }
+
+  return { success: true, maintId };
+}
+
+async function supabaseSubmitAbsensi(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const absenId = `ABS-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  const selfieUrl = data.selfie_base64 
+    ? await uploadToSupabaseStorage(data.selfie_base64, "absensi", `ABS-${data.nip}`)
+    : "";
+
+  await supabaseClient.from("tr_absensi_log").insert([{
+    absen_id: absenId,
+    nip: data.nip,
+    nama_karyawan: data.nama,
+    role: data.role,
+    cabang: data.cabang,
+    jenis_absen: data.jenis_absen,
+    lokasi_kantor: data.lokasi_kantor,
+    distance_meters: data.distance_meters,
+    lat: data.lat,
+    long: data.long,
+    catatan: data.catatan,
+    selfie_photo_url: selfieUrl
+  }]);
+
+  return { success: true, absenId };
+}
+
+async function supabaseSubmitOnboarding(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const onbId = `ONB-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  const selfieUrl = data.selfie_base64
+    ? await uploadToSupabaseStorage(data.selfie_base64, "onboarding", `ONB-SELFIE-${data.userId}`)
+    : "";
+
+  await supabaseClient.from("tr_onboarding_log").insert([{
+    onboarding_id: onbId,
+    nip: data.userId,
+    dealer_name: data.nama_usaha || data.nama_pemohon,
+    owner_name: data.nama_pemohon,
+    lokasi_lat: data.lat,
+    lokasi_long: data.long,
+    survei_kelayakan: data.aktivitas,
+    catatan_survey: `${data.status_db} | ${data.alamat} | ${data.detail_usaha} | Catatan: ${data.catatan} | Dokumen: ${data.dokumen_list}`,
+    foto_ktp_url: selfieUrl,
+    foto_showroom_url: selfieUrl
+  }]);
+
+  return { success: true, onbId };
+}
+
+async function supabaseSaveAssignment(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const assignId = `ASG-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  await supabaseClient.from("t_assignment").insert([{
+    assignment_id: assignId,
+    supervisor_nip: data.assignedByUserId,
+    dealer_name: data.dealerName,
+    unit_fasilitas: data.unitFasilitas || "Umum",
+    urgency_level: data.urgencyLevel || "Penting",
+    instruksi: data.instruksi,
+    status: "OPEN"
+  }]);
+
+  return { success: true, assignId };
+}
+
+// =========================================================================
+// API CALLER HELPER (SUPABASE NATIVE + GAS FALLBACK)
+// =========================================================================
+async function callApi(action, data = {}) {
+  // 1. Eksekusi melalui Supabase Client jika aktif
+  if (supabaseClient) {
+    try {
+      if (action === "login") return await supabaseLogin(data.identifier, data.password);
+      if (action === "getMasterData") return await supabaseGetMasterData();
+      if (action === "submitVisit") return await supabaseSubmitVisit(data);
+      if (action === "submitGpsMaintenance") return await supabaseSubmitGpsMaintenance(data);
+      if (action === "submitAbsensi") return await supabaseSubmitAbsensi(data);
+      if (action === "submitOnboarding") return await supabaseSubmitOnboarding(data);
+      if (action === "saveAssignment") return await supabaseSaveAssignment(data);
+      if (action === "resolveAssignment") {
+        await supabaseClient.from("t_assignment").update({ status: "RESOLVED", resolved_at: new Date().toISOString(), resolved_by: data.resolvedByUserId }).eq("assignment_id", data.assignmentId);
+        return { success: true };
+      }
+    } catch (supabaseErr) {
+      console.error(`[Supabase Execution Error on ${action}]:`, supabaseErr);
+    }
+  }
+
+  // 2. Fallback ke Google Apps Script
+  if (typeof CONFIG !== "undefined" && CONFIG.API_URL && !CONFIG.API_URL.includes("MASUKKAN_URL")) {
+    try {
+      const payload = { action, ...data };
+      const res = await fetch(CONFIG.API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (err) {
+      console.error("GAS Fallback Error:", err);
+      return { success: false, message: "Koneksi API Gagal: " + err.message };
+    }
+  }
+
+  return { success: false, message: "Backend database belum terkonfigurasi." };
 }
 
 // Sinkronisasi Data Master dari Google Spreadsheet
