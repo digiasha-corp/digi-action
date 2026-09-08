@@ -141,6 +141,7 @@ async function syncMasterDataFromApi() {
       APP_STATE.dealers.forEach(d => {
         d.units = APP_STATE.units.filter(u => String(u.dealer_name).trim().toLowerCase() === String(d.dealer_name).trim().toLowerCase());
         vehiclesByDealer[d.dealer_id] = d.units.map(u => ({
+          no_fasilitas: u.no_fasilitas || "",
           nopol: u.nopol,
           unit: u.unit,
           contract_status: u.contract_status,
@@ -2136,6 +2137,8 @@ async function handleOnboardingSubmit(e) {
 // =========================================================================
 // GPS MAINTENANCE CONTROLLER
 // =========================================================================
+let CURRENT_GPS_FILTERED_VEHICLES = [];
+
 function initGpsScreen() {
   populateGpsDealerDropdown();
   populateIdleImeiOptions();
@@ -2144,14 +2147,135 @@ function initGpsScreen() {
 
 function populateGpsDealerDropdown() {
   const sel = document.getElementById("gps-select-dealer");
-  if (!sel) return;
-  sel.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
-  MASTER_DEALER_PRIORITY_DATA.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.dealer_id;
-    opt.innerText = `${d.dealer_name} (${d.cabang})`;
-    sel.appendChild(opt);
+  if (sel) {
+    sel.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
+    MASTER_DEALER_PRIORITY_DATA.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d.dealer_id;
+      opt.innerText = `${d.dealer_name} (${d.cabang})`;
+      sel.appendChild(opt);
+    });
+  }
+  renderGpsDealerSearchDropdown("");
+}
+
+function renderGpsDealerSearchDropdown(query = "") {
+  const dropdown = document.getElementById("gps-dealer-search-dropdown");
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
+  const filtered = MASTER_DEALER_PRIORITY_DATA.filter(d => {
+    if (!q) return true;
+    const name = String(d.dealer_name || "").toLowerCase();
+    const branch = String(d.cabang || "").toLowerCase();
+    return name.includes(q) || branch.includes(q);
   });
+
+  dropdown.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "p-3 text-center text-xs text-slate-400";
+    emptyDiv.innerHTML = '<i class="fa-solid fa-store-slash mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok';
+    dropdown.appendChild(emptyDiv);
+    return;
+  }
+
+  const urgencyBadgeStyles = {
+    "Sangat Penting": "bg-red-100 text-red-700 border-red-200",
+    "Penting": "bg-orange-100 text-orange-700 border-orange-200",
+    "Moderat": "bg-amber-100 text-amber-700 border-amber-200",
+    "Normal": "bg-slate-100 text-slate-600 border-slate-200"
+  };
+
+  filtered.forEach(d => {
+    const item = document.createElement("div");
+    item.className = "p-2.5 hover:bg-emerald-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      selectGpsDealerFromSearch(d.dealer_id);
+    };
+
+    const lvl = d.priority_level || d.level || "Normal";
+    const badgeClass = urgencyBadgeStyles[lvl] || urgencyBadgeStyles["Normal"];
+
+    item.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-900 truncate">${d.dealer_name}</div>
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+          <span>${d.cabang || "-"}</span>
+          <span>•</span>
+          <span>Total Unit: ${d.total_unit || (d.units ? d.units.length : 0)}</span>
+        </div>
+      </div>
+      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeClass} shrink-0 uppercase">${lvl}</span>
+    `;
+    dropdown.appendChild(item);
+  });
+}
+
+function openGpsDealerSearchDropdown() {
+  const dropdown = document.getElementById("gps-dealer-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("gps-dealer-search-input");
+    renderGpsDealerSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeGpsDealerSearchDropdown() {
+  const dropdown = document.getElementById("gps-dealer-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterGpsDealerSearchOptions(query) {
+  openGpsDealerSearchDropdown();
+  renderGpsDealerSearchDropdown(query);
+
+  const clearBtn = document.getElementById("gps-dealer-search-clear-btn");
+  const chevron = document.getElementById("gps-dealer-search-chevron");
+  if (query && query.trim() !== "") {
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+  } else {
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  }
+}
+
+function selectGpsDealerFromSearch(dealerId) {
+  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
+  const input = document.getElementById("gps-dealer-search-input");
+  const sel = document.getElementById("gps-select-dealer");
+  const clearBtn = document.getElementById("gps-dealer-search-clear-btn");
+  const chevron = document.getElementById("gps-dealer-search-chevron");
+
+  if (d && input && sel) {
+    input.value = `${d.dealer_name} (${d.cabang || "-"})`;
+    sel.value = d.dealer_id;
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+    closeGpsDealerSearchDropdown();
+    onGpsDealerSelected(dealerId);
+  }
+}
+
+function clearGpsDealerSearchSelection() {
+  const input = document.getElementById("gps-dealer-search-input");
+  const sel = document.getElementById("gps-select-dealer");
+  const clearBtn = document.getElementById("gps-dealer-search-clear-btn");
+  const chevron = document.getElementById("gps-dealer-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (sel) sel.value = "";
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  onGpsDealerSelected("");
+  openGpsDealerSearchDropdown();
 }
 
 function onGpsActivityChange(actType) {
@@ -2182,18 +2306,35 @@ function onGpsDealerSelected(dealerId) {
 
 function filterVehiclesByActivity(dealerId, actType) {
   const selectKendaraan = document.getElementById("gps-select-kendaraan");
+  const searchInputKendaraan = document.getElementById("gps-kendaraan-search-input");
+  const clearBtn = document.getElementById("gps-kendaraan-search-clear-btn");
+  const chevron = document.getElementById("gps-kendaraan-search-chevron");
   const infoText = document.getElementById("gps-kendaraan-info");
-  if (!selectKendaraan) return;
 
-  selectKendaraan.innerHTML = '<option value="">-- Pilih Kendaraan --</option>';
+  CURRENT_GPS_FILTERED_VEHICLES = [];
+  if (selectKendaraan) selectKendaraan.innerHTML = '<option value="">-- Pilih Kendaraan --</option>';
+  if (searchInputKendaraan) {
+    searchInputKendaraan.value = "";
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
   const inputImeiLama = document.getElementById("gps-input-imei-lama");
   if (inputImeiLama) inputImeiLama.value = "-";
 
-  const allVehicles = APP_STATE.masterVehiclesGps[dealerId] || [];
+  closeGpsKendaraanSearchDropdown();
+
+  const allVehicles = (dealerId && APP_STATE.masterVehiclesGps[dealerId]) ? APP_STATE.masterVehiclesGps[dealerId] : [];
   if (!dealerId || allVehicles.length === 0) {
+    if (searchInputKendaraan) {
+      searchInputKendaraan.disabled = true;
+      searchInputKendaraan.placeholder = "-- Pilih Mitra Terlebih Dahulu --";
+      searchInputKendaraan.className = "w-full bg-slate-100 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
+    }
     if (infoText) {
-      infoText.innerText = "Mitra belum memiliki data unit terdaftar.";
+      infoText.innerText = dealerId ? "Mitra belum memiliki data unit terdaftar." : "";
       infoText.className = "text-[10px] text-slate-400 mt-1 block";
+      if (!dealerId) infoText.classList.add("hidden");
     }
     return;
   }
@@ -2207,18 +2348,33 @@ function filterVehiclesByActivity(dealerId, actType) {
     filtered = allVehicles.filter(v => (v.contract_status === "LIVE" || v.contract_status === "IN_PROCESS") && v.gps_status === "BELUM_PASANG");
   }
 
+  CURRENT_GPS_FILTERED_VEHICLES = filtered;
+
   if (filtered.length === 0) {
-    selectKendaraan.innerHTML = `<option value="">-- Tidak ada unit yang memenuhi kriteria ${actType} --</option>`;
+    if (selectKendaraan) selectKendaraan.innerHTML = `<option value="">-- Tidak ada unit yang memenuhi kriteria ${actType} --</option>`;
+    if (searchInputKendaraan) {
+      searchInputKendaraan.disabled = true;
+      searchInputKendaraan.placeholder = `Tidak ada unit yang memenuhi kriteria ${actType}`;
+      searchInputKendaraan.className = "w-full bg-slate-100 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
+    }
     if (infoText) {
       infoText.innerText = `Tidak ditemukan kendaraan mitra dengan kriteria ${actType}.`;
       infoText.className = "text-[10px] text-red-500 font-semibold mt-1 block";
+      infoText.classList.remove("hidden");
     }
     return;
+  }
+
+  if (searchInputKendaraan) {
+    searchInputKendaraan.disabled = false;
+    searchInputKendaraan.placeholder = `Ketik nopol, no fasilitas, atau unit (${filtered.length} unit)...`;
+    searchInputKendaraan.className = "w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition outline-none";
   }
 
   if (infoText) {
     infoText.innerText = `Menampilkan ${filtered.length} unit kendaraan yang sesuai kriteria ${actType}.`;
     infoText.className = "text-[10px] text-emerald-600 font-semibold mt-1 block";
+    infoText.classList.remove("hidden");
   }
 
   filtered.forEach(v => {
@@ -2229,8 +2385,134 @@ function filterVehiclesByActivity(dealerId, actType) {
     opt.setAttribute("data-unit", v.unit || "");
     opt.setAttribute("data-status", v.contract_status || "");
     opt.innerText = `${v.no_fasilitas ? v.no_fasilitas + ' | ' : ''}${v.nopol} | ${v.unit} (${v.contract_status})`;
-    selectKendaraan.appendChild(opt);
+    if (selectKendaraan) selectKendaraan.appendChild(opt);
   });
+}
+
+function renderGpsKendaraanSearchDropdown(query = "") {
+  const dropdown = document.getElementById("gps-kendaraan-search-dropdown");
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
+  const filtered = CURRENT_GPS_FILTERED_VEHICLES.filter(v => {
+    if (!q) return true;
+    const nopol = String(v.nopol || "").toLowerCase();
+    const unit = String(v.unit || "").toLowerCase();
+    const fas = String(v.no_fasilitas || "").toLowerCase();
+    const imei = String(v.imei || "").toLowerCase();
+    return nopol.includes(q) || unit.includes(q) || fas.includes(q) || imei.includes(q);
+  });
+
+  dropdown.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "p-3 text-center text-xs text-slate-400";
+    emptyDiv.innerHTML = '<i class="fa-solid fa-car-tunnel mb-1 block text-slate-300"></i>Tidak ada kendaraan yang cocok';
+    dropdown.appendChild(emptyDiv);
+    return;
+  }
+
+  const contractBadgeStyles = {
+    "LIVE": "bg-emerald-100 text-emerald-700 border-emerald-200",
+    "EXPIRED": "bg-red-100 text-red-700 border-red-200",
+    "IN_PROCESS": "bg-blue-100 text-blue-700 border-blue-200",
+    "NORMAL": "bg-slate-100 text-slate-600 border-slate-200"
+  };
+
+  filtered.forEach(v => {
+    const item = document.createElement("div");
+    item.className = "p-2.5 hover:bg-emerald-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      selectGpsKendaraanFromSearch(v.nopol);
+    };
+
+    const cStatus = v.contract_status || "LIVE";
+    const badgeClass = contractBadgeStyles[cStatus] || "bg-slate-100 text-slate-600 border-slate-200";
+
+    item.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-900 truncate">
+          <span class="text-emerald-700 font-mono font-bold mr-1">${v.nopol}</span>
+          <span class="text-slate-800">${v.unit || ""}</span>
+        </div>
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+          ${v.no_fasilitas ? `<span>Fas: <strong class="font-mono text-slate-700">${v.no_fasilitas}</strong></span><span>•</span>` : ''}
+          <span>IMEI: <strong class="font-mono ${v.imei ? 'text-slate-700' : 'text-slate-400'}">${v.imei || '-'}</strong></span>
+        </div>
+      </div>
+      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeClass} shrink-0 uppercase">${cStatus}</span>
+    `;
+    dropdown.appendChild(item);
+  });
+}
+
+function openGpsKendaraanSearchDropdown() {
+  const input = document.getElementById("gps-kendaraan-search-input");
+  if (input && input.disabled) return;
+  const dropdown = document.getElementById("gps-kendaraan-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    renderGpsKendaraanSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeGpsKendaraanSearchDropdown() {
+  const dropdown = document.getElementById("gps-kendaraan-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterGpsKendaraanSearchOptions(query) {
+  openGpsKendaraanSearchDropdown();
+  renderGpsKendaraanSearchDropdown(query);
+
+  const clearBtn = document.getElementById("gps-kendaraan-search-clear-btn");
+  const chevron = document.getElementById("gps-kendaraan-search-chevron");
+  if (query && query.trim() !== "") {
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+  } else {
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  }
+}
+
+function selectGpsKendaraanFromSearch(nopol) {
+  const v = CURRENT_GPS_FILTERED_VEHICLES.find(item => item.nopol === nopol);
+  const input = document.getElementById("gps-kendaraan-search-input");
+  const sel = document.getElementById("gps-select-kendaraan");
+  const clearBtn = document.getElementById("gps-kendaraan-search-clear-btn");
+  const chevron = document.getElementById("gps-kendaraan-search-chevron");
+
+  if (v && input && sel) {
+    input.value = `${v.nopol} | ${v.unit}${v.no_fasilitas ? ' (' + v.no_fasilitas + ')' : ''}`;
+    sel.value = v.nopol;
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+    closeGpsKendaraanSearchDropdown();
+    onGpsKendaraanSelected(nopol);
+  }
+}
+
+function clearGpsKendaraanSearchSelection() {
+  const input = document.getElementById("gps-kendaraan-search-input");
+  const sel = document.getElementById("gps-select-kendaraan");
+  const clearBtn = document.getElementById("gps-kendaraan-search-clear-btn");
+  const chevron = document.getElementById("gps-kendaraan-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (sel) sel.value = "";
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  const inputImeiLama = document.getElementById("gps-input-imei-lama");
+  if (inputImeiLama) inputImeiLama.value = "-";
+
+  openGpsKendaraanSearchDropdown();
 }
 
 function onGpsKendaraanSelected(nopol) {
@@ -2617,8 +2899,31 @@ function copyAndOpenWA() {
 }
 
 // =========================================================================
-// APP INITIALIZATION
+// APP INITIALIZATION & GLOBAL EVENT LISTENERS
 // =========================================================================
+document.addEventListener("click", (e) => {
+  // Close Visit Dealer Search if click outside
+  const visitWrapper = document.getElementById("dealer-search-wrapper");
+  if (visitWrapper && !visitWrapper.contains(e.target)) {
+    closeDealerSearchDropdown();
+  }
+  // Close Assign Dealer Search if click outside
+  const assignWrapper = document.getElementById("assign-dealer-search-wrapper");
+  if (assignWrapper && !assignWrapper.contains(e.target)) {
+    closeAssignDealerSearchDropdown();
+  }
+  // Close GPS Dealer Search if click outside
+  const gpsDealerWrapper = document.getElementById("gps-dealer-search-wrapper");
+  if (gpsDealerWrapper && !gpsDealerWrapper.contains(e.target)) {
+    closeGpsDealerSearchDropdown();
+  }
+  // Close GPS Kendaraan Search if click outside
+  const gpsKendaraanWrapper = document.getElementById("gps-kendaraan-search-wrapper");
+  if (gpsKendaraanWrapper && !gpsKendaraanWrapper.contains(e.target)) {
+    closeGpsKendaraanSearchDropdown();
+  }
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (CURRENT_USER) {
     await syncMasterDataFromApi();

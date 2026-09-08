@@ -39,22 +39,85 @@
         </div>
       </div>
 
-      <div>
+      <!-- Searchable Mitra Dealer -->
+      <div class="relative" id="gps-dealer-search-wrapper">
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Mitra Dealer <span
             class="text-red-500">*</span></label>
-        <select id="gps-select-dealer" onchange="onGpsDealerSelected(this.value)" required
-          class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-700">
+        <select id="gps-select-dealer" onchange="onGpsDealerSelected(this.value)" required class="sr-only">
           <option value="">-- Pilih Partner Dealer --</option>
         </select>
+
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+            <input
+              type="text"
+              id="gps-dealer-search-input"
+              placeholder="Ketik untuk cari partner dealer / cabang..."
+              autocomplete="off"
+              onfocus="openGpsDealerSearchDropdown()"
+              oninput="filterGpsDealerSearchOptions(this.value)"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition outline-none"
+            />
+            <button
+              type="button"
+              id="gps-dealer-search-clear-btn"
+              onclick="clearGpsDealerSearchSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="gps-dealer-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="gps-dealer-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown items rendered via JS -->
+          </div>
+        </div>
       </div>
 
-      <div>
+      <!-- Searchable Kendaraan Sesuai Aktivitas -->
+      <div class="relative" id="gps-kendaraan-search-wrapper">
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Kendaraan Sesuai Aktivitas <span
             class="text-red-500">*</span></label>
-        <select id="gps-select-kendaraan" onchange="onGpsKendaraanSelected(this.value)" required
-          class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-700">
+        <select id="gps-select-kendaraan" onchange="onGpsKendaraanSelected(this.value)" required class="sr-only">
           <option value="">-- Pilih Mitra Terlebih Dahulu --</option>
         </select>
+
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-car absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+            <input
+              type="text"
+              id="gps-kendaraan-search-input"
+              placeholder="-- Pilih Mitra Terlebih Dahulu --"
+              autocomplete="off"
+              disabled
+              onfocus="openGpsKendaraanSearchDropdown()"
+              oninput="filterGpsKendaraanSearchOptions(this.value)"
+              class="w-full bg-slate-100 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 transition outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            />
+            <button
+              type="button"
+              id="gps-kendaraan-search-clear-btn"
+              onclick="clearGpsKendaraanSearchSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="gps-kendaraan-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="gps-kendaraan-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown items rendered via JS -->
+          </div>
+        </div>
         <p id="gps-kendaraan-info" class="text-[10px] text-slate-400 mt-1 hidden"></p>
       </div>
     </div>
