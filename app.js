@@ -1046,6 +1046,12 @@ function renderPriorityList() {
           <span>Visit</span>
         </button>`;
 
+    // Hitung jumlah unit berstatus LIVE saja untuk ditampilkan pada kartu score card
+    const liveUnitsCount = (d.units || []).filter(u => {
+      const uContract = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
+      return uContract.includes("LIVE");
+    }).length;
+
     card.innerHTML = `
       <div class="min-w-0 flex-1">
         <h4 class="font-bold text-xs sm:text-sm text-slate-900 truncate leading-tight">${d.dealer_name}</h4>
@@ -1053,7 +1059,7 @@ function renderPriorityList() {
           <span class="text-[10px] text-slate-500 font-medium">${d.cabang || "-"}</span>
           <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
           ${statusPill}
-          ${d.units && d.units.length > 0 ? `<span class="text-[9px] text-slate-400 font-medium">• ${d.units.length} Unit</span>` : ''}
+          ${liveUnitsCount > 0 ? `<span class="text-[9px] text-slate-400 font-medium">• ${liveUnitsCount} Unit</span>` : ''}
         </div>
       </div>
 
