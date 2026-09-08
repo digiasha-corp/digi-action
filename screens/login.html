@@ -27,7 +27,10 @@
             <i class="fa-solid fa-lock"></i>
           </span>
           <input type="password" id="login-pass" required placeholder="Masukkan kata sandi"
-                 class="w-full pl-9 pr-9 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white" />
+                 class="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white" />
+          <button type="button" onclick="togglePasswordVisibility('login-pass', this)" title="Lihat/Sembunyikan Sandi" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-700 text-sm transition">
+            <i class="fa-solid fa-eye"></i>
+          </button>
         </div>
       </div>
 

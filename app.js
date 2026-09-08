@@ -280,6 +280,18 @@ function triggerCameraInput(inputId) {
   }
 }
 
+// Toggle Password Visibility (Mata Password)
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isPass = input.type === "password";
+  input.type = isPass ? "text" : "password";
+  const icon = btn ? btn.querySelector("i") : null;
+  if (icon) {
+    icon.className = isPass ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+  }
+}
+
 // =========================================================================
 // AUTH & SESSION CONTROLLER
 // =========================================================================
