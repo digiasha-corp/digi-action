@@ -2995,13 +2995,40 @@ function closeSummaryModal() {
   loadScreen("dashboard");
 }
 
-function copyAndOpenWA() {
+function copySummaryText() {
   const copyText = document.getElementById("text-wa-summary");
-  copyText.select();
-  copyText.setSelectionRange(0, 99999);
-  navigator.clipboard.writeText(copyText.value);
-  alert("Rekap berhasil disalin ke clipboard!");
-  window.open(`https://wa.me/?text=${encodeURIComponent(copyText.value)}`, '_blank');
+  if (copyText) {
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(copyText.value);
+      } else {
+        document.execCommand("copy");
+      }
+    } catch (e) {
+      document.execCommand("copy");
+    }
+  }
+
+  const btn = document.getElementById("btn-copy-summary");
+  if (btn) {
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-check text-sm text-emerald-400"></i> <span>Teks Berhasil Disalin!</span>';
+    btn.classList.add("bg-emerald-700");
+    btn.classList.remove("bg-slate-900");
+    setTimeout(() => {
+      btn.innerHTML = origHTML;
+      btn.classList.remove("bg-emerald-700");
+      btn.classList.add("bg-slate-900");
+    }, 2000);
+  }
+
+  showToast("Format rekap berhasil disalin ke clipboard!", "success", 1800);
+}
+
+function copyAndOpenWA() {
+  copySummaryText();
 }
 
 // =========================================================================
