@@ -25,9 +25,9 @@ BEGIN
       -- 1. Hitung Aging Visit Unit (Hari ini - Last Visit / Lifetime)
       GREATEST(0, (v_today - COALESCE(u.last_visit_date, (v_today - (COALESCE(u.lifetime_days, 0) || ' days')::INTERVAL)::DATE, v_today))) AS calc_aging_visit,
       
-      -- 2. Ambil Concern Aktif dari t_assignment
-      c.urgency AS concern_urgency,
-      c.catatan AS concern_note,
+      -- 2. Ambil Concern Aktif dari t_assignment (urgency_level, instruksi)
+      c.concern_urgency,
+      c.concern_note,
       
       -- 3. Flag H-3 JTO
       (u.jto_date IS NOT NULL AND u.jto_date >= v_today AND u.jto_date <= (v_today + INTERVAL '3 days')::DATE) AS is_h3_jto,
@@ -39,14 +39,21 @@ BEGIN
     FROM m_facility_unit u
     LEFT JOIN (
       SELECT 
-        LOWER(TRIM(target_id)) AS target_id_clean,
-        LOWER(TRIM(target_name)) AS target_name_clean,
-        urgency,
-        catatan,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(TRIM(COALESCE(target_id, target_name))) ORDER BY created_at DESC) as rn
+        LOWER(TRIM(dealer_name)) AS dealer_name_clean,
+        LOWER(TRIM(unit_fasilitas)) AS unit_fasilitas_clean,
+        urgency_level AS concern_urgency,
+        instruksi AS concern_note,
+        ROW_NUMBER() OVER(PARTITION BY LOWER(TRIM(dealer_name)), LOWER(TRIM(unit_fasilitas)) ORDER BY created_at DESC) as rn
       FROM t_assignment
-      WHERE UPPER(status) IN ('PENDING', 'OPEN')
-    ) c ON (LOWER(TRIM(u.no_fasilitas)) = c.target_id_clean OR LOWER(TRIM(COALESCE(u.nopol, ''))) = c.target_name_clean) AND c.rn = 1
+      WHERE UPPER(status) IN ('OPEN', 'PENDING')
+    ) c ON (
+      LOWER(TRIM(u.dealer_name)) = c.dealer_name_clean 
+      AND (
+        c.unit_fasilitas_clean = 'umum' 
+        OR LOWER(TRIM(u.no_fasilitas)) = c.unit_fasilitas_clean 
+        OR LOWER(TRIM(COALESCE(u.nopol, ''))) = c.unit_fasilitas_clean
+      )
+    ) AND c.rn = 1
   ),
   unit_scored AS (
     SELECT 
@@ -138,20 +145,19 @@ BEGIN
        OR LOWER(COALESCE(d.status, '')) ILIKE ANY(ARRAY['%closed%', '%dormant%'])
       ) AS is_closed_or_dormant,
 
-      -- 3. Concern Dealer Aktif dari t_assignment
-      c.urgency AS concern_urgency,
-      c.catatan AS concern_note
+      -- 3. Concern Dealer Aktif dari t_assignment (urgency_level, instruksi)
+      c.concern_urgency,
+      c.concern_note
     FROM m_dealer d
     LEFT JOIN (
       SELECT 
-        LOWER(TRIM(target_id)) AS target_id_clean,
-        LOWER(TRIM(target_name)) AS target_name_clean,
-        urgency,
-        catatan,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(TRIM(COALESCE(target_id, target_name))) ORDER BY created_at DESC) as rn
+        LOWER(TRIM(dealer_name)) AS dealer_name_clean,
+        urgency_level AS concern_urgency,
+        instruksi AS concern_note,
+        ROW_NUMBER() OVER(PARTITION BY LOWER(TRIM(dealer_name)) ORDER BY created_at DESC) as rn
       FROM t_assignment
-      WHERE UPPER(status) IN ('PENDING', 'OPEN')
-    ) c ON (LOWER(TRIM(d.dealer_id)) = c.target_id_clean OR LOWER(TRIM(d.dealer_name)) = c.target_name_clean) AND c.rn = 1
+      WHERE UPPER(status) IN ('OPEN', 'PENDING')
+    ) c ON LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean AND c.rn = 1
   ),
   mitra_internal_scored AS (
     SELECT 
@@ -233,8 +239,6 @@ END;
 $$;
 
 -- 2. TRIGGER REALTIME HANYA UNTUK ASSIGNMENT CONCERN (t_assignment)
--- Ketika Super Admin / Manager membuat concern baru atau menyelesaikan concern,
--- level prioritas mitra/unit langsung dihitung ulang secara real-time.
 CREATE OR REPLACE FUNCTION trg_auto_recalculate_concern()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -256,7 +260,6 @@ FOR EACH STATEMENT
 EXECUTE FUNCTION trg_auto_recalculate_concern();
 
 -- 3. JADWAL OTOMATIS PG_CRON HARIAN PUKUL 03:00 WIB (20:00 UTC)
--- Mengaktifkan ekstensi pg_cron dan menjadwalkan kalkulasi mandiri setiap jam 03:00 WIB
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- Hapus jadwal lama jika ada agar tidak duplikat
@@ -273,4 +276,3 @@ SELECT cron.schedule(
   '0 20 * * *',
   $$SELECT recalculate_all_priorities()$$
 );
-
