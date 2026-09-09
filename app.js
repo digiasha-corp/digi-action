@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260909_v22";
+const APP_BUILD_VERSION = "20260909_v23";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4087,24 +4087,11 @@ function renderEmployeeList(list) {
     return;
   }
 
-  const roleStyles = {
-    "R-01": "bg-indigo-100 text-indigo-800 border-indigo-200",
-    "R-02": "bg-amber-100 text-amber-800 border-amber-200",
-    "R-03": "bg-cyan-100 text-cyan-800 border-cyan-200",
-    "R-04": "bg-emerald-100 text-emerald-800 border-emerald-200"
-  };
-
-  const roleNames = {
-    "R-01": "Super Admin",
-    "R-02": "Branch Manager",
-    "R-03": "FAC Officer",
-    "R-04": "Field PIC"
-  };
-
   container.innerHTML = list.map(emp => {
     const rId = emp.role_id || "R-04";
-    const rBadge = roleStyles[rId] || "bg-slate-100 text-slate-700 border-slate-200";
-    const rName = roleNames[rId] || rId;
+    const roleObj = ROLE_PERMISSIONS_STATE[rId];
+    const rBadge = roleObj?.badgeBg || "bg-slate-100 text-slate-700 border-slate-200";
+    const rName = roleObj?.name || rId;
     const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
 
     return `
