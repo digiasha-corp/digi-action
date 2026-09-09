@@ -232,8 +232,10 @@ BEGIN
 END;
 $$;
 
--- 2. TRIGGER OTOMATIS: REKALKULASI SAAT ADA LAPORAN VISIT BARU / PERUBAHAN ASSIGNMENT
-CREATE OR REPLACE FUNCTION trg_auto_recalculate_priorities()
+-- 2. TRIGGER REALTIME HANYA UNTUK ASSIGNMENT CONCERN (t_assignment)
+-- Ketika Super Admin / Manager membuat concern baru atau menyelesaikan concern,
+-- level prioritas mitra/unit langsung dihitung ulang secara real-time.
+CREATE OR REPLACE FUNCTION trg_auto_recalculate_concern()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -243,17 +245,17 @@ BEGIN
 END;
 $$;
 
--- Drop trigger lama jika ada
+-- Drop trigger jika ada
 DROP TRIGGER IF EXISTS trg_recalc_on_visit ON tr_laporan_visit;
 DROP TRIGGER IF EXISTS trg_recalc_on_assignment ON t_assignment;
 
--- Buat trigger setelah insert/update di tr_laporan_visit dan t_assignment
-CREATE TRIGGER trg_recalc_on_visit
-AFTER INSERT OR UPDATE ON tr_laporan_visit
-FOR EACH STATEMENT
-EXECUTE FUNCTION trg_auto_recalculate_priorities();
-
+-- Trigger Realtime t_assignment
 CREATE TRIGGER trg_recalc_on_assignment
 AFTER INSERT OR UPDATE OR DELETE ON t_assignment
 FOR EACH STATEMENT
-EXECUTE FUNCTION trg_auto_recalculate_priorities();
+EXECUTE FUNCTION trg_auto_recalculate_concern();
+
+-- 3. JADWAL OTOMATIS (OPSIONAL PG_CRON DI SUPABASE):
+-- Jika pg_cron aktif di Supabase Dashboard, jalankan perintah di bawah ini untuk auto-run jam 03:00 WIB (20:00 UTC):
+-- SELECT cron.schedule('daily-priority-0300-wib', '0 20 * * *', 'SELECT recalculate_all_priorities()');
+
