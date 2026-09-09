@@ -1,0 +1,158 @@
+<div class="space-y-3">
+  <!-- Banner Header -->
+  <div class="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between gap-2">
+    <div class="min-w-0">
+      <div class="flex items-center space-x-1.5 mb-0.5">
+        <i class="fa-solid fa-clock-rotate-left text-amber-400 text-xs"></i>
+        <span class="text-xs font-bold block leading-tight">Riwayat Aktivitas PIC</span>
+      </div>
+      <p class="text-[10px] text-slate-300">Visit Mitra • Calon Mitra • GPS Maintenance</p>
+    </div>
+    <div class="flex items-center space-x-1.5 shrink-0">
+      <button type="button" onclick="loadActivityHistory(true)" id="btn-refresh-history" title="Muat Ulang Riwayat" class="w-8 h-8 bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center shadow-xs transition">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Info Aturan Edit Hari Ini -->
+  <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-[11px] text-amber-900 flex items-start space-x-2">
+    <i class="fa-solid fa-shield-halved text-amber-600 text-sm mt-0.5 shrink-0"></i>
+    <div class="leading-relaxed">
+      <strong class="font-bold text-amber-950">Aturan Same-Day Edit:</strong> Transaksi hari ini dapat diedit untuk update catatan dan hasil follow-up. Geotag lokasi dan foto bukti fisik terkunci permanen. Transaksi hari sebelumnya bersifat <strong>FINAL / Terkunci</strong>.
+    </div>
+  </div>
+
+  <!-- Filter Jenis Aktivitas -->
+  <div>
+    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Jenis Aktivitas</span>
+    <div class="grid grid-cols-4 gap-1 text-[11px] font-bold">
+      <button type="button" onclick="setHistoryTypeFilter('ALL')" id="h-type-all" class="py-1.5 px-1 rounded-xl bg-slate-900 text-white text-center shadow-xs transition truncate">Semua</button>
+      <button type="button" onclick="setHistoryTypeFilter('VISIT')" id="h-type-visit" class="py-1.5 px-1 rounded-xl bg-slate-200 text-slate-700 text-center hover:bg-slate-300 transition truncate">Visit Mitra</button>
+      <button type="button" onclick="setHistoryTypeFilter('ONBOARDING')" id="h-type-onb" class="py-1.5 px-1 rounded-xl bg-slate-200 text-slate-700 text-center hover:bg-slate-300 transition truncate">Calon Mitra</button>
+      <button type="button" onclick="setHistoryTypeFilter('GPS')" id="h-type-gps" class="py-1.5 px-1 rounded-xl bg-slate-200 text-slate-700 text-center hover:bg-slate-300 transition truncate">GPS Maint.</button>
+    </div>
+  </div>
+
+  <!-- Filter Kurun Waktu -->
+  <div class="flex items-center justify-between gap-2 pt-0.5">
+    <div class="flex space-x-1 text-[10px] font-bold flex-1">
+      <button type="button" onclick="setHistoryDateFilter('TODAY')" id="h-date-today" class="flex-1 py-1.5 rounded-xl bg-emerald-600 text-white shadow-xs transition">Hari Ini</button>
+      <button type="button" onclick="setHistoryDateFilter('7DAYS')" id="h-date-7days" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition">7 Hari</button>
+      <button type="button" onclick="setHistoryDateFilter('30DAYS')" id="h-date-30days" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition">30 Hari</button>
+      <button type="button" onclick="setHistoryDateFilter('ALL')" id="h-date-all" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition">Semua</button>
+    </div>
+  </div>
+
+  <!-- Container List Riwayat -->
+  <div id="history-list-container" class="space-y-2.5 pt-1">
+    <div class="py-12 text-center text-xs text-slate-400">
+      <i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-800"></i>Memuat riwayat aktivitas...
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL & EDIT AKTIVITAS TERPROTEKSI -->
+<div id="modal-history-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <!-- Modal Header -->
+    <div id="modal-history-header" class="p-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2 min-w-0">
+        <div id="modal-history-icon" class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-amber-400 shrink-0">
+          <i class="fa-solid fa-clipboard-check"></i>
+        </div>
+        <div class="min-w-0">
+          <h4 id="modal-history-title" class="font-bold text-xs truncate">Detail Aktivitas</h4>
+          <span id="modal-history-badge" class="px-2 py-0.5 rounded text-[9px] font-bold inline-block mt-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">🟢 Bisa Diedit</span>
+        </div>
+      </div>
+      <button onclick="closeHistoryDetailModal()" class="text-white/80 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+
+    <!-- Modal Content (Scrollable) -->
+    <div class="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs">
+      
+      <!-- Alert Status Hari Ini / Final -->
+      <div id="modal-history-status-alert" class="p-2.5 rounded-xl text-[11px] leading-relaxed flex items-center space-x-2">
+        <i class="fa-solid fa-circle-info text-base shrink-0"></i>
+        <span id="modal-history-status-msg">-</span>
+      </div>
+
+      <!-- Informasi Dasar Transaksi -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+        <div class="flex justify-between items-start">
+          <span class="text-[10px] text-slate-400 font-semibold uppercase">Mitra / Target:</span>
+          <span id="dtl-hist-target" class="font-bold text-slate-900 text-right">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[10px] text-slate-400 font-semibold uppercase">Waktu Input:</span>
+          <span id="dtl-hist-time" class="font-medium text-slate-700">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[10px] text-slate-400 font-semibold uppercase">PIC Petugas:</span>
+          <span id="dtl-hist-pic" class="font-medium text-slate-700">-</span>
+        </div>
+      </div>
+
+      <!-- SECTION 1: TAGGING LOKASI (READ-ONLY TERKUNCI) -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-1.5 text-slate-700 font-bold text-xs">
+            <i class="fa-solid fa-lock text-slate-400"></i>
+            <span>Tagging Lokasi GPS</span>
+          </div>
+          <span class="text-[9px] font-bold text-slate-400 uppercase bg-slate-200 px-1.5 py-0.5 rounded">Terkunci</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[11px]">
+          <div>
+            <span class="text-[10px] text-slate-400 block">Latitude:</span>
+            <span id="dtl-hist-lat" class="font-mono text-slate-800 font-semibold">-</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 block">Longitude:</span>
+            <span id="dtl-hist-long" class="font-mono text-slate-800 font-semibold">-</span>
+          </div>
+        </div>
+        <div id="box-hist-maps-link" class="pt-1">
+          <a id="dtl-hist-maps-btn" href="#" target="_blank" class="inline-flex items-center space-x-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Buka di Google Maps</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- SECTION 2: FOTO BUKTI AWAL (READ-ONLY TERKUNCI) -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-1.5 text-slate-700 font-bold text-xs">
+            <i class="fa-solid fa-lock text-slate-400"></i>
+            <span>Foto Bukti Fisik Awal</span>
+          </div>
+          <span class="text-[9px] font-bold text-slate-400 uppercase bg-slate-200 px-1.5 py-0.5 rounded">Terkunci</span>
+        </div>
+        <div id="dtl-hist-photos-container" class="grid grid-cols-3 gap-2">
+          <!-- Foto-foto bukti ter-render di sini -->
+        </div>
+      </div>
+
+      <!-- SECTION 3: FORM EDITABLE (DAPAT DIEDIT JIKA TRANSAKSI HARI INI) -->
+      <form id="form-history-edit" onsubmit="handleSaveEditActivity(event)" class="space-y-3">
+        <input type="hidden" id="edit-act-type" value="" />
+        <input type="hidden" id="edit-act-id" value="" />
+
+        <div id="dynamic-edit-fields-container" class="space-y-3">
+          <!-- Form dinamis ter-render sesuai jenis aktivitas -->
+        </div>
+
+        <div id="box-edit-actions" class="pt-2 border-t border-slate-200 flex space-x-2">
+          <button type="button" onclick="closeHistoryDetailModal()" class="w-1/3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-save-edit-act" class="w-2/3 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Simpan Perubahan</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>

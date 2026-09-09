@@ -668,7 +668,8 @@ async function loadScreen(screenName) {
         assignment: "Assign Concern Visit",
         fac: "Laporan GPS (FAC)",
         absensi: "Presensi Kehadiran",
-        settings: "In-App Management"
+        settings: "In-App Management",
+        history: "Riwayat Aktivitas PIC"
       };
       title.innerText = titles[screenName] || "Monitoring";
     }
@@ -699,6 +700,7 @@ async function loadScreen(screenName) {
     if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
     if (screenName === "absensi") acquireAbsenLocation();
     if (screenName === "settings") initSettingsScreen();
+    if (screenName === "history") initHistory();
 
     window.scrollTo(0, 0);
   } catch (err) {
@@ -1426,11 +1428,12 @@ function renderPriorityList() {
     return (Number(b.aging_visit_mitra || 0)) - (Number(a.aging_visit_mitra || 0));
   });
 
-  // 1. Filter Status Visit (ALL | PENDING | DONE)
-  if (PRIORITY_VISIT_STATUS_FILTER === "PENDING") {
-    computedList = computedList.filter(d => !d.visitedToday);
-  } else if (PRIORITY_VISIT_STATUS_FILTER === "DONE") {
+  // 1. Filter Status Visit: Sembunyikan mitra yang sudah dikunjungi hari ini dari daftar aksi aktif
+  if (PRIORITY_VISIT_STATUS_FILTER === "DONE") {
     computedList = computedList.filter(d => d.visitedToday);
+  } else {
+    // Default: Hanya tampilkan mitra yang belum dikunjungi hari ini
+    computedList = computedList.filter(d => !d.visitedToday);
   }
 
   // 2. Filter Level Urgensi (Hanya tampilkan mitra yang memiliki prioritas: Sangat Penting, Penting, Moderat)
@@ -4227,16 +4230,642 @@ document.addEventListener("click", (e) => {
   }
 });
 
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    if (CURRENT_USER) {
-      loadScreen("dashboard");
-      syncMasterDataFromApi();
-    } else {
-      loadScreen("login");
+// =========================================================================
+// RIWAYAT AKTIVITAS PIC & SAME-DAY PROTECTED EDIT CONTROLLER
+// =========================================================================
+let HISTORY_TYPE_FILTER = "ALL"; // "ALL" | "VISIT" | "ONBOARDING" | "GPS"
+let HISTORY_DATE_FILTER = "TODAY"; // "TODAY" | "7DAYS" | "30DAYS" | "ALL"
+let CACHED_HISTORY_DATA = [];
+
+function isTodayRecord(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function formatDisplayDate(dateStr) {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  const day = String(d.getDate()).padStart(2, "0");
+  const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+  const mon = months[d.getMonth()];
+  const yr = d.getFullYear();
+  const hr = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${mon} ${yr}, ${hr}:${min} WIB`;
+}
+
+function initHistory() {
+  setHistoryTypeFilter(HISTORY_TYPE_FILTER);
+  setHistoryDateFilter(HISTORY_DATE_FILTER);
+  loadActivityHistory();
+}
+
+function setHistoryTypeFilter(type) {
+  HISTORY_TYPE_FILTER = type;
+  const types = ["all", "visit", "onb", "gps"];
+  const typeMap = { ALL: "all", VISIT: "visit", ONBOARDING: "onb", GPS: "gps" };
+  types.forEach(t => {
+    const btn = document.getElementById(`h-type-${t}`);
+    if (btn) {
+      if (t === typeMap[type]) {
+        btn.className = "py-1.5 px-1 rounded-xl bg-slate-900 text-white text-center shadow-xs transition truncate font-bold";
+      } else {
+        btn.className = "py-1.5 px-1 rounded-xl bg-slate-200 text-slate-700 text-center hover:bg-slate-300 transition truncate font-bold";
+      }
     }
-  } catch (err) {
-    console.error("Initialization error:", err);
-    loadScreen("login");
+  });
+  renderHistoryList();
+}
+
+function setHistoryDateFilter(range) {
+  HISTORY_DATE_FILTER = range;
+  const ranges = ["today", "7days", "30days", "all"];
+  const rangeMap = { TODAY: "today", "7DAYS": "7days", "30DAYS": "30days", ALL: "all" };
+  ranges.forEach(r => {
+    const btn = document.getElementById(`h-date-${r}`);
+    if (btn) {
+      if (r === rangeMap[range]) {
+        btn.className = "flex-1 py-1.5 rounded-xl bg-emerald-600 text-white shadow-xs transition font-bold";
+      } else {
+        btn.className = "flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition font-bold";
+      }
+    }
+  });
+  renderHistoryList();
+}
+
+async function loadActivityHistory(forceRefresh = false) {
+  const container = document.getElementById("history-list-container");
+  const refreshBtn = document.getElementById("btn-refresh-history");
+  if (refreshBtn) refreshBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+
+  if (!supabaseClient) {
+    if (container) container.innerHTML = '<div class="p-4 bg-amber-50 text-amber-800 rounded-xl text-xs">Supabase Client belum siap.</div>';
+    if (refreshBtn) refreshBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
+    return;
   }
-});
+
+  try {
+    const isSuper = CURRENT_USER?.role === "SUPER_ADMIN" || CURRENT_USER?.role === "SUPERVISOR" || CURRENT_USER?.role === "DIREKSI" || CURRENT_USER?.role === "SUPERADMIN";
+    const userNip = CURRENT_USER?.nip || null;
+
+    // 1. Query Visit Mitra
+    let qVisit = supabaseClient.from("tr_laporan_visit").select("*").order("created_at", { ascending: false }).limit(100);
+    if (!isSuper && userNip) qVisit = qVisit.eq("nip", userNip);
+
+    // 2. Query Calon Mitra
+    let qOnb = supabaseClient.from("tr_onboarding_log").select("*").order("created_at", { ascending: false }).limit(100);
+    if (!isSuper && userNip) qOnb = qOnb.eq("nip", userNip);
+
+    // 3. Query GPS Maintenance
+    let qGps = supabaseClient.from("tr_gps_maintenance").select("*").order("created_at", { ascending: false }).limit(100);
+    if (!isSuper && userNip) qGps = qGps.eq("nip", userNip);
+
+    const [resVisit, resOnb, resGps] = await Promise.all([qVisit, qOnb, qGps]);
+
+    const visitLogs = (resVisit.data || []).map(item => ({
+      id: item.visit_id,
+      type: "VISIT",
+      typeLabel: "Visit Mitra",
+      icon: "fa-clipboard-check",
+      iconColor: "text-blue-600 bg-blue-50 border-blue-200",
+      title: item.dealer_name || "Mitra",
+      subtitle: `Lokasi: ${item.lokasi || 'Showroom'} • Bertemu: ${item.bertemu_owner || '-'}`,
+      notes: item.catatan_visit || item.tindak_lanjut_concern || "-",
+      createdAt: item.created_at,
+      dateObj: new Date(item.created_at),
+      isToday: isTodayRecord(item.created_at),
+      nip: item.nip,
+      lat: item.lat,
+      long: item.long,
+      photos: item.showroom_photo_url ? [{ label: "Foto Showroom", url: item.showroom_photo_url }] : [],
+      raw: item
+    }));
+
+    const onbLogs = (resOnb.data || []).map(item => ({
+      id: item.onboarding_id,
+      type: "ONBOARDING",
+      typeLabel: "Visit Calon Mitra",
+      icon: "fa-user-plus",
+      iconColor: "text-teal-600 bg-teal-50 border-teal-200",
+      title: item.dealer_name || item.owner_name || "Calon Mitra",
+      subtitle: `Owner: ${item.owner_name || '-'} • Kelayakan: ${item.survei_kelayakan || '-'}`,
+      notes: item.catatan_survey || "-",
+      createdAt: item.created_at,
+      dateObj: new Date(item.created_at),
+      isToday: isTodayRecord(item.created_at),
+      nip: item.nip,
+      lat: item.lokasi_lat,
+      long: item.lokasi_long,
+      photos: [
+        item.foto_ktp_url ? { label: "Foto KTP/Identitas", url: item.foto_ktp_url } : null,
+        item.foto_showroom_url && item.foto_showroom_url !== item.foto_ktp_url ? { label: "Foto Lokasi", url: item.foto_showroom_url } : null
+      ].filter(Boolean),
+      raw: item
+    }));
+
+    const gpsLogs = (resGps.data || []).map(item => ({
+      id: item.maint_id,
+      type: "GPS",
+      typeLabel: "GPS Maintenance",
+      icon: "fa-satellite-dish",
+      iconColor: "text-emerald-600 bg-emerald-50 border-emerald-200",
+      title: `${item.nopol || 'Kendaraan'} (${item.dealer_name || 'Mitra'})`,
+      subtitle: `Aktivitas: ${item.act_type || 'Maintenance'} • No Fas: ${item.no_fasilitas || '-'}`,
+      notes: item.catatan_teknis || "-",
+      createdAt: item.created_at,
+      dateObj: new Date(item.created_at),
+      isToday: isTodayRecord(item.created_at),
+      nip: item.nip,
+      lat: item.lat,
+      long: item.long,
+      photos: [
+        item.foto_imei_lama_url ? { label: "IMEI Lama", url: item.foto_imei_lama_url } : null,
+        item.foto_imei_baru_url ? { label: "IMEI Baru", url: item.foto_imei_baru_url } : null,
+        item.foto_posisi_gps_url ? { label: "Posisi GPS", url: item.foto_posisi_gps_url } : null
+      ].filter(Boolean),
+      raw: item
+    }));
+
+    // Merge and sort DESC
+    CACHED_HISTORY_DATA = [...visitLogs, ...onbLogs, ...gpsLogs].sort((a, b) => {
+      const timeA = a.dateObj.getTime() || 0;
+      const timeB = b.dateObj.getTime() || 0;
+      return timeB - timeA;
+    });
+
+    renderHistoryList();
+  } catch (err) {
+    console.error("Error loading activity history:", err);
+    if (container) {
+      container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-xs">Gagal memuat riwayat: ${err.message}</div>`;
+    }
+  } finally {
+    if (refreshBtn) refreshBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
+  }
+}
+
+function renderHistoryList() {
+  const container = document.getElementById("history-list-container");
+  if (!container) return;
+
+  let filtered = [...CACHED_HISTORY_DATA];
+
+  // Filter Type
+  if (HISTORY_TYPE_FILTER !== "ALL") {
+    filtered = filtered.filter(item => item.type === HISTORY_TYPE_FILTER);
+  }
+
+  // Filter Date Range
+  const now = new Date();
+  if (HISTORY_DATE_FILTER === "TODAY") {
+    filtered = filtered.filter(item => item.isToday);
+  } else if (HISTORY_DATE_FILTER === "7DAYS") {
+    const cutoff7 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+    filtered = filtered.filter(item => (item.dateObj.getTime() || 0) >= cutoff7);
+  } else if (HISTORY_DATE_FILTER === "30DAYS") {
+    const cutoff30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).getTime();
+    filtered = filtered.filter(item => (item.dateObj.getTime() || 0) >= cutoff30);
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-2">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-xl mx-auto mb-1">
+          <i class="fa-solid fa-calendar-xmark"></i>
+        </div>
+        <p class="font-bold text-sm text-slate-800">Tidak ada riwayat aktivitas</p>
+        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">Tidak ditemukan catatan aktivitas untuk kriteria filter yang dipilih.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach(item => {
+    const editBadge = item.isToday
+      ? `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">🟢 Bisa Diedit</span>`
+      : `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">🔒 Final</span>`;
+
+    const actionBtn = item.isToday
+      ? `<button type="button" onclick="openActivityDetailModal('${item.type}', '${item.id}')" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1 transition">
+          <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+          <span>Detail & Edit</span>
+         </button>`
+      : `<button type="button" onclick="openActivityDetailModal('${item.type}', '${item.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 flex items-center space-x-1 transition">
+          <i class="fa-solid fa-eye text-[10px]"></i>
+          <span>Lihat Detail</span>
+         </button>`;
+
+    html += `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition space-y-2.5">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <div class="w-9 h-9 rounded-xl ${item.iconColor} border flex items-center justify-center text-sm shrink-0">
+              <i class="fa-solid ${item.icon}"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center space-x-1.5">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${item.typeLabel}</span>
+              </div>
+              <h4 class="font-bold text-xs text-slate-900 truncate leading-tight">${item.title}</h4>
+            </div>
+          </div>
+          ${editBadge}
+        </div>
+
+        <div class="text-[11px] text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <div class="font-medium text-slate-800 truncate">${item.subtitle}</div>
+          <div class="text-[10px] text-slate-500 line-clamp-2 italic">${item.notes}</div>
+        </div>
+
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+          <div class="flex items-center space-x-1">
+            <i class="fa-regular fa-clock"></i>
+            <span>${formatDisplayDate(item.createdAt)}</span>
+          </div>
+          ${actionBtn}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+async function openActivityDetailModal(type, id) {
+  const modal = document.getElementById("modal-history-detail");
+  if (!modal) return;
+
+  const item = CACHED_HISTORY_DATA.find(x => x.type === type && String(x.id) === String(id));
+  if (!item) {
+    alert("Data aktivitas tidak ditemukan.");
+    return;
+  }
+
+  // 1. Setup Header & Basic Information
+  document.getElementById("edit-act-type").value = type;
+  document.getElementById("edit-act-id").value = id;
+
+  const modalTitle = document.getElementById("modal-history-title");
+  const modalIcon = document.getElementById("modal-history-icon");
+  const modalBadge = document.getElementById("modal-history-badge");
+  const statusAlert = document.getElementById("modal-history-status-alert");
+  const statusMsg = document.getElementById("modal-history-status-msg");
+
+  if (modalTitle) modalTitle.innerText = `${item.typeLabel} - ${item.title}`;
+  if (modalIcon) modalIcon.innerHTML = `<i class="fa-solid ${item.icon}"></i>`;
+
+  if (item.isToday) {
+    if (modalBadge) {
+      modalBadge.className = "px-2 py-0.5 rounded text-[9px] font-bold inline-block mt-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30";
+      modalBadge.innerHTML = "🟢 Mode Edit (Hari Ini)";
+    }
+    if (statusAlert) {
+      statusAlert.className = "p-2.5 rounded-xl text-[11px] leading-relaxed flex items-center space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200";
+    }
+    if (statusMsg) {
+      statusMsg.innerHTML = "<strong>Bisa Diedit:</strong> Anda dapat mengubah catatan hasil wawancara, respon, atau status unit. Tagging lokasi dan foto bukti awal terkunci permanen.";
+    }
+    document.getElementById("btn-save-edit-act")?.classList.remove("hidden");
+  } else {
+    if (modalBadge) {
+      modalBadge.className = "px-2 py-0.5 rounded text-[9px] font-bold inline-block mt-0.5 bg-slate-600 text-slate-300 border border-slate-500";
+      modalBadge.innerHTML = "🔒 Terkunci / Final";
+    }
+    if (statusAlert) {
+      statusAlert.className = "p-2.5 rounded-xl text-[11px] leading-relaxed flex items-center space-x-2 bg-slate-100 text-slate-600 border border-slate-200";
+    }
+    if (statusMsg) {
+      statusMsg.innerHTML = `<strong>Status Final:</strong> Aktivitas ini dilakukan pada <em>${formatDisplayDate(item.createdAt)}</em> dan sudah melewati hari transaksi. Seluruh data bersifat Read-Only demi audit integritas.`;
+    }
+    document.getElementById("btn-save-edit-act")?.classList.add("hidden");
+  }
+
+  // 2. Populate Header Details
+  document.getElementById("dtl-hist-target").innerText = item.title;
+  document.getElementById("dtl-hist-time").innerText = formatDisplayDate(item.createdAt);
+  document.getElementById("dtl-hist-pic").innerText = item.nip || (CURRENT_USER?.nama || "PIC Lapangan");
+
+  // 3. Geotag (Read-Only)
+  document.getElementById("dtl-hist-lat").innerText = item.lat || "-";
+  document.getElementById("dtl-hist-long").innerText = item.long || "-";
+  const mapsBtn = document.getElementById("dtl-hist-maps-btn");
+  const mapsBox = document.getElementById("box-hist-maps-link");
+  if (item.lat && item.long) {
+    mapsBtn.href = `https://www.google.com/maps?q=${item.lat},${item.long}`;
+    mapsBox?.classList.remove("hidden");
+  } else {
+    mapsBox?.classList.add("hidden");
+  }
+
+  // 4. Photos (Read-Only Preview)
+  const photosContainer = document.getElementById("dtl-hist-photos-container");
+  if (photosContainer) {
+    if (item.photos && item.photos.length > 0) {
+      photosContainer.innerHTML = item.photos.map(p => `
+        <a href="${p.url}" target="_blank" class="block group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-2xs hover:opacity-90 transition">
+          <img src="${p.url}" alt="${p.label}" class="w-full h-full object-cover" />
+          <div class="absolute inset-x-0 bottom-0 bg-slate-900/70 backdrop-blur-xs text-white text-[9px] font-bold p-1 text-center truncate">
+            ${p.label}
+          </div>
+        </a>
+      `).join("");
+    } else {
+      photosContainer.innerHTML = '<div class="col-span-3 py-2 text-center text-[10px] text-slate-400 italic">Tidak ada foto bukti terlampir</div>';
+    }
+  }
+
+  // 5. Build Dynamic Editable Fields
+  const fieldsContainer = document.getElementById("dynamic-edit-fields-container");
+  if (!fieldsContainer) return;
+  fieldsContainer.innerHTML = '<div class="py-4 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-base block mb-1"></i>Memuat detail...</div>';
+
+  const isReadOnly = !item.isToday;
+  const disabledAttr = isReadOnly ? 'disabled class="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-600 cursor-not-allowed"' : 'class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800"';
+
+  if (type === "VISIT") {
+    // Fetch checked units for this visit
+    let checkedUnits = [];
+    try {
+      const resUnits = await supabaseClient.from("tr_visit_unit_check").select("*").eq("visit_id", item.id);
+      checkedUnits = resUnits.data || [];
+    } catch (e) {
+      console.warn("Could not fetch unit checks:", e);
+    }
+
+    const raw = item.raw || {};
+    let unitsHtml = "";
+    if (checkedUnits.length > 0) {
+      unitsHtml = `
+        <div class="mt-3 pt-3 border-t border-slate-200 space-y-2">
+          <span class="text-[11px] font-bold text-slate-700 block">Checklist Unit yang Dikunjungi (${checkedUnits.length} Unit):</span>
+          <div class="space-y-2">
+            ${checkedUnits.map((u, idx) => `
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                <div class="flex justify-between items-center text-xs font-bold text-slate-800">
+                  <span>${idx + 1}. ${u.nopol || 'Unit'} - ${u.unit_desc || ''}</span>
+                  <span class="text-[10px] text-slate-400 font-mono">${u.no_fasilitas || ''}</span>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5">Status Keberadaan:</label>
+                  <select ${isReadOnly ? 'disabled' : ''} class="hist-edit-unit-status w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs" data-check-id="${u.check_id || u.id}">
+                    <option value="Terlihat di Showroom" ${u.status_keberadaan === 'Terlihat di Showroom' ? 'selected' : ''}>Terlihat di Showroom</option>
+                    <option value="Tidak Terlihat di Showroom" ${u.status_keberadaan === 'Tidak Terlihat di Showroom' ? 'selected' : ''}>Tidak Terlihat di Showroom</option>
+                    <option value="Sedang Digunakan" ${u.status_keberadaan === 'Sedang Digunakan' ? 'selected' : ''}>Sedang Digunakan</option>
+                    <option value="Lainnya" ${u.status_keberadaan === 'Lainnya' ? 'selected' : ''}>Lainnya</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5">Catatan / Detail Unit:</label>
+                  <input type="text" ${isReadOnly ? 'disabled' : ''} value="${u.catatan_unit || ''}" class="hist-edit-unit-notes w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs" data-check-id="${u.check_id || u.id}" placeholder="Catatan kondisi/posisi unit..." />
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    fieldsContainer.innerHTML = `
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Bertemu Owner:</label>
+            <select id="edit-visit-bertemu" ${disabledAttr}>
+              <option value="Ya" ${raw.bertemu_owner === 'Ya' ? 'selected' : ''}>Ya</option>
+              <option value="Tidak" ${raw.bertemu_owner === 'Tidak' ? 'selected' : ''}>Tidak</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Alasan Tidak Bertemu:</label>
+            <input type="text" id="edit-visit-reason" value="${raw.owner_reason || ''}" placeholder="Jika tidak bertemu" ${disabledAttr} />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Total Stok Unit:</label>
+            <input type="number" id="edit-visit-stock" value="${raw.stock || 0}" ${disabledAttr} />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Total Sales Bulanan:</label>
+            <input type="number" id="edit-visit-sales" value="${raw.sales || 0}" ${disabledAttr} />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Kunjungan:</label>
+          <textarea id="edit-visit-notes" rows="3" placeholder="Catatan hasil kunjungan mitra..." ${disabledAttr}>${raw.catatan_visit || ''}</textarea>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Tindak Lanjut Concern Prioritas:</label>
+          <textarea id="edit-visit-concern" rows="2" placeholder="Tindak lanjut concern yang ditugaskan..." ${disabledAttr}>${raw.tindak_lanjut_concern || ''}</textarea>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+          <span class="text-[10px] font-bold text-slate-500 uppercase">Isu / Feedback Lapangan</span>
+          <div>
+            <label class="block text-[10px] text-slate-600 mb-0.5">Isu Digiasha:</label>
+            <input type="text" id="edit-visit-issue-digi" value="${raw.issue_digi || ''}" placeholder="Isu sistem/layanan Digiasha" ${disabledAttr} />
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-600 mb-0.5">Isu Internal Mitra:</label>
+            <input type="text" id="edit-visit-issue-internal" value="${raw.issue_internal || ''}" placeholder="Isu internal mitra" ${disabledAttr} />
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-600 mb-0.5">Isu Kompetitor:</label>
+            <input type="text" id="edit-visit-issue-komp" value="${raw.issue_komp || ''}" placeholder="Aktivitas kompetitor" ${disabledAttr} />
+          </div>
+        </div>
+
+        ${unitsHtml}
+      </div>
+    `;
+  } else if (type === "ONBOARDING") {
+    const raw = item.raw || {};
+    fieldsContainer.innerHTML = `
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Nama Pemohon / Owner:</label>
+          <input type="text" id="edit-onb-owner" value="${raw.owner_name || ''}" ${disabledAttr} />
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Hasil Survei Kelayakan:</label>
+          <select id="edit-onb-kelayakan" ${disabledAttr}>
+            <option value="Layak Menjadi Mitra" ${raw.survei_kelayakan === 'Layak Menjadi Mitra' ? 'selected' : ''}>Layak Menjadi Mitra</option>
+            <option value="Pertimbangan Khusus" ${raw.survei_kelayakan === 'Pertimbangan Khusus' ? 'selected' : ''}>Pertimbangan Khusus</option>
+            <option value="Tidak Layak" ${raw.survei_kelayakan === 'Tidak Layak' ? 'selected' : ''}>Tidak Layak</option>
+            <option value="Follow-up Lanjutan" ${raw.survei_kelayakan === 'Follow-up Lanjutan' ? 'selected' : ''}>Follow-up Lanjutan</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Survei & Verifikasi Data:</label>
+          <textarea id="edit-onb-notes" rows="4" placeholder="Detail hasil survey calon mitra..." ${disabledAttr}>${raw.catatan_survey || ''}</textarea>
+        </div>
+      </div>
+    `;
+  } else if (type === "GPS") {
+    const raw = item.raw || {};
+    fieldsContainer.innerHTML = `
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">Aktivitas (Terkunci):</label>
+            <div class="p-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">${raw.act_type || 'GPS Maintenance'}</div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">No Fasilitas (Terkunci):</label>
+            <div class="p-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-800">${raw.no_fasilitas || '-'}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">IMEI Lama (Terkunci):</label>
+            <div class="p-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 truncate">${raw.imei_lama || '-'}</div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">IMEI Baru (Terkunci):</label>
+            <div class="p-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 truncate">${raw.imei_baru || '-'}</div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Teknis Maintenance:</label>
+          <textarea id="edit-gps-notes" rows="4" placeholder="Catatan teknis hasil maintenance GPS..." ${disabledAttr}>${raw.catatan_teknis || ''}</textarea>
+        </div>
+      </div>
+    `;
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeHistoryDetailModal() {
+  const modal = document.getElementById("modal-history-detail");
+  if (modal) modal.classList.add("hidden");
+}
+
+async function handleSaveEditActivity(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const type = document.getElementById("edit-act-type")?.value;
+  const id = document.getElementById("edit-act-id")?.value;
+  const btn = document.getElementById("btn-save-edit-act");
+
+  const item = CACHED_HISTORY_DATA.find(x => x.type === type && String(x.id) === String(id));
+  if (!item) {
+    alert("Data transaksi tidak valid.");
+    return;
+  }
+
+  // Strict Validation: Only same-day transactions are editable
+  if (!item.isToday) {
+    alert("Transaksi ini sudah melewati hari kunjungan dan bersifat FINAL (Terkunci).");
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Menyimpan...</span>';
+  }
+
+  try {
+    if (type === "VISIT") {
+      const bertemuOwner = document.getElementById("edit-visit-bertemu")?.value || "Ya";
+      const ownerReason = document.getElementById("edit-visit-reason")?.value || "";
+      const stock = parseInt(document.getElementById("edit-visit-stock")?.value) || 0;
+      const sales = parseInt(document.getElementById("edit-visit-sales")?.value) || 0;
+      const notes = document.getElementById("edit-visit-notes")?.value || "";
+      const concern = document.getElementById("edit-visit-concern")?.value || "";
+      const issueDigi = document.getElementById("edit-visit-issue-digi")?.value || "";
+      const issueInternal = document.getElementById("edit-visit-issue-internal")?.value || "";
+      const issueKomp = document.getElementById("edit-visit-issue-komp")?.value || "";
+
+      // 1. Update tr_laporan_visit
+      const { error: visitErr } = await supabaseClient.from("tr_laporan_visit").update({
+        bertemu_owner: bertemuOwner,
+        owner_reason: ownerReason,
+        stock: stock,
+        sales: sales,
+        catatan_visit: notes,
+        tindak_lanjut_concern: concern,
+        issue_digi: issueDigi,
+        issue_internal: issueInternal,
+        issue_komp: issueKomp
+      }).eq("visit_id", id);
+
+      if (visitErr) throw visitErr;
+
+      // 2. Update tr_visit_unit_check child items
+      const statusSelects = document.querySelectorAll(".hist-edit-unit-status");
+      const notesInputs = document.querySelectorAll(".hist-edit-unit-notes");
+
+      for (let i = 0; i < statusSelects.length; i++) {
+        const checkId = statusSelects[i].getAttribute("data-check-id");
+        const uStatus = statusSelects[i].value;
+        const uNotes = notesInputs[i] ? notesInputs[i].value : "";
+
+        if (checkId) {
+          await supabaseClient.from("tr_visit_unit_check").update({
+            status_keberadaan: uStatus,
+            catatan_unit: uNotes
+          }).eq("check_id", checkId);
+        }
+      }
+
+    } else if (type === "ONBOARDING") {
+      const ownerName = document.getElementById("edit-onb-owner")?.value || "";
+      const kelayakan = document.getElementById("edit-onb-kelayakan")?.value || "";
+      const notes = document.getElementById("edit-onb-notes")?.value || "";
+
+      const { error: onbErr } = await supabaseClient.from("tr_onboarding_log").update({
+        owner_name: ownerName,
+        survei_kelayakan: kelayakan,
+        catatan_survey: notes
+      }).eq("onboarding_id", id);
+
+      if (onbErr) throw onbErr;
+
+    } else if (type === "GPS") {
+      const techNotes = document.getElementById("edit-gps-notes")?.value || "";
+
+      const { error: gpsErr } = await supabaseClient.from("tr_gps_maintenance").update({
+        catatan_teknis: techNotes
+      }).eq("maint_id", id);
+
+      if (gpsErr) throw gpsErr;
+    }
+
+    closeHistoryDetailModal();
+    alert("Perubahan laporan berhasil disimpan!");
+    await loadActivityHistory(true);
+
+  } catch (err) {
+    console.error("Error saving activity edit:", err);
+    alert("Gagal menyimpan perubahan: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span>Simpan Perubahan</span>';
+    }
+  }
+}
+
+// Global Camera Trigger
+function triggerCameraInput(inputId) {
+  const input = document.getElementById(inputId);
+  if (input) input.click();
+}
