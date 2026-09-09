@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260909_v23";
+const APP_BUILD_VERSION = "20260909_v24";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4035,7 +4035,11 @@ function switchSettingsTab(tab) {
       }
     }
   });
-  if (tab === "role") {
+  if (tab === "emp") {
+    if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
+      renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
+    }
+  } else if (tab === "role") {
     loadRolePermissionsSettings();
   }
 }
@@ -4060,6 +4064,12 @@ async function loadEmployeesForSettings() {
     } catch (e) {
       console.warn("Error load employees from supabase:", e);
     }
+  }
+
+  if (APP_STATE.employees && APP_STATE.employees.length > 0) {
+    SETTINGS_EMPLOYEES_DATA = APP_STATE.employees;
+    renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
+    return;
   }
 
   container.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">Tidak dapat memuat data karyawan.</div>';
@@ -4088,8 +4098,11 @@ function renderEmployeeList(list) {
   }
 
   container.innerHTML = list.map(emp => {
-    const rId = emp.role_id || "R-04";
-    const roleObj = ROLE_PERMISSIONS_STATE[rId];
+    const rId = String(emp.role_id || emp.role || emp.jabatan || "R-04").trim();
+    let roleObj = ROLE_PERMISSIONS_STATE[rId];
+    if (!roleObj) {
+      roleObj = Object.values(ROLE_PERMISSIONS_STATE).find(r => r.name.toLowerCase() === rId.toLowerCase() || rId.toLowerCase().includes(r.name.toLowerCase()) || r.name.toLowerCase().includes(rId.toLowerCase()));
+    }
     const rBadge = roleObj?.badgeBg || "bg-slate-100 text-slate-700 border-slate-200";
     const rName = roleObj?.name || rId;
     const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
@@ -4856,6 +4869,9 @@ function handleSaveRoleInfo(e) {
   closeRoleModal();
   loadRolePermissionsSettings();
   populateEmployeeRoleOptions();
+  if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
+    renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
+  }
 }
 
 function deleteCustomRole(roleId) {
