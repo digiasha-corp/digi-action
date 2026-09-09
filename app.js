@@ -1,6 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
+const APP_BUILD_VERSION = "20260909_v19";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -747,7 +748,7 @@ async function loadScreen(screenName) {
 
   try {
     if (!screenCache[screenName]) {
-      const res = await fetch(`screens/${screenName}.html`);
+      const res = await fetch(`screens/${screenName}.html?v=${APP_BUILD_VERSION}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Gagal mengambil file screen");
       screenCache[screenName] = await res.text();
     }
