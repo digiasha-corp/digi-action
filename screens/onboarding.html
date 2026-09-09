@@ -133,78 +133,259 @@
 
     <!-- Segmen 4 -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
-        <span class="w-5 h-5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center">4</span>
-        <h3 class="text-xs font-bold text-slate-800 uppercase">Dokumen Terkumpulkan (Kamera / Galeri)</h3>
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div class="flex items-center space-x-2">
+          <span class="w-5 h-5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center">4</span>
+          <h3 class="text-xs font-bold text-slate-800 uppercase">Dokumen Terkumpulkan (Multi File / PDF / Foto)</h3>
+        </div>
+        <span id="onb-total-doc-count" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">0 Dokumen</span>
       </div>
 
-      <p class="text-[11px] text-slate-500">Pilih dokumen yang berhasil didapatkan pada kunjungan ini, lalu unggah foto via kamera atau galeri.</p>
+      <p class="text-[11px] text-slate-500">Unggah berkas dokumen yang didapatkan (bisa foto langsung atau file/PDF, mendukung upload lebih dari 1 file per dokumen).</p>
 
       <div class="space-y-2.5" id="container-onb-attachments">
-        <div class="grid grid-cols-2 gap-2 text-[11px]">
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="KTP" onchange="toggleDocUploadRow(this, 'KTP')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">KTP Pemohon</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="KK" onchange="toggleDocUploadRow(this, 'KK')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Kartu Keluarga (KK)</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="KTP Pasangan" onchange="toggleDocUploadRow(this, 'KTP Pasangan')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">KTP Pasangan</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Dokumen PT CV" onchange="toggleDocUploadRow(this, 'Dokumen PT CV')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Dokumen PT/CV</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="NPWP" onchange="toggleDocUploadRow(this, 'NPWP')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">NPWP</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Rekening Koran" onchange="toggleDocUploadRow(this, 'Rekening Koran')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Rekening Koran (RK)</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Legalitas Usaha" onchange="toggleDocUploadRow(this, 'Legalitas Usaha')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Legalitas Usaha</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Bukti Domisili" onchange="toggleDocUploadRow(this, 'Bukti Domisili')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Bukti Domisili</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Bukti Tempat Usaha" onchange="toggleDocUploadRow(this, 'Bukti Tempat Usaha')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Bukti Tempat Usaha</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Foto Stok Unit" onchange="toggleDocUploadRow(this, 'Foto Stok Unit')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Foto Stok Unit</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Foto Stok BPKB" onchange="toggleDocUploadRow(this, 'Foto Stok BPKB')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Foto Stok BPKB</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Foto Domisili" onchange="toggleDocUploadRow(this, 'Foto Domisili')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Foto Domisili</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Foto Tempat Usaha" onchange="toggleDocUploadRow(this, 'Foto Tempat Usaha')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Foto Tempat Usaha</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-            <input type="checkbox" name="onb_doc_chk" value="Selfie dg Pemohon" onchange="toggleDocUploadRow(this, 'Selfie dg Pemohon')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Selfie dg Pemohon</span>
-          </label>
-          <label class="flex items-center space-x-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer col-span-2">
-            <input type="checkbox" name="onb_doc_chk" value="Dokumen Lainnya" onchange="toggleDocUploadRow(this, 'Dokumen Lainnya')" class="rounded text-teal-600" />
-            <span class="font-medium text-slate-700">Dokumen Lainnya (Multi Attachment)</span>
-          </label>
-        </div>
+        <!-- List Dokumen dengan Tombol Upload Langsung -->
+        <div class="space-y-2" id="onb-doc-rows-list">
+          <!-- Item 1: KTP Pemohon -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-id-card text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">KTP Pemohon</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KTP', 'KTP Pemohon')" />
+              </label>
+            </div>
+            <div id="file-chips-KTP" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
 
-        <div id="dynamic-upload-slots" class="space-y-2 pt-2 border-t border-slate-100"></div>
+          <!-- Item 2: KK -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-users text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Kartu Keluarga (KK)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KK', 'Kartu Keluarga (KK)')" />
+              </label>
+            </div>
+            <div id="file-chips-KK" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 3: KTP Pasangan -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-id-card-clip text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">KTP Pasangan</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KTP_Pasangan', 'KTP Pasangan')" />
+              </label>
+            </div>
+            <div id="file-chips-KTP_Pasangan" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 4: Dokumen PT/CV -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-building-flag text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Dokumen Legalitas PT / CV</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Dokumen_PT_CV', 'Dokumen Legalitas PT/CV')" />
+              </label>
+            </div>
+            <div id="file-chips-Dokumen_PT_CV" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 5: NPWP -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-file-invoice text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">NPWP (Pribadi / Badan)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'NPWP', 'NPWP')" />
+              </label>
+            </div>
+            <div id="file-chips-NPWP" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 6: Rekening Koran -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-money-check-dollar text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Rekening Koran (3 Bulan Terakhir)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Rekening_Koran', 'Rekening Koran')" />
+              </label>
+            </div>
+            <div id="file-chips-Rekening_Koran" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 7: Legalitas Usaha -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-stamp text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Legalitas Usaha (NIB / SKU / SIUP)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Legalitas_Usaha', 'Legalitas Usaha')" />
+              </label>
+            </div>
+            <div id="file-chips-Legalitas_Usaha" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 8: Bukti Domisili -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-house-user text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Bukti Domisili (PBB / Rek Listrik)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Bukti_Domisili', 'Bukti Domisili')" />
+              </label>
+            </div>
+            <div id="file-chips-Bukti_Domisili" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 9: Bukti Tempat Usaha -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-shop text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Bukti Tempat Usaha (Sewa / Milik)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Bukti_Tempat_Usaha', 'Bukti Tempat Usaha')" />
+              </label>
+            </div>
+            <div id="file-chips-Bukti_Tempat_Usaha" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 10: Foto Stok Unit -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-car text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Foto Stok Unit / Barang</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Stok_Unit', 'Foto Stok Unit')" />
+              </label>
+            </div>
+            <div id="file-chips-Foto_Stok_Unit" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 11: Foto Stok BPKB -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-folder-open text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Foto Stok BPKB / Faktur</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Stok_BPKB', 'Foto Stok BPKB')" />
+              </label>
+            </div>
+            <div id="file-chips-Foto_Stok_BPKB" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 12: Foto Domisili -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-house text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Foto Domisili (Tempat Tinggal)</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Domisili', 'Foto Domisili')" />
+              </label>
+            </div>
+            <div id="file-chips-Foto_Domisili" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 13: Foto Tempat Usaha -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-store text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Foto Tempat Usaha / Showroom</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Tempat_Usaha', 'Foto Tempat Usaha')" />
+              </label>
+            </div>
+            <div id="file-chips-Foto_Tempat_Usaha" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 14: Selfie dg Pemohon -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-camera-retro text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Foto Bersama Pemohon di Lokasi</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Selfie_Pemohon', 'Foto Bersama Pemohon')" />
+              </label>
+            </div>
+            <div id="file-chips-Selfie_Pemohon" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+
+          <!-- Item 15: Dokumen Lainnya -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i class="fa-solid fa-folder-plus text-teal-600 text-sm"></i>
+                <span class="text-xs font-bold text-slate-800 truncate">Dokumen Tambahan Lainnya</span>
+              </div>
+              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Upload</span>
+                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Dokumen_Lainnya', 'Dokumen Lainnya')" />
+              </label>
+            </div>
+            <div id="file-chips-Dokumen_Lainnya" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+          </div>
+        </div>
       </div>
     </div>
 

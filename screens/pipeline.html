@@ -1,0 +1,198 @@
+<div class="space-y-3.5">
+  <!-- Header & Filter Card -->
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center text-sm font-bold">
+          <i class="fa-solid fa-bars-progress"></i>
+        </div>
+        <div>
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Pipeline Onboarding</h3>
+          <p class="text-[10px] text-slate-400">Monitoring progres & kelengkapan dokumen calon mitra</p>
+        </div>
+      </div>
+      <button onclick="loadPipelineData(true)" class="p-2 text-slate-500 hover:text-teal-700 hover:bg-slate-50 rounded-xl transition" title="Segarkan Data">
+        <i class="fa-solid fa-rotate-right text-xs" id="btn-refresh-pipeline-icon"></i>
+      </button>
+    </div>
+
+    <!-- Search Input -->
+    <div class="relative">
+      <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+      <input type="text" id="pipeline-search-input" oninput="filterPipelineList()" placeholder="Cari nama pemohon, tempat usaha, atau PIC..." class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-700 outline-none" />
+    </div>
+
+    <!-- Stage Filter Tabs (3 Tahap Utama Sesuai Ketentuan) -->
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold no-scrollbar">
+      <button type="button" onclick="setPipelineFilter('ALL')" id="filter-tab-ALL" class="pipeline-tab-btn px-3 py-1.5 rounded-xl bg-teal-700 text-white shadow-xs transition">
+        Semua (<span id="count-pipeline-all">0</span>)
+      </button>
+      <button type="button" onclick="setPipelineFilter('Penawaran')" id="filter-tab-Penawaran" class="pipeline-tab-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+        Penawaran (<span id="count-pipeline-penawaran">0</span>)
+      </button>
+      <button type="button" onclick="setPipelineFilter('Coll Doc')" id="filter-tab-CollDoc" class="pipeline-tab-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+        Coll Doc (<span id="count-pipeline-colldoc">0</span>)
+      </button>
+      <button type="button" onclick="setPipelineFilter('Survey')" id="filter-tab-Survey" class="pipeline-tab-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+        Survey (<span id="count-pipeline-survey">0</span>)
+      </button>
+    </div>
+  </div>
+
+  <!-- Pipeline List Container -->
+  <div id="pipeline-cards-container" class="space-y-3">
+    <div class="py-12 text-center text-xs text-slate-400">
+      <i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-teal-700"></i>
+      Memuat pipeline calon mitra...
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL DETAIL & FOLDER DOKUMEN PIPELINE ONBOARDING -->
+<!-- ========================================================================= -->
+<div id="modal-pipeline-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    
+    <!-- Modal Top Header -->
+    <div class="p-4 bg-teal-700 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-folder-open text-teal-200"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-xs uppercase tracking-wider leading-tight">Detail & Folder Calon Mitra</h4>
+          <p class="text-[10px] text-teal-100" id="modal-pipe-id-label">ONB-XXXX</p>
+        </div>
+      </div>
+      <button onclick="closePipelineDetailModal()" class="text-white/80 hover:text-white p-1 rounded-lg">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Modal Content (Scrollable) -->
+    <div class="p-4 flex-1 overflow-y-auto space-y-4">
+      
+      <!-- 1. BAGIAN PALING ATAS: Nama Pemohon & Nama Tempat Usaha -->
+      <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+            <span class="text-xs font-bold text-slate-800 uppercase">Informasi Calon Mitra</span>
+          </div>
+          <span id="modal-pipe-badge-db" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">Database Baru</span>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Nama Pemohon <span class="text-red-500">*</span></label>
+          <input type="text" id="modal-pipe-input-pemohon" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-700" placeholder="Nama Pemohon" />
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Nama Tempat Usaha <span class="text-red-500">*</span></label>
+          <input type="text" id="modal-pipe-input-usaha" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-700" placeholder="Nama Tempat Usaha" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-[11px]">
+          <div>
+            <span class="text-slate-400 block text-[10px]">PIC Penginput:</span>
+            <span id="modal-pipe-pic" class="font-bold text-slate-700 truncate block">-</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Tanggal Kunjungan:</span>
+            <span id="modal-pipe-tgl" class="font-bold text-slate-700 block">-</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Alamat / Lokasi:</label>
+          <textarea id="modal-pipe-input-alamat" rows="2" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-700 focus:ring-2 focus:ring-teal-700" placeholder="Alamat calon mitra..."></textarea>
+        </div>
+      </div>
+
+      <!-- 2. BAGIAN TENGAH: Progress Status (Penawaran, Coll Doc, Survey) -->
+      <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center">2</span>
+            <span class="text-xs font-bold text-slate-800 uppercase">Progress Status Onboarding</span>
+          </div>
+          <span id="modal-pipe-progress-label" class="text-[10px] font-bold text-teal-700">1/3 Tahap Selesai</span>
+        </div>
+
+        <p class="text-[11px] text-slate-500">Centang tahapan yang sudah berjalan / selesai pada calon mitra ini:</p>
+
+        <div class="grid grid-cols-3 gap-2">
+          <label class="p-2.5 bg-white rounded-xl border border-slate-300 flex flex-col items-center text-center cursor-pointer hover:border-teal-600 transition has-[:checked]:border-teal-700 has-[:checked]:bg-teal-50">
+            <input type="checkbox" id="modal-pipe-chk-penawaran" onchange="updateModalProgressSummary()" class="rounded text-teal-600 w-4 h-4 mb-1" />
+            <span class="text-xs font-bold text-slate-800">Penawaran</span>
+            <span class="text-[9px] text-slate-400 mt-0.5">Tahap 1</span>
+          </label>
+
+          <label class="p-2.5 bg-white rounded-xl border border-slate-300 flex flex-col items-center text-center cursor-pointer hover:border-teal-600 transition has-[:checked]:border-teal-700 has-[:checked]:bg-teal-50">
+            <input type="checkbox" id="modal-pipe-chk-colldoc" onchange="updateModalProgressSummary()" class="rounded text-teal-600 w-4 h-4 mb-1" />
+            <span class="text-xs font-bold text-slate-800">Coll Doc</span>
+            <span class="text-[9px] text-slate-400 mt-0.5">Tahap 2</span>
+          </label>
+
+          <label class="p-2.5 bg-white rounded-xl border border-slate-300 flex flex-col items-center text-center cursor-pointer hover:border-teal-600 transition has-[:checked]:border-teal-700 has-[:checked]:bg-teal-50">
+            <input type="checkbox" id="modal-pipe-chk-survey" onchange="updateModalProgressSummary()" class="rounded text-teal-600 w-4 h-4 mb-1" />
+            <span class="text-xs font-bold text-slate-800">Survey</span>
+            <span class="text-[9px] text-slate-400 mt-0.5">Tahap 3</span>
+          </label>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Catatan Hasil & Rencana Tindak Lanjut:</label>
+          <textarea id="modal-pipe-input-catatan" rows="2" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-700 focus:ring-2 focus:ring-teal-700" placeholder="Tuliskan catatan update..."></textarea>
+        </div>
+      </div>
+
+      <!-- 3. BAGIAN BAWAH: Detail Folder Dokumen Yang Sudah Diupload & Upload Berkas Susulan -->
+      <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center">3</span>
+            <span class="text-xs font-bold text-slate-800 uppercase">Detail Folder Dokumen</span>
+          </div>
+          <span id="modal-pipe-doc-count" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">0 File Terkumpul</span>
+        </div>
+
+        <p class="text-[11px] text-slate-500">Daftar berkas dokumen yang sudah masuk. Anda dapat mengunggah berkas susulan langsung ke folder yang bersangkutan.</p>
+
+        <!-- Folder Categories Accordion / List -->
+        <div id="modal-pipe-doc-folder-list" class="space-y-2">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div class="p-3 bg-slate-100 border-t border-slate-200 flex space-x-2 shrink-0">
+      <button type="button" onclick="closePipelineDetailModal()" class="w-1/3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">
+        Tutup
+      </button>
+      <button type="button" id="btn-save-pipeline-modal" onclick="handleSavePipelineUpdate()" class="w-2/3 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition">
+        <i class="fa-solid fa-floppy-disk mr-1"></i>
+        <span>Simpan Perubahan Pipeline</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL PREVIEW GAMBAR / DOKUMEN -->
+<!-- ========================================================================= -->
+<div id="modal-image-viewer" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] hidden flex flex-col items-center justify-center p-4">
+  <div class="w-full max-w-lg flex justify-between items-center text-white mb-2">
+    <span id="image-viewer-title" class="text-xs font-bold truncate">Preview Dokumen</span>
+    <button onclick="closeImageViewer()" class="p-1.5 text-slate-400 hover:text-white rounded-lg">
+      <i class="fa-solid fa-xmark text-lg"></i>
+    </button>
+  </div>
+  <div class="w-full max-w-lg max-h-[80vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black/40 border border-white/10">
+    <img id="image-viewer-img" src="" alt="Preview" class="max-w-full max-h-[75vh] object-contain rounded-xl" />
+  </div>
+</div>

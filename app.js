@@ -95,12 +95,33 @@ function base64ToBlob(base64Data) {
   return new Blob([uInt8Array], { type: contentType });
 }
 
+function getExtensionFromMime(mimeType) {
+  if (!mimeType) return "jpg";
+  const m = String(mimeType).toLowerCase();
+  if (m.includes("pdf")) return "pdf";
+  if (m.includes("png")) return "png";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("gif")) return "gif";
+  if (m.includes("svg")) return "svg";
+  if (m.includes("jpeg") || m.includes("jpg")) return "jpg";
+  return "jpg";
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
 async function uploadToSupabaseStorage(base64Data, folder, prefix = "IMG") {
   if (!base64Data || !supabaseClient) return "";
   try {
     const blob = base64ToBlob(base64Data);
     if (!blob) return "";
-    const ext = "jpg";
+    const ext = getExtensionFromMime(blob.type);
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').substring(0, 14);
     const random = Math.floor(Math.random() * 10000);
     const filePath = `${folder}/${prefix}-${timestamp}-${random}.${ext}`;
@@ -108,7 +129,7 @@ async function uploadToSupabaseStorage(base64Data, folder, prefix = "IMG") {
     const { data, error } = await supabaseClient.storage
       .from(CONFIG.MEDIA_BUCKET || "digiasha-media")
       .upload(filePath, blob, {
-        contentType: "image/jpeg",
+        contentType: blob.type || "image/jpeg",
         upsert: true
       });
 
@@ -456,6 +477,51 @@ async function supabaseSubmitOnboarding(data) {
     ? await uploadToSupabaseStorage(data.selfie_base64, "onboarding", `ONB-SELFIE-${data.userId}`)
     : "";
 
+  // Upload each document's files
+  const uploadedDocuments = [];
+  if (data.documents && Array.isArray(data.documents)) {
+    for (const docGroup of data.documents) {
+      const groupFiles = [];
+      if (docGroup.files && Array.isArray(docGroup.files)) {
+        for (let i = 0; i < docGroup.files.length; i++) {
+          const f = docGroup.files[i];
+          if (f.url) {
+            groupFiles.push({ name: f.name, url: f.url, type: f.type });
+          } else if (f.base64) {
+            const uploadedUrl = await uploadToSupabaseStorage(f.base64, "onboarding", `DOC-${docGroup.key}-${i+1}`);
+            if (uploadedUrl) {
+              groupFiles.push({ name: f.name, url: uploadedUrl, type: f.type });
+            }
+          }
+        }
+      }
+      if (groupFiles.length > 0) {
+        uploadedDocuments.push({
+          key: docGroup.key,
+          title: docGroup.title,
+          files: groupFiles
+        });
+      }
+    }
+  }
+
+  const ktpDoc = uploadedDocuments.find(d => d.key === "KTP");
+  const ktpPhotoUrl = ktpDoc?.files?.[0]?.url || selfieUrl;
+
+  const showroomDoc = uploadedDocuments.find(d => d.key === "Foto_Tempat_Usaha" || d.key === "Foto_Stok_Unit");
+  const showroomPhotoUrl = showroomDoc?.files?.[0]?.url || selfieUrl;
+
+  const payloadMeta = {
+    status_db: data.status_db,
+    alamat: data.alamat,
+    jenis_usaha: data.jenis_usaha,
+    detail_usaha: data.detail_usaha,
+    catatan: data.catatan,
+    stages: data.stages || (data.aktivitas ? data.aktivitas.split(',').map(s => s.trim()) : ["Penawaran"]),
+    documents: uploadedDocuments,
+    legacy_text: `${data.status_db} | ${data.alamat} | ${data.detail_usaha} | Catatan: ${data.catatan} | Dokumen: ${data.dokumen_list}`
+  };
+
   await supabaseClient.from("tr_onboarding_log").insert([{
     onboarding_id: onbId,
     nip: data.userId,
@@ -463,10 +529,10 @@ async function supabaseSubmitOnboarding(data) {
     owner_name: data.nama_pemohon,
     lokasi_lat: data.lat,
     lokasi_long: data.long,
-    survei_kelayakan: data.aktivitas,
-    catatan_survey: `${data.status_db} | ${data.alamat} | ${data.detail_usaha} | Catatan: ${data.catatan} | Dokumen: ${data.dokumen_list}`,
-    foto_ktp_url: selfieUrl,
-    foto_showroom_url: selfieUrl
+    survei_kelayakan: Array.isArray(data.stages) ? data.stages.join(", ") : data.aktivitas,
+    catatan_survey: JSON.stringify(payloadMeta),
+    foto_ktp_url: ktpPhotoUrl,
+    foto_showroom_url: showroomPhotoUrl
   }]);
 
   return { success: true, onbId };
@@ -664,6 +730,7 @@ async function loadScreen(screenName) {
       const titles = {
         visit: "Laporan Visit Mitra",
         onboarding: "Visit Calon Mitra",
+        pipeline: "Pipeline Onboarding",
         gps: "GPS Maintenance",
         priority: "Priority Visit",
         assignment: "Assign Concern Visit",
@@ -697,6 +764,7 @@ async function loadScreen(screenName) {
     }
     if (screenName === "assignment") populateAssignDealerOptions();
     if (screenName === "visit") populateVisitDealerOptions();
+    if (screenName === "pipeline") initPipeline();
     if (screenName === "gps") initGpsScreen();
     if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
     if (screenName === "absensi") acquireAbsenLocation();
@@ -2499,45 +2567,104 @@ function toggleJenisUsaha(val) {
   }
 }
 
-function toggleDocUploadRow(checkbox, docKey) {
-  const slotsContainer = document.getElementById("dynamic-upload-slots");
-  const cleanKey = docKey.replace(/[^a-zA-Z0-9]/g, '_');
-  const rowId = `doc-slot-${cleanKey}`;
+// Master Dokumen Onboarding
+const ONBOARDING_DOC_MASTER = [
+  { key: "KTP", title: "KTP Pemohon", icon: "fa-id-card" },
+  { key: "KK", title: "Kartu Keluarga (KK)", icon: "fa-users" },
+  { key: "KTP_Pasangan", title: "KTP Pasangan", icon: "fa-id-card-clip" },
+  { key: "Dokumen_PT_CV", title: "Dokumen Legalitas PT / CV", icon: "fa-building-flag" },
+  { key: "NPWP", title: "NPWP (Pribadi / Badan)", icon: "fa-file-invoice" },
+  { key: "Rekening_Koran", title: "Rekening Koran (3 Bulan Terakhir)", icon: "fa-money-check-dollar" },
+  { key: "Legalitas_Usaha", title: "Legalitas Usaha (NIB / SKU / SIUP)", icon: "fa-stamp" },
+  { key: "Bukti_Domisili", title: "Bukti Domisili (PBB / Rek Listrik)", icon: "fa-house-user" },
+  { key: "Bukti_Tempat_Usaha", title: "Bukti Tempat Usaha (Sewa / Milik)", icon: "fa-shop" },
+  { key: "Foto_Stok_Unit", title: "Foto Stok Unit / Barang", icon: "fa-car" },
+  { key: "Foto_Stok_BPKB", title: "Foto Stok BPKB / Faktur", icon: "fa-folder-open" },
+  { key: "Foto_Domisili", title: "Foto Domisili (Tempat Tinggal)", icon: "fa-house" },
+  { key: "Foto_Tempat_Usaha", title: "Foto Tempat Usaha / Showroom", icon: "fa-store" },
+  { key: "Selfie_Pemohon", title: "Foto Bersama Pemohon di Lokasi", icon: "fa-camera-retro" },
+  { key: "Dokumen_Lainnya", title: "Dokumen Tambahan Lainnya", icon: "fa-folder-plus" }
+];
 
-  if (checkbox.checked) {
-    const row = document.createElement("div");
-    row.id = rowId;
-    row.className = "p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2 text-xs";
-    row.innerHTML = `
-      <div class="min-w-0 flex-1">
-        <span class="font-bold text-slate-800 block truncate">${checkbox.value}</span>
-        <span id="label-status-${cleanKey}" class="text-[10px] text-amber-600 block">Belum ada file</span>
-      </div>
-      <div class="shrink-0 flex items-center space-x-1.5">
-        <button type="button" onclick="triggerCameraInput('file-doc-${cleanKey}')" class="px-2.5 py-1.5 bg-teal-700 text-white rounded-lg text-xs font-semibold shadow">
-          <i class="fa-solid fa-folder-open mr-1"></i> Upload
+async function handleDocMultiFilesSelected(input, docKey, docTitle) {
+  if (!input.files || input.files.length === 0) return;
+  if (!ONB_DOC_FILES[docKey]) {
+    ONB_DOC_FILES[docKey] = { title: docTitle, files: [] };
+  }
+
+  for (let i = 0; i < input.files.length; i++) {
+    const file = input.files[i];
+    let base64 = "";
+    if (file.type && file.type.startsWith("image/")) {
+      base64 = await compressImage(file, 1200, 0.75);
+    } else {
+      base64 = await readFileAsBase64(file);
+    }
+    ONB_DOC_FILES[docKey].files.push({
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+      base64: base64
+    });
+  }
+
+  input.value = "";
+  renderDocChips(docKey);
+  updateOnbDocCounter();
+}
+
+function removeDocFile(docKey, index) {
+  if (ONB_DOC_FILES[docKey] && ONB_DOC_FILES[docKey].files) {
+    ONB_DOC_FILES[docKey].files.splice(index, 1);
+    if (ONB_DOC_FILES[docKey].files.length === 0) {
+      delete ONB_DOC_FILES[docKey];
+    }
+  }
+  renderDocChips(docKey);
+  updateOnbDocCounter();
+}
+
+function renderDocChips(docKey) {
+  const container = document.getElementById(`file-chips-${docKey}`);
+  if (!container) return;
+  const docObj = ONB_DOC_FILES[docKey];
+  if (!docObj || !docObj.files || docObj.files.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = docObj.files.map((f, idx) => {
+    const isImg = f.type && f.type.startsWith("image/");
+    const icon = isImg ? "fa-image text-teal-600" : "fa-file-pdf text-rose-600";
+    return `
+      <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-teal-300 rounded-lg text-[10px] font-medium text-slate-700 shadow-2xs">
+        <i class="fa-solid ${icon}"></i>
+        <span class="max-w-[110px] truncate" title="${f.name}">${f.name}</span>
+        <button type="button" onclick="removeDocFile('${docKey}', ${idx})" class="text-slate-400 hover:text-red-500 ml-0.5" title="Hapus file">
+          <i class="fa-solid fa-xmark text-xs"></i>
         </button>
-        <input type="file" id="file-doc-${cleanKey}" accept="image/*" class="hidden" onchange="handleDocPhotoCaptured(this, '${docKey}', '${checkbox.value}', '${cleanKey}')" />
       </div>
     `;
-    slotsContainer.appendChild(row);
-  } else {
-    const existingRow = document.getElementById(rowId);
-    if (existingRow) existingRow.remove();
-    delete ONB_DOC_FILES[docKey];
-  }
+  }).join('');
+}
+
+function updateOnbDocCounter() {
+  const counter = document.getElementById("onb-total-doc-count");
+  if (!counter) return;
+  const docKeys = Object.keys(ONB_DOC_FILES);
+  let totalFiles = 0;
+  docKeys.forEach(k => {
+    totalFiles += (ONB_DOC_FILES[k]?.files?.length || 0);
+  });
+  counter.innerText = `${docKeys.length} Dokumen (${totalFiles} File)`;
+}
+
+function toggleDocUploadRow(checkbox, docKey) {
+  // Legacy stub for backward compatibility
 }
 
 async function handleDocPhotoCaptured(input, docKey, docTitle, cleanKey) {
-  if (input.files && input.files[0]) {
-    const compressed = await compressImage(input.files[0], 1024, 0.75);
-    ONB_DOC_FILES[docKey] = { title: docTitle, base64: compressed };
-    const label = document.getElementById(`label-status-${cleanKey}`);
-    if (label) {
-      label.innerText = "✓ File Terunggah";
-      label.className = "text-[10px] text-emerald-600 font-bold block";
-    }
-  }
+  // Legacy stub
 }
 
 async function handleOnbSelfieSelected(input) {
@@ -2563,7 +2690,7 @@ async function handleOnboardingSubmit(e) {
   const actChecked = [];
   document.querySelectorAll('input[name="onb_act_type"]:checked').forEach(c => actChecked.push(c.value));
   if (actChecked.length === 0) {
-    alert("Pilih minimal 1 jenis aktivitas onboarding!");
+    alert("Pilih minimal 1 jenis aktivitas onboarding (Penawaran, Coll Doc, atau Survey)!");
     return;
   }
   if (!CURRENT_ONB_SELFIE_BASE64) {
@@ -2602,32 +2729,71 @@ async function handleOnboardingSubmit(e) {
   }
 
   const docKeys = Object.keys(ONB_DOC_FILES);
-  const docList = docKeys.length > 0 ? docKeys.map(k => `✓ ${ONB_DOC_FILES[k].title}`).join('\n') : '- Tidak ada dokumen fisik yang didapatkan pada visit ini';
+  let totalAttachedFiles = 0;
+  const docListLines = [];
+  const structuredDocs = [];
+
+  docKeys.forEach(k => {
+    const docItem = ONB_DOC_FILES[k];
+    if (docItem && docItem.files && docItem.files.length > 0) {
+      totalAttachedFiles += docItem.files.length;
+      docListLines.push(`✓ ${docItem.title} (${docItem.files.length} file)`);
+      structuredDocs.push({
+        key: k,
+        title: docItem.title,
+        files: docItem.files
+      });
+    }
+  });
+
+  const docList = docListLines.length > 0 ? docListLines.join('\n') : '- Belum ada berkas fisik yang diunggah pada visit ini';
   const catatanHasil = document.getElementById("onb-catatan-hasil").value.trim();
 
   let waText = `*LAPORAN VISIT ONBOARDING CALON MITRA*\n------------------------------------\n*Aktivitas:* ${actChecked.join(' & ')}\n*Status Database:* ${isDbBaru === 'Ya' ? 'Database Baru' : 'Database On-Process'}\n*Nama Pemohon:* ${namaPemohon}\n*Nama Usaha:* ${namaUsaha}\n`;
   if (isDbBaru === 'Ya') {
     waText += `*Alamat:* ${alamat}\n*Jenis Usaha:* ${jenisUsaha}\n${detailTambahan}\n`;
   }
-  waText += `\n*DOKUMEN DIDAPATKAN:*\n${docList}\n\n*HASIL & CATATAN KUNJUNGAN:*\n${catatanHasil}\n\n• Foto Selfie: [Kamera Langsung OK]\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+  waText += `\n*DOKUMEN DIDAPATKAN (${totalAttachedFiles} File):*\n${docList}\n\n*HASIL & CATATAN KUNJUNGAN:*\n${catatanHasil}\n\n• Foto Selfie: [Kamera Langsung OK]\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
 
-  callApi("submitOnboarding", {
-    userId: CURRENT_USER?.nip || CURRENT_USER?.email,
-    aktivitas: actChecked.join(', '),
-    status_db: isDbBaru === 'Ya' ? 'Database Baru' : 'Database On-Process',
-    nama_pemohon: namaPemohon,
-    nama_usaha: namaUsaha,
-    alamat: alamat,
-    jenis_usaha: jenisUsaha,
-    detail_usaha: detailTambahan,
-    dokumen_list: docKeys.map(k => ONB_DOC_FILES[k].title).join(', '),
-    catatan: catatanHasil,
-    lat: CURRENT_USER_GEO.lat,
-    long: CURRENT_USER_GEO.long,
-    selfie_base64: CURRENT_ONB_SELFIE_BASE64
-  });
+  const submitBtn = document.getElementById("btn-submit-onb-btn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i><span>Mengunggah & Menyimpan Laporan...</span>';
+  }
 
-  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-teal-700");
+  try {
+    await callApi("submitOnboarding", {
+      userId: CURRENT_USER?.nip || CURRENT_USER?.email,
+      aktivitas: actChecked.join(', '),
+      stages: actChecked,
+      status_db: isDbBaru === 'Ya' ? 'Database Baru' : 'Database On-Process',
+      nama_pemohon: namaPemohon,
+      nama_usaha: namaUsaha,
+      alamat: alamat,
+      jenis_usaha: jenisUsaha,
+      detail_usaha: detailTambahan,
+      dokumen_list: docKeys.map(k => ONB_DOC_FILES[k].title).join(', '),
+      documents: structuredDocs,
+      catatan: catatanHasil,
+      lat: CURRENT_USER_GEO.lat,
+      long: CURRENT_USER_GEO.long,
+      selfie_base64: CURRENT_ONB_SELFIE_BASE64
+    });
+
+    openSummaryModal("Laporan Onboarding Berhasil!", "Siap disalin ke WhatsApp Group", waText, "bg-teal-700");
+
+    // Reset ONB_DOC_FILES and Selfie
+    ONB_DOC_FILES = {};
+    CURRENT_ONB_SELFIE_BASE64 = null;
+  } catch (err) {
+    console.error("Error submit onboarding:", err);
+    alert("Gagal mengirim laporan onboarding: " + err.message);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i><span>Kirim Laporan Onboarding</span>';
+    }
+  }
 }
 
 // =========================================================================
@@ -5112,4 +5278,570 @@ async function handleSaveEditActivity(e) {
 function triggerCameraInput(inputId) {
   const input = document.getElementById(inputId);
   if (input) input.click();
+}
+
+// =========================================================================
+// PIPELINE ONBOARDING CONTROLLER (3 STAGES: Penawaran, Coll Doc, Survey)
+// =========================================================================
+let PIPELINE_RAW_DATA = [];
+let CURRENT_PIPELINE_FILTER = "ALL";
+let ACTIVE_PIPELINE_ITEM = null;
+let PIPELINE_PENDING_UPLOADS = {};
+
+async function initPipeline() {
+  await loadPipelineData();
+}
+
+function parseOnboardingRecord(item) {
+  let meta = {
+    status_db: "Database Baru",
+    alamat: "-",
+    jenis_usaha: "-",
+    detail_usaha: "",
+    catatan: "",
+    stages: [],
+    documents: []
+  };
+
+  const rawNotes = item.catatan_survey || "";
+  if (rawNotes.startsWith("{") && rawNotes.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(rawNotes);
+      meta = { ...meta, ...parsed };
+    } catch (e) {
+      console.warn("Parse JSON notes error, fallback to regex:", e);
+    }
+  } else if (rawNotes) {
+    // Parse legacy string: "Database Baru | Alamat | Detail | Catatan: ... | Dokumen: ..."
+    const parts = rawNotes.split(" | ");
+    if (parts[0]) meta.status_db = parts[0];
+    if (parts[1]) meta.alamat = parts[1];
+    if (parts[2]) meta.detail_usaha = parts[2];
+    const catMatch = rawNotes.match(/Catatan:\s*([^|]+)/i);
+    if (catMatch) meta.catatan = catMatch[1].trim();
+    const docMatch = rawNotes.match(/Dokumen:\s*([^|]+)/i);
+    if (docMatch && docMatch[1]) {
+      const docNames = docMatch[1].split(",").map(d => d.trim()).filter(Boolean);
+      meta.documents = docNames.map(name => ({
+        key: name.replace(/[^a-zA-Z0-9]/g, '_'),
+        title: name,
+        files: item.foto_ktp_url ? [{ name: "Foto Terlampir", url: item.foto_ktp_url, type: "image/jpeg" }] : []
+      }));
+    }
+  }
+
+  // Fallback / Normalize stages from survei_kelayakan
+  if (!meta.stages || meta.stages.length === 0) {
+    const rawStage = String(item.survei_kelayakan || "").toLowerCase();
+    const derived = [];
+    if (rawStage.includes("penawaran")) derived.push("Penawaran");
+    if (rawStage.includes("coll doc") || rawStage.includes("colldoc") || rawStage.includes("coll")) derived.push("Coll Doc");
+    if (rawStage.includes("survey") || rawStage.includes("survei")) derived.push("Survey");
+    meta.stages = derived.length > 0 ? derived : ["Penawaran"];
+  }
+
+  // Ensure stages only contains the 3 supported stages
+  meta.stages = meta.stages.filter(s => ["Penawaran", "Coll Doc", "Survey"].includes(s));
+  if (meta.stages.length === 0) meta.stages = ["Penawaran"];
+
+  // Normalize documents list
+  if (!Array.isArray(meta.documents)) meta.documents = [];
+
+  return {
+    id: item.onboarding_id,
+    nip: item.nip,
+    namaPemohon: item.owner_name || item.dealer_name || "Calon Mitra",
+    namaUsaha: item.dealer_name || item.owner_name || "-",
+    alamat: meta.alamat || "-",
+    statusDb: meta.status_db || "Database Baru",
+    stages: meta.stages,
+    catatan: meta.catatan || "",
+    documents: meta.documents,
+    fotoKtp: item.foto_ktp_url,
+    fotoShowroom: item.foto_showroom_url,
+    createdAt: item.created_at,
+    dateObj: new Date(item.created_at),
+    raw: item
+  };
+}
+
+async function loadPipelineData(isManualRefresh = false) {
+  const container = document.getElementById("pipeline-cards-container");
+  const icon = document.getElementById("btn-refresh-pipeline-icon");
+  if (icon) icon.classList.add("fa-spin");
+
+  if (isManualRefresh && container) {
+    container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-teal-700"></i>Memuat ulang pipeline calon mitra...</div>';
+  }
+
+  try {
+    if (!supabaseClient) throw new Error("Supabase Client belum terhubung");
+
+    const isSuper = CURRENT_USER?.role === "SUPER_ADMIN" || CURRENT_USER?.role === "SUPERVISOR" || CURRENT_USER?.role === "DIREKSI" || CURRENT_USER?.role === "SUPERADMIN";
+    const userNip = CURRENT_USER?.nip || null;
+
+    let query = supabaseClient.from("tr_onboarding_log").select("*").order("created_at", { ascending: false }).limit(200);
+    if (!isSuper && userNip) {
+      query = query.eq("nip", userNip);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    PIPELINE_RAW_DATA = (data || []).map(parseOnboardingRecord);
+    updatePipelineCounts();
+    renderPipelineList();
+  } catch (err) {
+    console.error("Error loading pipeline data:", err);
+    if (container) {
+      container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-2xl text-xs">Gagal memuat pipeline: ${err.message}</div>`;
+    }
+  } finally {
+    if (icon) icon.classList.remove("fa-spin");
+  }
+}
+
+function updatePipelineCounts() {
+  const countAll = PIPELINE_RAW_DATA.length;
+  const countPenawaran = PIPELINE_RAW_DATA.filter(i => i.stages.includes("Penawaran")).length;
+  const countCollDoc = PIPELINE_RAW_DATA.filter(i => i.stages.includes("Coll Doc")).length;
+  const countSurvey = PIPELINE_RAW_DATA.filter(i => i.stages.includes("Survey")).length;
+
+  const elAll = document.getElementById("count-pipeline-all");
+  const elPenawaran = document.getElementById("count-pipeline-penawaran");
+  const elCollDoc = document.getElementById("count-pipeline-colldoc");
+  const elSurvey = document.getElementById("count-pipeline-survey");
+
+  if (elAll) elAll.innerText = countAll;
+  if (elPenawaran) elPenawaran.innerText = countPenawaran;
+  if (elCollDoc) elCollDoc.innerText = countCollDoc;
+  if (elSurvey) elSurvey.innerText = countSurvey;
+}
+
+function setPipelineFilter(filter) {
+  CURRENT_PIPELINE_FILTER = filter;
+  document.querySelectorAll(".pipeline-tab-btn").forEach(btn => {
+    btn.className = "pipeline-tab-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
+  });
+  const activeBtn = document.getElementById(`filter-tab-${filter.replace(/\s+/g, '')}`);
+  if (activeBtn) {
+    activeBtn.className = "pipeline-tab-btn px-3 py-1.5 rounded-xl bg-teal-700 text-white shadow-xs transition";
+  }
+  filterPipelineList();
+}
+
+function filterPipelineList() {
+  renderPipelineList();
+}
+
+function renderPipelineList() {
+  const container = document.getElementById("pipeline-cards-container");
+  if (!container) return;
+
+  const query = (document.getElementById("pipeline-search-input")?.value || "").toLowerCase().trim();
+
+  const filtered = PIPELINE_RAW_DATA.filter(item => {
+    // 1. Stage filter
+    if (CURRENT_PIPELINE_FILTER !== "ALL") {
+      if (!item.stages.includes(CURRENT_PIPELINE_FILTER)) return false;
+    }
+    // 2. Query search
+    if (query) {
+      const matchPemohon = item.namaPemohon.toLowerCase().includes(query);
+      const matchUsaha = item.namaUsaha.toLowerCase().includes(query);
+      const matchAlamat = item.alamat.toLowerCase().includes(query);
+      const matchNip = String(item.nip || "").toLowerCase().includes(query);
+      if (!matchPemohon && !matchUsaha && !matchAlamat && !matchNip) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+        <i class="fa-solid fa-folder-open text-3xl text-slate-300"></i>
+        <p class="text-xs font-bold text-slate-700">Tidak ada calon mitra pada filter ini</p>
+        <p class="text-[10px] text-slate-400">Silakan ubah filter atau lakukan kunjungan onboarding baru.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(item => {
+    // Total documents & files
+    const totalDocs = item.documents.length;
+    let totalFiles = 0;
+    item.documents.forEach(d => {
+      totalFiles += (d.files?.length || 0);
+    });
+
+    const isPenawaran = item.stages.includes("Penawaran");
+    const isCollDoc = item.stages.includes("Coll Doc");
+    const isSurvey = item.stages.includes("Survey");
+
+    const tglStr = !isNaN(item.dateObj)
+      ? item.dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+      : "-";
+
+    return `
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-teal-400 transition space-y-3 cursor-pointer" onclick="openPipelineDetailModal('${item.id}')">
+        <!-- TOP: Nama Pemohon & Nama Tempat Usaha -->
+        <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5 mb-0.5">
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${item.statusDb.includes('Baru') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">
+                ${item.statusDb}
+              </span>
+              <span class="text-[10px] text-slate-400">• ${tglStr}</span>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900 truncate">${item.namaPemohon}</h4>
+            <p class="text-xs font-semibold text-teal-800 flex items-center gap-1 mt-0.5 truncate">
+              <i class="fa-solid fa-store text-[10px] text-teal-600"></i>
+              <span>${item.namaUsaha}</span>
+            </p>
+          </div>
+          <button type="button" class="p-2 text-teal-700 hover:bg-teal-50 rounded-xl shrink-0" title="Buka Detail">
+            <i class="fa-solid fa-chevron-right text-xs"></i>
+          </button>
+        </div>
+
+        <!-- MIDDLE: Progres Status (Penawaran, Coll Doc, Survey) -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="font-bold text-slate-500 uppercase tracking-wider">Progress Status:</span>
+            <span class="font-bold text-teal-700">${item.stages.length}/3 Tahap Aktif</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5 text-[11px] font-bold text-center">
+            <div class="py-1 px-1.5 rounded-lg border flex items-center justify-center space-x-1 ${isPenawaran ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+              <i class="fa-solid ${isPenawaran ? 'fa-circle-check text-teal-600' : 'fa-circle text-slate-300'} text-[10px]"></i>
+              <span class="truncate">Penawaran</span>
+            </div>
+            <div class="py-1 px-1.5 rounded-lg border flex items-center justify-center space-x-1 ${isCollDoc ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+              <i class="fa-solid ${isCollDoc ? 'fa-circle-check text-teal-600' : 'fa-circle text-slate-300'} text-[10px]"></i>
+              <span class="truncate">Coll Doc</span>
+            </div>
+            <div class="py-1 px-1.5 rounded-lg border flex items-center justify-center space-x-1 ${isSurvey ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+              <i class="fa-solid ${isSurvey ? 'fa-circle-check text-teal-600' : 'fa-circle text-slate-300'} text-[10px]"></i>
+              <span class="truncate">Survey</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM: Detail Folder Dokumen Summary & Action -->
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+          <div class="flex items-center space-x-1.5 text-[11px]">
+            <div class="w-6 h-6 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-folder"></i>
+            </div>
+            <span class="font-bold text-slate-700">${totalDocs} Dokumen (${totalFiles} File)</span>
+          </div>
+
+          <span class="text-[10px] font-bold text-teal-700 flex items-center space-x-1">
+            <span>Buka Folder & Edit</span>
+            <i class="fa-solid fa-arrow-right text-[9px]"></i>
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openPipelineDetailModal(onbId) {
+  const item = PIPELINE_RAW_DATA.find(i => i.id === onbId);
+  if (!item) return;
+
+  ACTIVE_PIPELINE_ITEM = JSON.parse(JSON.stringify(item));
+  PIPELINE_PENDING_UPLOADS = {};
+
+  // 1. TOP SECTION: Nama Pemohon & Usaha
+  document.getElementById("modal-pipe-id-label").innerText = item.id;
+  document.getElementById("modal-pipe-badge-db").innerText = item.statusDb;
+  document.getElementById("modal-pipe-input-pemohon").value = item.namaPemohon;
+  document.getElementById("modal-pipe-input-usaha").value = item.namaUsaha;
+  document.getElementById("modal-pipe-pic").innerText = item.nip || "-";
+  document.getElementById("modal-pipe-tgl").innerText = !isNaN(item.dateObj)
+    ? item.dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : "-";
+  document.getElementById("modal-pipe-input-alamat").value = item.alamat || "";
+
+  // 2. MIDDLE SECTION: Stages (Penawaran, Coll Doc, Survey)
+  document.getElementById("modal-pipe-chk-penawaran").checked = item.stages.includes("Penawaran");
+  document.getElementById("modal-pipe-chk-colldoc").checked = item.stages.includes("Coll Doc");
+  document.getElementById("modal-pipe-chk-survey").checked = item.stages.includes("Survey");
+  document.getElementById("modal-pipe-input-catatan").value = item.catatan || "";
+  updateModalProgressSummary();
+
+  // 3. BOTTOM SECTION: Folder Dokumen
+  renderModalPipelineDocFolders();
+
+  // Show modal
+  document.getElementById("modal-pipeline-detail").classList.remove("hidden");
+}
+
+function closePipelineDetailModal() {
+  document.getElementById("modal-pipeline-detail").classList.add("hidden");
+  ACTIVE_PIPELINE_ITEM = null;
+  PIPELINE_PENDING_UPLOADS = {};
+}
+
+function updateModalProgressSummary() {
+  const p = document.getElementById("modal-pipe-chk-penawaran")?.checked;
+  const c = document.getElementById("modal-pipe-chk-colldoc")?.checked;
+  const s = document.getElementById("modal-pipe-chk-survey")?.checked;
+  const count = [p, c, s].filter(Boolean).length;
+  const label = document.getElementById("modal-pipe-progress-label");
+  if (label) label.innerText = `${count}/3 Tahap Aktif`;
+}
+
+function renderModalPipelineDocFolders() {
+  const container = document.getElementById("modal-pipe-doc-folder-list");
+  if (!container || !ACTIVE_PIPELINE_ITEM) return;
+
+  let totalFilesCount = 0;
+
+  // Build document master list and map existing & pending files
+  const html = ONBOARDING_DOC_MASTER.map(docMaster => {
+    // Existing files in ACTIVE_PIPELINE_ITEM
+    const existingDoc = ACTIVE_PIPELINE_ITEM.documents?.find(d => d.key === docMaster.key || d.title === docMaster.title);
+    const existingFiles = existingDoc?.files || [];
+
+    // Pending new files in PIPELINE_PENDING_UPLOADS
+    const pendingFiles = PIPELINE_PENDING_UPLOADS[docMaster.key] || [];
+
+    const totalInThisDoc = existingFiles.length + pendingFiles.length;
+    totalFilesCount += totalInThisDoc;
+
+    const hasFiles = totalInThisDoc > 0;
+
+    let filesListHtml = "";
+    if (hasFiles) {
+      const existingList = existingFiles.map((f, idx) => {
+        const isImg = (f.type && f.type.startsWith("image/")) || (f.url && f.url.match(/\.(jpg|jpeg|png|webp)/i));
+        const previewAction = isImg ? `onclick="openImageViewer('${f.url}', '${f.name || docMaster.title}')"` : `onclick="window.open('${f.url}', '_blank')"`;
+        return `
+          <div class="relative group bg-white border border-slate-200 rounded-xl p-2 flex items-center justify-between gap-2 shadow-2xs">
+            <div class="flex items-center space-x-2 min-w-0 cursor-pointer" ${previewAction}>
+              ${isImg ? `<img src="${f.url}" class="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" />` : `<div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-file-pdf"></i></div>`}
+              <div class="min-w-0">
+                <span class="text-xs font-bold text-slate-800 truncate block">${f.name || 'Dokumen'}</span>
+                <span class="text-[9px] text-emerald-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-cloud-arrow-up"></i> Tersimpan</span>
+              </div>
+            </div>
+            <button type="button" onclick="removePipelineDocFile('${docMaster.key}', ${idx}, false)" class="text-slate-300 hover:text-red-500 p-1" title="Hapus file">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      const pendingList = pendingFiles.map((f, idx) => {
+        const isImg = f.type && f.type.startsWith("image/");
+        return `
+          <div class="relative group bg-amber-50 border border-amber-300 rounded-xl p-2 flex items-center justify-between gap-2 shadow-2xs">
+            <div class="flex items-center space-x-2 min-w-0">
+              ${isImg ? `<img src="${f.base64}" class="w-8 h-8 rounded-lg object-cover border border-amber-200 shrink-0" />` : `<div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-file-pdf"></i></div>`}
+              <div class="min-w-0">
+                <span class="text-xs font-bold text-slate-800 truncate block">${f.name}</span>
+                <span class="text-[9px] text-amber-700 font-bold flex items-center gap-1"><i class="fa-solid fa-clock"></i> Siap Diunggah</span>
+              </div>
+            </div>
+            <button type="button" onclick="removePipelineDocFile('${docMaster.key}', ${idx}, true)" class="text-slate-400 hover:text-red-500 p-1" title="Batalkan file">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      filesListHtml = `<div class="grid grid-cols-1 gap-1.5 pt-2 border-t border-slate-100">${existingList}${pendingList}</div>`;
+    }
+
+    return `
+      <div class="p-3 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center space-x-2 min-w-0">
+            <div class="w-7 h-7 rounded-lg ${hasFiles ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-400'} flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid ${docMaster.icon}"></i>
+            </div>
+            <div class="min-w-0">
+              <h5 class="text-xs font-bold text-slate-800 truncate">${docMaster.title}</h5>
+              <span class="text-[9px] ${hasFiles ? 'text-teal-700 font-bold' : 'text-slate-400'} block">
+                ${hasFiles ? `✓ ${totalInThisDoc} Berkas Terlampir` : 'Belum ada berkas'}
+              </span>
+            </div>
+          </div>
+
+          <label class="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold cursor-pointer shrink-0 flex items-center space-x-1 transition">
+            <i class="fa-solid fa-plus text-[10px]"></i>
+            <span>Upload</span>
+            <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handlePipelineDocFilesAdded(this, '${docMaster.key}')" />
+          </label>
+        </div>
+
+        ${filesListHtml}
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = html;
+
+  const docCountBadge = document.getElementById("modal-pipe-doc-count");
+  if (docCountBadge) docCountBadge.innerText = `${totalFilesCount} File Terkumpul`;
+}
+
+async function handlePipelineDocFilesAdded(input, docKey) {
+  if (!input.files || input.files.length === 0) return;
+  if (!PIPELINE_PENDING_UPLOADS[docKey]) {
+    PIPELINE_PENDING_UPLOADS[docKey] = [];
+  }
+
+  for (let i = 0; i < input.files.length; i++) {
+    const file = input.files[i];
+    let base64 = "";
+    if (file.type && file.type.startsWith("image/")) {
+      base64 = await compressImage(file, 1200, 0.75);
+    } else {
+      base64 = await readFileAsBase64(file);
+    }
+    PIPELINE_PENDING_UPLOADS[docKey].push({
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+      base64: base64
+    });
+  }
+
+  input.value = "";
+  renderModalPipelineDocFolders();
+}
+
+function removePipelineDocFile(docKey, fileIdx, isPending) {
+  if (!ACTIVE_PIPELINE_ITEM) return;
+
+  if (isPending) {
+    if (PIPELINE_PENDING_UPLOADS[docKey]) {
+      PIPELINE_PENDING_UPLOADS[docKey].splice(fileIdx, 1);
+      if (PIPELINE_PENDING_UPLOADS[docKey].length === 0) {
+        delete PIPELINE_PENDING_UPLOADS[docKey];
+      }
+    }
+  } else {
+    const docItem = ACTIVE_PIPELINE_ITEM.documents?.find(d => d.key === docKey);
+    if (docItem && docItem.files) {
+      docItem.files.splice(fileIdx, 1);
+    }
+  }
+
+  renderModalPipelineDocFolders();
+}
+
+async function handleSavePipelineUpdate() {
+  if (!ACTIVE_PIPELINE_ITEM) return;
+
+  const btn = document.getElementById("btn-save-pipeline-modal");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i><span>Menyimpan Perubahan...</span>';
+  }
+
+  try {
+    const newPemohon = document.getElementById("modal-pipe-input-pemohon")?.value.trim();
+    const newUsaha = document.getElementById("modal-pipe-input-usaha")?.value.trim();
+    const newAlamat = document.getElementById("modal-pipe-input-alamat")?.value.trim();
+    const newCatatan = document.getElementById("modal-pipe-input-catatan")?.value.trim();
+
+    if (!newPemohon || !newUsaha) {
+      alert("Nama Pemohon dan Nama Usaha wajib diisi!");
+      return;
+    }
+
+    const newStages = [];
+    if (document.getElementById("modal-pipe-chk-penawaran")?.checked) newStages.push("Penawaran");
+    if (document.getElementById("modal-pipe-chk-colldoc")?.checked) newStages.push("Coll Doc");
+    if (document.getElementById("modal-pipe-chk-survey")?.checked) newStages.push("Survey");
+
+    if (newStages.length === 0) {
+      alert("Pilih minimal 1 tahap progress onboarding (Penawaran, Coll Doc, atau Survey)!");
+      return;
+    }
+
+    // 1. Upload any pending new files to Supabase storage
+    const updatedDocuments = [...(ACTIVE_PIPELINE_ITEM.documents || [])];
+
+    const pendingKeys = Object.keys(PIPELINE_PENDING_UPLOADS);
+    for (const docKey of pendingKeys) {
+      const filesToUpload = PIPELINE_PENDING_UPLOADS[docKey] || [];
+      const docMaster = ONBOARDING_DOC_MASTER.find(m => m.key === docKey);
+      const docTitle = docMaster?.title || docKey;
+
+      let docEntry = updatedDocuments.find(d => d.key === docKey);
+      if (!docEntry) {
+        docEntry = { key: docKey, title: docTitle, files: [] };
+        updatedDocuments.push(docEntry);
+      }
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const pf = filesToUpload[i];
+        const uploadedUrl = await uploadToSupabaseStorage(pf.base64, "onboarding", `DOC-${docKey}-${Date.now()}-${i+1}`);
+        if (uploadedUrl) {
+          docEntry.files.push({
+            name: pf.name,
+            url: uploadedUrl,
+            type: pf.type
+          });
+        }
+      }
+    }
+
+    // Filter out documents with 0 files
+    const cleanDocuments = updatedDocuments.filter(d => d.files && d.files.length > 0);
+
+    // Build payload JSON
+    const payloadMeta = {
+      status_db: ACTIVE_PIPELINE_ITEM.statusDb,
+      alamat: newAlamat,
+      jenis_usaha: ACTIVE_PIPELINE_ITEM.jenis_usaha || "Dealer",
+      detail_usaha: ACTIVE_PIPELINE_ITEM.detail_usaha || "",
+      catatan: newCatatan,
+      stages: newStages,
+      documents: cleanDocuments
+    };
+
+    const { error: updateErr } = await supabaseClient.from("tr_onboarding_log").update({
+      owner_name: newPemohon,
+      dealer_name: newUsaha,
+      survei_kelayakan: newStages.join(", "),
+      catatan_survey: JSON.stringify(payloadMeta)
+    }).eq("onboarding_id", ACTIVE_PIPELINE_ITEM.id);
+
+    if (updateErr) throw updateErr;
+
+    alert("Pipeline calon mitra berhasil diperbarui!");
+    closePipelineDetailModal();
+    await loadPipelineData(true);
+  } catch (err) {
+    console.error("Error saving pipeline update:", err);
+    alert("Gagal menyimpan update pipeline: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Pipeline</span>';
+    }
+  }
+}
+
+function openImageViewer(imgUrl, title = "Preview Dokumen") {
+  if (!imgUrl) return;
+  const viewer = document.getElementById("modal-image-viewer");
+  const img = document.getElementById("image-viewer-img");
+  const titleEl = document.getElementById("image-viewer-title");
+  if (img) img.src = imgUrl;
+  if (titleEl) titleEl.innerText = title;
+  if (viewer) viewer.classList.remove("hidden");
+}
+
+function closeImageViewer() {
+  const viewer = document.getElementById("modal-image-viewer");
+  const img = document.getElementById("image-viewer-img");
+  if (img) img.src = "";
+  if (viewer) viewer.classList.add("hidden");
 }
