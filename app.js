@@ -2144,17 +2144,42 @@ function openUnitModal(index) {
   document.getElementById("modal-input-indikasi").value = u.indikasi;
   document.querySelector(`input[name="modal_gps_match"][value="${u.gps_match}"]`).checked = true;
 
-  document.querySelectorAll('input[name="modal_info_unit"]').forEach(cb => {
-    cb.checked = u.info_unit.includes(cb.value);
+  let hasLainnya = false;
+  let customLainnyaText = "";
+  const predefinedInfo = ["Plan Perpanjang", "Plan Pelunasan", "Ada Calon Pembeli", "Proses Kredit", "Unit Cash Tempo", "Unit Milik Orang Lain"];
+  
+  (u.info_unit || []).forEach(item => {
+    if (item.startsWith("Lainnya:") || item.startsWith("Lainnya - ")) {
+      hasLainnya = true;
+      customLainnyaText = item.replace(/^Lainnya[:\-]\s*/i, "").trim();
+    } else if (!predefinedInfo.includes(item) && item !== "Lainnya") {
+      hasLainnya = true;
+      customLainnyaText = item.trim();
+    } else if (item === "Lainnya") {
+      hasLainnya = true;
+    }
   });
+
+  document.querySelectorAll('input[name="modal_info_unit"]').forEach(cb => {
+    if (cb.value === "Lainnya") {
+      cb.checked = hasLainnya;
+    } else {
+      cb.checked = (u.info_unit || []).includes(cb.value);
+    }
+  });
+
+  const boxLainnya = document.getElementById("modal-box-info-lainnya");
+  const inputLainnya = document.getElementById("modal-input-info-lainnya");
+  if (boxLainnya) boxLainnya.classList.toggle("hidden", !hasLainnya);
+  if (inputLainnya) inputLainnya.value = customLainnyaText;
 
   const overdueContainer = document.getElementById("modal-box-overdue-container");
   if (u.is_ovd) {
     overdueContainer.classList.remove("hidden");
-    document.getElementById("modal-input-ovd-plan").value = u.ovd_plan;
-    document.getElementById("modal-select-komitmen").value = u.komitmen;
-    onModalKomitmenChange(u.komitmen);
-    document.getElementById("modal-input-tgl-komitmen").value = u.tgl_komitmen;
+    document.getElementById("modal-input-ovd-plan").value = u.ovd_plan || "";
+    document.getElementById("modal-select-komitmen").value = u.komitmen || "Tidak Ada";
+    onModalKomitmenChange(u.komitmen || "Tidak Ada");
+    document.getElementById("modal-input-tgl-komitmen").value = u.tgl_komitmen || "";
   } else {
     overdueContainer.classList.add("hidden");
     u.ovd_plan = "";
@@ -2163,6 +2188,15 @@ function openUnitModal(index) {
   }
 
   document.getElementById("modal-unit").classList.remove("hidden");
+}
+
+function toggleInfoUnitLainnya(isChecked) {
+  const box = document.getElementById("modal-box-info-lainnya");
+  const input = document.getElementById("modal-input-info-lainnya");
+  if (box) box.classList.toggle("hidden", !isChecked);
+  if (isChecked && input) {
+    input.focus();
+  }
 }
 
 function closeUnitModal() {
@@ -2224,7 +2258,18 @@ function saveUnitChecklist() {
   u.gps_match = document.querySelector('input[name="modal_gps_match"]:checked').value;
 
   const checkedInfo = [];
-  document.querySelectorAll('input[name="modal_info_unit"]:checked').forEach(cb => checkedInfo.push(cb.value));
+  document.querySelectorAll('input[name="modal_info_unit"]:checked').forEach(cb => {
+    if (cb.value === "Lainnya") {
+      const customVal = document.getElementById("modal-input-info-lainnya")?.value.trim();
+      if (customVal) {
+        checkedInfo.push(`Lainnya: ${customVal}`);
+      } else {
+        checkedInfo.push("Lainnya");
+      }
+    } else {
+      checkedInfo.push(cb.value);
+    }
+  });
   u.info_unit = checkedInfo;
 
   if (u.is_ovd) {

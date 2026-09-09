@@ -239,6 +239,10 @@
             <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Proses Kredit" class="rounded text-slate-900" /> <span>Proses Kredit</span></label>
             <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Unit Cash Tempo" class="rounded text-slate-900" /> <span>Unit Cash Tempo</span></label>
             <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit" value="Unit Milik Orang Lain" class="rounded text-slate-900" /> <span>Milik Orang Lain</span></label>
+            <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" id="modal-info-lainnya-chk" name="modal_info_unit" value="Lainnya" onchange="toggleInfoUnitLainnya(this.checked)" class="rounded text-slate-900" /> <span>Lainnya</span></label>
+          </div>
+          <div id="modal-box-info-lainnya" class="hidden mt-2">
+            <input type="text" id="modal-input-info-lainnya" placeholder="Sebutkan status unit lainnya..." class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold placeholder-slate-400 focus:border-slate-800 outline-none" />
           </div>
         </div>
         <div id="modal-box-overdue-container" class="hidden space-y-3 pt-2 border-t border-red-100">
@@ -297,7 +301,7 @@
 
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260909_v8"></script>
-  <script src="app.js?v=20260909_v8"></script>
+  <script src="config.js?v=20260909_v9"></script>
+  <script src="app.js?v=20260909_v9"></script>
 </body>
 </html>
