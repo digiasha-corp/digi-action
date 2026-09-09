@@ -2567,30 +2567,54 @@ function toggleJenisUsaha(val) {
   }
 }
 
-// Master Dokumen Onboarding
+// Master Dokumen Onboarding (15 Kategori Dokumen Sesuai Urutan)
 const ONBOARDING_DOC_MASTER = [
-  { key: "KTP", title: "KTP Pemohon", icon: "fa-id-card" },
-  { key: "KK", title: "Kartu Keluarga (KK)", icon: "fa-users" },
+  // Baris 1
+  { key: "KTP_Pemohon", title: "KTP Pemohon", icon: "fa-id-card" },
   { key: "KTP_Pasangan", title: "KTP Pasangan", icon: "fa-id-card-clip" },
-  { key: "Dokumen_PT_CV", title: "Dokumen Legalitas PT / CV", icon: "fa-building-flag" },
-  { key: "NPWP", title: "NPWP (Pribadi / Badan)", icon: "fa-file-invoice" },
-  { key: "Rekening_Koran", title: "Rekening Koran (3 Bulan Terakhir)", icon: "fa-money-check-dollar" },
-  { key: "Legalitas_Usaha", title: "Legalitas Usaha (NIB / SKU / SIUP)", icon: "fa-stamp" },
-  { key: "Bukti_Domisili", title: "Bukti Domisili (PBB / Rek Listrik)", icon: "fa-house-user" },
-  { key: "Bukti_Tempat_Usaha", title: "Bukti Tempat Usaha (Sewa / Milik)", icon: "fa-shop" },
-  { key: "Foto_Stok_Unit", title: "Foto Stok Unit / Barang", icon: "fa-car" },
-  { key: "Foto_Stok_BPKB", title: "Foto Stok BPKB / Faktur", icon: "fa-folder-open" },
-  { key: "Foto_Domisili", title: "Foto Domisili (Tempat Tinggal)", icon: "fa-house" },
-  { key: "Foto_Tempat_Usaha", title: "Foto Tempat Usaha / Showroom", icon: "fa-store" },
-  { key: "Selfie_Pemohon", title: "Foto Bersama Pemohon di Lokasi", icon: "fa-camera-retro" },
-  { key: "Dokumen_Lainnya", title: "Dokumen Tambahan Lainnya", icon: "fa-folder-plus" }
+  { key: "Kartu_Keluarga", title: "Kartu Keluarga", icon: "fa-users" },
+
+  // Baris 2
+  { key: "Legalitas_PT_CV", title: "Legalitas PT/CV", icon: "fa-building-flag" },
+  { key: "NPWP", title: "NPWP", icon: "fa-file-invoice" },
+  { key: "Legalitas_Usaha", title: "Legalitas Usaha", icon: "fa-stamp" },
+
+  // Baris 3
+  { key: "Bukti_Domisili", title: "Bukti Domisili", icon: "fa-house-user" },
+  { key: "Bukti_Tempat_Usaha", title: "Bukti Tempat Usaha", icon: "fa-shop" },
+  { key: "Rekening_Koran", title: "Rekening Koran", icon: "fa-money-check-dollar" },
+
+  // Baris 4
+  { key: "Foto_Domisili", title: "Foto Domisili", icon: "fa-house" },
+  { key: "Foto_Tempat_Usaha", title: "Foto Tempat Usaha", icon: "fa-store" },
+  { key: "Foto_Dengan_Pemohon", title: "Foto Dengan Pemohon", icon: "fa-camera-retro" },
+
+  // Baris 5
+  { key: "Stok_Unit_Barang", title: "Stok Unit/Barang", icon: "fa-car" },
+  { key: "Stok_BPKB", title: "Stok BPKB", icon: "fa-folder-open" },
+  { key: "Dokumen_Lain", title: "Dokumen lain", icon: "fa-folder-plus" }
 ];
+
+function generateStandardDocFileName(docTitle, fileIndex, originalFileName) {
+  const extMatch = String(originalFileName || "").match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch ? extMatch[1].toLowerCase() : "jpg";
+  return `${docTitle} - Berkas ${fileIndex}.${ext}`;
+}
+
+let ACTIVE_FOLDER_MODAL_DOC = null;
+
+function triggerDocUploadInput(docKey, docTitle) {
+  const inp = document.getElementById(`onb-file-input-${docKey}`);
+  if (inp) inp.click();
+}
 
 async function handleDocMultiFilesSelected(input, docKey, docTitle) {
   if (!input.files || input.files.length === 0) return;
   if (!ONB_DOC_FILES[docKey]) {
     ONB_DOC_FILES[docKey] = { title: docTitle, files: [] };
   }
+
+  const existingCount = ONB_DOC_FILES[docKey].files.length;
 
   for (let i = 0; i < input.files.length; i++) {
     const file = input.files[i];
@@ -2600,8 +2624,9 @@ async function handleDocMultiFilesSelected(input, docKey, docTitle) {
     } else {
       base64 = await readFileAsBase64(file);
     }
+    const stdName = generateStandardDocFileName(docTitle, existingCount + i + 1, file.name);
     ONB_DOC_FILES[docKey].files.push({
-      name: file.name,
+      name: stdName,
       type: file.type || "application/octet-stream",
       size: file.size,
       base64: base64
@@ -2609,8 +2634,12 @@ async function handleDocMultiFilesSelected(input, docKey, docTitle) {
   }
 
   input.value = "";
-  renderDocChips(docKey);
+  renderDocScorecardBadge(docKey);
   updateOnbDocCounter();
+
+  if (ACTIVE_FOLDER_MODAL_DOC && ACTIVE_FOLDER_MODAL_DOC.key === docKey && ACTIVE_FOLDER_MODAL_DOC.context === 'onboarding') {
+    renderDocFolderModalFilesList();
+  }
 }
 
 function removeDocFile(docKey, index) {
@@ -2620,46 +2649,158 @@ function removeDocFile(docKey, index) {
       delete ONB_DOC_FILES[docKey];
     }
   }
-  renderDocChips(docKey);
+  renderDocScorecardBadge(docKey);
   updateOnbDocCounter();
+  if (ACTIVE_FOLDER_MODAL_DOC && ACTIVE_FOLDER_MODAL_DOC.key === docKey && ACTIVE_FOLDER_MODAL_DOC.context === 'onboarding') {
+    renderDocFolderModalFilesList();
+  }
 }
 
-function renderDocChips(docKey) {
-  const container = document.getElementById(`file-chips-${docKey}`);
+function renderDocScorecardBadge(docKey) {
   const badge = document.getElementById(`badge-count-${docKey}`);
   const docObj = ONB_DOC_FILES[docKey];
-
   if (!docObj || !docObj.files || docObj.files.length === 0) {
-    if (container) container.innerHTML = "";
     if (badge) {
       badge.innerText = "0 File";
       badge.classList.add("hidden");
     }
+  } else {
+    if (badge) {
+      badge.innerText = `✓ ${docObj.files.length} File`;
+      badge.classList.remove("hidden");
+    }
+  }
+}
+
+function renderDocChips(docKey) {
+  renderDocScorecardBadge(docKey);
+}
+
+function openDocFolderModal(docKey, docTitle, context = "onboarding") {
+  ACTIVE_FOLDER_MODAL_DOC = { key: docKey, title: docTitle, context: context };
+  
+  const titleEl = document.getElementById("doc-folder-modal-title");
+  if (titleEl) titleEl.innerText = `Folder: ${docTitle}`;
+
+  renderDocFolderModalFilesList();
+
+  const modal = document.getElementById("modal-doc-folder-viewer");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeDocFolderModal() {
+  const modal = document.getElementById("modal-doc-folder-viewer");
+  if (modal) modal.classList.add("hidden");
+  ACTIVE_FOLDER_MODAL_DOC = null;
+}
+
+function triggerFolderModalUpload() {
+  const inp = document.getElementById("input-folder-modal-file");
+  if (inp) inp.click();
+}
+
+async function handleFolderModalFilesSelected(input) {
+  if (!ACTIVE_FOLDER_MODAL_DOC || !input.files || input.files.length === 0) return;
+  const { key, title, context } = ACTIVE_FOLDER_MODAL_DOC;
+
+  if (context === "onboarding") {
+    await handleDocMultiFilesSelected(input, key, title);
+  } else if (context === "pipeline") {
+    if (!PIPELINE_PENDING_UPLOADS[key]) PIPELINE_PENDING_UPLOADS[key] = [];
+    const existingDoc = ACTIVE_PIPELINE_ITEM?.documents?.find(d => d.key === key || d.title === title);
+    const existingCount = (existingDoc?.files?.length || 0) + (PIPELINE_PENDING_UPLOADS[key]?.length || 0);
+
+    for (let i = 0; i < input.files.length; i++) {
+      const file = input.files[i];
+      let base64 = "";
+      if (file.type && file.type.startsWith("image/")) {
+        base64 = await compressImage(file, 1200, 0.75);
+      } else {
+        base64 = await readFileAsBase64(file);
+      }
+      const stdName = generateStandardDocFileName(title, existingCount + i + 1, file.name);
+      PIPELINE_PENDING_UPLOADS[key].push({
+        name: stdName,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        base64: base64
+      });
+    }
+    input.value = "";
+    renderModalPipelineDocFolders();
+    renderDocFolderModalFilesList();
+  }
+}
+
+function renderDocFolderModalFilesList() {
+  if (!ACTIVE_FOLDER_MODAL_DOC) return;
+  const { key, title, context } = ACTIVE_FOLDER_MODAL_DOC;
+  const listContainer = document.getElementById("doc-folder-modal-files-list");
+  const countEl = document.getElementById("doc-folder-modal-count");
+  if (!listContainer) return;
+
+  let files = [];
+  if (context === "onboarding") {
+    files = (ONB_DOC_FILES[key]?.files || []).map((f, idx) => ({ ...f, idx, isPending: false, isLocal: true }));
+  } else if (context === "pipeline") {
+    const existingDoc = ACTIVE_PIPELINE_ITEM?.documents?.find(d => d.key === key || d.title === title);
+    const existingFiles = (existingDoc?.files || []).map((f, idx) => ({ ...f, idx, isPending: false, isLocal: false }));
+    const pendingFiles = (PIPELINE_PENDING_UPLOADS[key] || []).map((f, idx) => ({ ...f, idx, isPending: true, isLocal: true }));
+    files = [...existingFiles, ...pendingFiles];
+  }
+
+  if (countEl) countEl.innerText = `${files.length} Berkas Terlampir`;
+
+  if (files.length === 0) {
+    listContainer.innerHTML = `
+      <div class="py-10 text-center space-y-2">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-xl mx-auto">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <p class="text-xs font-bold text-slate-700">Folder Masih Kosong</p>
+        <p class="text-[10px] text-slate-400 max-w-[200px] mx-auto leading-relaxed">Belum ada berkas untuk jenis dokumen ini. Klik tombol di atas untuk mengunggah berkas baru.</p>
+      </div>
+    `;
     return;
   }
 
-  if (badge) {
-    badge.innerText = `✓ ${docObj.files.length} File`;
-    badge.classList.remove("hidden");
-  }
+  listContainer.innerHTML = files.map((f, i) => {
+    const isImg = (f.type && f.type.startsWith("image/")) || (f.url && f.url.match(/\.(jpg|jpeg|png|webp)/i)) || f.base64;
+    const previewSrc = f.base64 || f.url || "";
+    const previewAction = isImg ? `onclick="openImageViewer('${previewSrc}', '${f.name}')"` : `onclick="window.open('${f.url}', '_blank')"`;
+    const isPending = f.isPending;
 
-  if (container) {
-    container.innerHTML = docObj.files.map((f, idx) => {
-      const isImg = f.type && f.type.startsWith("image/");
-      const icon = isImg ? "fa-image text-teal-600" : "fa-file-pdf text-rose-600";
-      return `
-        <div class="flex items-center justify-between gap-1 px-1.5 py-0.5 bg-white border border-teal-300 rounded-lg text-[9px] font-medium text-slate-700 shadow-2xs w-full">
-          <div class="flex items-center space-x-1 min-w-0">
-            <i class="fa-solid ${icon} text-[8px] shrink-0"></i>
-            <span class="truncate block" title="${f.name}">${f.name}</span>
+    return `
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 flex items-center justify-between gap-2.5 shadow-2xs hover:border-teal-300 transition">
+        <div class="flex items-center space-x-2.5 min-w-0 cursor-pointer flex-1" ${previewAction}>
+          ${isImg ? `<img src="${previewSrc}" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0 bg-white" />` : `<div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-sm shrink-0 border border-rose-200"><i class="fa-solid fa-file-pdf"></i></div>`}
+          <div class="min-w-0 flex-1">
+            <h5 class="text-xs font-bold text-slate-800 truncate" title="${f.name}">${f.name}</h5>
+            <div class="flex items-center space-x-2 mt-0.5">
+              <span class="text-[9px] ${isPending ? 'text-amber-700 font-bold' : 'text-emerald-600 font-semibold'} flex items-center gap-1">
+                <i class="fa-solid ${isPending ? 'fa-clock' : 'fa-circle-check'}"></i>
+                <span>${isPending ? 'Siap Diunggah' : 'Tersimpan'}</span>
+              </span>
+              <span class="text-[9px] text-teal-600 hover:underline">Lihat Preview</span>
+            </div>
           </div>
-          <button type="button" onclick="removeDocFile('${docKey}', ${idx})" class="text-slate-400 hover:text-red-500 shrink-0 p-0.5" title="Hapus file">
-            <i class="fa-solid fa-xmark text-[10px]"></i>
-          </button>
         </div>
-      `;
-    }).join('');
+
+        <button type="button" onclick="removeFileFromFolderModal('${key}', ${f.idx}, ${isPending}, '${context}')" class="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition shrink-0" title="Hapus berkas ini">
+          <i class="fa-solid fa-trash-can text-xs"></i>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function removeFileFromFolderModal(docKey, fileIdx, isPending, context) {
+  if (context === "onboarding") {
+    removeDocFile(docKey, fileIdx);
+  } else if (context === "pipeline") {
+    removePipelineDocFile(docKey, fileIdx, isPending);
   }
+  renderDocFolderModalFilesList();
 }
 
 function updateOnbDocCounter() {
@@ -5608,90 +5749,39 @@ function updateModalProgressSummary() {
 }
 
 function renderModalPipelineDocFolders() {
-  const container = document.getElementById("modal-pipe-doc-folder-list");
+  const container = document.getElementById("modal-pipe-doc-folder-grid");
   if (!container || !ACTIVE_PIPELINE_ITEM) return;
 
   let totalFilesCount = 0;
 
-  // Build document master list and map existing & pending files
   const html = ONBOARDING_DOC_MASTER.map(docMaster => {
-    // Existing files in ACTIVE_PIPELINE_ITEM
     const existingDoc = ACTIVE_PIPELINE_ITEM.documents?.find(d => d.key === docMaster.key || d.title === docMaster.title);
     const existingFiles = existingDoc?.files || [];
-
-    // Pending new files in PIPELINE_PENDING_UPLOADS
     const pendingFiles = PIPELINE_PENDING_UPLOADS[docMaster.key] || [];
-
     const totalInThisDoc = existingFiles.length + pendingFiles.length;
     totalFilesCount += totalInThisDoc;
 
     const hasFiles = totalInThisDoc > 0;
 
-    let filesListHtml = "";
-    if (hasFiles) {
-      const existingList = existingFiles.map((f, idx) => {
-        const isImg = (f.type && f.type.startsWith("image/")) || (f.url && f.url.match(/\.(jpg|jpeg|png|webp)/i));
-        const previewAction = isImg ? `onclick="openImageViewer('${f.url}', '${f.name || docMaster.title}')"` : `onclick="window.open('${f.url}', '_blank')"`;
-        return `
-          <div class="relative group bg-white border border-slate-200 rounded-xl p-2 flex items-center justify-between gap-2 shadow-2xs">
-            <div class="flex items-center space-x-2 min-w-0 cursor-pointer" ${previewAction}>
-              ${isImg ? `<img src="${f.url}" class="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" />` : `<div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-file-pdf"></i></div>`}
-              <div class="min-w-0">
-                <span class="text-xs font-bold text-slate-800 truncate block">${f.name || 'Dokumen'}</span>
-                <span class="text-[9px] text-emerald-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-cloud-arrow-up"></i> Tersimpan</span>
-              </div>
-            </div>
-            <button type="button" onclick="removePipelineDocFile('${docMaster.key}', ${idx}, false)" class="text-slate-300 hover:text-red-500 p-1" title="Hapus file">
-              <i class="fa-solid fa-trash-can text-xs"></i>
-            </button>
-          </div>
-        `;
-      }).join('');
-
-      const pendingList = pendingFiles.map((f, idx) => {
-        const isImg = f.type && f.type.startsWith("image/");
-        return `
-          <div class="relative group bg-amber-50 border border-amber-300 rounded-xl p-2 flex items-center justify-between gap-2 shadow-2xs">
-            <div class="flex items-center space-x-2 min-w-0">
-              ${isImg ? `<img src="${f.base64}" class="w-8 h-8 rounded-lg object-cover border border-amber-200 shrink-0" />` : `<div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-file-pdf"></i></div>`}
-              <div class="min-w-0">
-                <span class="text-xs font-bold text-slate-800 truncate block">${f.name}</span>
-                <span class="text-[9px] text-amber-700 font-bold flex items-center gap-1"><i class="fa-solid fa-clock"></i> Siap Diunggah</span>
-              </div>
-            </div>
-            <button type="button" onclick="removePipelineDocFile('${docMaster.key}', ${idx}, true)" class="text-slate-400 hover:text-red-500 p-1" title="Batalkan file">
-              <i class="fa-solid fa-xmark text-sm"></i>
-            </button>
-          </div>
-        `;
-      }).join('');
-
-      filesListHtml = `<div class="grid grid-cols-1 gap-1.5 pt-2 border-t border-slate-100">${existingList}${pendingList}</div>`;
-    }
-
     return `
-      <div class="p-3 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center space-x-2 min-w-0">
-            <div class="w-7 h-7 rounded-lg ${hasFiles ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-400'} flex items-center justify-center text-xs shrink-0">
+      <div class="flex flex-col">
+        <div onclick="openDocFolderModal('${docMaster.key}', '${docMaster.title}', 'pipeline')" class="group relative flex flex-col items-center justify-between p-2.5 ${hasFiles ? 'bg-teal-50/60 border-teal-300' : 'bg-white border-slate-200'} hover:border-teal-500 rounded-2xl cursor-pointer text-center transition min-h-[98px] shadow-2xs">
+          <div class="flex flex-col items-center pointer-events-none">
+            <div class="w-7 h-7 rounded-xl ${hasFiles ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700'} flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
               <i class="fa-solid ${docMaster.icon}"></i>
             </div>
-            <div class="min-w-0">
-              <h5 class="text-xs font-bold text-slate-800 truncate">${docMaster.title}</h5>
-              <span class="text-[9px] ${hasFiles ? 'text-teal-700 font-bold' : 'text-slate-400'} block">
-                ${hasFiles ? `✓ ${totalInThisDoc} Berkas Terlampir` : 'Belum ada berkas'}
-              </span>
-            </div>
+            <span class="text-[11px] font-bold text-slate-800 leading-tight">${docMaster.title}</span>
           </div>
-
-          <label class="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold cursor-pointer shrink-0 flex items-center space-x-1 transition">
-            <i class="fa-solid fa-plus text-[10px]"></i>
-            <span>Upload</span>
-            <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handlePipelineDocFilesAdded(this, '${docMaster.key}')" />
-          </label>
+          <div class="mt-1 w-full flex flex-col items-center">
+            <span class="${hasFiles ? '' : 'hidden'} text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">
+              ✓ ${totalInThisDoc} File
+            </span>
+            <button type="button" onclick="event.stopPropagation(); triggerPipelineCardUpload('${docMaster.key}', '${docMaster.title}')" class="text-[9px] text-teal-600 hover:text-teal-800 italic font-semibold hover:underline">
+              push to upload
+            </button>
+          </div>
+          <input type="file" id="pipe-file-input-${docMaster.key}" multiple accept="image/*,application/pdf" class="hidden" onchange="handlePipelineDocFilesAdded(this, '${docMaster.key}')" />
         </div>
-
-        ${filesListHtml}
       </div>
     `;
   }).join('');
@@ -5702,11 +5792,21 @@ function renderModalPipelineDocFolders() {
   if (docCountBadge) docCountBadge.innerText = `${totalFilesCount} File Terkumpul`;
 }
 
+function triggerPipelineCardUpload(docKey, docTitle) {
+  const inp = document.getElementById(`pipe-file-input-${docKey}`);
+  if (inp) inp.click();
+}
+
 async function handlePipelineDocFilesAdded(input, docKey) {
   if (!input.files || input.files.length === 0) return;
   if (!PIPELINE_PENDING_UPLOADS[docKey]) {
     PIPELINE_PENDING_UPLOADS[docKey] = [];
   }
+
+  const docMaster = ONBOARDING_DOC_MASTER.find(m => m.key === docKey);
+  const docTitle = docMaster?.title || docKey;
+  const existingDoc = ACTIVE_PIPELINE_ITEM?.documents?.find(d => d.key === docKey || d.title === docTitle);
+  const existingCount = (existingDoc?.files?.length || 0) + PIPELINE_PENDING_UPLOADS[docKey].length;
 
   for (let i = 0; i < input.files.length; i++) {
     const file = input.files[i];
@@ -5716,8 +5816,9 @@ async function handlePipelineDocFilesAdded(input, docKey) {
     } else {
       base64 = await readFileAsBase64(file);
     }
+    const stdName = generateStandardDocFileName(docTitle, existingCount + i + 1, file.name);
     PIPELINE_PENDING_UPLOADS[docKey].push({
-      name: file.name,
+      name: stdName,
       type: file.type || "application/octet-stream",
       size: file.size,
       base64: base64
@@ -5726,6 +5827,10 @@ async function handlePipelineDocFilesAdded(input, docKey) {
 
   input.value = "";
   renderModalPipelineDocFolders();
+
+  if (ACTIVE_FOLDER_MODAL_DOC && ACTIVE_FOLDER_MODAL_DOC.key === docKey && ACTIVE_FOLDER_MODAL_DOC.context === 'pipeline') {
+    renderDocFolderModalFilesList();
+  }
 }
 
 function removePipelineDocFile(docKey, fileIdx, isPending) {
@@ -5746,6 +5851,9 @@ function removePipelineDocFile(docKey, fileIdx, isPending) {
   }
 
   renderModalPipelineDocFolders();
+  if (ACTIVE_FOLDER_MODAL_DOC && ACTIVE_FOLDER_MODAL_DOC.key === docKey && ACTIVE_FOLDER_MODAL_DOC.context === 'pipeline') {
+    renderDocFolderModalFilesList();
+  }
 }
 
 async function handleSavePipelineUpdate() {

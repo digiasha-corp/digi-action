@@ -297,11 +297,65 @@
         </button>
       </div>
     </div>
+  <!-- MODAL FOLDER DOKUMEN VIEWER (GLOBAL) -->
+  <div id="modal-doc-folder-viewer" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <!-- Header -->
+      <div class="p-4 bg-teal-700 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-sm shrink-0">
+            <i class="fa-solid fa-folder-open text-teal-200"></i>
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-bold text-xs uppercase tracking-wider leading-tight truncate" id="doc-folder-modal-title">Folder Dokumen</h4>
+            <p class="text-[10px] text-teal-100" id="doc-folder-modal-count">0 Berkas Terlampir</p>
+          </div>
+        </div>
+        <button onclick="closeDocFolderModal()" class="text-white/80 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Action: Upload button inside modal -->
+      <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0">
+        <span class="text-[11px] text-slate-500 font-medium">Daftar berkas dalam folder:</span>
+        <button type="button" id="btn-folder-modal-upload" onclick="triggerFolderModalUpload()" class="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-plus text-[10px]"></i>
+          <span>Upload Berkas Baru</span>
+        </button>
+        <input type="file" id="input-folder-modal-file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleFolderModalFilesSelected(this)" />
+      </div>
+
+      <!-- Files List Container (Scrollable) -->
+      <div class="p-4 flex-1 overflow-y-auto space-y-2.5" id="doc-folder-modal-files-list">
+        <!-- Dynamic Files List -->
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
+        <button type="button" onclick="closeDocFolderModal()" class="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">
+          Selesai / Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PREVIEW GAMWAR (GLOBAL) -->
+  <div id="modal-image-viewer" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] hidden flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-lg flex justify-between items-center text-white mb-2">
+      <span id="image-viewer-title" class="text-xs font-bold truncate">Preview Dokumen</span>
+      <button onclick="closeImageViewer()" class="p-1.5 text-slate-400 hover:text-white rounded-lg">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="w-full max-w-lg max-h-[80vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black/40 border border-white/10">
+      <img id="image-viewer-img" src="" alt="Preview" class="max-w-full max-h-[75vh] object-contain rounded-xl" />
+    </div>
   </div>
 
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260909_v16"></script>
-  <script src="app.js?v=20260909_v16"></script>
+  <script src="config.js?v=20260909_v17"></script>
+  <script src="app.js?v=20260909_v17"></script>
 </body>
 </html>
