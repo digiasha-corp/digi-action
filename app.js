@@ -2658,16 +2658,26 @@ function removeDocFile(docKey, index) {
 
 function renderDocScorecardBadge(docKey) {
   const badge = document.getElementById(`badge-count-${docKey}`);
+  const card = document.getElementById(`card-doc-${docKey}`);
   const docObj = ONB_DOC_FILES[docKey];
-  if (!docObj || !docObj.files || docObj.files.length === 0) {
+  const count = (docObj && docObj.files) ? docObj.files.length : 0;
+  if (count === 0) {
     if (badge) {
-      badge.innerText = "0 File";
+      badge.innerText = "0";
       badge.classList.add("hidden");
+    }
+    if (card) {
+      card.classList.remove("bg-teal-50/70", "border-teal-400");
+      card.classList.add("bg-slate-50", "border-slate-200");
     }
   } else {
     if (badge) {
-      badge.innerText = `✓ ${docObj.files.length} File`;
+      badge.innerText = `${count}`;
       badge.classList.remove("hidden");
+    }
+    if (card) {
+      card.classList.remove("bg-slate-50", "border-slate-200");
+      card.classList.add("bg-teal-50/70", "border-teal-400");
     }
   }
 }
@@ -5765,21 +5775,18 @@ function renderModalPipelineDocFolders() {
 
     return `
       <div class="flex flex-col">
-        <div onclick="openDocFolderModal('${docMaster.key}', '${docMaster.title}', 'pipeline')" class="group relative flex flex-col items-center justify-between p-2.5 ${hasFiles ? 'bg-teal-50/60 border-teal-300' : 'bg-white border-slate-200'} hover:border-teal-500 rounded-2xl cursor-pointer text-center transition min-h-[98px] shadow-2xs">
-          <div class="flex flex-col items-center pointer-events-none">
-            <div class="w-7 h-7 rounded-xl ${hasFiles ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700'} flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+        <div onclick="openDocFolderModal('${docMaster.key}', '${docMaster.title}', 'pipeline')" class="group relative flex flex-col items-center justify-between p-2.5 ${hasFiles ? 'bg-teal-50/70 border-teal-400' : 'bg-slate-50 border-slate-200'} hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[102px] shadow-2xs">
+          ${hasFiles ? `<span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-teal-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white shadow-sm z-10">${totalInThisDoc}</span>` : ''}
+          <div class="flex flex-col items-center pointer-events-none mt-1">
+            <div class="w-8 h-8 rounded-xl ${hasFiles ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-700'} flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
               <i class="fa-solid ${docMaster.icon}"></i>
             </div>
             <span class="text-[11px] font-bold text-slate-800 leading-tight">${docMaster.title}</span>
           </div>
-          <div class="mt-1 w-full flex flex-col items-center">
-            <span class="${hasFiles ? '' : 'hidden'} text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">
-              ✓ ${totalInThisDoc} File
-            </span>
-            <button type="button" onclick="event.stopPropagation(); triggerPipelineCardUpload('${docMaster.key}', '${docMaster.title}')" class="text-[9px] text-teal-600 hover:text-teal-800 italic font-semibold hover:underline">
-              push to upload
-            </button>
-          </div>
+          <button type="button" onclick="event.stopPropagation(); triggerPipelineCardUpload('${docMaster.key}', '${docMaster.title}')" class="w-full mt-2 py-1 px-1 bg-white hover:bg-teal-700 hover:text-white text-teal-700 border border-teal-200 hover:border-teal-700 rounded-lg text-[9px] font-bold shadow-2xs transition flex items-center justify-center space-x-1">
+            <i class="fa-solid fa-arrow-up-from-bracket text-[8px]"></i>
+            <span>Upload</span>
+          </button>
           <input type="file" id="pipe-file-input-${docMaster.key}" multiple accept="image/*,application/pdf" class="hidden" onchange="handlePipelineDocFilesAdded(this, '${docMaster.key}')" />
         </div>
       </div>
