@@ -1433,20 +1433,25 @@ function renderPriorityList() {
     computedList = computedList.filter(d => d.visitedToday);
   }
 
-  // 2. Filter Level Urgensi
+  // 2. Filter Level Urgensi (Hanya tampilkan mitra yang memiliki prioritas: Sangat Penting, Penting, Moderat)
   if (PRIORITY_ACTIVE_FILTER !== "ALL") {
     computedList = computedList.filter(d => d.level === PRIORITY_ACTIVE_FILTER);
+  } else {
+    computedList = computedList.filter(d => d.level !== "Normal" && d.level !== "NORMAL" && (d.score || 0) > 0);
   }
 
   if (computedList.length === 0) {
+    const filterText = PRIORITY_ACTIVE_FILTER === "ALL" ? "Prioritas Kunjungan Aktif" : `Level "${PRIORITY_ACTIVE_FILTER}"`;
     container.innerHTML = `
       <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-2">
-        <i class="fa-solid fa-clipboard-check text-2xl text-slate-300 block"></i>
-        <p class="font-semibold text-slate-700">Tidak ada data mitra untuk filter "${PRIORITY_ACTIVE_FILTER}"</p>
-        <p class="text-[11px] text-slate-400">Jika sheet baru saja diisi atau diperbarui, muat ulang data master:</p>
-        <button type="button" onclick="refreshPriorityData()" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mx-auto mb-1">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <p class="font-bold text-sm text-slate-800">Tidak ada data untuk ${filterText}</p>
+        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">Semua mitra saat ini dalam kondisi normal dan terjadwal dengan baik.</p>
+        <button type="button" onclick="refreshPriorityData(this)" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
           <i class="fa-solid fa-arrows-rotate"></i>
-          <span>Muat Ulang Data dari Sheet</span>
+          <span>Muat Ulang Data</span>
         </button>
       </div>
     `;
