@@ -3653,6 +3653,9 @@ async function handleSaveEmployee(e) {
   btn.disabled = true;
 
   try {
+    const existingEmp = (typeof SETTINGS_EMPLOYEES_DATA !== "undefined" ? SETTINGS_EMPLOYEES_DATA.find(x => String(x.nip).trim() === nip) : null) || 
+                        (APP_STATE.employees ? APP_STATE.employees.find(x => String(x.nip).trim() === nip) : null);
+
     const payload = {
       nip: nip,
       nama_lengkap: nama,
@@ -3661,19 +3664,32 @@ async function handleSaveEmployee(e) {
       role_id: roleId,
       area_cover: areaCover,
       status_aktif: status,
+      password_hash: pass || existingEmp?.password_hash || "Password123!",
       updated_at: new Date().toISOString()
     };
 
-    if (pass) {
-      payload.password_hash = pass;
+    if (supabaseClient) {
+      if (existingEmp) {
+        const { error } = await supabaseClient
+          .from("m_employee")
+          .update(payload)
+          .eq("nip", nip);
+        if (error) throw error;
+      } else {
+        const { error } = await supabaseClient
+          .from("m_employee")
+          .upsert(payload, { onConflict: "nip" });
+        if (error) throw error;
+      }
     }
 
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("m_employee")
-        .upsert(payload, { onConflict: "nip" });
-
-      if (error) throw error;
+    // Perbarui local state
+    if (existingEmp) {
+      Object.assign(existingEmp, payload);
+    }
+    if (APP_STATE.employees) {
+      const match = APP_STATE.employees.find(x => String(x.nip).trim() === nip);
+      if (match) Object.assign(match, payload);
     }
 
     showToast("Data karyawan berhasil disimpan!", "success", 1500);
