@@ -144,247 +144,279 @@
       <p class="text-[11px] text-slate-500">Unggah berkas dokumen yang didapatkan (bisa foto langsung atau file/PDF, mendukung upload lebih dari 1 file per dokumen).</p>
 
       <div class="space-y-2.5" id="container-onb-attachments">
-        <!-- List Dokumen dengan Tombol Upload Langsung -->
-        <div class="space-y-2" id="onb-doc-rows-list">
+        <!-- Grid 3 Kolom Score Card Upload Langsung -->
+        <div class="grid grid-cols-3 gap-2" id="onb-doc-grid-list">
+          
           <!-- Item 1: KTP Pemohon -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-id-card text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">KTP Pemohon</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KTP', 'KTP Pemohon')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-id-card"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">KTP Pemohon</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KTP', 'KTP Pemohon')" />
-              </label>
-            </div>
-            <div id="file-chips-KTP" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-KTP" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-KTP" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 2: KK -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-users text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Kartu Keluarga (KK)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KK', 'Kartu Keluarga (KK)')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-users"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Kartu Keluarga</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KK', 'Kartu Keluarga (KK)')" />
-              </label>
-            </div>
-            <div id="file-chips-KK" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-KK" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-KK" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 3: KTP Pasangan -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-id-card-clip text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">KTP Pasangan</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KTP_Pasangan', 'KTP Pasangan')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-id-card-clip"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">KTP Pasangan</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'KTP_Pasangan', 'KTP Pasangan')" />
-              </label>
-            </div>
-            <div id="file-chips-KTP_Pasangan" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-KTP_Pasangan" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-KTP_Pasangan" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 4: Dokumen PT/CV -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-building-flag text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Dokumen Legalitas PT / CV</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Dokumen_PT_CV', 'Dokumen Legalitas PT/CV')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-building-flag"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Legalitas PT/CV</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Dokumen_PT_CV', 'Dokumen Legalitas PT/CV')" />
-              </label>
-            </div>
-            <div id="file-chips-Dokumen_PT_CV" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Dokumen_PT_CV" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Dokumen_PT_CV" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 5: NPWP -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-file-invoice text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">NPWP (Pribadi / Badan)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'NPWP', 'NPWP')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-file-invoice"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">NPWP</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'NPWP', 'NPWP')" />
-              </label>
-            </div>
-            <div id="file-chips-NPWP" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-NPWP" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-NPWP" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 6: Rekening Koran -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-money-check-dollar text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Rekening Koran (3 Bulan Terakhir)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Rekening_Koran', 'Rekening Koran')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-money-check-dollar"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Rekening Koran</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Rekening_Koran', 'Rekening Koran')" />
-              </label>
-            </div>
-            <div id="file-chips-Rekening_Koran" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Rekening_Koran" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Rekening_Koran" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 7: Legalitas Usaha -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-stamp text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Legalitas Usaha (NIB / SKU / SIUP)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Legalitas_Usaha', 'Legalitas Usaha')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-stamp"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Legalitas Usaha</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Legalitas_Usaha', 'Legalitas Usaha')" />
-              </label>
-            </div>
-            <div id="file-chips-Legalitas_Usaha" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Legalitas_Usaha" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Legalitas_Usaha" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 8: Bukti Domisili -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-house-user text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Bukti Domisili (PBB / Rek Listrik)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Bukti_Domisili', 'Bukti Domisili')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-house-user"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Bukti Domisili</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Bukti_Domisili', 'Bukti Domisili')" />
-              </label>
-            </div>
-            <div id="file-chips-Bukti_Domisili" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Bukti_Domisili" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Bukti_Domisili" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 9: Bukti Tempat Usaha -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-shop text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Bukti Tempat Usaha (Sewa / Milik)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Bukti_Tempat_Usaha', 'Bukti Tempat Usaha')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-shop"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Tempat Usaha</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Bukti_Tempat_Usaha', 'Bukti Tempat Usaha')" />
-              </label>
-            </div>
-            <div id="file-chips-Bukti_Tempat_Usaha" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Bukti_Tempat_Usaha" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Bukti_Tempat_Usaha" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 10: Foto Stok Unit -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-car text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Foto Stok Unit / Barang</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Stok_Unit', 'Foto Stok Unit')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-car"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Stok Unit/Barang</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Stok_Unit', 'Foto Stok Unit')" />
-              </label>
-            </div>
-            <div id="file-chips-Foto_Stok_Unit" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Foto_Stok_Unit" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Foto_Stok_Unit" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 11: Foto Stok BPKB -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-folder-open text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Foto Stok BPKB / Faktur</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Stok_BPKB', 'Foto Stok BPKB')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-folder-open"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Stok BPKB/Faktur</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Stok_BPKB', 'Foto Stok BPKB')" />
-              </label>
-            </div>
-            <div id="file-chips-Foto_Stok_BPKB" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Foto_Stok_BPKB" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Foto_Stok_BPKB" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 12: Foto Domisili -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-house text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Foto Domisili (Tempat Tinggal)</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Domisili', 'Foto Domisili')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-house"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Foto Domisili</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Domisili', 'Foto Domisili')" />
-              </label>
-            </div>
-            <div id="file-chips-Foto_Domisili" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Foto_Domisili" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Foto_Domisili" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 13: Foto Tempat Usaha -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-store text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Foto Tempat Usaha / Showroom</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Tempat_Usaha', 'Foto Tempat Usaha')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-store"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Foto Usaha</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Foto_Tempat_Usaha', 'Foto Tempat Usaha')" />
-              </label>
-            </div>
-            <div id="file-chips-Foto_Tempat_Usaha" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Foto_Tempat_Usaha" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Foto_Tempat_Usaha" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 14: Selfie dg Pemohon -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-camera-retro text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Foto Bersama Pemohon di Lokasi</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Selfie_Pemohon', 'Foto Bersama Pemohon')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-camera-retro"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Selfie Pemohon</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Selfie_Pemohon', 'Foto Bersama Pemohon')" />
-              </label>
-            </div>
-            <div id="file-chips-Selfie_Pemohon" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Selfie_Pemohon" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Selfie_Pemohon" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
 
           <!-- Item 15: Dokumen Lainnya -->
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-folder-plus text-teal-600 text-sm"></i>
-                <span class="text-xs font-bold text-slate-800 truncate">Dokumen Tambahan Lainnya</span>
+          <div class="flex flex-col">
+            <label class="group relative flex flex-col items-center justify-between p-2.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-2xl cursor-pointer text-center transition min-h-[96px] shadow-2xs">
+              <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Dokumen_Lainnya', 'Dokumen Lainnya')" />
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xs mb-1.5 group-hover:scale-105 transition">
+                  <i class="fa-solid fa-folder-plus"></i>
+                </div>
+                <span class="text-[11px] font-bold text-slate-800 leading-tight">Dokumen Lain</span>
               </div>
-              <label class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold cursor-pointer shadow flex items-center space-x-1 shrink-0 transition">
-                <i class="fa-solid fa-plus text-[10px]"></i>
-                <span>Upload</span>
-                <input type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleDocMultiFilesSelected(this, 'Dokumen_Lainnya', 'Dokumen Lainnya')" />
-              </label>
-            </div>
-            <div id="file-chips-Dokumen_Lainnya" class="flex flex-wrap gap-1.5 empty:hidden"></div>
+              <div class="mt-1 w-full flex flex-col items-center">
+                <span id="badge-count-Dokumen_Lainnya" class="hidden text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 mb-0.5">0 File</span>
+                <span class="text-[9px] text-teal-600 italic block font-medium">push to upload</span>
+              </div>
+            </label>
+            <div id="file-chips-Dokumen_Lainnya" class="flex flex-col gap-1 mt-1.5 empty:hidden"></div>
           </div>
+
         </div>
       </div>
     </div>

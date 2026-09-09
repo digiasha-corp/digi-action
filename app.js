@@ -2626,26 +2626,40 @@ function removeDocFile(docKey, index) {
 
 function renderDocChips(docKey) {
   const container = document.getElementById(`file-chips-${docKey}`);
-  if (!container) return;
+  const badge = document.getElementById(`badge-count-${docKey}`);
   const docObj = ONB_DOC_FILES[docKey];
+
   if (!docObj || !docObj.files || docObj.files.length === 0) {
-    container.innerHTML = "";
+    if (container) container.innerHTML = "";
+    if (badge) {
+      badge.innerText = "0 File";
+      badge.classList.add("hidden");
+    }
     return;
   }
 
-  container.innerHTML = docObj.files.map((f, idx) => {
-    const isImg = f.type && f.type.startsWith("image/");
-    const icon = isImg ? "fa-image text-teal-600" : "fa-file-pdf text-rose-600";
-    return `
-      <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-teal-300 rounded-lg text-[10px] font-medium text-slate-700 shadow-2xs">
-        <i class="fa-solid ${icon}"></i>
-        <span class="max-w-[110px] truncate" title="${f.name}">${f.name}</span>
-        <button type="button" onclick="removeDocFile('${docKey}', ${idx})" class="text-slate-400 hover:text-red-500 ml-0.5" title="Hapus file">
-          <i class="fa-solid fa-xmark text-xs"></i>
-        </button>
-      </div>
-    `;
-  }).join('');
+  if (badge) {
+    badge.innerText = `✓ ${docObj.files.length} File`;
+    badge.classList.remove("hidden");
+  }
+
+  if (container) {
+    container.innerHTML = docObj.files.map((f, idx) => {
+      const isImg = f.type && f.type.startsWith("image/");
+      const icon = isImg ? "fa-image text-teal-600" : "fa-file-pdf text-rose-600";
+      return `
+        <div class="flex items-center justify-between gap-1 px-1.5 py-0.5 bg-white border border-teal-300 rounded-lg text-[9px] font-medium text-slate-700 shadow-2xs w-full">
+          <div class="flex items-center space-x-1 min-w-0">
+            <i class="fa-solid ${icon} text-[8px] shrink-0"></i>
+            <span class="truncate block" title="${f.name}">${f.name}</span>
+          </div>
+          <button type="button" onclick="removeDocFile('${docKey}', ${idx})" class="text-slate-400 hover:text-red-500 shrink-0 p-0.5" title="Hapus file">
+            <i class="fa-solid fa-xmark text-[10px]"></i>
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 function updateOnbDocCounter() {
