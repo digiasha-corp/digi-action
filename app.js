@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260909_v19";
+const APP_BUILD_VERSION = "20260909_v20";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4164,20 +4164,30 @@ function loadDealerSettings() {
   const branchSelect = document.getElementById("dealer-branch-filter");
   if (branchSelect) {
     const branches = new Set();
-    APP_STATE.dealers.forEach(d => { if (d.cabang) branches.add(d.cabang); });
+    APP_STATE.dealers.forEach(d => {
+      if (d.cabang && String(d.cabang).trim()) {
+        branches.add(String(d.cabang).trim());
+      }
+    });
+    const sortedBranches = Array.from(branches).sort();
     branchSelect.innerHTML = '<option value="ALL">Semua Cabang</option>' + 
-      Array.from(branches).map(b => `<option value="${b}">${b}</option>`).join("");
+      sortedBranches.map(b => `<option value="${b}">${b}</option>`).join("");
   }
   filterDealerSettingsList();
 }
 
 function filterDealerSettingsList() {
   const q = String(document.getElementById("dealer-settings-search")?.value || "").trim().toLowerCase();
-  const bFilter = document.getElementById("dealer-branch-filter")?.value || "ALL";
+  const bFilter = String(document.getElementById("dealer-branch-filter")?.value || "ALL").trim().toLowerCase();
 
   const filtered = APP_STATE.dealers.filter(d => {
-    const matchQ = !q || String(d.dealer_name || "").toLowerCase().includes(q) || String(d.area_cover || "").toLowerCase().includes(q);
-    const matchB = bFilter === "ALL" || d.cabang === bFilter;
+    const name = String(d.dealer_name || "").toLowerCase();
+    const cabang = String(d.cabang || "").toLowerCase();
+    const area = String(d.area_cover || "").toLowerCase();
+    const id = String(d.dealer_id || "").toLowerCase();
+
+    const matchQ = !q || name.includes(q) || cabang.includes(q) || area.includes(q) || id.includes(q);
+    const matchB = bFilter === "all" || cabang === bFilter;
     return matchQ && matchB;
   });
 
