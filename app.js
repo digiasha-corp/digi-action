@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260909_v21";
+const APP_BUILD_VERSION = "20260909_v22";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4131,6 +4131,18 @@ function renderEmployeeList(list) {
   }).join("");
 }
 
+function populateEmployeeRoleOptions(selectedRoleId = "R-04") {
+  const select = document.getElementById("emp-input-role");
+  if (!select) return;
+
+  const roleKeys = Object.keys(ROLE_PERMISSIONS_STATE);
+  select.innerHTML = roleKeys.map(k => {
+    const r = ROLE_PERMISSIONS_STATE[k];
+    const isSel = k === selectedRoleId;
+    return `<option value="${k}" ${isSel ? 'selected' : ''}>${r.name} (${k})</option>`;
+  }).join('');
+}
+
 function openAddEmployeeModal() {
   document.getElementById("modal-emp-title").innerText = "Tambah Karyawan Baru";
   document.getElementById("emp-input-nip").value = "";
@@ -4138,7 +4150,7 @@ function openAddEmployeeModal() {
   document.getElementById("emp-input-nama").value = "";
   document.getElementById("emp-input-email").value = "";
   document.getElementById("emp-input-cabang").value = "Head Office";
-  document.getElementById("emp-input-role").value = "R-04";
+  populateEmployeeRoleOptions("R-04");
   document.getElementById("emp-input-area").value = "";
   document.getElementById("emp-input-password").value = "Password123!";
   document.getElementById("emp-input-status").value = "AKTIF";
@@ -4156,7 +4168,7 @@ function openEditEmployeeModal(nip) {
   document.getElementById("emp-input-nama").value = emp.nama_lengkap || "";
   document.getElementById("emp-input-email").value = emp.email || "";
   document.getElementById("emp-input-cabang").value = emp.cabang || "";
-  document.getElementById("emp-input-role").value = emp.role_id || "R-04";
+  populateEmployeeRoleOptions(emp.role_id || "R-04");
   document.getElementById("emp-input-area").value = emp.area_cover || "";
   document.getElementById("emp-input-password").value = "";
   document.getElementById("emp-input-status").value = (emp.status_aktif === "AKTIF" || emp.status_aktif === true) ? "AKTIF" : "NONAKTIF";
@@ -4699,6 +4711,7 @@ function loadRolePermissionsSettings() {
   container.innerHTML = roleKeys.map(roleId => {
     const role = ROLE_PERMISSIONS_STATE[roleId];
     const rolePerms = role.permissions || [];
+    const isCoreRole = ["R-01"].includes(roleId);
 
     const modulesHtml = ALL_APP_MODULES.map(mod => {
       const isChecked = rolePerms.includes(mod.key);
@@ -4719,22 +4732,33 @@ function loadRolePermissionsSettings() {
     return `
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
         <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 flex-wrap gap-2">
-          <div class="flex items-center space-x-2.5">
+          <div class="flex items-center space-x-2.5 min-w-0">
             <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-base shrink-0">
-              <i class="fa-solid ${role.icon}"></i>
+              <i class="fa-solid ${role.icon || 'fa-user-gear'}"></i>
             </div>
-            <div>
-              <div class="flex items-center space-x-2">
+            <div class="min-w-0">
+              <div class="flex items-center space-x-2 flex-wrap">
                 <span class="text-xs font-bold text-slate-900">${role.name}</span>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${role.badgeBg}">${roleId}</span>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${role.badgeBg || 'bg-purple-100 text-purple-800 border border-purple-200'}">${roleId}</span>
               </div>
-              <p class="text-[10px] text-slate-500 mt-0.5">${role.desc}</p>
+              <p class="text-[10px] text-slate-500 mt-0.5">${role.desc || '-'}</p>
             </div>
           </div>
-          <button type="button" onclick="saveRolePermissions('${roleId}')" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center space-x-1.5 transition shrink-0">
-            <i class="fa-solid fa-floppy-disk text-xs"></i>
-            <span>Simpan Hak Akses</span>
-          </button>
+          <div class="flex items-center space-x-1.5 shrink-0 flex-wrap">
+            <button type="button" onclick="openEditRoleInfoModal('${roleId}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 flex items-center space-x-1 transition" title="Ubah Nama & Info Role">
+              <i class="fa-solid fa-pen text-[10px]"></i>
+              <span>Edit Info</span>
+            </button>
+            ${!isCoreRole ? `
+              <button type="button" onclick="deleteCustomRole('${roleId}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs border border-rose-200 flex items-center space-x-1 transition" title="Hapus Role">
+                <i class="fa-solid fa-trash-can text-[10px]"></i>
+              </button>
+            ` : ''}
+            <button type="button" onclick="saveRolePermissions('${roleId}')" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center space-x-1.5 transition">
+              <i class="fa-solid fa-floppy-disk text-xs"></i>
+              <span>Simpan Hak Akses</span>
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -4743,6 +4767,125 @@ function loadRolePermissionsSettings() {
       </div>
     `;
   }).join('');
+}
+
+let ROLE_EDIT_MODE = "add"; // "add" | "edit"
+
+function openAddRoleModal() {
+  ROLE_EDIT_MODE = "add";
+  document.getElementById("modal-role-title").innerText = "Tambah Role Baru";
+  
+  // Auto suggest next R-0X
+  const keys = Object.keys(ROLE_PERMISSIONS_STATE);
+  let nextNum = keys.length + 1;
+  while (ROLE_PERMISSIONS_STATE[`R-0${nextNum}`] || ROLE_PERMISSIONS_STATE[`R-${nextNum}`]) {
+    nextNum++;
+  }
+  const suggestedId = nextNum < 10 ? `R-0${nextNum}` : `R-${nextNum}`;
+  
+  const idInput = document.getElementById("role-input-id");
+  idInput.value = suggestedId;
+  idInput.disabled = false;
+  
+  document.getElementById("role-input-name").value = "";
+  document.getElementById("role-input-desc").value = "";
+  document.getElementById("role-input-icon").value = "fa-user-gear";
+  document.getElementById("role-input-color").value = "purple";
+  document.getElementById("modal-role-create-edit").classList.remove("hidden");
+}
+
+function openEditRoleInfoModal(roleId) {
+  const role = ROLE_PERMISSIONS_STATE[roleId];
+  if (!role) return;
+
+  ROLE_EDIT_MODE = "edit";
+  document.getElementById("modal-role-title").innerText = `Edit Role: ${role.name}`;
+  
+  const idInput = document.getElementById("role-input-id");
+  idInput.value = roleId;
+  idInput.disabled = true;
+  
+  document.getElementById("role-input-name").value = role.name;
+  document.getElementById("role-input-desc").value = role.desc || "";
+  document.getElementById("role-input-icon").value = role.icon || "fa-user-gear";
+  document.getElementById("role-input-color").value = role.color || "purple";
+  document.getElementById("modal-role-create-edit").classList.remove("hidden");
+}
+
+function closeRoleModal() {
+  document.getElementById("modal-role-create-edit").classList.add("hidden");
+}
+
+function handleSaveRoleInfo(e) {
+  e.preventDefault();
+  const id = document.getElementById("role-input-id").value.trim().toUpperCase();
+  const name = document.getElementById("role-input-name").value.trim();
+  const desc = document.getElementById("role-input-desc").value.trim();
+  const icon = document.getElementById("role-input-icon").value;
+  const color = document.getElementById("role-input-color").value;
+
+  if (!id || !name) {
+    alert("Kode Role ID dan Nama Role wajib diisi!");
+    return;
+  }
+
+  const badgeColorMap = {
+    purple: "bg-purple-100 text-purple-800 border border-purple-200",
+    blue: "bg-blue-100 text-blue-800 border border-blue-200",
+    cyan: "bg-cyan-100 text-cyan-800 border border-cyan-200",
+    emerald: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+    amber: "bg-amber-100 text-amber-800 border border-amber-200",
+    rose: "bg-rose-100 text-rose-800 border border-rose-200",
+    indigo: "bg-indigo-100 text-indigo-800 border border-indigo-200"
+  };
+
+  const badgeBg = badgeColorMap[color] || badgeColorMap.purple;
+
+  if (ROLE_EDIT_MODE === "add") {
+    if (ROLE_PERMISSIONS_STATE[id]) {
+      alert(`Role ID ${id} sudah terdaftar. Gunakan ID lain!`);
+      return;
+    }
+    ROLE_PERMISSIONS_STATE[id] = {
+      name: name,
+      icon: icon,
+      color: color,
+      badgeBg: badgeBg,
+      desc: desc || "Role kustom pengguna",
+      permissions: ["priority", "visit", "onboarding", "pipeline", "gps", "history"]
+    };
+    showToast(`Role baru ${name} (${id}) berhasil ditambahkan!`, "success", 2000);
+  } else {
+    if (!ROLE_PERMISSIONS_STATE[id]) return;
+    ROLE_PERMISSIONS_STATE[id].name = name;
+    ROLE_PERMISSIONS_STATE[id].desc = desc;
+    ROLE_PERMISSIONS_STATE[id].icon = icon;
+    ROLE_PERMISSIONS_STATE[id].color = color;
+    ROLE_PERMISSIONS_STATE[id].badgeBg = badgeBg;
+    showToast(`Informasi role ${name} (${id}) berhasil diperbarui!`, "success", 2000);
+  }
+
+  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+  closeRoleModal();
+  loadRolePermissionsSettings();
+  populateEmployeeRoleOptions();
+}
+
+function deleteCustomRole(roleId) {
+  if (roleId === "R-01") {
+    alert("Role Super Admin (R-01) tidak dapat dihapus!");
+    return;
+  }
+  const role = ROLE_PERMISSIONS_STATE[roleId];
+  if (!role) return;
+
+  if (!confirm(`Hapus role "${role.name}" (${roleId})? Karyawan yang menggunakan role ini akan memerlukan pembaruan role.`)) return;
+
+  delete ROLE_PERMISSIONS_STATE[roleId];
+  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+  loadRolePermissionsSettings();
+  populateEmployeeRoleOptions();
+  showToast(`Role ${role.name} berhasil dihapus!`, "success", 2000);
 }
 
 function saveRolePermissions(roleId) {
@@ -4772,6 +4915,7 @@ function resetRolePermissionsToDefault() {
   ROLE_PERMISSIONS_STATE = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
   localStorage.removeItem("DIGIASHA_ROLE_PERMS");
   loadRolePermissionsSettings();
+  populateEmployeeRoleOptions();
   showToast("Hak akses seluruh role telah dikembalikan ke default!", "success", 2000);
 }
 
