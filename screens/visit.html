@@ -7,9 +7,9 @@
         <h3 class="text-xs font-bold text-slate-800 uppercase">Identitas Kunjungan & Pertemuan Owner</h3>
       </div>
       <div class="relative" id="dealer-search-wrapper">
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Partner Dealer <span class="text-red-500">*</span></label>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Mitra <span class="text-red-500">*</span></label>
         <select id="input-dealer" onchange="onDealerSelected(this.value)" required class="sr-only">
-          <option value="">-- Pilih Partner Dealer --</option>
+          <option value="">-- Pilih Mitra --</option>
         </select>
         
         <div class="relative">
@@ -18,7 +18,7 @@
             <input
               type="text"
               id="dealer-search-input"
-              placeholder="Ketik untuk cari partner dealer / cabang..."
+              placeholder="Ketik untuk cari mitra / cabang..."
               autocomplete="off"
               onfocus="openDealerSearchDropdown()"
               oninput="filterDealerSearchOptions(this.value)"
@@ -111,7 +111,7 @@
         <textarea id="input-issue-digiasha" rows="2" placeholder="Masukan layanan, admin, GPS, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
       </div>
       <div>
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Internal Dealer</label>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Internal Mitra</label>
         <textarea id="input-issue-internal" rows="2" placeholder="Kendala cashflow, sengketa, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
       </div>
       <div>
@@ -130,7 +130,7 @@
         <span id="unit-count-badge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">0 Unit</span>
       </div>
       <div id="box-empty-facility" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs text-slate-500">
-        Pilih partner dealer di Segmen 1 untuk memuat data fasilitas aktif.
+        Pilih mitra di Segmen 1 untuk memuat data fasilitas aktif.
       </div>
       <div id="container-unit-list" class="hidden space-y-2"></div>
     </div>

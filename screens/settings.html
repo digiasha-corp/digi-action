@@ -17,7 +17,7 @@
       <i class="fa-solid fa-users mr-1 text-indigo-600"></i> Karyawan
     </button>
     <button type="button" id="tab-btn-dealer" onclick="switchSettingsTab('dealer')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
-      <i class="fa-solid fa-store mr-1 text-amber-600"></i> Area Dealer
+      <i class="fa-solid fa-store mr-1 text-amber-600"></i> Area Mitra
     </button>
     <button type="button" id="tab-btn-office" onclick="switchSettingsTab('office')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
       <i class="fa-solid fa-location-dot mr-1 text-emerald-600"></i> Geofence
@@ -47,12 +47,12 @@
     </div>
   </div>
 
-  <!-- ================= TAB 2: AREA COVER DEALER ================= -->
+  <!-- ================= TAB 2: AREA COVER MITRA ================= -->
   <div id="settings-tab-dealer" class="space-y-3 hidden">
     <div class="flex items-center gap-2">
       <div class="relative flex-1">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" id="dealer-settings-search" oninput="filterDealerSettingsList(this.value)" placeholder="Cari nama dealer / cabang..." class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-amber-600 outline-none shadow-sm" />
+        <input type="text" id="dealer-settings-search" oninput="filterDealerSettingsList(this.value)" placeholder="Cari nama mitra / cabang..." class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-amber-600 outline-none shadow-sm" />
       </div>
       <select id="dealer-branch-filter" onchange="filterDealerSettingsList()" class="bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none shadow-sm shrink-0">
         <option value="ALL">Semua Cabang</option>
@@ -61,7 +61,7 @@
 
     <div id="dealer-settings-list-container" class="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
       <div class="p-8 text-center text-xs text-slate-400">
-        <i class="fa-solid fa-circle-notch fa-spin text-base text-amber-600 mb-1 block"></i> Memuat daftar dealer...
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-amber-600 mb-1 block"></i> Memuat daftar mitra...
       </div>
     </div>
   </div>
@@ -185,15 +185,15 @@
   </div>
 </div>
 
-<!-- ================= MODAL EDIT AREA COVER DEALER ================= -->
+<!-- ================= MODAL EDIT AREA COVER MITRA ================= -->
 <div id="modal-dealer-area-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
   <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden p-4 space-y-3 text-xs">
     <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-      <h4 class="font-bold text-sm text-slate-800">Ubah Area Cover Dealer</h4>
+      <h4 class="font-bold text-sm text-slate-800">Ubah Area Cover Mitra</h4>
       <button onclick="closeDealerAreaModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
     </div>
     <div>
-      <span class="text-[10px] text-slate-400 uppercase font-bold block">Nama Partner Mitra:</span>
+      <span class="text-[10px] text-slate-400 uppercase font-bold block">Nama Mitra:</span>
       <h5 id="modal-dealer-name-display" class="font-bold text-sm text-slate-900 mt-0.5">-</h5>
       <p id="modal-dealer-branch-display" class="text-[11px] text-slate-500">-</p>
     </div>

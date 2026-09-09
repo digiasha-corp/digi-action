@@ -39,12 +39,12 @@
         </div>
       </div>
 
-      <!-- Searchable Mitra Dealer -->
+      <!-- Searchable Mitra -->
       <div class="relative" id="gps-dealer-search-wrapper">
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Mitra Dealer <span
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Mitra <span
             class="text-red-500">*</span></label>
         <select id="gps-select-dealer" onchange="onGpsDealerSelected(this.value)" required class="sr-only">
-          <option value="">-- Pilih Partner Dealer --</option>
+          <option value="">-- Pilih Mitra --</option>
         </select>
 
         <div class="relative">
@@ -53,7 +53,7 @@
             <input
               type="text"
               id="gps-dealer-search-input"
-              placeholder="Ketik untuk cari partner dealer / cabang..."
+              placeholder="Ketik untuk cari mitra / cabang..."
               autocomplete="off"
               onfocus="openGpsDealerSearchDropdown()"
               oninput="filterGpsDealerSearchOptions(this.value)"
