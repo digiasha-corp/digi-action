@@ -267,7 +267,7 @@ function syncDealersAndFacilitiesFromSource() {
 }
 
 /**
- * ⚡ 1. SINKRONISASI PERIODIK DATA SUMBER (SETIAP 5 MENIT)
+ * ⚡ SINKRONISASI PERIODIK DATA SUMBER (SETIAP 5 MENIT)
  * Pasang fungsi ini pada Trigger: Berdasarkan Waktu -> Pemicu Menit -> Setiap 5 Menit.
  * Tugas: Murni cloning data baru dari Spreadsheet ke Supabase.
  */
@@ -279,20 +279,5 @@ function syncAllSourcesPeriodically() {
     Logger.log("=== SINKRONISASI CLONING DATA SELESAI ===");
   } catch (e) {
     Logger.log("Error sync periodik: " + e.toString());
-  }
-}
-
-/**
- * 🌙 2. TRIGGER KALKULASI PRIORITAS SUPABASE (PUKUL 03:00 WIB)
- * Pasang fungsi ini pada Trigger: Berdasarkan Waktu -> Pemicu Harian -> Jam 03:00 - 04:00.
- * Tugas: Memerintahkan database Supabase untuk menghitung ulang parameter prioritas harian.
- */
-function triggerDailyPriorityRecalc() {
-  Logger.log("=== MEMICU KALKULASI PRIORITAS HARIAN DI SUPABASE (03:00 WIB) ===");
-  try {
-    callSupabaseRpc("recalculate_all_priorities");
-    Logger.log("=== KALKULASI PRIORITAS BERHASIL DIJALANKAN ===");
-  } catch (e) {
-    Logger.log("Error trigger prioritas: " + e.toString());
   }
 }

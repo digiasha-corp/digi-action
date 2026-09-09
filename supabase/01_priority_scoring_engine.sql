@@ -245,17 +245,28 @@ BEGIN
 END;
 $$;
 
--- Drop trigger jika ada
-DROP TRIGGER IF EXISTS trg_recalc_on_visit ON tr_laporan_visit;
-DROP TRIGGER IF EXISTS trg_recalc_on_assignment ON t_assignment;
-
 -- Trigger Realtime t_assignment
 CREATE TRIGGER trg_recalc_on_assignment
 AFTER INSERT OR UPDATE OR DELETE ON t_assignment
 FOR EACH STATEMENT
 EXECUTE FUNCTION trg_auto_recalculate_concern();
 
--- 3. JADWAL OTOMATIS (OPSIONAL PG_CRON DI SUPABASE):
--- Jika pg_cron aktif di Supabase Dashboard, jalankan perintah di bawah ini untuk auto-run jam 03:00 WIB (20:00 UTC):
--- SELECT cron.schedule('daily-priority-0300-wib', '0 20 * * *', 'SELECT recalculate_all_priorities()');
+-- 3. JADWAL OTOMATIS PG_CRON HARIAN PUKUL 03:00 WIB (20:00 UTC)
+-- Mengaktifkan ekstensi pg_cron dan menjadwalkan kalkulasi mandiri setiap jam 03:00 WIB
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Hapus jadwal lama jika ada agar tidak duplikat
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'daily-priority-recalc-0300-wib') THEN
+    PERFORM cron.unschedule('daily-priority-recalc-0300-wib');
+  END IF;
+END $$;
+
+-- Daftarkan jadwal baru: Pukul 03:00 WIB = Pukul 20:00 UTC
+SELECT cron.schedule(
+  'daily-priority-recalc-0300-wib',
+  '0 20 * * *',
+  $$SELECT recalculate_all_priorities()$$
+);
 
