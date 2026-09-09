@@ -4522,6 +4522,72 @@ function renderHistoryList() {
   container.innerHTML = html;
 }
 
+function parseCatatanUnit(str) {
+  const result = {
+    indikasi: "",
+    infoList: [],
+    infoLainnya: "",
+    ovdPlan: "",
+    komitmen: "Tidak Ada"
+  };
+  if (!str) return result;
+  
+  const parts = str.split(";").map(s => s.trim());
+  parts.forEach(p => {
+    if (p.startsWith("Indikasi:")) {
+      const val = p.replace("Indikasi:", "").trim();
+      if (val !== "-") result.indikasi = val;
+    } else if (p.startsWith("Info:")) {
+      const val = p.replace("Info:", "").trim();
+      if (val && val !== "-") {
+        const standardOptions = ["Plan Perpanjang", "Plan Pelunasan", "Ada Calon Pembeli", "Proses Kredit", "Unit Cash Tempo", "Unit Milik Orang Lain"];
+        const splitItems = val.split(",").map(x => x.trim());
+        splitItems.forEach(item => {
+          if (standardOptions.includes(item)) {
+            result.infoList.push(item);
+          } else if (item.startsWith("Lainnya:")) {
+            result.infoList.push("Lainnya");
+            result.infoLainnya = item.replace("Lainnya:", "").trim();
+          } else if (item && item !== "Lainnya") {
+            result.infoList.push("Lainnya");
+            result.infoLainnya = item;
+          }
+        });
+      }
+    } else if (p.startsWith("Plan:")) {
+      const val = p.replace("Plan:", "").trim();
+      if (val !== "-") result.ovdPlan = val;
+    } else if (p.startsWith("Komitmen:")) {
+      const val = p.replace("Komitmen:", "").trim();
+      if (val && val !== "-") result.komitmen = val;
+    }
+  });
+
+  return result;
+}
+
+function toggleHistUnitAda(val, checkId) {
+  const boxIndikasi = document.getElementById(`box-hist-indikasi-${checkId}`);
+  if (boxIndikasi) {
+    if (val === "Tidak Terlihat" || val === "Tidak") {
+      boxIndikasi.classList.remove("hidden");
+    } else {
+      boxIndikasi.classList.add("hidden");
+    }
+  }
+}
+
+function toggleHistUnitLainnya(chk, checkId) {
+  const boxLainnya = document.getElementById(`box-hist-info-lainnya-${checkId}`);
+  if (boxLainnya) {
+    if (chk && chk.checked) {
+      boxLainnya.classList.remove("hidden");
+    } else {
+      boxLainnya.classList.add("hidden");
+    }
+  }
+}
+
 async function openActivityDetailModal(type, id) {
   const modal = document.getElementById("modal-history-detail");
   if (!modal) return;
@@ -4627,30 +4693,96 @@ async function openActivityDetailModal(type, id) {
     let unitsHtml = "";
     if (checkedUnits.length > 0) {
       unitsHtml = `
-        <div class="mt-3 pt-3 border-t border-slate-200 space-y-2">
-          <span class="text-[11px] font-bold text-slate-700 block">Checklist Unit yang Dikunjungi (${checkedUnits.length} Unit):</span>
-          <div class="space-y-2">
-            ${checkedUnits.map((u, idx) => `
-              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                <div class="flex justify-between items-center text-xs font-bold text-slate-800">
-                  <span>${idx + 1}. ${u.nopol || 'Unit'} - ${u.unit_desc || ''}</span>
-                  <span class="text-[10px] text-slate-400 font-mono">${u.no_fasilitas || ''}</span>
+        <div class="mt-3 pt-3 border-t border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-800 block">Checklist Unit yang Dikunjungi (${checkedUnits.length} Unit):</span>
+            <span class="text-[10px] text-slate-400">Status, checklist & plan</span>
+          </div>
+          <div class="space-y-3">
+            ${checkedUnits.map((u, idx) => {
+              const parsed = parseCatatanUnit(u.catatan_unit);
+              const checkId = u.check_id || u.id;
+              const isAda = u.status_keberadaan === "Ya" || u.status_keberadaan === "Ya, Terlihat" || u.status_keberadaan === "Terlihat di Showroom";
+              const statusVal = isAda ? "Ya, Terlihat" : "Tidak Terlihat";
+              const gpsMatchVal = (u.kondisi_unit === "Tidak Sesuai" || u.kondisi_unit === "Tidak") ? "Tidak Sesuai" : "Ya, Sesuai";
+              const hasLainnya = parsed.infoList.includes("Lainnya") || (parsed.infoLainnya && parsed.infoLainnya.trim() !== "");
+
+              return `
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5 hist-unit-card" data-check-id="${checkId}">
+                  <!-- Unit Header -->
+                  <div class="flex justify-between items-start">
+                    <div class="min-w-0">
+                      <span class="font-bold text-xs text-slate-900 block leading-tight">${idx + 1}. ${u.nopol || 'Unit'} - ${u.unit_desc || ''}</span>
+                      <span class="text-[10px] text-slate-400 font-mono">${u.no_fasilitas || '-'}</span>
+                    </div>
+                    ${u.foto_unit_url ? `
+                      <a href="${u.foto_unit_url}" target="_blank" class="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 bg-slate-200 shrink-0 block hover:opacity-80 transition" title="Lihat Foto Fisik Unit">
+                        <img src="${u.foto_unit_url}" alt="Foto Unit" class="w-full h-full object-cover" />
+                      </a>
+                    ` : ''}
+                  </div>
+
+                  <!-- 1. Status Keberadaan Unit -->
+                  <div class="space-y-1">
+                    <label class="block text-[10px] font-bold text-slate-600">Apakah Unit Terlihat di Lokasi?</label>
+                    <select ${isReadOnly ? 'disabled' : ''} onchange="toggleHistUnitAda(this.value, '${checkId}')" class="hist-unit-ada w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                      <option value="Ya, Terlihat" ${statusVal === 'Ya, Terlihat' ? 'selected' : ''}>Ya, Terlihat</option>
+                      <option value="Tidak Terlihat" ${statusVal === 'Tidak Terlihat' ? 'selected' : ''}>Tidak Terlihat</option>
+                    </select>
+                  </div>
+
+                  <!-- Indikasi Keberadaan (Tampil jika Tidak Terlihat) -->
+                  <div id="box-hist-indikasi-${checkId}" class="${statusVal === 'Tidak Terlihat' ? '' : 'hidden'} p-2 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+                    <label class="block text-[10px] font-bold text-amber-900">Indikasi Keberadaan Unit:</label>
+                    <input type="text" ${isReadOnly ? 'disabled' : ''} value="${parsed.indikasi}" placeholder="Contoh: Unit dipinjam owner / test drive" class="hist-unit-indikasi w-full bg-white border border-amber-300 rounded-lg p-1.5 text-xs text-slate-800" />
+                  </div>
+
+                  <!-- 2. Titik GPS Sesuai Lokasi Visit? -->
+                  <div class="space-y-1">
+                    <label class="block text-[10px] font-bold text-slate-600">Titik GPS Sesuai Lokasi Visit?</label>
+                    <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-gps-match w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                      <option value="Ya, Sesuai" ${gpsMatchVal === 'Ya, Sesuai' ? 'selected' : ''}>Ya, Sesuai</option>
+                      <option value="Tidak Sesuai" ${gpsMatchVal === 'Tidak Sesuai' ? 'selected' : ''}>Tidak Sesuai</option>
+                    </select>
+                  </div>
+
+                  <!-- 3. Info Status Unit (Multi Checkbox + Lainnya Free Text) -->
+                  <div class="space-y-1.5">
+                    <label class="block text-[10px] font-bold text-slate-600">Info Status Unit (Bisa Pilih >1):</label>
+                    <div class="grid grid-cols-2 gap-1.5 bg-white p-2.5 rounded-xl border border-slate-200 text-[11px]">
+                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Perpanjang" ${parsed.infoList.includes('Plan Perpanjang') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Perpanjang</span></label>
+                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Pelunasan" ${parsed.infoList.includes('Plan Pelunasan') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Pelunasan</span></label>
+                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Ada Calon Pembeli" ${parsed.infoList.includes('Ada Calon Pembeli') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Ada Calon Pembeli</span></label>
+                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Proses Kredit" ${parsed.infoList.includes('Proses Kredit') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Proses Kredit</span></label>
+                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Cash Tempo" ${parsed.infoList.includes('Unit Cash Tempo') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Unit Cash Tempo</span></label>
+                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Milik Orang Lain" ${parsed.infoList.includes('Unit Milik Orang Lain') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Milik Orang Lain</span></label>
+                      <label class="flex items-center space-x-1.5 col-span-2"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Lainnya" ${hasLainnya ? 'checked' : ''} onchange="toggleHistUnitLainnya(this, '${checkId}')" class="hist-unit-info-chk hist-unit-info-lainnya-chk rounded text-slate-900" /> <span class="font-semibold text-slate-800">Lainnya (Free Text)</span></label>
+                    </div>
+                    <div id="box-hist-info-lainnya-${checkId}" class="${hasLainnya ? '' : 'hidden'} mt-1.5">
+                      <input type="text" ${isReadOnly ? 'disabled' : ''} value="${parsed.infoLainnya}" placeholder="Sebutkan info status unit lainnya..." class="hist-unit-info-lainnya w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400" />
+                    </div>
+                  </div>
+
+                  <!-- 4. Plan Penyelesaian Overdue & Komitmen -->
+                  <div class="space-y-2 pt-1 border-t border-slate-200">
+                    <div class="p-2.5 bg-red-50/60 rounded-xl border border-red-200 space-y-1">
+                      <label class="block font-bold text-red-900 text-[10px]">Plan Penyelesaian Overdue (Free Text):</label>
+                      <textarea ${isReadOnly ? 'disabled' : ''} rows="2" placeholder="Rencana penanganan pelunasan unit..." class="hist-unit-ovd-plan w-full bg-white border border-red-300 rounded-lg p-2 text-xs text-slate-800 focus:ring-2 focus:ring-red-500">${parsed.ovdPlan}</textarea>
+                    </div>
+
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Komitmen Pembayaran:</label>
+                      <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-komitmen w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                        <option value="Tidak Ada" ${parsed.komitmen === 'Tidak Ada' ? 'selected' : ''}>Tidak Ada Komitmen</option>
+                        <option value="Sudah Bayar" ${parsed.komitmen === 'Sudah Bayar' ? 'selected' : ''}>Sudah Bayar</option>
+                        <option value="Bayar" ${parsed.komitmen === 'Bayar' ? 'selected' : ''}>Bayar</option>
+                        <option value="Serahkan Unit" ${parsed.komitmen === 'Serahkan Unit' ? 'selected' : ''}>Serahkan Unit</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-[10px] text-slate-500 mb-0.5">Status Keberadaan:</label>
-                  <select ${isReadOnly ? 'disabled' : ''} class="hist-edit-unit-status w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs" data-check-id="${u.check_id || u.id}">
-                    <option value="Terlihat di Showroom" ${u.status_keberadaan === 'Terlihat di Showroom' ? 'selected' : ''}>Terlihat di Showroom</option>
-                    <option value="Tidak Terlihat di Showroom" ${u.status_keberadaan === 'Tidak Terlihat di Showroom' ? 'selected' : ''}>Tidak Terlihat di Showroom</option>
-                    <option value="Sedang Digunakan" ${u.status_keberadaan === 'Sedang Digunakan' ? 'selected' : ''}>Sedang Digunakan</option>
-                    <option value="Lainnya" ${u.status_keberadaan === 'Lainnya' ? 'selected' : ''}>Lainnya</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-[10px] text-slate-500 mb-0.5">Catatan / Detail Unit:</label>
-                  <input type="text" ${isReadOnly ? 'disabled' : ''} value="${u.catatan_unit || ''}" class="hist-edit-unit-notes w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs" data-check-id="${u.check_id || u.id}" placeholder="Catatan kondisi/posisi unit..." />
-                </div>
-              </div>
-            `).join("")}
+              `;
+            }).join("")}
           </div>
         </div>
       `;
@@ -4831,20 +4963,40 @@ async function handleSaveEditActivity(e) {
       if (visitErr) throw visitErr;
 
       // 2. Update tr_visit_unit_check child items
-      const statusSelects = document.querySelectorAll(".hist-edit-unit-status");
-      const notesInputs = document.querySelectorAll(".hist-edit-unit-notes");
+      const unitCards = document.querySelectorAll(".hist-unit-card");
 
-      for (let i = 0; i < statusSelects.length; i++) {
-        const checkId = statusSelects[i].getAttribute("data-check-id");
-        const uStatus = statusSelects[i].value;
-        const uNotes = notesInputs[i] ? notesInputs[i].value : "";
+      for (let i = 0; i < unitCards.length; i++) {
+        const card = unitCards[i];
+        const checkId = card.getAttribute("data-check-id");
+        if (!checkId) continue;
 
-        if (checkId) {
-          await supabaseClient.from("tr_visit_unit_check").update({
-            status_keberadaan: uStatus,
-            catatan_unit: uNotes
-          }).eq("check_id", checkId);
-        }
+        const uAda = card.querySelector(".hist-unit-ada")?.value || "Ya, Terlihat";
+        const uIndikasi = card.querySelector(".hist-unit-indikasi")?.value || "";
+        const uGpsMatch = card.querySelector(".hist-unit-gps-match")?.value || "Ya, Sesuai";
+        
+        const chkElems = card.querySelectorAll(".hist-unit-info-chk:checked");
+        const selectedInfos = Array.from(chkElems).map(c => c.value);
+        const customLainnya = card.querySelector(".hist-unit-info-lainnya")?.value?.trim() || "";
+
+        const finalInfoList = [];
+        selectedInfos.forEach(info => {
+          if (info === "Lainnya") {
+            if (customLainnya) finalInfoList.push(`Lainnya: ${customLainnya}`);
+          } else {
+            finalInfoList.push(info);
+          }
+        });
+
+        const uOvdPlan = card.querySelector(".hist-unit-ovd-plan")?.value?.trim() || "";
+        const uKomitmen = card.querySelector(".hist-unit-komitmen")?.value || "Tidak Ada";
+
+        const constructedNotes = `Indikasi: ${uIndikasi || '-'}; Info: ${finalInfoList.length > 0 ? finalInfoList.join(', ') : '-'}; Plan: ${uOvdPlan || '-'}; Komitmen: ${uKomitmen}`;
+
+        await supabaseClient.from("tr_visit_unit_check").update({
+          status_keberadaan: uAda,
+          kondisi_unit: uGpsMatch,
+          catatan_unit: constructedNotes
+        }).eq("check_id", checkId);
       }
 
     } else if (type === "ONBOARDING") {
