@@ -2635,6 +2635,12 @@ async function handleOnboardingSubmit(e) {
 // =========================================================================
 let CURRENT_GPS_FILTERED_VEHICLES = [];
 
+function isUnitContractLive(v) {
+  if (!v) return false;
+  const status = String(v.contract_status || "").trim().toUpperCase();
+  return status.includes("LIVE");
+}
+
 function isUnitGpsInstalled(v) {
   if (!v) return false;
   const imei = String(v.imei || v.imei_gps || "").replace(/\D/g, "").trim();
@@ -2667,8 +2673,8 @@ function getEligibleGpsDealers(actType) {
       // Hanya mitra yang memiliki unit dengan GPS TERPASANG
       return vehicles.some(v => isUnitGpsInstalled(v));
     } else if (actType === "Pasang GPS" || actType === "Pasang Baru") {
-      // Hanya mitra yang memiliki unit dengan GPS BELUM TERPASANG & TIDAK DIPASANG
-      return vehicles.some(v => !isUnitGpsInstalled(v));
+      // Hanya mitra yang memiliki unit LIVE dengan GPS BELUM TERPASANG & TIDAK DIPASANG
+      return vehicles.some(v => isUnitContractLive(v) && !isUnitGpsInstalled(v));
     }
     return true;
   });
@@ -2744,7 +2750,7 @@ function renderGpsDealerSearchDropdown(query = "") {
     const vehicles = APP_STATE.masterVehiclesGps[d.dealer_id] || d.units || [];
     const matchingUnits = vehicles.filter(v => {
       if (actType === "Ganti GPS" || actType === "Cabut GPS") return isUnitGpsInstalled(v);
-      return !isUnitGpsInstalled(v);
+      return isUnitContractLive(v) && !isUnitGpsInstalled(v);
     });
 
     item.innerHTML = `
@@ -2904,8 +2910,8 @@ function filterVehiclesByActivity(dealerId, actType) {
     // Unit dengan GPS TERPASANG
     filtered = allVehicles.filter(v => isUnitGpsInstalled(v));
   } else if (actType === "Pasang GPS" || actType === "Pasang Baru") {
-    // Unit dengan GPS BELUM TERPASANG & TIDAK DIPASANG
-    filtered = allVehicles.filter(v => !isUnitGpsInstalled(v));
+    // Unit LIVE dengan GPS BELUM TERPASANG & TIDAK DIPASANG
+    filtered = allVehicles.filter(v => isUnitContractLive(v) && !isUnitGpsInstalled(v));
   }
 
   CURRENT_GPS_FILTERED_VEHICLES = filtered;
