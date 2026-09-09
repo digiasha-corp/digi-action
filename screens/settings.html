@@ -25,6 +25,9 @@
     <button type="button" id="tab-btn-gps" onclick="switchSettingsTab('gps')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
       <i class="fa-solid fa-satellite-dish mr-1 text-cyan-600"></i> Stok GPS
     </button>
+    <button type="button" id="tab-btn-role" onclick="switchSettingsTab('role')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
+      <i class="fa-solid fa-shield-halved mr-1 text-purple-600"></i> Role & Akses
+    </button>
   </div>
 
   <!-- ================= TAB 1: KARYAWAN & AKUN ================= -->
@@ -115,6 +118,28 @@
     <div id="gps-settings-list-container" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
       <div class="p-8 text-center text-xs text-slate-400">
         <i class="fa-solid fa-circle-notch fa-spin text-base text-cyan-600 mb-1 block"></i> Memuat stok GPS...
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TAB 5: ROLE & HAK AKSES MODUL ================= -->
+  <div id="settings-tab-role" class="space-y-3 hidden">
+    <div class="flex items-center justify-between gap-2 bg-purple-50/70 border border-purple-200 p-3 rounded-2xl">
+      <div>
+        <h4 class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-halved text-purple-600"></i> Matriks Hak Akses Modul
+        </h4>
+        <p class="text-[10px] text-purple-700">Tentukan menu dan fitur yang dapat diakses oleh masing-masing Role</p>
+      </div>
+      <button type="button" onclick="resetRolePermissionsToDefault()" class="px-2.5 py-1.5 bg-white hover:bg-purple-100 text-purple-700 rounded-xl text-[10px] font-bold border border-purple-300 shadow-2xs transition shrink-0 flex items-center space-x-1">
+        <i class="fa-solid fa-rotate-left"></i>
+        <span>Reset Default</span>
+      </button>
+    </div>
+
+    <div id="role-matrix-container" class="space-y-3">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-purple-600 mb-1 block"></i> Memuat matriks hak akses role...
       </div>
     </div>
   </div>

@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260909_v20";
+const APP_BUILD_VERSION = "20260909_v21";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -14,19 +14,96 @@ let CURRENT_USER = (() => {
   }
 })();
 
-// Hak Akses Modul per Role (Mendukung ID DB R-01 s/d R-04 dan Dynamic DB Permissions)
+// Definisi Matriks Role & Hak Akses Standar
+const DEFAULT_ROLE_PERMISSIONS = {
+  "R-01": {
+    name: "Super Admin",
+    icon: "fa-crown",
+    color: "purple",
+    badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
+    desc: "Akses penuh seluruh modul, kelola karyawan, area mitra, geofence, dan parameter sistem.",
+    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"]
+  },
+  "R-02": {
+    name: "Branch Manager / Supervisor",
+    icon: "fa-user-tie",
+    color: "blue",
+    badgeBg: "bg-blue-100 text-blue-800 border border-blue-200",
+    desc: "Monitoring cabang, kelola prioritas, penugasan concern, kunjungan mitra & calon mitra, serta pipeline.",
+    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history"]
+  },
+  "R-03": {
+    name: "FAC Officer",
+    icon: "fa-satellite-dish",
+    color: "cyan",
+    badgeBg: "bg-cyan-100 text-cyan-800 border border-cyan-200",
+    desc: "Monitoring dan operasional GPS armada dealer, penanganan unit bermasalah, dan laporan berkala FAC.",
+    permissions: ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history"]
+  },
+  "R-04": {
+    name: "Field PIC",
+    icon: "fa-person-walking",
+    color: "emerald",
+    badgeBg: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+    desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, dan cek GPS.",
+    permissions: ["priority", "visit", "onboarding", "pipeline", "gps", "history"]
+  }
+};
+
+const ALL_APP_MODULES = [
+  { key: "priority", title: "Priority Visit", desc: "Scorecard & prioritas mitra", icon: "fa-triangle-exclamation" },
+  { key: "assignment", title: "Assign Concern", desc: "Tandai concern visit mitra", icon: "fa-bullhorn" },
+  { key: "visit", title: "Laporan Visit Mitra", desc: "Input regular & unit OVD", icon: "fa-clipboard-check" },
+  { key: "onboarding", title: "Visit Calon Mitra", desc: "Input onboarding baru", icon: "fa-user-plus" },
+  { key: "pipeline", title: "Pipeline Onboarding", desc: "Progres & folder dokumen", icon: "fa-bars-progress" },
+  { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish" },
+  { key: "fac", title: "Laporan GPS (FAC)", desc: "Monitoring sinyal harian", icon: "fa-tower-broadcast" },
+  { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left" },
+  { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area & GPS", icon: "fa-sliders" }
+];
+
+let ROLE_PERMISSIONS_STATE = (() => {
+  try {
+    const saved = localStorage.getItem("DIGIASHA_ROLE_PERMS");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const merged = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
+      Object.keys(parsed).forEach(k => {
+        if (merged[k]) merged[k].permissions = parsed[k].permissions || merged[k].permissions;
+      });
+      return merged;
+    }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
+})();
+
+function getPermissionsForRole(roleKey, userObj = null) {
+  if (userObj && Array.isArray(userObj.permissions) && userObj.permissions.length > 0) {
+    return userObj.permissions;
+  }
+  const roleId = String(userObj?.role_id || roleKey || "").trim();
+  const roleName = String(userObj?.role || userObj?.jabatan || roleKey || "").trim();
+
+  if (ROLE_PERMISSIONS_STATE[roleId]) return ROLE_PERMISSIONS_STATE[roleId].permissions;
+  const match = Object.values(ROLE_PERMISSIONS_STATE).find(r => r.name.toLowerCase() === roleName.toLowerCase() || r.name.toLowerCase().includes(roleName.toLowerCase()));
+  if (match) return match.permissions;
+
+  return ["priority", "visit", "onboarding", "pipeline", "gps", "history"];
+}
+
+// Hak Akses Modul per Role (Legacy Fallback)
 const ROLE_PERMISSIONS = {
-  "Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"],
-  "R-01": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"],
-  "Super Admin": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"],
-  "Supervisor": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
-  "Branch Manager": ["priority", "assignment", "visit", "onboarding", "gps"],
-  "R-02": ["priority", "assignment", "visit", "onboarding", "gps"],
-  "FAC": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
-  "R-03": ["priority", "assignment", "visit", "onboarding", "gps", "fac"],
+  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"],
+  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"],
+  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"],
+  "Supervisor": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history"],
+  "Branch Manager": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history"],
+  "R-02": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history"],
+  "FAC": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history"],
+  "R-03": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history"],
   "Other": ["priority"],
-  "R-04": ["priority"],
-  "Field PIC": ["priority", "visit", "onboarding", "gps"]
+  "R-04": ["priority", "visit", "onboarding", "pipeline", "gps", "history"],
+  "Field PIC": ["priority", "visit", "onboarding", "pipeline", "gps", "history"]
 };
 
 // Data Kantor untuk Geofencing Presensi (Sinkron Dinamis dengan Sheet M_WORK_LOCATION)
@@ -863,11 +940,9 @@ function initDashboard() {
   const roleEl = document.getElementById("badge-role");
   if (roleEl) roleEl.innerText = uRole;
 
-  const perms = (Array.isArray(CURRENT_USER.permissions) && CURRENT_USER.permissions.length > 0)
-    ? CURRENT_USER.permissions
-    : (ROLE_PERMISSIONS[uRole] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"]);
+  const perms = getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER);
 
-  ["priority", "assignment", "visit", "onboarding", "gps", "fac", "settings"].forEach(key => {
+  ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) btn.style.display = perms.includes(key) ? "flex" : "none";
   });
@@ -3940,10 +4015,11 @@ function initSettingsScreen() {
   loadDealerSettings();
   loadOfficeLocationsForSettings();
   loadGpsInventoryForSettings();
+  loadRolePermissionsSettings();
 }
 
 function switchSettingsTab(tab) {
-  const tabs = ["emp", "dealer", "office", "gps"];
+  const tabs = ["emp", "dealer", "office", "gps", "role"];
   tabs.forEach(t => {
     const el = document.getElementById(`settings-tab-${t}`);
     const btn = document.getElementById(`tab-btn-${t}`);
@@ -3959,6 +4035,9 @@ function switchSettingsTab(tab) {
       }
     }
   });
+  if (tab === "role") {
+    loadRolePermissionsSettings();
+  }
 }
 
 // ---------------- TAB 1: KARYAWAN & AKUN ----------------
@@ -4610,7 +4689,91 @@ async function saveNewGpsDevice() {
   }
 }
 
+// ---------------- TAB 5: ROLE & HAK AKSES MODUL ----------------
+function loadRolePermissionsSettings() {
+  const container = document.getElementById("role-matrix-container");
+  if (!container) return;
 
+  const roleKeys = Object.keys(ROLE_PERMISSIONS_STATE);
+  
+  container.innerHTML = roleKeys.map(roleId => {
+    const role = ROLE_PERMISSIONS_STATE[roleId];
+    const rolePerms = role.permissions || [];
+
+    const modulesHtml = ALL_APP_MODULES.map(mod => {
+      const isChecked = rolePerms.includes(mod.key);
+      return `
+        <label class="flex items-start space-x-2.5 p-2.5 bg-slate-50 hover:bg-purple-50/50 rounded-xl border border-slate-200 hover:border-purple-300 cursor-pointer transition select-none">
+          <input type="checkbox" name="role_perm_${roleId}" value="${mod.key}" ${isChecked ? 'checked' : ''} class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer" />
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
+              <span class="text-xs font-bold text-slate-800">${mod.title}</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
+          </div>
+        </label>
+      `;
+    }).join('');
+
+    return `
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 flex-wrap gap-2">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-base shrink-0">
+              <i class="fa-solid ${role.icon}"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-slate-900">${role.name}</span>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${role.badgeBg}">${roleId}</span>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-0.5">${role.desc}</p>
+            </div>
+          </div>
+          <button type="button" onclick="saveRolePermissions('${roleId}')" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center space-x-1.5 transition shrink-0">
+            <i class="fa-solid fa-floppy-disk text-xs"></i>
+            <span>Simpan Hak Akses</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          ${modulesHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function saveRolePermissions(roleId) {
+  const checkboxes = document.querySelectorAll(`input[name="role_perm_${roleId}"]:checked`);
+  const selected = Array.from(checkboxes).map(cb => cb.value);
+
+  if (!ROLE_PERMISSIONS_STATE[roleId]) return;
+  ROLE_PERMISSIONS_STATE[roleId].permissions = selected;
+
+  try {
+    localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+    showToast(`Hak akses ${ROLE_PERMISSIONS_STATE[roleId].name} (${roleId}) berhasil disimpan!`, "success", 2000);
+
+    // If current logged-in user is under this role, sync and update dashboard immediately
+    const uRole = CURRENT_USER?.role || CURRENT_USER?.role_id;
+    if (uRole === roleId || CURRENT_USER?.role_id === roleId || (CURRENT_USER?.jabatan && CURRENT_USER.jabatan.includes(ROLE_PERMISSIONS_STATE[roleId].name))) {
+      CURRENT_USER.permissions = selected;
+      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+    }
+  } catch (err) {
+    alert("Gagal menyimpan hak akses role: " + err.message);
+  }
+}
+
+function resetRolePermissionsToDefault() {
+  if (!confirm("Kembalikan seluruh konfigurasi hak akses role ke pengaturan default sistem?")) return;
+  ROLE_PERMISSIONS_STATE = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
+  localStorage.removeItem("DIGIASHA_ROLE_PERMS");
+  loadRolePermissionsSettings();
+  showToast("Hak akses seluruh role telah dikembalikan ke default!", "success", 2000);
+}
 
 // =========================================================================
 // APP INITIALIZATION & GLOBAL EVENT LISTENERS
