@@ -76,10 +76,44 @@ function upsertToSupabase(tableName, payloadArray, onConflict) {
 }
 
 /**
+ * DIAGNOSA HEADER & KOLOM HR SPREADSHEET
+ * Jalankan fungsi ini di Apps Script untuk melihat nama & index semua kolom di Spreadsheet HR
+ */
+function debugCheckHrColumns() {
+  Logger.log("=== CEK HEADER & SAMPLE DATA SPREADSHEET HR ===");
+  const ss = SpreadsheetApp.openById(PERIODIC_SYNC_CONFIG.HR_SOURCE_ID);
+  const sheets = ss.getSheets();
+  let sheet = sheets.find(s => String(s.getSheetId()) === PERIODIC_SYNC_CONFIG.HR_SHEET_GID) || sheets[0];
+  if (!sheet) {
+    Logger.log("Sheet HR tidak ditemukan!");
+    return;
+  }
+  
+  const values = sheet.getRange(1, 1, Math.min(sheet.getLastRow(), 5), sheet.getLastColumn()).getValues();
+  if (values.length < 1) {
+    Logger.log("Sheet kosong!");
+    return;
+  }
+
+  const headers = values[0];
+  const sampleRow = values.length > 1 ? values[1] : [];
+  
+  Logger.log("DAFTAR KOLOM HR:");
+  for (let c = 0; c < headers.length; c++) {
+    const colLetter = String.fromCharCode(65 + (c % 26)); // A, B, C...
+    const colPrefix = c >= 26 ? String.fromCharCode(65 + Math.floor(c / 26) - 1) : "";
+    const colName = colPrefix + colLetter;
+    const headerTitle = headers[c];
+    const sampleVal = sampleRow[c];
+    Logger.log(`Kolom ${colName} (Index ${c}) => Header: "${headerTitle}" | Contoh Data: "${sampleVal}"`);
+  }
+}
+
+/**
  * 1. SINKRONISASI DATA HR (KARYAWAN)
  * Mapping Kolom Sumber HR:
  * - NO ID (NIP): Kolom F (Index 5) -> Wajib ada
- * - Nama Lengkap: Kolom B (Index 1)
+ * - Nama Lengkap: Kolom G (Index 6)
  * - Jabatan: Kolom P (Index 15)
  * - Cabang: Kolom Q (Index 16)
  * - Email: Kolom N (Index 13)
@@ -110,9 +144,11 @@ function syncHrEmployeesFromSource() {
       continue;
     }
 
-    const nama = String(r[1] || nip).trim();       // Kolom B (Index 1)
+    // Kolom G = NAMA KARYAWAN (Index 6)
+    const nama = String(r[6] || "").trim() || nip;
+
     const emailRaw = String(r[13] || "").trim();   // Kolom N (Index 13)
-    const email = emailRaw || `${nip}@digiasha.com`;
+    const email = (emailRaw && emailRaw.includes("@")) ? emailRaw : `${nip}@digiasha.com`;
     const jabatan = String(r[15] || "").trim();    // Kolom P (Index 15)
     const cabang = String(r[16] || "Head Office").trim(); // Kolom Q (Index 16)
 
