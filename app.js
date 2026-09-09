@@ -4234,8 +4234,17 @@ document.addEventListener("click", (e) => {
 // RIWAYAT AKTIVITAS PIC & SAME-DAY PROTECTED EDIT CONTROLLER
 // =========================================================================
 let HISTORY_TYPE_FILTER = "ALL"; // "ALL" | "VISIT" | "ONBOARDING" | "GPS"
-let HISTORY_DATE_FILTER = "TODAY"; // "TODAY" | "7DAYS" | "30DAYS" | "ALL"
+let HISTORY_START_DATE = "";
+let HISTORY_END_DATE = "";
 let CACHED_HISTORY_DATA = [];
+
+function getLocalDateString(d) {
+  if (!d || isNaN(d.getTime())) return "";
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${yr}-${mo}-${da}`;
+}
 
 function isTodayRecord(dateStr) {
   if (!dateStr) return false;
@@ -4263,9 +4272,39 @@ function formatDisplayDate(dateStr) {
 }
 
 function initHistory() {
+  const todayStr = getLocalDateString(new Date());
+  HISTORY_START_DATE = todayStr;
+  HISTORY_END_DATE = todayStr;
+
+  const startInput = document.getElementById("history-start-date");
+  const endInput = document.getElementById("history-end-date");
+  if (startInput) startInput.value = todayStr;
+  if (endInput) endInput.value = todayStr;
+
   setHistoryTypeFilter(HISTORY_TYPE_FILTER);
-  setHistoryDateFilter(HISTORY_DATE_FILTER);
   loadActivityHistory();
+}
+
+function setHistoryTodayDate() {
+  const todayStr = getLocalDateString(new Date());
+  HISTORY_START_DATE = todayStr;
+  HISTORY_END_DATE = todayStr;
+
+  const startInput = document.getElementById("history-start-date");
+  const endInput = document.getElementById("history-end-date");
+  if (startInput) startInput.value = todayStr;
+  if (endInput) endInput.value = todayStr;
+
+  renderHistoryList();
+}
+
+function handleHistoryDateRangeChange() {
+  const startInput = document.getElementById("history-start-date");
+  const endInput = document.getElementById("history-end-date");
+  if (startInput) HISTORY_START_DATE = startInput.value;
+  if (endInput) HISTORY_END_DATE = endInput.value;
+
+  renderHistoryList();
 }
 
 function setHistoryTypeFilter(type) {
@@ -4279,23 +4318,6 @@ function setHistoryTypeFilter(type) {
         btn.className = "py-1.5 px-1 rounded-xl bg-slate-900 text-white text-center shadow-xs transition truncate font-bold";
       } else {
         btn.className = "py-1.5 px-1 rounded-xl bg-slate-200 text-slate-700 text-center hover:bg-slate-300 transition truncate font-bold";
-      }
-    }
-  });
-  renderHistoryList();
-}
-
-function setHistoryDateFilter(range) {
-  HISTORY_DATE_FILTER = range;
-  const ranges = ["today", "7days", "30days", "all"];
-  const rangeMap = { TODAY: "today", "7DAYS": "7days", "30DAYS": "30days", ALL: "all" };
-  ranges.forEach(r => {
-    const btn = document.getElementById(`h-date-${r}`);
-    if (btn) {
-      if (r === rangeMap[range]) {
-        btn.className = "flex-1 py-1.5 rounded-xl bg-emerald-600 text-white shadow-xs transition font-bold";
-      } else {
-        btn.className = "flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition font-bold";
       }
     }
   });
@@ -4424,16 +4446,15 @@ function renderHistoryList() {
     filtered = filtered.filter(item => item.type === HISTORY_TYPE_FILTER);
   }
 
-  // Filter Date Range
-  const now = new Date();
-  if (HISTORY_DATE_FILTER === "TODAY") {
-    filtered = filtered.filter(item => item.isToday);
-  } else if (HISTORY_DATE_FILTER === "7DAYS") {
-    const cutoff7 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
-    filtered = filtered.filter(item => (item.dateObj.getTime() || 0) >= cutoff7);
-  } else if (HISTORY_DATE_FILTER === "30DAYS") {
-    const cutoff30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).getTime();
-    filtered = filtered.filter(item => (item.dateObj.getTime() || 0) >= cutoff30);
+  // Filter Date Range (Start & End Date)
+  if (HISTORY_START_DATE || HISTORY_END_DATE) {
+    filtered = filtered.filter(item => {
+      const itemDateStr = getLocalDateString(item.dateObj);
+      if (!itemDateStr) return false;
+      if (HISTORY_START_DATE && itemDateStr < HISTORY_START_DATE) return false;
+      if (HISTORY_END_DATE && itemDateStr > HISTORY_END_DATE) return false;
+      return true;
+    });
   }
 
   if (filtered.length === 0) {

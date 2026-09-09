@@ -34,13 +34,27 @@
     </div>
   </div>
 
-  <!-- Filter Kurun Waktu -->
-  <div class="flex items-center justify-between gap-2 pt-0.5">
-    <div class="flex space-x-1 text-[10px] font-bold flex-1">
-      <button type="button" onclick="setHistoryDateFilter('TODAY')" id="h-date-today" class="flex-1 py-1.5 rounded-xl bg-emerald-600 text-white shadow-xs transition">Hari Ini</button>
-      <button type="button" onclick="setHistoryDateFilter('7DAYS')" id="h-date-7days" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition">7 Hari</button>
-      <button type="button" onclick="setHistoryDateFilter('30DAYS')" id="h-date-30days" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition">30 Hari</button>
-      <button type="button" onclick="setHistoryDateFilter('ALL')" id="h-date-all" class="flex-1 py-1.5 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition">Semua</button>
+  <!-- Filter Rentang Tanggal -->
+  <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
+    <div class="flex items-center justify-between">
+      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1.5">
+        <i class="fa-regular fa-calendar text-slate-400"></i>
+        <span>Rentang Tanggal</span>
+      </span>
+      <button type="button" onclick="setHistoryTodayDate()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 transition flex items-center space-x-1">
+        <i class="fa-solid fa-rotate-left text-[9px]"></i>
+        <span>Hari Ini</span>
+      </button>
+    </div>
+    <div class="grid grid-cols-2 gap-2 text-xs">
+      <div>
+        <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Dari Tanggal:</label>
+        <input type="date" id="history-start-date" onchange="handleHistoryDateRangeChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800 focus:bg-white" />
+      </div>
+      <div>
+        <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Sampai Tanggal:</label>
+        <input type="date" id="history-end-date" onchange="handleHistoryDateRangeChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800 focus:bg-white" />
+      </div>
     </div>
   </div>
 
