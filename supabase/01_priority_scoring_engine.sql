@@ -245,6 +245,10 @@ BEGIN
 END;
 $$;
 
+-- Drop trigger lama jika ada agar bisa di-run berulang kali
+DROP TRIGGER IF EXISTS trg_recalc_on_assignment ON t_assignment;
+DROP TRIGGER IF EXISTS trg_recalc_on_visit ON tr_laporan_visit;
+
 -- Trigger Realtime t_assignment
 CREATE TRIGGER trg_recalc_on_assignment
 AFTER INSERT OR UPDATE OR DELETE ON t_assignment
