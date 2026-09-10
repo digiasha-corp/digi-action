@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v25";
+const APP_BUILD_VERSION = "20260910_v26";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -282,7 +282,7 @@ async function supabaseLogin(identifier, password) {
       area_cover: user.area_cover || "",
       role: roleNameMap[user.role_id] || user.role_id || "Field PIC",
       role_id: user.role_id,
-      status_ganti_pass: user.status_ganti_pass,
+      status_ganti_pass: user.status_ganti_pass === true || String(user.status_ganti_pass).toLowerCase() === "true",
       permissions: permissions
     }
   };
@@ -792,6 +792,12 @@ async function loadScreen(screenName) {
     screenName = "login";
   }
 
+  // Force Password Change Guard: Jika user wajib ganti password, cegah buka screen lain
+  if (CURRENT_USER && (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") && screenName !== "login") {
+    openForceChangePassModal();
+    return;
+  }
+
   if (screenName === "login") {
     topbar.classList.add("hidden");
   } else {
@@ -909,6 +915,11 @@ async function handleLoginSubmit(e) {
       localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(res.user));
     } catch (err) {}
 
+    if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
+      openForceChangePassModal();
+      return;
+    }
+
     loadScreen("dashboard");
     syncMasterDataFromApi();
   } catch (err) {
@@ -921,6 +932,7 @@ async function handleLoginSubmit(e) {
 function handleLogout() {
   localStorage.removeItem("DIGIASHA_AUTH_USER");
   CURRENT_USER = null;
+  closeForceChangePassModal();
   loadScreen("login");
 }
 
@@ -4203,6 +4215,9 @@ async function handleSaveEmployee(e) {
     const existingEmp = (typeof SETTINGS_EMPLOYEES_DATA !== "undefined" ? SETTINGS_EMPLOYEES_DATA.find(x => String(x.nip).trim() === nip) : null) || 
                         (APP_STATE.employees ? APP_STATE.employees.find(x => String(x.nip).trim() === nip) : null);
 
+    // Jika karyawan baru ATAU admin mengisi/mereset password di kolom input, set status_ganti_pass = true
+    const shouldRequirePasswordChange = pass ? true : (existingEmp ? (existingEmp.status_ganti_pass === true || String(existingEmp.status_ganti_pass).toLowerCase() === "true") : true);
+
     const payload = {
       nip: nip,
       nama_lengkap: nama,
@@ -4212,6 +4227,7 @@ async function handleSaveEmployee(e) {
       area_cover: areaCover,
       status_aktif: status,
       password_hash: pass || existingEmp?.password_hash || "Password123!",
+      status_ganti_pass: shouldRequirePasswordChange,
       updated_at: new Date().toISOString()
     };
 
@@ -6297,12 +6313,95 @@ function closeImageViewer() {
 }
 
 // =========================================================================
+// FORCE CHANGE PASSWORD CONTROLLER (FIRST LOGIN / RESET TRIGGER)
+// =========================================================================
+function openForceChangePassModal() {
+  const modal = document.getElementById("modal-force-change-pass");
+  if (modal) {
+    modal.classList.remove("hidden");
+    const inputNew = document.getElementById("force-new-pass");
+    const inputConf = document.getElementById("force-confirm-pass");
+    if (inputNew) inputNew.value = "";
+    if (inputConf) inputConf.value = "";
+  }
+}
+
+function closeForceChangePassModal() {
+  const modal = document.getElementById("modal-force-change-pass");
+  if (modal) modal.classList.add("hidden");
+}
+
+async function handleForceChangePasswordSubmit(e) {
+  e.preventDefault();
+  if (!CURRENT_USER) return;
+  const newPass = document.getElementById("force-new-pass")?.value.trim();
+  const confirmPass = document.getElementById("force-confirm-pass")?.value.trim();
+
+  if (!newPass || !confirmPass) {
+    alert("Silakan masukkan kata sandi baru dan konfirmasi kata sandi!");
+    return;
+  }
+  if (newPass.length < 6) {
+    alert("Kata sandi baru minimal harus 6 karakter!");
+    return;
+  }
+  if (newPass === "Password123!") {
+    alert("Kata sandi baru tidak boleh sama dengan kata sandi default (Password123!). Buatlah kata sandi pribadi yang aman.");
+    return;
+  }
+  if (newPass !== confirmPass) {
+    alert("Konfirmasi kata sandi tidak cocok! Silakan periksa kembali.");
+    return;
+  }
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const origText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan sandi baru...';
+  submitBtn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_employee")
+        .update({
+          password_hash: newPass,
+          status_ganti_pass: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq("nip", CURRENT_USER.nip);
+      if (error) throw error;
+    }
+
+    CURRENT_USER.status_ganti_pass = false;
+    try {
+      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+    } catch (err) {}
+
+    closeForceChangePassModal();
+    alert("Kata sandi berhasil diperbarui! Selamat datang di Digiasha Monitoring.");
+    loadScreen("dashboard");
+    syncMasterDataFromApi();
+  } catch (err) {
+    console.error("Gagal update kata sandi:", err);
+    alert("Gagal memperbarui kata sandi: " + err.message);
+  } finally {
+    submitBtn.innerHTML = origText;
+    submitBtn.disabled = false;
+  }
+}
+
+// =========================================================================
 // APP BOOTSTRAP / INITIALIZATION
 // =========================================================================
 function initAppBootstrap() {
   if (CURRENT_USER) {
-    loadScreen("dashboard");
-    syncMasterDataFromApi();
+    if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
+      loadScreen("login");
+      openForceChangePassModal();
+    } else {
+      loadScreen("dashboard");
+      syncMasterDataFromApi();
+    }
   } else {
     loadScreen("login");
   }
