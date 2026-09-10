@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v31";
+const APP_BUILD_VERSION = "20260910_v32";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -3259,12 +3259,102 @@ function triggerFolderModalUpload() {
   if (inp) inp.click();
 }
 
+let HIST_ACTIVE_ONB_DOCS = {};
+
+function initHistOnbDocuments(documents) {
+  HIST_ACTIVE_ONB_DOCS = {};
+  if (Array.isArray(documents)) {
+    documents.forEach(doc => {
+      if (doc.key && doc.files && doc.files.length > 0) {
+        HIST_ACTIVE_ONB_DOCS[doc.key] = {
+          title: doc.title || doc.key,
+          files: [...doc.files]
+        };
+      }
+    });
+  }
+}
+
+function updateHistOnbDocCounter() {
+  const counter = document.getElementById("hist-onb-doc-total-badge");
+  if (!counter) return;
+  const docKeys = Object.keys(HIST_ACTIVE_ONB_DOCS);
+  let totalFiles = 0;
+  docKeys.forEach(k => {
+    if (HIST_ACTIVE_ONB_DOCS[k]?.files) totalFiles += HIST_ACTIVE_ONB_DOCS[k].files.length;
+  });
+  counter.innerText = `${totalFiles} Berkas`;
+}
+
+function renderHistDocScorecardBadge(docKey) {
+  const badge = document.getElementById(`hist-badge-count-${docKey}`);
+  const card = document.getElementById(`hist-card-doc-${docKey}`);
+  const docObj = HIST_ACTIVE_ONB_DOCS[docKey];
+  const count = (docObj && docObj.files) ? docObj.files.length : 0;
+  if (count === 0) {
+    if (badge) {
+      badge.innerText = "0";
+      badge.classList.add("hidden");
+    }
+    if (card) {
+      card.classList.remove("bg-teal-50/80", "border-teal-400");
+      card.classList.add("bg-white", "border-slate-200");
+    }
+  } else {
+    if (badge) {
+      badge.innerText = `${count}`;
+      badge.classList.remove("hidden");
+    }
+    if (card) {
+      card.classList.remove("bg-white", "border-slate-200");
+      card.classList.add("bg-teal-50/80", "border-teal-400");
+    }
+  }
+  updateHistOnbDocCounter();
+}
+
+function toggleHistOnbJenisUsaha(val) {
+  const boxDealer = document.getElementById("box-hist-onb-dealer");
+  const boxLainnya = document.getElementById("box-hist-onb-lainnya");
+  if (val === "Dealer") {
+    if (boxDealer) boxDealer.classList.remove("hidden");
+    if (boxLainnya) boxLainnya.classList.add("hidden");
+  } else {
+    if (boxDealer) boxDealer.classList.add("hidden");
+    if (boxLainnya) boxLainnya.classList.remove("hidden");
+  }
+}
+
 async function handleFolderModalFilesSelected(input) {
   if (!ACTIVE_FOLDER_MODAL_DOC || !input.files || input.files.length === 0) return;
   const { key, title, context } = ACTIVE_FOLDER_MODAL_DOC;
 
   if (context === "onboarding") {
     await handleDocMultiFilesSelected(input, key, title);
+  } else if (context === "history_onboarding") {
+    if (!HIST_ACTIVE_ONB_DOCS[key]) {
+      HIST_ACTIVE_ONB_DOCS[key] = { title: title, files: [] };
+    }
+    const existingCount = HIST_ACTIVE_ONB_DOCS[key].files.length;
+    for (let i = 0; i < input.files.length; i++) {
+      const file = input.files[i];
+      let base64 = "";
+      if (file.type && file.type.startsWith("image/")) {
+        base64 = await compressImage(file, 1200, 0.75);
+      } else {
+        base64 = await readFileAsBase64(file);
+      }
+      const stdName = generateStandardDocFileName(title, existingCount + i + 1, file.name);
+      HIST_ACTIVE_ONB_DOCS[key].files.push({
+        name: stdName,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        base64: base64
+      });
+    }
+    input.value = "";
+    renderHistDocScorecardBadge(key);
+    renderDocFolderModalFilesList();
   } else if (context === "pipeline") {
     if (!PIPELINE_PENDING_UPLOADS[key]) PIPELINE_PENDING_UPLOADS[key] = [];
     const existingDoc = ACTIVE_PIPELINE_ITEM?.documents?.find(d => d.key === key || d.title === title);
@@ -3302,6 +3392,8 @@ function renderDocFolderModalFilesList() {
   let files = [];
   if (context === "onboarding") {
     files = (ONB_DOC_FILES[key]?.files || []).map((f, idx) => ({ ...f, idx, isPending: false, isLocal: true }));
+  } else if (context === "history_onboarding") {
+    files = (HIST_ACTIVE_ONB_DOCS[key]?.files || []).map((f, idx) => ({ ...f, idx, isPending: false, isLocal: true }));
   } else if (context === "pipeline") {
     const existingDoc = ACTIVE_PIPELINE_ITEM?.documents?.find(d => d.key === key || d.title === title);
     const existingFiles = (existingDoc?.files || []).map((f, idx) => ({ ...f, idx, isPending: false, isLocal: false }));
@@ -3357,6 +3449,14 @@ function renderDocFolderModalFilesList() {
 function removeFileFromFolderModal(docKey, fileIdx, isPending, context) {
   if (context === "onboarding") {
     removeDocFile(docKey, fileIdx);
+  } else if (context === "history_onboarding") {
+    if (HIST_ACTIVE_ONB_DOCS[docKey] && HIST_ACTIVE_ONB_DOCS[docKey].files) {
+      HIST_ACTIVE_ONB_DOCS[docKey].files.splice(fileIdx, 1);
+      if (HIST_ACTIVE_ONB_DOCS[docKey].files.length === 0) {
+        delete HIST_ACTIVE_ONB_DOCS[docKey];
+      }
+    }
+    renderHistDocScorecardBadge(docKey);
   } else if (context === "pipeline") {
     removePipelineDocFile(docKey, fileIdx, isPending);
   }
@@ -5673,27 +5773,30 @@ async function loadActivityHistory(forceRefresh = false) {
       raw: item
     }));
 
-    const onbLogs = (resOnb.data || []).map(item => ({
-      id: item.onboarding_id,
-      type: "ONBOARDING",
-      typeLabel: "Visit Calon Mitra",
-      icon: "fa-user-plus",
-      iconColor: "text-teal-600 bg-teal-50 border-teal-200",
-      title: item.dealer_name || item.owner_name || "Calon Mitra",
-      subtitle: `Owner: ${item.owner_name || '-'} • Kelayakan: ${item.survei_kelayakan || '-'}`,
-      notes: item.catatan_survey || "-",
-      createdAt: item.created_at,
-      dateObj: new Date(item.created_at),
-      isToday: isTodayRecord(item.created_at),
-      nip: item.nip,
-      lat: item.lokasi_lat,
-      long: item.lokasi_long,
-      photos: [
-        item.foto_ktp_url ? { label: "Foto KTP/Identitas", url: item.foto_ktp_url } : null,
-        item.foto_showroom_url && item.foto_showroom_url !== item.foto_ktp_url ? { label: "Foto Lokasi", url: item.foto_showroom_url } : null
-      ].filter(Boolean),
-      raw: item
-    }));
+    const onbLogs = (resOnb.data || []).map(item => {
+      const parsed = parseOnboardingRecord(item);
+      const selfieUrl = item.selfie_photo_url || item.foto_showroom_url || item.foto_ktp_url || null;
+      return {
+        id: item.onboarding_id,
+        type: "ONBOARDING",
+        typeLabel: "Visit Calon Mitra",
+        icon: "fa-user-plus",
+        iconColor: "text-teal-600 bg-teal-50 border-teal-200",
+        title: parsed.namaUsaha || parsed.namaPemohon || "Calon Mitra",
+        subtitle: `Pemohon: ${parsed.namaPemohon || '-'} • Tahapan: ${parsed.stages.join(' & ') || 'On-Process'}`,
+        notes: parsed.catatan || "-",
+        createdAt: item.created_at,
+        dateObj: new Date(item.created_at),
+        isToday: isTodayRecord(item.created_at),
+        nip: item.nip,
+        lat: item.lokasi_lat,
+        long: item.lokasi_long,
+        selfieUrl: selfieUrl,
+        photos: selfieUrl ? [{ label: "Foto Selfie Kunjungan", url: selfieUrl }] : [],
+        parsedOnb: parsed,
+        raw: item
+      };
+    });
 
     const gpsLogs = (resGps.data || []).map(item => ({
       id: item.maint_id,
@@ -5957,18 +6060,43 @@ async function openActivityDetailModal(type, id) {
 
   // 4. Photos (Read-Only Preview)
   const photosContainer = document.getElementById("dtl-hist-photos-container");
+  const photosSectionTitle = document.getElementById("hist-photos-section-title");
+
+  if (photosSectionTitle) {
+    photosSectionTitle.innerText = type === "ONBOARDING" ? "Foto Selfie Kunjungan" : "Foto Bukti Fisik Awal";
+  }
+
   if (photosContainer) {
-    if (item.photos && item.photos.length > 0) {
-      photosContainer.innerHTML = item.photos.map(p => `
-        <a href="${p.url}" target="_blank" class="block group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-2xs hover:opacity-90 transition">
-          <img src="${p.url}" alt="${p.label}" class="w-full h-full object-cover" />
-          <div class="absolute inset-x-0 bottom-0 bg-slate-900/70 backdrop-blur-xs text-white text-[9px] font-bold p-1 text-center truncate">
-            ${p.label}
-          </div>
-        </a>
-      `).join("");
+    if (type === "ONBOARDING") {
+      const selfieUrl = item.selfieUrl || (item.photos && item.photos[0] ? item.photos[0].url : null);
+      if (selfieUrl) {
+        photosContainer.className = "flex items-center justify-center p-1";
+        photosContainer.innerHTML = `
+          <a href="${selfieUrl}" target="_blank" class="block group relative rounded-2xl overflow-hidden border-2 border-slate-300 bg-slate-100 w-32 h-32 shadow-2xs hover:opacity-90 transition">
+            <img src="${selfieUrl}" alt="Selfie Kunjungan" class="w-full h-full object-cover" />
+            <div class="absolute inset-x-0 bottom-0 bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-bold py-1 text-center truncate">
+              <i class="fa-solid fa-camera mr-1"></i>Foto Selfie
+            </div>
+          </a>
+        `;
+      } else {
+        photosContainer.className = "grid grid-cols-3 gap-2";
+        photosContainer.innerHTML = '<div class="col-span-3 py-2 text-center text-[10px] text-slate-400 italic">Foto selfie tidak terlampir</div>';
+      }
     } else {
-      photosContainer.innerHTML = '<div class="col-span-3 py-2 text-center text-[10px] text-slate-400 italic">Tidak ada foto bukti terlampir</div>';
+      photosContainer.className = "grid grid-cols-3 gap-2";
+      if (item.photos && item.photos.length > 0) {
+        photosContainer.innerHTML = item.photos.map(p => `
+          <a href="${p.url}" target="_blank" class="block group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-2xs hover:opacity-90 transition">
+            <img src="${p.url}" alt="${p.label}" class="w-full h-full object-cover" />
+            <div class="absolute inset-x-0 bottom-0 bg-slate-900/70 backdrop-blur-xs text-white text-[9px] font-bold p-1 text-center truncate">
+              ${p.label}
+            </div>
+          </a>
+        `).join("");
+      } else {
+        photosContainer.innerHTML = '<div class="col-span-3 py-2 text-center text-[10px] text-slate-400 italic">Tidak ada foto bukti terlampir</div>';
+      }
     }
   }
 
@@ -6147,29 +6275,143 @@ async function openActivityDetailModal(type, id) {
     `;
   } else if (type === "ONBOARDING") {
     const raw = item.raw || {};
+    const parsed = item.parsedOnb || parseOnboardingRecord(raw);
+    initHistOnbDocuments(parsed.documents);
+
+    const isDealer = (parsed.jenisUsaha || "Dealer") === "Dealer";
+    let stokDealer = "0";
+    let lokasiDealer = "Jalan Utama";
+    let gambaranUsaha = "";
+    let stokLainnya = "0";
+
+    const detailUsaha = parsed.detailUsaha || "";
+    const matchStok = detailUsaha.match(/Stok Unit Showroom:\s*(\d+)/i);
+    if (matchStok) stokDealer = matchStok[1];
+    const matchLokasi = detailUsaha.match(/Lokasi Usaha:\s*([^•\n]+)/i);
+    if (matchLokasi) lokasiDealer = matchLokasi[1].trim();
+    const matchGambaran = detailUsaha.match(/Gambaran Usaha:\s*([^•\n]+)/i);
+    if (matchGambaran) gambaranUsaha = matchGambaran[1].trim();
+    const matchStokLain = detailUsaha.match(/Stok Barang\/Aset:\s*(\d+)/i);
+    if (matchStokLain) stokLainnya = matchStokLain[1];
+
+    const stages = parsed.stages || ["Penawaran"];
+
     fieldsContainer.innerHTML = `
-      <div class="space-y-3">
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Nama Pemohon / Owner:</label>
-          <input type="text" id="edit-onb-owner" value="${raw.owner_name || ''}" ${disabledAttr} />
+      <div class="space-y-3.5">
+        <!-- 1. Jenis Aktivitas -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+          <label class="block text-[11px] font-bold text-slate-800">1. Jenis Aktivitas (Bisa Pilih > 1):</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="p-2 bg-white rounded-xl border border-slate-200 text-center text-xs font-semibold flex items-center justify-center space-x-1.5 cursor-pointer">
+              <input type="checkbox" name="hist_onb_act_type" value="Penawaran" ${stages.includes('Penawaran') ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="rounded text-teal-700" />
+              <span>Penawaran</span>
+            </label>
+            <label class="p-2 bg-white rounded-xl border border-slate-200 text-center text-xs font-semibold flex items-center justify-center space-x-1.5 cursor-pointer">
+              <input type="checkbox" name="hist_onb_act_type" value="Coll Doc" ${stages.includes('Coll Doc') ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="rounded text-teal-700" />
+              <span>Coll Doc</span>
+            </label>
+            <label class="p-2 bg-white rounded-xl border border-slate-200 text-center text-xs font-semibold flex items-center justify-center space-x-1.5 cursor-pointer">
+              <input type="checkbox" name="hist_onb_act_type" value="Survey" ${stages.includes('Survey') ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="rounded text-teal-700" />
+              <span>Survey</span>
+            </label>
+          </div>
         </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Hasil Survei Kelayakan:</label>
-          <select id="edit-onb-kelayakan" ${disabledAttr}>
-            <option value="Layak Menjadi Mitra" ${raw.survei_kelayakan === 'Layak Menjadi Mitra' ? 'selected' : ''}>Layak Menjadi Mitra</option>
-            <option value="Pertimbangan Khusus" ${raw.survei_kelayakan === 'Pertimbangan Khusus' ? 'selected' : ''}>Pertimbangan Khusus</option>
-            <option value="Tidak Layak" ${raw.survei_kelayakan === 'Tidak Layak' ? 'selected' : ''}>Tidak Layak</option>
-            <option value="Follow-up Lanjutan" ${raw.survei_kelayakan === 'Follow-up Lanjutan' ? 'selected' : ''}>Follow-up Lanjutan</option>
-          </select>
+        <!-- 2. Profil Calon Mitra -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+          <label class="block text-[11px] font-bold text-slate-800">2. Profil Calon Mitra:</label>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Nama Pemohon <span class="text-red-500">*</span></label>
+            <input type="text" id="edit-onb-pemohon" value="${parsed.namaPemohon || ''}" ${disabledAttr} />
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Nama Tempat Usaha <span class="text-red-500">*</span></label>
+            <input type="text" id="edit-onb-usaha" value="${parsed.namaUsaha || ''}" ${disabledAttr} />
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Alamat Lengkap <span class="text-red-500">*</span></label>
+            <textarea id="edit-onb-alamat" rows="2" ${disabledAttr}>${parsed.alamat || ''}</textarea>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Jenis Usaha</label>
+            <select id="edit-onb-jenis-usaha" onchange="toggleHistOnbJenisUsaha(this.value)" ${disabledAttr}>
+              <option value="Dealer" ${isDealer ? 'selected' : ''}>Mitra (Showroom Mobil/Motor)</option>
+              <option value="Lainnya" ${!isDealer ? 'selected' : ''}>Lainnya (Sebutkan)</option>
+            </select>
+          </div>
+
+          <!-- Box Dealer Fields -->
+          <div id="box-hist-onb-dealer" class="${isDealer ? '' : 'hidden'} space-y-2">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Jumlah Stok Unit Showroom</label>
+              <input type="number" id="edit-onb-stok" min="0" value="${stokDealer}" ${disabledAttr} />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Lokasi Usaha</label>
+              <select id="edit-onb-lokasi" ${disabledAttr}>
+                <option value="Jalan Utama" ${lokasiDealer === 'Jalan Utama' ? 'selected' : ''}>Jalan Utama</option>
+                <option value="Bursa Otomotif / Sentra" ${lokasiDealer.includes('Bursa') ? 'selected' : ''}>Bursa Otomotif / Sentra Mobil</option>
+                <option value="Perkampungan" ${lokasiDealer === 'Perkampungan' ? 'selected' : ''}>Perkampungan</option>
+                <option value="Rumahan" ${lokasiDealer === 'Rumahan' ? 'selected' : ''}>Rumahan</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Box Lainnya Fields -->
+          <div id="box-hist-onb-lainnya" class="${!isDealer ? '' : 'hidden'} space-y-2">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Gambaran Usaha</label>
+              <textarea id="edit-onb-gambaran" rows="2" placeholder="Bidang bisnis..." ${disabledAttr}>${gambaranUsaha}</textarea>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Jumlah Stok Barang / Aset</label>
+              <input type="number" id="edit-onb-stok-lainnya" min="0" value="${stokLainnya}" ${disabledAttr} />
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Survei & Verifikasi Data:</label>
-          <textarea id="edit-onb-notes" rows="4" placeholder="Detail hasil survey calon mitra..." ${disabledAttr}>${raw.catatan_survey || ''}</textarea>
+        <!-- 3. Dokumen Terkumpulkan (15 Folders Scorecard) -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-[11px] font-bold text-slate-800">3. Berkas Dokumen Terkumpul:</label>
+            <span id="hist-onb-doc-total-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">0 Dokumen</span>
+          </div>
+          <p class="text-[10px] text-slate-400">Klik pada folder jenis dokumen untuk melihat atau mengunggah berkas.</p>
+
+          <div class="grid grid-cols-3 gap-2 pt-1" id="hist-onb-doc-grid">
+            ${ONBOARDING_DOC_MASTER.map(m => {
+              const docObj = HIST_ACTIVE_ONB_DOCS[m.key];
+              const count = docObj && docObj.files ? docObj.files.length : 0;
+              const hasFile = count > 0;
+              return `
+                <div onclick="openDocFolderModal('${m.key}', '${m.title}', 'history_onboarding')" class="relative flex flex-col items-center justify-between p-2 rounded-2xl border cursor-pointer text-center transition min-h-[92px] shadow-2xs ${hasFile ? 'bg-teal-50/80 border-teal-400' : 'bg-white border-slate-200 hover:border-slate-300'}" id="hist-card-doc-${m.key}">
+                  <span id="hist-badge-count-${m.key}" class="${hasFile ? '' : 'hidden'} absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 px-1 rounded-full bg-teal-700 text-white text-[9px] font-extrabold flex items-center justify-center border-2 border-white shadow-xs z-10">${count}</span>
+                  <div class="flex flex-col items-center pointer-events-none mt-1">
+                    <div class="w-7 h-7 rounded-xl ${hasFile ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600'} flex items-center justify-center text-xs mb-1">
+                      <i class="fa-solid ${m.icon}"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-800 leading-tight">${m.title}</span>
+                  </div>
+                  <span class="w-full mt-1.5 py-0.5 text-[8px] font-bold rounded ${hasFile ? 'text-teal-800 bg-teal-100' : 'text-slate-400 bg-slate-100'}">Folder</span>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+
+        <!-- 4. Hasil & Catatan Kunjungan -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1.5">
+          <label class="block text-[11px] font-bold text-slate-800">4. Catatan & Hasil Kunjungan:</label>
+          <textarea id="edit-onb-notes" rows="3" placeholder="Catatan hasil visit calon mitra..." ${disabledAttr}>${parsed.catatan || ''}</textarea>
         </div>
       </div>
     `;
+
+    updateHistOnbDocCounter();
   } else if (type === "GPS") {
     const raw = item.raw || {};
     fieldsContainer.innerHTML = `
@@ -6301,19 +6543,92 @@ async function handleSaveEditActivity(e) {
       }
 
     } else if (type === "ONBOARDING") {
-      const ownerName = document.getElementById("edit-onb-owner")?.value || "";
-      const kelayakan = document.getElementById("edit-onb-kelayakan")?.value || "";
-      const notes = document.getElementById("edit-onb-notes")?.value || "";
+      const actChecked = [];
+      document.querySelectorAll('input[name="hist_onb_act_type"]:checked').forEach(c => actChecked.push(c.value));
+      if (actChecked.length === 0) {
+        alert("Pilih minimal 1 jenis aktivitas (Penawaran, Coll Doc, atau Survey)!");
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span>Simpan Perubahan</span>';
+        }
+        return;
+      }
+
+      const namaPemohon = document.getElementById("edit-onb-pemohon")?.value.trim() || "";
+      const namaUsaha = document.getElementById("edit-onb-usaha")?.value.trim() || "";
+      const alamat = document.getElementById("edit-onb-alamat")?.value.trim() || "";
+      const jenisUsaha = document.getElementById("edit-onb-jenis-usaha")?.value || "Dealer";
+      let detailTambahan = "";
+
+      if (jenisUsaha === "Dealer") {
+        const kapasitas = document.getElementById("edit-onb-stok")?.value || "0";
+        const lokasi = document.getElementById("edit-onb-lokasi")?.value || "Jalan Utama";
+        detailTambahan = `• Stok Unit Showroom: ${kapasitas} Unit\n• Lokasi Usaha: ${lokasi}`;
+      } else {
+        const gambaran = document.getElementById("edit-onb-gambaran")?.value.trim() || "";
+        const stokLainnya = document.getElementById("edit-onb-stok-lainnya")?.value || "0";
+        detailTambahan = `• Gambaran Usaha: ${gambaran}\n• Stok Barang/Aset: ${stokLainnya} Unit`;
+      }
+
+      const catatanHasil = document.getElementById("edit-onb-notes")?.value.trim() || "";
+
+      // Format clean documents structure
+      const structuredDocs = [];
+      Object.keys(HIST_ACTIVE_ONB_DOCS).forEach(k => {
+        const docItem = HIST_ACTIVE_ONB_DOCS[k];
+        if (docItem && docItem.files && docItem.files.length > 0) {
+          structuredDocs.push({
+            key: k,
+            title: docItem.title,
+            files: docItem.files
+          });
+        }
+      });
+
+      const payloadMeta = {
+        stages: actChecked,
+        nama_pemohon: namaPemohon,
+        nama_usaha: namaUsaha,
+        alamat: alamat,
+        jenis_usaha: jenisUsaha,
+        detail_usaha: detailTambahan,
+        catatan: catatanHasil,
+        documents: structuredDocs
+      };
 
       const { error: onbErr } = await supabaseClient.from("tr_onboarding_log").update({
-        owner_name: ownerName,
-        survei_kelayakan: kelayakan,
-        catatan_survey: notes
+        owner_name: namaPemohon,
+        dealer_name: namaUsaha,
+        survei_kelayakan: actChecked.join(", "),
+        catatan_survey: JSON.stringify(payloadMeta)
       }).eq("onboarding_id", id);
 
       if (onbErr) throw onbErr;
 
     } else if (type === "GPS") {
+      const techNotes = document.getElementById("edit-gps-notes")?.value || "";
+
+      const { error: gpsErr } = await supabaseClient.from("tr_gps_maintenance").update({
+        catatan_teknis: techNotes
+      }).eq("maint_id", id);
+
+      if (gpsErr) throw gpsErr;
+    }
+
+    closeHistoryDetailModal();
+    alert("Perubahan laporan berhasil disimpan!");
+    await loadActivityHistory(true);
+
+  } catch (err) {
+    console.error("Error saving activity edit:", err);
+    alert("Gagal menyimpan perubahan: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span>Simpan Perubahan</span>';
+    }
+  }
+}
       const techNotes = document.getElementById("edit-gps-notes")?.value || "";
 
       const { error: gpsErr } = await supabaseClient.from("tr_gps_maintenance").update({
