@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260909_v24";
+const APP_BUILD_VERSION = "20260910_v25";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6294,4 +6294,22 @@ function closeImageViewer() {
   const img = document.getElementById("image-viewer-img");
   if (img) img.src = "";
   if (viewer) viewer.classList.add("hidden");
+}
+
+// =========================================================================
+// APP BOOTSTRAP / INITIALIZATION
+// =========================================================================
+function initAppBootstrap() {
+  if (CURRENT_USER) {
+    loadScreen("dashboard");
+    syncMasterDataFromApi();
+  } else {
+    loadScreen("login");
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAppBootstrap);
+} else {
+  initAppBootstrap();
 }
