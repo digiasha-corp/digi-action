@@ -147,7 +147,7 @@ function syncHrEmployeesFromSource() {
       area_cover: old?.area_cover || "",
       password_hash: old?.password_hash || "Password123!",
       role_id: old?.role_id || "R-04",
-      status_ganti_pass: old?.status_ganti_pass || false,
+      status_ganti_pass: old ? (old.status_ganti_pass === true || String(old.status_ganti_pass).toLowerCase() === "true") : true,
       status_aktif: old?.status_aktif || "AKTIF",
       updated_at: new Date().toISOString()
     });
