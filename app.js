@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v33";
+const APP_BUILD_VERSION = "20260910_v34";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -691,12 +691,26 @@ async function syncMasterDataFromApi() {
       // Hak Akses Berdasarkan Coverage Area:
       // Jika user Super Admin atau area_cover bernilai kosong / 'ALL' / '*', user dapat mengakses seluruh mitra.
       // Jika memiliki area_cover spesifik (mendukung multi-area dengan koma, misal: 'TNG-1, TNG-2'), lakukan filter scoping.
-      if (CURRENT_USER && CURRENT_USER.role !== "Super Admin" && CURRENT_USER.area_cover && CURRENT_USER.area_cover.trim() !== "" && CURRENT_USER.area_cover.trim().toUpperCase() !== "ALL" && CURRENT_USER.area_cover.trim() !== "*") {
-        const userAreas = CURRENT_USER.area_cover.split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
-        if (userAreas.length > 0) {
+      const isSuper = !CURRENT_USER || 
+        CURRENT_USER.role === "Super Admin" || 
+        CURRENT_USER.role_id === "R-01" || 
+        CURRENT_USER.role === "SUPERADMIN" || 
+        CURRENT_USER.role === "DIREKSI" || 
+        !CURRENT_USER.area_cover || 
+        CURRENT_USER.area_cover.trim() === "" || 
+        CURRENT_USER.area_cover.trim() === "*" || 
+        CURRENT_USER.area_cover.trim().toUpperCase() === "ALL";
+
+      if (CURRENT_USER && !isSuper) {
+        const userAreas = (CURRENT_USER.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+        const userBranch = String(CURRENT_USER.cabang || "").trim().toLowerCase();
+        if (userAreas.length > 0 || (userBranch && userBranch !== "head office")) {
           rawDealers = rawDealers.filter(d => {
             const dArea = String(d.area_cover || "").trim().toLowerCase();
-            return dArea && userAreas.includes(dArea);
+            const dBranch = String(d.cabang || "").trim().toLowerCase();
+            const matchArea = userAreas.length > 0 && userAreas.some(a => dArea.includes(a) || a.includes(dArea));
+            const matchBranch = userBranch && userBranch !== "head office" && dBranch === userBranch;
+            return matchArea || matchBranch;
           });
           const allowedDealerNames = new Set(rawDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
           rawUnits = rawUnits.filter(u => allowedDealerNames.has(String(u.dealer_name).trim().toLowerCase()));
@@ -749,30 +763,8 @@ async function syncMasterDataFromApi() {
 
       MASTER_DEALER_PRIORITY_DATA = JSON.parse(JSON.stringify(APP_STATE.dealers));
 
-      // Buat list FAC GPS Monitoring
-      FAC_GPS_MONITORING_DATA = APP_STATE.units.map((u, i) => {
-        let codes = [];
-        if (u.gps_status === "Tidak Pasang") codes = ["1"];
-        else if (u.gps_status === "Belum Lepas") codes = ["2"];
-        else if (u.gps_status === "Belum Pasang") codes = ["3"];
-        else if (u.gps_status === "Baterai Lemah") codes = ["4"];
-        else if (u.gps_status === "Geser") codes = ["5"];
-        else if (u.gps_status === "Pelepasan") codes = ["6"];
-        else if (u.gps_status === "Offline") codes = ["7"];
-
-        return {
-          id: `U-${String(i + 1).padStart(2, '0')}`,
-          no_fasilitas: u.no_fasilitas || "",
-          dealer: u.dealer_name,
-          asset_desc: `${u.unit} (${u.nopol})`,
-          nopol: u.nopol,
-          imei: u.imei_gps,
-          status_kontrak: u.contract_status,
-          gps_installed: !!u.imei_gps,
-          status_codes: codes,
-          catatan: ""
-        };
-      });
+      // Buat list FAC GPS Monitoring dengan scoping cover area & status kontrak yang eligible (LIVE atau EXPIRED dg GPS)
+      initFacMonitoringData();
 
       console.log("Data master berhasil disinkronkan dari Google Spreadsheet!");
     }
@@ -855,7 +847,11 @@ async function loadScreen(screenName) {
     if (screenName === "onboarding") initOnboardingScreen();
     if (screenName === "pipeline") initPipeline();
     if (screenName === "gps") initGpsScreen();
-    if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
+    if (screenName === "fac") {
+      initFacMonitoringData();
+      renderLegendFilters();
+      renderFacGpsList();
+    }
     if (screenName === "absensi") acquireAbsenLocation();
     if (screenName === "settings") initSettingsScreen();
     if (screenName === "history") initHistory();
@@ -4349,6 +4345,107 @@ async function handleGpsSubmit(e) {
 // =========================================================================
 // FAC GPS AUDIT CONTROLLER
 // =========================================================================
+function isUnitGpsInstalled(u) {
+  if (!u) return false;
+  const imei = String(u.imei_gps || u.imei || "").trim();
+  const hasImei = imei !== "" && imei !== "-" && imei !== "0" && !imei.toLowerCase().includes("tidak") && !imei.toLowerCase().includes("belum");
+  const gpsStatus = String(u.gps_status || "").trim().toLowerCase();
+  
+  if (gpsStatus === "tidak pasang" || gpsStatus === "belum pasang") {
+    return false;
+  }
+  
+  if (["belum lepas", "baterai lemah", "geser", "pelepasan", "offline", "normal", "aktif"].includes(gpsStatus)) {
+    return true;
+  }
+  
+  return hasImei;
+}
+
+function isUnitEligibleForFacMonitoring(u) {
+  if (!u) return false;
+  const cStatus = String(u.contract_status || "").trim().toUpperCase();
+  const gpsInstalled = isUnitGpsInstalled(u);
+
+  // 1. Status LIVE: Selalu masuk monitoring
+  if (cStatus.includes("LIVE")) {
+    return true;
+  }
+
+  // 2. Status EXPIRED: HANYA MASUK jika GPS MASIH TERPASANG
+  if (cStatus.includes("EXPIRED")) {
+    return gpsInstalled;
+  }
+
+  // Status kontrak lainnya (SELESAI, LUNAS, BATAL, dsb) tidak masuk monitoring
+  return false;
+}
+
+function initFacMonitoringData() {
+  const isSuper = !CURRENT_USER || 
+    CURRENT_USER.role === "Super Admin" || 
+    CURRENT_USER.role_id === "R-01" || 
+    CURRENT_USER.role === "SUPERADMIN" || 
+    CURRENT_USER.role === "DIREKSI" || 
+    !CURRENT_USER.area_cover || 
+    CURRENT_USER.area_cover.trim() === "" || 
+    CURRENT_USER.area_cover.trim() === "*" || 
+    CURRENT_USER.area_cover.trim().toUpperCase() === "ALL";
+
+  const userAreas = (CURRENT_USER?.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+  const userBranch = String(CURRENT_USER?.cabang || "").trim().toLowerCase();
+
+  // 1. Filter dealers by cover area
+  let coveredDealers = APP_STATE.dealers || [];
+  if (!isSuper) {
+    coveredDealers = coveredDealers.filter(d => {
+      const dArea = String(d.area_cover || "").trim().toLowerCase();
+      const dBranch = String(d.cabang || "").trim().toLowerCase();
+      const matchArea = userAreas.length > 0 && userAreas.some(a => dArea.includes(a) || a.includes(dArea));
+      const matchBranch = userBranch && userBranch !== "head office" && dBranch === userBranch;
+      return matchArea || matchBranch;
+    });
+  }
+  const allowedDealerNames = new Set(coveredDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
+
+  // 2. Filter units: must belong to allowed dealers AND be eligible (LIVE or EXPIRED with GPS)
+  const eligibleUnits = (APP_STATE.units || []).filter(u => {
+    if (allowedDealerNames.size > 0 && !allowedDealerNames.has(String(u.dealer_name).trim().toLowerCase())) {
+      return false;
+    }
+    return isUnitEligibleForFacMonitoring(u);
+  });
+
+  // 3. Map to FAC_GPS_MONITORING_DATA
+  FAC_GPS_MONITORING_DATA = eligibleUnits.map((u, i) => {
+    let codes = [];
+    const gpsStatusRaw = String(u.gps_status || "").trim().toLowerCase();
+    if (gpsStatusRaw === "tidak pasang") codes = ["1"];
+    else if (gpsStatusRaw === "belum lepas") codes = ["2"];
+    else if (gpsStatusRaw === "belum pasang") codes = ["3"];
+    else if (gpsStatusRaw === "baterai lemah") codes = ["4"];
+    else if (gpsStatusRaw === "geser") codes = ["5"];
+    else if (gpsStatusRaw === "pelepasan") codes = ["6"];
+    else if (gpsStatusRaw === "offline") codes = ["7"];
+
+    const cStatus = String(u.contract_status || "LIVE").toUpperCase();
+    const normalizedContractStatus = cStatus.includes("EXPIRED") ? "EXPIRED" : (cStatus.includes("LIVE") ? "LIVE" : cStatus);
+
+    return {
+      id: `U-${String(i + 1).padStart(3, '0')}`,
+      no_fasilitas: u.no_fasilitas || "",
+      dealer: u.dealer_name,
+      asset_desc: `${u.unit} (${u.nopol})`,
+      nopol: u.nopol,
+      imei: u.imei_gps || u.imei || "",
+      status_kontrak: normalizedContractStatus,
+      gps_installed: isUnitGpsInstalled(u),
+      status_codes: codes,
+      catatan: ""
+    };
+  });
+}
+
 function renderLegendFilters() {
   const container = document.getElementById("legend-filter-container");
   if (!container) return;
@@ -4424,6 +4521,12 @@ function renderFacGpsList(keyword = "") {
     list = list.filter(item =>
       FAC_SELECTED_STATUS_FILTERS.some(code => item.status_codes.includes(code))
     );
+  }
+
+  // Update summary count element
+  const countEl = document.getElementById("fac-unit-count-summary");
+  if (countEl) {
+    countEl.innerText = `Menampilkan ${list.length} Unit (${FAC_GPS_MONITORING_DATA.length} Terdaftar)`;
   }
 
   if (list.length === 0) {
