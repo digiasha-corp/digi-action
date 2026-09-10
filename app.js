@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v28";
+const APP_BUILD_VERSION = "20260910_v29";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -38,7 +38,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     color: "cyan",
     badgeBg: "bg-cyan-100 text-cyan-800 border border-cyan-200",
     desc: "Monitoring dan operasional GPS armada dealer, penanganan unit bermasalah, dan laporan berkala FAC.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history"]
+    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history"]
   },
   "R-04": {
     name: "Field PIC",
@@ -78,15 +78,19 @@ let ROLE_PERMISSIONS_STATE = (() => {
 })();
 
 function getPermissionsForRole(roleKey, userObj = null) {
-  if (userObj && Array.isArray(userObj.permissions) && userObj.permissions.length > 0) {
-    return userObj.permissions;
-  }
   const roleId = String(userObj?.role_id || roleKey || "").trim();
   const roleName = String(userObj?.role || userObj?.jabatan || roleKey || "").trim();
 
-  if (ROLE_PERMISSIONS_STATE[roleId]) return ROLE_PERMISSIONS_STATE[roleId].permissions;
-  const match = Object.values(ROLE_PERMISSIONS_STATE).find(r => r.name.toLowerCase() === roleName.toLowerCase() || r.name.toLowerCase().includes(roleName.toLowerCase()));
-  if (match) return match.permissions;
+  if (ROLE_PERMISSIONS_STATE[roleId] && Array.isArray(ROLE_PERMISSIONS_STATE[roleId].permissions) && ROLE_PERMISSIONS_STATE[roleId].permissions.length > 0) {
+    return ROLE_PERMISSIONS_STATE[roleId].permissions;
+  }
+  const match = Object.values(ROLE_PERMISSIONS_STATE).find(r => r.name.toLowerCase() === roleName.toLowerCase() || r.name.toLowerCase().includes(roleName.toLowerCase()) || roleName.toLowerCase().includes(r.name.toLowerCase()));
+  if (match && Array.isArray(match.permissions) && match.permissions.length > 0) {
+    return match.permissions;
+  }
+  if (userObj && Array.isArray(userObj.permissions) && userObj.permissions.length > 0) {
+    return userObj.permissions;
+  }
 
   return ["priority", "visit", "onboarding", "pipeline", "gps", "history"];
 }
@@ -4214,12 +4218,13 @@ let SETTINGS_GPS_DATA = [];
 let SETTINGS_CURRENT_DEALER_ID = null;
 let SETTINGS_CURRENT_OFFICE_ID = null;
 
-function initSettingsScreen() {
+async function initSettingsScreen() {
   switchSettingsTab("emp");
   loadEmployeesForSettings();
   loadDealerSettings();
   loadOfficeLocationsForSettings();
   loadGpsInventoryForSettings();
+  await syncRolePermissionsFromSupabase();
   loadRolePermissionsSettings();
 }
 
@@ -5075,6 +5080,19 @@ function handleSaveRoleInfo(e) {
   }
 
   localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+  
+  if (supabaseClient) {
+    const roleObj = ROLE_PERMISSIONS_STATE[id];
+    supabaseClient.from("m_role_permission").upsert({
+      role_id: id,
+      role_name: name,
+      permission_keys: roleObj?.permissions || [],
+      updated_at: new Date().toISOString()
+    }, { onConflict: "role_id" }).then(({ error }) => {
+      if (error) console.warn("Error sync role to supabase:", error);
+    });
+  }
+
   closeRoleModal();
   loadRolePermissionsSettings();
   populateEmployeeRoleOptions();
@@ -5083,7 +5101,7 @@ function handleSaveRoleInfo(e) {
   }
 }
 
-function deleteCustomRole(roleId) {
+async function deleteCustomRole(roleId) {
   if (roleId === "R-01") {
     alert("Role Super Admin (R-01) tidak dapat dihapus!");
     return;
@@ -5095,12 +5113,19 @@ function deleteCustomRole(roleId) {
 
   delete ROLE_PERMISSIONS_STATE[roleId];
   localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("m_role_permission").delete().eq("role_id", roleId);
+    } catch (e) {}
+  }
+
   loadRolePermissionsSettings();
   populateEmployeeRoleOptions();
   showToast(`Role ${role.name} berhasil dihapus!`, "success", 2000);
 }
 
-function saveRolePermissions(roleId) {
+async function saveRolePermissions(roleId) {
   const checkboxes = document.querySelectorAll(`input[name="role_perm_${roleId}"]:checked`);
   const selected = Array.from(checkboxes).map(cb => cb.value);
 
@@ -5109,16 +5134,81 @@ function saveRolePermissions(roleId) {
 
   try {
     localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+    if (supabaseClient) {
+      const roleObj = ROLE_PERMISSIONS_STATE[roleId];
+      const { error } = await supabaseClient
+        .from("m_role_permission")
+        .upsert({
+          role_id: roleId,
+          role_name: roleObj?.name || roleId,
+          permission_keys: selected,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "role_id" });
+      if (error) console.warn("Supabase m_role_permission error:", error);
+    }
+
     showToast(`Hak akses ${ROLE_PERMISSIONS_STATE[roleId].name} (${roleId}) berhasil disimpan!`, "success", 2000);
 
     // If current logged-in user is under this role, sync and update dashboard immediately
     const uRole = CURRENT_USER?.role || CURRENT_USER?.role_id;
     if (uRole === roleId || CURRENT_USER?.role_id === roleId || (CURRENT_USER?.jabatan && CURRENT_USER.jabatan.includes(ROLE_PERMISSIONS_STATE[roleId].name))) {
       CURRENT_USER.permissions = selected;
-      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+      try {
+        localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+      } catch (e) {}
+      initDashboard();
     }
   } catch (err) {
     alert("Gagal menyimpan hak akses role: " + err.message);
+  }
+}
+
+async function syncRolePermissionsFromSupabase() {
+  if (!supabaseClient) return;
+  try {
+    const { data: permsData, error } = await supabaseClient.from("m_role_permission").select("*");
+    if (!error && permsData && permsData.length > 0) {
+      permsData.forEach(r => {
+        const rId = String(r.role_id || "").trim();
+        if (!rId) return;
+        if (ROLE_PERMISSIONS_STATE[rId]) {
+          if (Array.isArray(r.permission_keys)) {
+            ROLE_PERMISSIONS_STATE[rId].permissions = r.permission_keys;
+          }
+          if (r.role_name) ROLE_PERMISSIONS_STATE[rId].name = r.role_name;
+        } else {
+          ROLE_PERMISSIONS_STATE[rId] = {
+            name: r.role_name || rId,
+            icon: "fa-user-gear",
+            color: "purple",
+            badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
+            desc: `Role ${r.role_name || rId}`,
+            permissions: Array.isArray(r.permission_keys) ? r.permission_keys : []
+          };
+        }
+      });
+      try {
+        localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+      } catch (e) {}
+
+      // Refresh CURRENT_USER permissions if logged in
+      if (CURRENT_USER) {
+        const uRole = CURRENT_USER.role || CURRENT_USER.role_id || CURRENT_USER.jabatan;
+        const freshPerms = getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER);
+        CURRENT_USER.permissions = freshPerms;
+        try {
+          localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+        } catch (e) {}
+        // Refresh dashboard buttons if on dashboard
+        const nameEl = document.getElementById("dash-user-name");
+        if (nameEl) {
+          initDashboard();
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Gagal sinkronisasi m_role_permission:", err);
   }
 }
 
@@ -6586,7 +6676,8 @@ async function handleForceChangePasswordSubmit(e) {
 // =========================================================================
 // APP BOOTSTRAP / INITIALIZATION
 // =========================================================================
-function initAppBootstrap() {
+async function initAppBootstrap() {
+  await syncRolePermissionsFromSupabase();
   if (CURRENT_USER) {
     if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
       loadScreen("login");
