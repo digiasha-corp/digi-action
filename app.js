@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v29";
+const APP_BUILD_VERSION = "20260910_v30";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -852,6 +852,7 @@ async function loadScreen(screenName) {
     }
     if (screenName === "assignment") populateAssignDealerOptions();
     if (screenName === "visit") populateVisitDealerOptions();
+    if (screenName === "onboarding") initOnboardingScreen();
     if (screenName === "pipeline") initPipeline();
     if (screenName === "gps") initGpsScreen();
     if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
@@ -2805,6 +2806,148 @@ async function handleFormSubmit(e) {
 // =========================================================================
 // ONBOARDING CALON MITRA
 // =========================================================================
+let ACTIVE_ONBOARDING_CANDIDATES = [];
+
+async function initOnboardingScreen() {
+  const selectLama = document.getElementById("onb-select-db-lama");
+  const countBadge = document.getElementById("onb-pipeline-count-badge");
+  const previewBox = document.getElementById("onb-db-lama-preview-box");
+
+  if (previewBox) previewBox.classList.add("hidden");
+  if (selectLama) {
+    selectLama.innerHTML = '<option value="">-- Memuat calon mitra on-process... --</option>';
+  }
+
+  try {
+    if (!supabaseClient) throw new Error("Supabase Client belum terhubung");
+
+    const isSuper = CURRENT_USER?.role === "Super Admin" || CURRENT_USER?.role_id === "R-01" || !CURRENT_USER?.area_cover || CURRENT_USER?.area_cover === "*" || CURRENT_USER?.area_cover?.toUpperCase() === "ALL";
+    const userAreas = (CURRENT_USER?.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+    const userBranch = String(CURRENT_USER?.cabang || "").trim().toLowerCase();
+    const userNip = CURRENT_USER?.nip || null;
+
+    // Ambil data onboarding log dari Supabase
+    const { data, error } = await supabaseClient
+      .from("tr_onboarding_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    if (error) throw error;
+
+    const parsedList = (data || []).map(parseOnboardingRecord);
+
+    // Filter status belum final (bukan FINAL, APPROVED, REJECTED, DEALER_RESMI, BATAL)
+    const onProcessList = parsedList.filter(item => {
+      const st = String(item.statusDb || "").toUpperCase();
+      const cat = String(item.catatan || "").toUpperCase();
+      const isFinal = st.includes("FINAL") || st.includes("APPROVED") || st.includes("REJECT") || st.includes("BATAL") || cat.includes("FINAL APPROVED");
+      return !isFinal;
+    });
+
+    // Filter scoping area cover & PIC
+    const filteredByArea = onProcessList.filter(item => {
+      if (isSuper) return true;
+      // Jika diinput oleh user ini sendiri
+      if (userNip && item.nip === userNip) return true;
+      // Jika memiliki area match
+      if (userAreas.length > 0) {
+        const itemAlamat = String(item.alamat || "").toLowerCase();
+        const itemUsaha = String(item.namaUsaha || "").toLowerCase();
+        const itemCat = String(item.catatan || "").toLowerCase();
+        const matchArea = userAreas.some(a => itemAlamat.includes(a) || itemUsaha.includes(a) || itemCat.includes(a));
+        if (matchArea) return true;
+      }
+      // Jika dalam cabang yang sama
+      if (userBranch && userBranch !== "head office") {
+        const itemAlamat = String(item.alamat || "").toLowerCase();
+        if (itemAlamat.includes(userBranch)) return true;
+      }
+      return false;
+    });
+
+    // Grouping per calon mitra (pilih versi terupdate per nama usaha / pemohon)
+    const uniqueMap = new Map();
+    filteredByArea.forEach(item => {
+      const key = `${String(item.namaPemohon).trim().toLowerCase()}_${String(item.namaUsaha).trim().toLowerCase()}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, item);
+      }
+    });
+
+    ACTIVE_ONBOARDING_CANDIDATES = Array.from(uniqueMap.values());
+
+    if (selectLama) {
+      if (ACTIVE_ONBOARDING_CANDIDATES.length === 0) {
+        selectLama.innerHTML = '<option value="">-- Belum ada calon mitra on-process di area ini --</option>';
+      } else {
+        selectLama.innerHTML = '<option value="">-- Pilih Calon Mitra On-Process (' + ACTIVE_ONBOARDING_CANDIDATES.length + ' Data) --</option>' +
+          ACTIVE_ONBOARDING_CANDIDATES.map(c => {
+            const stageText = c.stages && c.stages.length > 0 ? c.stages.join(' & ') : 'On-Process';
+            return `<option value="${c.id}">${c.namaPemohon} - ${c.namaUsaha} (${stageText})</option>`;
+          }).join('');
+      }
+    }
+
+    if (countBadge) {
+      countBadge.innerText = `${ACTIVE_ONBOARDING_CANDIDATES.length} Prospek`;
+    }
+  } catch (err) {
+    console.error("Error init onboarding screen:", err);
+    if (selectLama) {
+      selectLama.innerHTML = '<option value="">-- Gagal memuat data calon mitra --</option>';
+    }
+    if (countBadge) {
+      countBadge.innerText = '0 Prospek';
+    }
+  }
+}
+
+function onSelectOnboardingDbLama(candId) {
+  const previewBox = document.getElementById("onb-db-lama-preview-box");
+  const prevUsaha = document.getElementById("onb-prev-usaha");
+  const prevPemohon = document.getElementById("onb-prev-pemohon");
+  const prevStage = document.getElementById("onb-prev-stage-badge");
+  const prevAlamat = document.getElementById("onb-prev-alamat");
+  const prevPic = document.getElementById("onb-prev-pic");
+
+  if (!candId) {
+    if (previewBox) previewBox.classList.add("hidden");
+    return;
+  }
+
+  const cand = ACTIVE_ONBOARDING_CANDIDATES.find(c => c.id === candId);
+  if (!cand) return;
+
+  if (previewBox) previewBox.classList.remove("hidden");
+  if (prevUsaha) prevUsaha.innerText = cand.namaUsaha || "-";
+  if (prevPemohon) prevPemohon.innerText = `Pemohon: ${cand.namaPemohon || "-"}`;
+  if (prevStage) prevStage.innerText = cand.stages && cand.stages.length > 0 ? cand.stages.join(' & ') : "On-Process";
+  if (prevAlamat) prevAlamat.innerText = `Alamat: ${cand.alamat || "-"}`;
+  if (prevPic) prevPic.innerText = `PIC Terakhir: ${cand.nip || "-"}`;
+
+  // Pre-check previous stages
+  document.querySelectorAll('input[name="onb_act_type"]').forEach(cb => {
+    cb.checked = cand.stages && cand.stages.includes(cb.value);
+  });
+
+  // Pre-load existing document files if any
+  if (cand.documents && Array.isArray(cand.documents) && cand.documents.length > 0) {
+    cand.documents.forEach(doc => {
+      if (doc.key && doc.files && doc.files.length > 0) {
+        ONB_DOC_FILES[doc.key] = {
+          title: doc.title || doc.key,
+          files: [...doc.files]
+        };
+      }
+    });
+    ONBOARDING_DOC_MASTER.forEach(m => {
+      renderDocScorecardBadge(m.key);
+    });
+    updateOnbDocCounter();
+  }
+}
+
 function toggleDatabaseBaru(isBaru) {
   const boxBaru = document.getElementById("box-segmen-db-baru");
   const boxLama = document.getElementById("box-segmen-db-lama");
@@ -2827,6 +2970,9 @@ function toggleDatabaseBaru(isBaru) {
     namaUsaha.required = false;
     alamat.required = false;
     selectLama.required = true;
+    if (ACTIVE_ONBOARDING_CANDIDATES.length === 0) {
+      initOnboardingScreen();
+    }
   }
 }
 
@@ -3171,11 +3317,21 @@ async function handleOnboardingSubmit(e) {
     }
   } else {
     const selectLama = document.getElementById("onb-select-db-lama");
-    const selectedOption = selectLama.options[selectLama.selectedIndex];
-    namaPemohon = selectedOption.getAttribute("data-pemohon") || selectedOption.text;
-    namaUsaha = selectedOption.getAttribute("data-usaha") || "-";
-    alamat = "- (Sesuai Database)";
-    jenisUsaha = "On-Process Partner";
+    const candId = selectLama?.value;
+    const cand = ACTIVE_ONBOARDING_CANDIDATES.find(c => c.id === candId);
+    if (cand) {
+      namaPemohon = cand.namaPemohon;
+      namaUsaha = cand.namaUsaha;
+      alamat = cand.alamat || "-";
+      jenisUsaha = cand.jenisUsaha || "Dealer";
+      detailTambahan = cand.detailUsaha || "";
+    } else {
+      const selectedOption = selectLama ? selectLama.options[selectLama.selectedIndex] : null;
+      namaPemohon = selectedOption ? (selectedOption.getAttribute("data-pemohon") || selectedOption.text) : "-";
+      namaUsaha = selectedOption ? (selectedOption.getAttribute("data-usaha") || "-") : "-";
+      alamat = "- (Sesuai Database)";
+      jenisUsaha = "On-Process Partner";
+    }
   }
 
   const docKeys = Object.keys(ONB_DOC_FILES);
