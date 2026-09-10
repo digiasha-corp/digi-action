@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v36";
+const APP_BUILD_VERSION = "20260910_v37";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4454,12 +4454,13 @@ function renderLegendFilters() {
     const isFilterActive = FAC_SELECTED_STATUS_FILTERS.includes(code);
     const activeCls = isFilterActive
       ? `${STATUS_MAP[code].activeBg} ring-2 ring-slate-900 font-black shadow-sm`
-      : `${STATUS_MAP[code].normalBg} font-semibold opacity-80`;
+      : `${STATUS_MAP[code].normalBg} font-semibold opacity-90`;
 
     return `
-      <button type="button" onclick="toggleStatusFilter('${code}')" class="p-1.5 rounded-xl border text-[10px] flex items-center justify-center space-x-1 transition cursor-pointer ${activeCls}">
+      <button type="button" onclick="toggleStatusFilter('${code}')" 
+              class="p-1 sm:p-1.5 rounded-xl border flex items-center justify-center space-x-1 min-h-[30px] transition cursor-pointer ${activeCls}">
         <span class="w-3.5 h-3.5 rounded-full text-center leading-3.5 text-[8px] font-black shrink-0 ${isFilterActive ? 'bg-white text-slate-900' : 'bg-slate-700 text-white'}">${code}</span>
-        <span class="truncate">${STATUS_MAP[code].short}</span>
+        <span class="text-[8px] sm:text-[9.5px] font-bold leading-[1.1] text-center whitespace-normal break-words">${STATUS_MAP[code].short}</span>
       </button>
     `;
   }).join('');
