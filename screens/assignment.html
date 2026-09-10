@@ -47,11 +47,43 @@
         </div>
       </div>
 
-      <div>
+      <!-- SEARCHABLE DROPDOWN FASILITAS / UNIT -->
+      <div class="relative" id="assign-unit-search-wrapper">
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Fasilitas Terkait (Opsional)</label>
-        <select id="assign-select-unit" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-purple-700">
+        <select id="assign-select-unit" class="sr-only">
           <option value="Umum">-- Umum (Seluruh Showroom / Non-Fasilitas) --</option>
         </select>
+
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-car absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+            <input
+              type="text"
+              id="assign-unit-search-input"
+              placeholder="-- Umum (Seluruh Showroom / Non-Fasilitas) --"
+              autocomplete="off"
+              onfocus="openAssignUnitSearchDropdown()"
+              oninput="filterAssignUnitSearchOptions(this.value)"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-500 focus:bg-white focus:border-purple-700 focus:ring-1 focus:ring-purple-700 transition outline-none"
+            />
+            <button
+              type="button"
+              id="assign-unit-search-clear-btn"
+              onclick="clearAssignUnitSearchSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="assign-unit-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="assign-unit-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown unit items rendered via JS -->
+          </div>
+        </div>
       </div>
 
       <div>

@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v27";
+const APP_BUILD_VERSION = "20260910_v28";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1780,6 +1780,8 @@ function closeParamModal() { document.getElementById("modal-param-info").classLi
 // =========================================================================
 // ASSIGN CONCERN
 // =========================================================================
+let ACTIVE_ASSIGN_ELIGIBLE_UNITS = [];
+
 function populateAssignDealerOptions() {
   const selectDealer = document.getElementById("assign-select-dealer");
   if (!selectDealer) return;
@@ -1792,13 +1794,26 @@ function populateAssignDealerOptions() {
   });
 
   renderAssignDealerSearchDropdown("");
+  renderAssignUnitSearchDropdown("");
 
-  // Setup click outside listener to auto-close dropdown
+  // Setup click outside listener to auto-close dealer dropdown
   if (!window._assignDealerSearchClickAttached) {
     window._assignDealerSearchClickAttached = true;
     document.addEventListener("click", (e) => {
       const wrapper = document.getElementById("assign-dealer-search-wrapper");
       const dropdown = document.getElementById("assign-dealer-search-dropdown");
+      if (dropdown && wrapper && !wrapper.contains(e.target)) {
+        dropdown.classList.add("hidden");
+      }
+    });
+  }
+
+  // Setup click outside listener to auto-close unit dropdown
+  if (!window._assignUnitSearchClickAttached) {
+    window._assignUnitSearchClickAttached = true;
+    document.addEventListener("click", (e) => {
+      const wrapper = document.getElementById("assign-unit-search-wrapper");
+      const dropdown = document.getElementById("assign-unit-search-dropdown");
       if (dropdown && wrapper && !wrapper.contains(e.target)) {
         dropdown.classList.add("hidden");
       }
@@ -1927,16 +1942,194 @@ function clearAssignDealerSearchSelection() {
 
 function onAssignDealerSelected(dealerId) {
   const selectUnit = document.getElementById("assign-select-unit");
-  selectUnit.innerHTML = '<option value="Umum">-- Umum (Seluruh Showroom / Non-Fasilitas) --</option>';
-  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
-  if (!d || !d.units) return;
+  const inputUnit = document.getElementById("assign-unit-search-input");
+  const clearBtn = document.getElementById("assign-unit-search-clear-btn");
+  const chevron = document.getElementById("assign-unit-search-chevron");
 
-  d.units.forEach(u => {
-    const opt = document.createElement("option");
-    opt.value = u.nopol;
-    opt.innerText = `${u.nopol} - ${u.unit}`;
-    selectUnit.appendChild(opt);
+  if (selectUnit) {
+    selectUnit.innerHTML = '<option value="Umum">-- Umum (Seluruh Showroom / Non-Fasilitas) --</option>';
+  }
+  if (inputUnit) {
+    inputUnit.value = "";
+    inputUnit.placeholder = "-- Umum (Seluruh Showroom / Non-Fasilitas) --";
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
+  if (!d || !d.units || d.units.length === 0) {
+    ACTIVE_ASSIGN_ELIGIBLE_UNITS = [];
+    renderAssignUnitSearchDropdown("");
+    return;
+  }
+
+  // Filter: Hanya tampilkan yang status LIVE atau status Expired tapi masih terpasang GPS
+  ACTIVE_ASSIGN_ELIGIBLE_UNITS = d.units.filter(u => {
+    const contractStatus = String(u.contract_status || u.status_kontrak || u.status || "").trim().toUpperCase();
+    const rawImei = String(u.imei_gps || u.imei || "").trim();
+    const hasImei = hasValidImei(rawImei);
+    const isLive = contractStatus === "LIVE" || contractStatus.indexOf("LIVE") !== -1;
+    const isExpiredWithImei = contractStatus.indexOf("EXPIRED") !== -1 && hasImei;
+    return isLive || isExpiredWithImei;
   });
+
+  if (selectUnit) {
+    ACTIVE_ASSIGN_ELIGIBLE_UNITS.forEach(u => {
+      const opt = document.createElement("option");
+      opt.value = u.nopol;
+      opt.innerText = `${u.nopol} - ${u.unit || u.tipe_unit || "Kendaraan"}`;
+      selectUnit.appendChild(opt);
+    });
+  }
+
+  renderAssignUnitSearchDropdown("");
+}
+
+function renderAssignUnitSearchDropdown(query = "") {
+  const dropdown = document.getElementById("assign-unit-search-dropdown");
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
+  dropdown.innerHTML = "";
+
+  // 1. Opsi Default: Umum (Seluruh Showroom / Non-Fasilitas)
+  const isUmumMatch = !q || "umum".includes(q) || "seluruh showroom".includes(q) || "non-fasilitas".includes(q);
+  if (isUmumMatch) {
+    const defaultItem = document.createElement("div");
+    defaultItem.className = "p-2.5 hover:bg-purple-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition bg-slate-50/50";
+    defaultItem.onmousedown = (e) => {
+      e.preventDefault();
+      selectAssignUnitFromSearch("Umum");
+    };
+    defaultItem.innerHTML = `
+      <div class="flex items-center space-x-2 min-w-0">
+        <i class="fa-solid fa-house-chimney text-purple-600 text-xs shrink-0"></i>
+        <span class="font-bold text-slate-800 text-xs">-- Umum (Seluruh Showroom / Non-Fasilitas) --</span>
+      </div>
+      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200 uppercase shrink-0">SHOWROOM</span>
+    `;
+    dropdown.appendChild(defaultItem);
+  }
+
+  // 2. Filter Unit Kendaraan Eligible
+  const filtered = ACTIVE_ASSIGN_ELIGIBLE_UNITS.filter(u => {
+    if (!q) return true;
+    const nopol = String(u.nopol || "").toLowerCase();
+    const unitName = String(u.unit || u.tipe_unit || "").toLowerCase();
+    const status = String(u.contract_status || u.status_kontrak || u.status || "").toLowerCase();
+    const imei = String(u.imei_gps || u.imei || "").toLowerCase();
+    return nopol.includes(q) || unitName.includes(q) || status.includes(q) || imei.includes(q);
+  });
+
+  if (filtered.length === 0 && !isUmumMatch) {
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "p-3 text-center text-xs text-slate-400";
+    emptyDiv.innerHTML = '<i class="fa-solid fa-car-tunnel mb-1 block text-slate-300"></i>Tidak ada unit eligible yang cocok';
+    dropdown.appendChild(emptyDiv);
+    return;
+  }
+
+  filtered.forEach(u => {
+    const item = document.createElement("div");
+    item.className = "p-2.5 hover:bg-purple-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      selectAssignUnitFromSearch(u.nopol);
+    };
+
+    const cStatus = String(u.contract_status || u.status_kontrak || u.status || "LIVE").trim().toUpperCase();
+    const isLive = cStatus.includes("LIVE");
+    const contractBadge = isLive 
+      ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase shrink-0">LIVE</span>'
+      : '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 uppercase shrink-0">EXP + GPS</span>';
+
+    const gpsStatus = u.gps_status ? ` • GPS: ${u.gps_status}` : "";
+    const ovdStatus = u.overdue_days && Number(u.overdue_days) > 0 ? ` • OVD ${u.overdue_days} hr` : "";
+
+    item.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-900 truncate">${u.nopol} - ${u.unit || u.tipe_unit || "Kendaraan"}</div>
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1 mt-0.5 truncate">
+          <span>Aging Visit: ${u.aging_visit_unit || u.aging_visit_days || 0} hr</span>
+          <span>${gpsStatus}${ovdStatus}</span>
+        </div>
+      </div>
+      ${contractBadge}
+    `;
+    dropdown.appendChild(item);
+  });
+}
+
+function openAssignUnitSearchDropdown() {
+  const dropdown = document.getElementById("assign-unit-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("assign-unit-search-input");
+    renderAssignUnitSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeAssignUnitSearchDropdown() {
+  const dropdown = document.getElementById("assign-unit-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterAssignUnitSearchOptions(query) {
+  openAssignUnitSearchDropdown();
+  renderAssignUnitSearchDropdown(query);
+
+  const clearBtn = document.getElementById("assign-unit-search-clear-btn");
+  const chevron = document.getElementById("assign-unit-search-chevron");
+  if (query && query.trim() !== "") {
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+  } else {
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  }
+}
+
+function selectAssignUnitFromSearch(nopol) {
+  const input = document.getElementById("assign-unit-search-input");
+  const sel = document.getElementById("assign-select-unit");
+  const clearBtn = document.getElementById("assign-unit-search-clear-btn");
+  const chevron = document.getElementById("assign-unit-search-chevron");
+
+  if (nopol === "Umum" || !nopol) {
+    if (input) {
+      input.value = "-- Umum (Seluruh Showroom / Non-Fasilitas) --";
+    }
+    if (sel) sel.value = "Umum";
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  } else {
+    const u = ACTIVE_ASSIGN_ELIGIBLE_UNITS.find(item => item.nopol === nopol);
+    if (u && input && sel) {
+      input.value = `${u.nopol} - ${u.unit || u.tipe_unit || "Kendaraan"}`;
+      sel.value = u.nopol;
+      if (clearBtn) clearBtn.classList.remove("hidden");
+      if (chevron) chevron.classList.add("hidden");
+    }
+  }
+  closeAssignUnitSearchDropdown();
+}
+
+function clearAssignUnitSearchSelection() {
+  const input = document.getElementById("assign-unit-search-input");
+  const sel = document.getElementById("assign-select-unit");
+  const clearBtn = document.getElementById("assign-unit-search-clear-btn");
+  const chevron = document.getElementById("assign-unit-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.placeholder = "-- Umum (Seluruh Showroom / Non-Fasilitas) --";
+    input.focus();
+  }
+  if (sel) sel.value = "Umum";
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  openAssignUnitSearchDropdown();
 }
 
 async function handleAssignConcernSubmit(e) {
