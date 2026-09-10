@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v30";
+const APP_BUILD_VERSION = "20260910_v31";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -2892,6 +2892,8 @@ async function initOnboardingScreen() {
     if (countBadge) {
       countBadge.innerText = `${ACTIVE_ONBOARDING_CANDIDATES.length} Prospek`;
     }
+
+    renderOnbDbLamaSearchDropdown("");
   } catch (err) {
     console.error("Error init onboarding screen:", err);
     if (selectLama) {
@@ -2900,7 +2902,124 @@ async function initOnboardingScreen() {
     if (countBadge) {
       countBadge.innerText = '0 Prospek';
     }
+    renderOnbDbLamaSearchDropdown("");
   }
+}
+
+function renderOnbDbLamaSearchDropdown(query = "") {
+  const dropdown = document.getElementById("onb-db-lama-search-dropdown");
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
+  const filtered = ACTIVE_ONBOARDING_CANDIDATES.filter(c => {
+    if (!q) return true;
+    const pemohon = String(c.namaPemohon || "").toLowerCase();
+    const usaha = String(c.namaUsaha || "").toLowerCase();
+    const alamat = String(c.alamat || "").toLowerCase();
+    const pic = String(c.nip || "").toLowerCase();
+    return pemohon.includes(q) || usaha.includes(q) || alamat.includes(q) || pic.includes(q);
+  });
+
+  dropdown.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "p-3 text-center text-xs text-slate-400";
+    emptyDiv.innerHTML = '<i class="fa-solid fa-user-slash mb-1 block text-slate-300"></i>Tidak ada calon mitra yang cocok';
+    dropdown.appendChild(emptyDiv);
+    return;
+  }
+
+  filtered.forEach(c => {
+    const item = document.createElement("div");
+    item.className = "p-2.5 hover:bg-teal-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      selectOnbDbLamaFromSearch(c.id);
+    };
+
+    const stageText = c.stages && c.stages.length > 0 ? c.stages.join(' & ') : 'On-Process';
+
+    item.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-900 truncate">
+          <span class="text-teal-800 font-bold">${c.namaPemohon || "-"}</span>
+          <span class="text-slate-500 font-normal">(${c.namaUsaha || "-"})</span>
+        </div>
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+          <span class="truncate max-w-[200px]">${c.alamat || "Alamat Sesuai DB"}</span>
+          <span>•</span>
+          <span class="text-slate-400">PIC: ${c.nip || "-"}</span>
+        </div>
+      </div>
+      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200 shrink-0 uppercase">${stageText}</span>
+    `;
+    dropdown.appendChild(item);
+  });
+}
+
+function openOnbDbLamaSearchDropdown() {
+  const dropdown = document.getElementById("onb-db-lama-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("onb-db-lama-search-input");
+    renderOnbDbLamaSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeOnbDbLamaSearchDropdown() {
+  const dropdown = document.getElementById("onb-db-lama-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterOnbDbLamaSearchOptions(query) {
+  openOnbDbLamaSearchDropdown();
+  renderOnbDbLamaSearchDropdown(query);
+
+  const clearBtn = document.getElementById("onb-db-lama-search-clear-btn");
+  const chevron = document.getElementById("onb-db-lama-search-chevron");
+  if (query && query.trim() !== "") {
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+  } else {
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (chevron) chevron.classList.remove("hidden");
+  }
+}
+
+function selectOnbDbLamaFromSearch(candId) {
+  const cand = ACTIVE_ONBOARDING_CANDIDATES.find(c => c.id === candId);
+  const input = document.getElementById("onb-db-lama-search-input");
+  const sel = document.getElementById("onb-select-db-lama");
+  const clearBtn = document.getElementById("onb-db-lama-search-clear-btn");
+  const chevron = document.getElementById("onb-db-lama-search-chevron");
+
+  if (cand && input && sel) {
+    input.value = `${cand.namaPemohon} - ${cand.namaUsaha}`;
+    sel.value = cand.id;
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    if (chevron) chevron.classList.add("hidden");
+    closeOnbDbLamaSearchDropdown();
+    onSelectOnboardingDbLama(cand.id);
+  }
+}
+
+function clearOnbDbLamaSearchSelection() {
+  const input = document.getElementById("onb-db-lama-search-input");
+  const sel = document.getElementById("onb-select-db-lama");
+  const clearBtn = document.getElementById("onb-db-lama-search-clear-btn");
+  const chevron = document.getElementById("onb-db-lama-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (sel) sel.value = "";
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  onSelectOnboardingDbLama("");
+  openOnbDbLamaSearchDropdown();
 }
 
 function onSelectOnboardingDbLama(candId) {
@@ -3318,6 +3437,10 @@ async function handleOnboardingSubmit(e) {
   } else {
     const selectLama = document.getElementById("onb-select-db-lama");
     const candId = selectLama?.value;
+    if (!candId) {
+      alert("Pilih calon mitra on-process terlebih dahulu melalui kolom pencarian!");
+      return;
+    }
     const cand = ACTIVE_ONBOARDING_CANDIDATES.find(c => c.id === candId);
     if (cand) {
       namaPemohon = cand.namaPemohon;
@@ -6852,3 +6975,22 @@ if (document.readyState === "loading") {
 } else {
   initAppBootstrap();
 }
+
+document.addEventListener("click", function(e) {
+  const onbWrap = document.getElementById("onb-db-lama-search-wrapper");
+  if (onbWrap && !onbWrap.contains(e.target)) {
+    closeOnbDbLamaSearchDropdown();
+  }
+  const gpsDealerWrap = document.getElementById("gps-dealer-search-wrapper");
+  if (gpsDealerWrap && !gpsDealerWrap.contains(e.target)) {
+    closeGpsDealerSearchDropdown();
+  }
+  const gpsKendWrap = document.getElementById("gps-kendaraan-search-wrapper");
+  if (gpsKendWrap && !gpsKendWrap.contains(e.target)) {
+    closeGpsKendaraanSearchDropdown();
+  }
+  const gpsImeiWrap = document.getElementById("gps-imei-search-wrapper");
+  if (gpsImeiWrap && !gpsImeiWrap.contains(e.target)) {
+    closeGpsImeiSearchDropdown();
+  }
+});
