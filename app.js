@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v34";
+const APP_BUILD_VERSION = "20260910_v35";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4576,7 +4576,7 @@ function renderFacGpsList(keyword = "") {
           </span>
           <button type="button" onclick="resetAllCodes('${item.id}')" class="text-[9px] text-red-500 font-bold hover:underline shrink-0 ml-1">Reset Status</button>
         </div>
-        <input type="text" id="input-catatan-${item.id}" value="${item.catatan}" oninput="onFacCatatanInput('${item.id}', this.value)" placeholder="Wajib isi keterangan khusus..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-cyan-700" />
+        <input type="text" id="input-catatan-${item.id}" value="${item.catatan}" oninput="onFacCatatanInput('${item.id}', this.value)" placeholder="Keterangan / catatan khusus (opsional)..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-cyan-700" />
       </div>
     `;
     container.appendChild(card);
@@ -4610,12 +4610,6 @@ function onFacCatatanInput(unitId, text) {
 }
 
 async function submitFacGpsReport() {
-  const missingNotes = FAC_GPS_MONITORING_DATA.filter(u => u.status_codes.length > 0 && (!u.catatan || !u.catatan.trim()));
-  if (missingNotes.length > 0) {
-    alert(`Peringatan: Terdapat ${missingNotes.length} unit dengan status anomali yang belum diisi keterangannya!`);
-    return;
-  }
-
   const now = new Date();
   const tglFormatted = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 
