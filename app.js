@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v35";
+const APP_BUILD_VERSION = "20260910_v36";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -4545,17 +4545,36 @@ function renderFacGpsList(keyword = "") {
     const hasCodes = item.status_codes.length > 0;
 
     card.innerHTML = `
+      <!-- Baris 1: Nama Mitra + Status Kontrak | Kode Status 1 2 3 4 -->
       <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center space-x-1.5 min-w-0 flex-1">
+          <span class="font-bold text-xs text-slate-900 truncate">${item.dealer}</span>
+          <span class="text-[8px] px-1.5 py-0.5 rounded font-bold shrink-0 ${item.status_kontrak === 'LIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">${item.status_kontrak}</span>
+        </div>
+
+        <div class="flex items-center space-x-1 shrink-0">
+          ${["1", "2", "3", "4"].map(code => {
+            const isSelected = item.status_codes.includes(code);
+            const activeCls = isSelected ? STATUS_MAP[code].activeBg : `bg-slate-50 border-slate-200 ${STATUS_MAP[code].normalBg}`;
+            return `
+              <button type="button" 
+                      onclick="onFacCodeToggle('${item.id}', '${code}')" 
+                      class="w-6 h-6 rounded-lg text-[10px] font-black border flex items-center justify-center transition shadow-xs ${activeCls}">
+                ${code}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Baris 2: Deskripsi Kendaraan / Nopol | Kode Status 5 6 7 -->
+      <div class="flex items-center justify-between gap-2 pt-0.5">
         <div class="min-w-0 flex-1">
-          <div class="flex items-center space-x-1.5">
-            <span class="font-bold text-xs text-slate-900">${item.dealer}</span>
-            <span class="text-[8px] px-1 py-0.2 rounded font-bold ${item.status_kontrak === 'LIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">${item.status_kontrak}</span>
-          </div>
           <p class="text-[11px] font-medium text-slate-600 truncate">${item.asset_desc}</p>
         </div>
 
         <div class="flex items-center space-x-1 shrink-0">
-          ${["1", "2", "3", "4", "5", "6", "7"].map(code => {
+          ${["5", "6", "7"].map(code => {
             const isSelected = item.status_codes.includes(code);
             const activeCls = isSelected ? STATUS_MAP[code].activeBg : `bg-slate-50 border-slate-200 ${STATUS_MAP[code].normalBg}`;
             return `
