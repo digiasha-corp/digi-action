@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v32";
+const APP_BUILD_VERSION = "20260910_v33";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6606,29 +6606,6 @@ async function handleSaveEditActivity(e) {
       if (onbErr) throw onbErr;
 
     } else if (type === "GPS") {
-      const techNotes = document.getElementById("edit-gps-notes")?.value || "";
-
-      const { error: gpsErr } = await supabaseClient.from("tr_gps_maintenance").update({
-        catatan_teknis: techNotes
-      }).eq("maint_id", id);
-
-      if (gpsErr) throw gpsErr;
-    }
-
-    closeHistoryDetailModal();
-    alert("Perubahan laporan berhasil disimpan!");
-    await loadActivityHistory(true);
-
-  } catch (err) {
-    console.error("Error saving activity edit:", err);
-    alert("Gagal menyimpan perubahan: " + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span>Simpan Perubahan</span>';
-    }
-  }
-}
       const techNotes = document.getElementById("edit-gps-notes")?.value || "";
 
       const { error: gpsErr } = await supabaseClient.from("tr_gps_maintenance").update({
