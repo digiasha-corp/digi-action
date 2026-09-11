@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260910_v37";
+const APP_BUILD_VERSION = "20260911_v38";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -686,240 +686,6 @@ async function callApi(action, data = {}) {
   }
 
   return { success: false, message: "Backend database belum terkonfigurasi." };
-}
-
-// Router Screen SPA Terpadu
-async function loadScreen(screenName) {
-  const container = document.getElementById("main-view-container");
-  const topbar = document.getElementById("topbar");
-  const btnBack = document.getElementById("btn-back-home");
-  const title = document.getElementById("topbar-title");
-  const sub = document.getElementById("topbar-sub");
-
-  // Auth Guard: Jika belum login dan mencoba buka selain login, redirect ke login
-  if (!CURRENT_USER && screenName !== "login") {
-    screenName = "login";
-  }
-
-  if (screenName === "login") {
-    topbar.classList.add("hidden");
-  } else {
-    topbar.classList.remove("hidden");
-    const areaSuffix = CURRENT_USER.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
-    sub.innerText = `${CURRENT_USER.nama} • ${CURRENT_USER.role}${areaSuffix}`;
-    if (screenName === "dashboard") {
-      btnBack.classList.add("hidden");
-      title.innerText = "Digiasha Monitoring";
-    } else {
-      btnBack.classList.remove("hidden");
-      const titles = {
-        visit: "Laporan Visit Mitra",
-        onboarding: "Visit Calon Mitra",
-        gps: "GPS Maintenance",
-        priority: "Priority Visit",
-        assignment: "Assign Concern Visit",
-        fac: "Laporan GPS (FAC)",
-        absensi: "Presensi Kehadiran",
-        izin: "Pengajuan Izin",
-        persetujuan: "Pusat Persetujuan"
-      };
-      title.innerText = titles[screenName] || "Monitoring";
-    }
-  }
-
-  container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-800"></i>Memuat halaman...</div>';
-
-  try {
-    if (!screenCache[screenName]) {
-      const res = await fetch(`screens/${screenName}.html`);
-      if (!res.ok) throw new Error("Gagal mengambil file screen");
-      screenCache[screenName] = await res.text();
-    }
-    container.innerHTML = screenCache[screenName];
-
-    // Inisialisasi controller tiap modul
-    if (screenName === "dashboard") initDashboard();
-    if (screenName === "priority") {
-      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
-        syncMasterDataFromApi().then(() => renderPriorityList());
-      } else {
-        renderPriorityList();
-      }
-    }
-    if (screenName === "assignment") populateAssignDealerOptions();
-    if (screenName === "visit") populateVisitDealerOptions();
-    if (screenName === "gps") initGpsScreen();
-    if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
-    if (screenName === "absensi") initAbsensiScreen();
-    if (screenName === "izin") initIzinScreen();
-    if (screenName === "persetujuan") initPersetujuanScreen();
-
-    window.scrollTo(0, 0);
-  } catch (err) {
-    container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-xs">Error memuat layar: ${err.message}</div>`;
-  }
-}
-
-// Sinkronisasi Data Master dari Database (Supabase 100% Direct dengan GAS Fallback)
-async function syncMasterDataFromApi() {
-  try {
-    let rawDealers = [];
-    let rawUnits = [];
-    let rawAssignments = [];
-    let idleGps = [];
-
-    // 1. Ambil Langsung dari Supabase REST API
-    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      try {
-        const headers = {
-          "apikey": CONFIG.SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
-        };
-
-        const [dlrRes, unitRes, locRes, gpsRes] = await Promise.all([
-          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_dealer?select=*`, { headers }),
-          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_facility_unit?select=*`, { headers }),
-          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_work_location?select=*`, { headers }),
-          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_gps_device?select=*`, { headers })
-        ]);
-
-        if (dlrRes.ok) rawDealers = await dlrRes.json();
-        if (unitRes.ok) rawUnits = await unitRes.json();
-        if (locRes.ok) {
-          const locs = await locRes.json();
-          if (Array.isArray(locs) && locs.length > 0) {
-            OFFICE_LOCATIONS = locs.map(l => ({
-              location_id: l.location_id || "LOC",
-              name: l.name || "Kantor",
-              lat: Number(l.lat),
-              long: Number(l.long),
-              maxRadiusMeter: Number(l.max_radius_meter || 100),
-              address: l.address || ""
-            }));
-          }
-        }
-        if (gpsRes.ok) {
-          const gpsList = await gpsRes.json();
-          idleGps = (gpsList || []).map(g => ({
-            imei: g.imei,
-            tipe: g.posisi_stock || "Stok Cabang",
-            status_device: g.status_device || "TERSEDIA",
-            posisi_stock: g.posisi_stock || "Stok Cabang"
-          }));
-        }
-      } catch (errSup) {
-        console.warn("Direct Supabase fetch error, fallback to GAS API:", errSup);
-      }
-    }
-
-    // 2. Fallback ke Google Apps Script API jika belum dapat dari Supabase
-    if (rawDealers.length === 0) {
-      const res = await callApi("getMasterData");
-      if (res && res.success) {
-        rawDealers = res.dealers || [];
-        rawUnits = res.units || [];
-        rawAssignments = res.assignments || [];
-        idleGps = res.idleGps || [];
-        if (res.workLocations && Array.isArray(res.workLocations) && res.workLocations.length > 0) {
-          OFFICE_LOCATIONS = res.workLocations;
-        }
-      }
-    }
-
-    if (rawDealers.length > 0 || rawUnits.length > 0) {
-      // Hak Akses Berdasarkan Coverage Area:
-      const isSuper = !CURRENT_USER || 
-        CURRENT_USER.role === "Super Admin" || 
-        CURRENT_USER.role_id === "R-01" || 
-        CURRENT_USER.role === "SUPERADMIN" || 
-        CURRENT_USER.role === "DIREKSI" || 
-        !CURRENT_USER.area_cover || 
-        CURRENT_USER.area_cover.trim() === "" || 
-        CURRENT_USER.area_cover.trim() === "*" || 
-        CURRENT_USER.area_cover.trim().toUpperCase() === "ALL";
-
-      if (CURRENT_USER && !isSuper) {
-        const userAreas = (CURRENT_USER.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
-        const userBranch = String(CURRENT_USER.cabang || "").trim().toLowerCase();
-        if (userAreas.length > 0 || (userBranch && userBranch !== "head office")) {
-          rawDealers = rawDealers.filter(d => {
-            const dArea = String(d.area_cover || "").trim().toLowerCase();
-            const dBranch = String(d.cabang || "").trim().toLowerCase();
-            const matchArea = userAreas.length > 0 && userAreas.some(a => dArea.includes(a) || a.includes(dArea));
-            const matchBranch = userBranch && userBranch !== "head office" && dBranch === userBranch;
-            return matchArea || matchBranch;
-          });
-          const allowedDealerNames = new Set(rawDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
-          rawUnits = rawUnits.filter(u => allowedDealerNames.has(String(u.dealer_name).trim().toLowerCase()));
-          rawAssignments = rawAssignments.filter(a => allowedDealerNames.has(String(a.dealer_name).trim().toLowerCase()));
-        }
-      }
-          rawDealers = rawDealers.filter(d => {
-            const dArea = String(d.area_cover || "").trim().toLowerCase();
-            const dBranch = String(d.cabang || "").trim().toLowerCase();
-            const matchArea = userAreas.length > 0 && userAreas.some(a => dArea.includes(a) || a.includes(dArea));
-            const matchBranch = userBranch && userBranch !== "head office" && dBranch === userBranch;
-            return matchArea || matchBranch;
-          });
-          const allowedDealerNames = new Set(rawDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
-          rawUnits = rawUnits.filter(u => allowedDealerNames.has(String(u.dealer_name).trim().toLowerCase()));
-          rawAssignments = rawAssignments.filter(a => allowedDealerNames.has(String(a.dealer_name).trim().toLowerCase()));
-        }
-      }
-
-      APP_STATE.dealers = rawDealers;
-      APP_STATE.units = rawUnits;
-      APP_STATE.idleGps = idleGps;
-      APP_STATE.assignments = rawAssignments;
-
-      // Sinkronkan daftar lokasi kantor geofence jika ada dari API
-      if (res.workLocations && Array.isArray(res.workLocations) && res.workLocations.length > 0) {
-        OFFICE_LOCATIONS = res.workLocations;
-      }
-
-      // Kelompokkan unit per dealer
-      const vehiclesByDealer = {};
-      APP_STATE.dealers.forEach(d => {
-        d.units = APP_STATE.units.filter(u => String(u.dealer_name).trim().toLowerCase() === String(d.dealer_name).trim().toLowerCase());
-        vehiclesByDealer[d.dealer_id] = d.units.map(u => ({
-          no_fasilitas: u.no_fasilitas || "",
-          nopol: u.nopol,
-          unit: u.unit,
-          contract_status: u.contract_status,
-          gps_status: u.gps_status,
-          imei: u.imei_gps,
-          imei_gps: u.imei_gps
-        }));
-      });
-      APP_STATE.masterVehiclesGps = vehiclesByDealer;
-      // Pasangkan active assignments dari Google Spreadsheet ke Dealer & Unit Concern
-      if (APP_STATE.assignments && APP_STATE.assignments.length > 0) {
-        APP_STATE.assignments.forEach(a => {
-          const d = APP_STATE.dealers.find(dlr => String(dlr.dealer_name).trim().toLowerCase() === String(a.dealer_name).trim().toLowerCase());
-          if (d) {
-            const unitFas = String(a.unit_fasilitas || "Umum").trim();
-            if (unitFas === "Umum" || unitFas.toLowerCase().includes("seluruh")) {
-              d.dealer_concern = { urgency: a.urgency_level || "Penting", note: a.instruksi || "-" };
-            } else {
-              const u = d.units?.find(unit => String(unit.nopol).trim().toLowerCase() === unitFas.toLowerCase() || unitFas.toLowerCase().includes(String(unit.nopol).trim().toLowerCase()));
-              if (u) {
-                u.unit_concern = { urgency: a.urgency_level || "Penting", note: a.instruksi || "-" };
-              }
-            }
-          }
-        });
-      }
-
-      MASTER_DEALER_PRIORITY_DATA = JSON.parse(JSON.stringify(APP_STATE.dealers));
-
-      // Buat list FAC GPS Monitoring dengan scoping cover area & status kontrak yang eligible (LIVE atau EXPIRED dg GPS)
-      initFacMonitoringData();
-
-      console.log("Data master berhasil disinkronkan dari Google Spreadsheet!");
-    }
-  } catch (err) {
-    console.warn("Gagal sync master data online:", err);
-  }
 }
 
 // =========================================================================
@@ -8452,17 +8218,32 @@ async function handleForceChangePasswordSubmit(e) {
 // APP BOOTSTRAP / INITIALIZATION
 // =========================================================================
 async function initAppBootstrap() {
-  await syncRolePermissionsFromSupabase();
-  if (CURRENT_USER) {
-    if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
-      loadScreen("login");
-      openForceChangePassModal();
-    } else {
-      loadScreen("dashboard");
-      syncMasterDataFromApi();
+  try {
+    if (typeof syncRolePermissionsFromSupabase === "function") {
+      await syncRolePermissionsFromSupabase();
     }
-  } else {
-    loadScreen("login");
+  } catch (err) {
+    console.warn("Sync permissions error at bootstrap:", err);
+  }
+
+  try {
+    if (CURRENT_USER) {
+      if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
+        await loadScreen("login");
+        if (typeof openForceChangePassModal === "function") openForceChangePassModal();
+      } else {
+        await loadScreen("dashboard");
+        syncMasterDataFromApi();
+      }
+    } else {
+      await loadScreen("login");
+    }
+  } catch (err) {
+    console.error("Critical error in initAppBootstrap:", err);
+    const container = document.getElementById("main-view-container");
+    if (container && (!container.innerHTML || container.innerHTML.trim() === "")) {
+      loadScreen("login");
+    }
   }
 }
 
