@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v46";
+const APP_BUILD_VERSION = "20260911_v47";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6558,27 +6558,116 @@ function populateEmployeeRoleOptions(selectedRoleId = "R-04") {
   }).join('');
 }
 
-function populateEmployeeAtasanOptions(currentNip = null, selectedAtasanNip = "") {
-  const select = document.getElementById("emp-input-atasan");
-  if (!select) return;
+let CURRENT_EMP_EDIT_NIP = null;
+
+function renderEmpAtasanSearchDropdown(query = "") {
+  const dropdown = document.getElementById("emp-atasan-search-dropdown");
+  if (!dropdown) return;
 
   const allEmployees = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) 
     ? SETTINGS_EMPLOYEES_DATA 
     : (APP_STATE.employees || []);
 
-  const eligible = allEmployees.filter(e => !currentNip || String(e.nip).trim() !== String(currentNip).trim());
+  const eligible = allEmployees.filter(e => !CURRENT_EMP_EDIT_NIP || String(e.nip).trim() !== String(CURRENT_EMP_EDIT_NIP).trim());
+  const selectedNip = document.getElementById("emp-input-atasan-nip")?.value || "";
 
-  let optionsHtml = '<option value="">-- Tidak Ada / Atasan Tertinggi --</option>';
-  optionsHtml += eligible.map(e => {
-    const isSel = String(e.nip).trim() === String(selectedAtasanNip || "").trim();
-    const roleTitle = e.role_id || e.jabatan || "";
-    return `<option value="${e.nip}" data-nama="${e.nama_lengkap || ''}" ${isSel ? 'selected' : ''}>${e.nama_lengkap} (${e.nip})${roleTitle ? ' - ' + roleTitle : ''}</option>`;
-  }).join("");
+  const q = String(query || "").trim().toLowerCase();
+  const filtered = eligible.filter(e => {
+    if (!q) return true;
+    return String(e.nama_lengkap || "").toLowerCase().includes(q) ||
+      String(e.nip || "").toLowerCase().includes(q) ||
+      String(e.jabatan || "").toLowerCase().includes(q) ||
+      String(e.role_id || "").toLowerCase().includes(q) ||
+      String(e.cabang || "").toLowerCase().includes(q);
+  });
 
-  select.innerHTML = optionsHtml;
+  let itemsHtml = `
+    <div onclick="selectEmpAtasan('', '')" class="p-2.5 hover:bg-slate-100 cursor-pointer flex items-center justify-between text-xs transition ${!selectedNip ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-slate-600'}">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-ban text-slate-400 text-xs"></i>
+        <span>-- Tidak Ada / Atasan Tertinggi --</span>
+      </div>
+      ${!selectedNip ? '<i class="fa-solid fa-check text-indigo-600 text-xs"></i>' : ''}
+    </div>
+  `;
+
+  if (filtered.length === 0) {
+    itemsHtml += '<div class="p-3 text-center text-slate-400 text-[11px]"><i class="fa-solid fa-user-slash mr-1"></i>Tidak ada atasan yang cocok</div>';
+  } else {
+    itemsHtml += filtered.map(e => {
+      const isSel = String(e.nip).trim() === String(selectedNip).trim();
+      const rName = e.role_id || e.jabatan || 'PIC';
+      const cleanNama = (e.nama_lengkap || '').replace(/'/g, "\\'");
+      return `
+        <div onclick="selectEmpAtasan('${e.nip}', '${cleanNama}')" class="p-2.5 hover:bg-indigo-50 cursor-pointer flex items-center justify-between text-xs transition ${isSel ? 'bg-indigo-50/80 font-bold text-indigo-900' : 'text-slate-700'}">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5">
+              <span class="font-bold truncate">${e.nama_lengkap}</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono shrink-0">${e.nip}</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5 flex items-center space-x-2">
+              <span class="text-indigo-600 font-semibold">${rName}</span>
+              <span>•</span>
+              <span>${e.cabang || '-'}</span>
+            </div>
+          </div>
+          ${isSel ? '<i class="fa-solid fa-check text-indigo-600 text-xs ml-2 shrink-0"></i>' : ''}
+        </div>
+      `;
+    }).join("");
+  }
+
+  dropdown.innerHTML = itemsHtml;
+}
+
+function openEmpAtasanSearchDropdown() {
+  const dropdown = document.getElementById("emp-atasan-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("emp-atasan-search-input");
+    renderEmpAtasanSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeEmpAtasanSearchDropdown() {
+  const dropdown = document.getElementById("emp-atasan-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterEmpAtasanSearchOptions(query) {
+  openEmpAtasanSearchDropdown();
+  renderEmpAtasanSearchDropdown(query);
+}
+
+function selectEmpAtasan(nip, nama) {
+  const nipInput = document.getElementById("emp-input-atasan-nip");
+  const namaInput = document.getElementById("emp-input-atasan-nama");
+  const searchInput = document.getElementById("emp-atasan-search-input");
+  const clearBtn = document.getElementById("emp-atasan-search-clear-btn");
+
+  if (nipInput) nipInput.value = nip || "";
+  if (namaInput) namaInput.value = nama || "";
+
+  if (searchInput) {
+    searchInput.value = nip ? `${nama} (${nip})` : "";
+  }
+
+  if (clearBtn) {
+    if (nip) clearBtn.classList.remove("hidden");
+    else clearBtn.classList.add("hidden");
+  }
+
+  closeEmpAtasanSearchDropdown();
+}
+
+function clearEmpAtasanSelection() {
+  selectEmpAtasan("", "");
+  const searchInput = document.getElementById("emp-atasan-search-input");
+  if (searchInput) searchInput.value = "";
 }
 
 function openAddEmployeeModal() {
+  CURRENT_EMP_EDIT_NIP = null;
   document.getElementById("modal-emp-title").innerText = "Tambah Karyawan Baru";
   document.getElementById("emp-input-nip").value = "";
   document.getElementById("emp-input-nip").disabled = false;
@@ -6586,7 +6675,7 @@ function openAddEmployeeModal() {
   document.getElementById("emp-input-email").value = "";
   document.getElementById("emp-input-cabang").value = "Head Office";
   populateEmployeeRoleOptions("R-04");
-  populateEmployeeAtasanOptions(null, "");
+  clearEmpAtasanSelection();
   document.getElementById("emp-input-area").value = "";
   document.getElementById("emp-input-password").value = "Password123!";
   document.getElementById("emp-input-status").value = "AKTIF";
@@ -6597,6 +6686,7 @@ function openEditEmployeeModal(nip) {
   const emp = SETTINGS_EMPLOYEES_DATA.find(e => e.nip === nip);
   if (!emp) return;
 
+  CURRENT_EMP_EDIT_NIP = nip;
   document.getElementById("modal-emp-title").innerText = `Edit Karyawan: ${emp.nama_lengkap}`;
   const nipInput = document.getElementById("emp-input-nip");
   nipInput.value = emp.nip;
@@ -6605,7 +6695,13 @@ function openEditEmployeeModal(nip) {
   document.getElementById("emp-input-email").value = emp.email || "";
   document.getElementById("emp-input-cabang").value = emp.cabang || "";
   populateEmployeeRoleOptions(emp.role_id || "R-04");
-  populateEmployeeAtasanOptions(emp.nip, emp.atasan_nip || "");
+  
+  if (emp.atasan_nip) {
+    selectEmpAtasan(emp.atasan_nip, emp.atasan_nama || emp.atasan_nip);
+  } else {
+    clearEmpAtasanSelection();
+  }
+
   document.getElementById("emp-input-area").value = emp.area_cover || "";
   document.getElementById("emp-input-password").value = "";
   document.getElementById("emp-input-status").value = (emp.status_aktif === "AKTIF" || emp.status_aktif === true) ? "AKTIF" : "NONAKTIF";
@@ -6613,6 +6709,7 @@ function openEditEmployeeModal(nip) {
 }
 
 function closeEmployeeModal() {
+  closeEmpAtasanSearchDropdown();
   document.getElementById("modal-employee-edit").classList.add("hidden");
 }
 
@@ -6631,15 +6728,11 @@ async function handleSaveEmployee(e) {
   const pass = document.getElementById("emp-input-password").value.trim();
   const status = document.getElementById("emp-input-status").value;
 
-  const atasanSelect = document.getElementById("emp-input-atasan");
-  const atasanNip = atasanSelect ? atasanSelect.value.trim() : "";
-  let atasanNama = "";
-  if (atasanNip && atasanSelect.selectedIndex >= 0) {
-    atasanNama = atasanSelect.options[atasanSelect.selectedIndex].getAttribute("data-nama") || "";
-    if (!atasanNama) {
-      const matchAtasan = (SETTINGS_EMPLOYEES_DATA || []).find(x => String(x.nip).trim() === atasanNip);
-      if (matchAtasan) atasanNama = matchAtasan.nama_lengkap || "";
-    }
+  const atasanNip = document.getElementById("emp-input-atasan-nip")?.value.trim() || "";
+  let atasanNama = document.getElementById("emp-input-atasan-nama")?.value.trim() || "";
+  if (atasanNip && !atasanNama) {
+    const matchAtasan = (SETTINGS_EMPLOYEES_DATA || []).find(x => String(x.nip).trim() === atasanNip);
+    if (matchAtasan) atasanNama = matchAtasan.nama_lengkap || "";
   }
 
   const btn = document.getElementById("btn-save-emp");
@@ -9184,5 +9277,9 @@ document.addEventListener("click", function(e) {
   const gpsImeiWrap = document.getElementById("gps-imei-search-wrapper");
   if (gpsImeiWrap && !gpsImeiWrap.contains(e.target)) {
     closeGpsImeiSearchDropdown();
+  }
+  const empAtasanWrap = document.getElementById("emp-atasan-search-wrapper");
+  if (empAtasanWrap && !empAtasanWrap.contains(e.target)) {
+    closeEmpAtasanSearchDropdown();
   }
 });

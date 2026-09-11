@@ -192,11 +192,42 @@
           </select>
         </div>
       </div>
-      <div>
+      <!-- ATASAN LANGSUNG SEARCHABLE DROPDOWN -->
+      <div class="relative" id="emp-atasan-search-wrapper">
         <label class="block font-semibold text-slate-700 mb-1">Atasan Langsung (Approver):</label>
-        <select id="emp-input-atasan" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
-          <option value="">-- Tidak Ada / Atasan Tertinggi --</option>
-        </select>
+        <input type="hidden" id="emp-input-atasan-nip" value="" />
+        <input type="hidden" id="emp-input-atasan-nama" value="" />
+        
+        <div class="relative">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-user-tie absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+            <input
+              type="text"
+              id="emp-atasan-search-input"
+              placeholder="Cari Atasan (NIP, Nama, atau Role)..."
+              autocomplete="off"
+              onfocus="openEmpAtasanSearchDropdown()"
+              oninput="filterEmpAtasanSearchOptions(this.value)"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition outline-none"
+            />
+            <button
+              type="button"
+              id="emp-atasan-search-clear-btn"
+              onclick="clearEmpAtasanSelection()"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i id="emp-atasan-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+          </div>
+
+          <div
+            id="emp-atasan-search-dropdown"
+            class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-100"
+          >
+            <!-- Dropdown items rendered via JS -->
+          </div>
+        </div>
         <span class="text-[10px] text-slate-400 mt-0.5 block">PIC yang akan menerima notifikasi dan menyetujui izin/reimburse karyawan ini</span>
       </div>
       <div>
