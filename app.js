@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v47";
+const APP_BUILD_VERSION = "20260911_v48";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1045,20 +1045,18 @@ async function handleLoginSubmit(e) {
 
               const rawRoleId = String(emp.role_id || "R-01").trim();
               let resolvedRoleName = emp.jabatan || rawRoleId;
-              let resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "izin", "persetujuan"];
 
               if (rawRoleId === "R-01" || rawRoleId.toLowerCase().includes("admin")) {
                 resolvedRoleName = "Admin";
               } else if (rawRoleId === "R-02" || rawRoleId.toLowerCase().includes("branch manager") || rawRoleId.toLowerCase().includes("bm")) {
                 resolvedRoleName = "Branch Manager";
-                resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "persetujuan", "izin"];
               } else if (rawRoleId === "R-03" || rawRoleId.toLowerCase().includes("fac")) {
                 resolvedRoleName = "FAC";
-                resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "izin"];
               } else if (rawRoleId === "R-04" || rawRoleId.toLowerCase().includes("other")) {
                 resolvedRoleName = "Other";
-                resolvedPerms = ["priority", "izin"];
               }
+
+              let resolvedPerms = getPermissionsForRole(rawRoleId, emp);
 
               const isMustChangePass = (
                 emp.status_ganti_pass === true ||
@@ -1292,9 +1290,15 @@ async function initDashboard() {
   const roleEl = document.getElementById("badge-role");
   if (roleEl) roleEl.innerText = uRole;
 
-  const perms = (Array.isArray(CURRENT_USER.permissions) && CURRENT_USER.permissions.length > 0)
-    ? CURRENT_USER.permissions
-    : (typeof getPermissionsForRole === "function" ? getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER) : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"]));
+  const perms = getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER);
+
+  const isSuperAdminOrBM = (
+    CURRENT_USER.role_id === "R-01" ||
+    CURRENT_USER.role_id === "R-02" ||
+    String(CURRENT_USER.role || "").toLowerCase().includes("admin") ||
+    String(CURRENT_USER.role || "").toLowerCase().includes("manager") ||
+    String(CURRENT_USER.role || "").toLowerCase().includes("supervisor")
+  );
 
   // Render & filter seluruh modul aplikasi sesuai hak akses role
   const allModulesList = [
@@ -1307,8 +1311,10 @@ async function initDashboard() {
   allModulesList.forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) {
-      if (key === "izin") {
-        btn.style.display = "flex"; // Modul Izin selalu tersedia
+      if (key === "izin" || key === "attendance_summary" || key === "work_calendar" || key === "helpdesk_support") {
+        btn.style.display = "flex"; // Modul esensial selalu tersedia
+      } else if (key === "persetujuan") {
+        btn.style.display = (isSuperAdminOrBM || perms.includes("persetujuan")) ? "flex" : "none";
       } else {
         btn.style.display = perms.includes(key) ? "flex" : "none";
       }
