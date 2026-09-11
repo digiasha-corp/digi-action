@@ -117,8 +117,16 @@ CREATE INDEX IF NOT EXISTS idx_izin_nip ON public.tr_izin_log (nip, timestamp DE
 CREATE INDEX IF NOT EXISTS idx_izin_status ON public.tr_izin_log (status_approval);
 
 -- 4. HAK AKSES DAN RLS (ROW LEVEL SECURITY)
+ALTER TABLE public.m_employee ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.m_role_permission ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tr_absensi_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tr_izin_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon all on m_employee" ON public.m_employee;
+CREATE POLICY "Allow anon all on m_employee" ON public.m_employee FOR ALL TO anon USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon all on m_role_permission" ON public.m_role_permission;
+CREATE POLICY "Allow anon all on m_role_permission" ON public.m_role_permission FOR ALL TO anon USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow anon all on tr_absensi_log" ON public.tr_absensi_log;
 CREATE POLICY "Allow anon all on tr_absensi_log" ON public.tr_absensi_log FOR ALL TO anon USING (true) WITH CHECK (true);
@@ -127,5 +135,7 @@ DROP POLICY IF EXISTS "Allow anon all on tr_izin_log" ON public.tr_izin_log;
 CREATE POLICY "Allow anon all on tr_izin_log" ON public.tr_izin_log FOR ALL TO anon USING (true) WITH CHECK (true);
 
 -- Verifikasi Komentar Tabel
+COMMENT ON TABLE public.m_employee IS 'Tabel Master Karyawan dan Kredensial Login';
+COMMENT ON TABLE public.m_role_permission IS 'Tabel Konfigurasi Akses Menu Berdasarkan Role';
 COMMENT ON TABLE public.tr_absensi_log IS 'Tabel Rekapitulasi Presensi Kehadiran dan Kepulangan Lapangan';
 COMMENT ON TABLE public.tr_izin_log IS 'Tabel Pengajuan Izin Karyawan dan Pusat Approval PIC';
