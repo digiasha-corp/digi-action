@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v39";
+const APP_BUILD_VERSION = "20260911_v42";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -813,6 +813,57 @@ async function callApi(action, data = {}) {
   }
 
   return { success: false, message: "Backend database belum terkonfigurasi." };
+}
+
+// =========================================================================
+// MASTER DATA SYNC ENGINE (POPULATES APP_STATE, GEOFENCE & PRIORITIES)
+// =========================================================================
+async function syncMasterDataFromApi() {
+  try {
+    const res = await callApi("getMasterData");
+    if (res && res.success) {
+      APP_STATE.dealers = res.dealers || [];
+      APP_STATE.units = res.units || [];
+      APP_STATE.idleGps = res.idleGps || [];
+      APP_STATE.assignments = res.assignments || [];
+      if (res.workLocations && res.workLocations.length > 0) {
+        OFFICE_LOCATIONS = res.workLocations;
+      }
+
+      // Hubungkan unit fasilitas dan assign concern ke masing-masing dealer
+      const assignmentsByDealer = {};
+      (APP_STATE.assignments || []).forEach(asg => {
+        const dName = String(asg.dealer_name || "").toUpperCase();
+        if (!assignmentsByDealer[dName]) assignmentsByDealer[dName] = [];
+        assignmentsByDealer[dName].push(asg);
+      });
+
+      const unitsByDealer = {};
+      (APP_STATE.units || []).forEach(u => {
+        const dName = String(u.dealer_name || "").toUpperCase();
+        if (!unitsByDealer[dName]) unitsByDealer[dName] = [];
+        unitsByDealer[dName].push(u);
+      });
+
+      MASTER_DEALER_PRIORITY_DATA = (APP_STATE.dealers || []).map(d => {
+        const dName = String(d.dealer_name || "").toUpperCase();
+        const dUnits = unitsByDealer[dName] || [];
+        const dAsg = assignmentsByDealer[dName] || [];
+        const dealerConcern = dAsg.find(a => !a.unit_fasilitas || a.unit_fasilitas === "Umum" || a.unit_fasilitas === "-");
+
+        return {
+          ...d,
+          units: dUnits,
+          dealer_concern: dealerConcern ? { urgency: dealerConcern.urgency_level, note: dealerConcern.instruksi } : null
+        };
+      });
+
+      return res;
+    }
+  } catch (err) {
+    console.warn("[syncMasterDataFromApi Warning]:", err);
+  }
+  return null;
 }
 
 // =========================================================================
