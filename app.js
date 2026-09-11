@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v38";
+const APP_BUILD_VERSION = "20260911_v39";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1379,6 +1379,7 @@ async function handleAbsenSubmit() {
   const selfieData = CURRENT_ABSEN_SELFIE_BASE64;
   const loadingOverlay = document.getElementById("absen-submitting-overlay");
 
+  try {
     const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
     const res = await callApi("submitAbsensi", {
       nip: CURRENT_USER?.nip || "-",
