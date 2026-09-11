@@ -1057,6 +1057,148 @@ function handleLogout() {
   loadScreen("login");
 }
 
+// =========================================================================
+// BANNER CAROUSEL & SLIDESHOW ENGINE
+// =========================================================================
+let CURRENT_BANNER_INDEX = 0;
+let BANNER_SLIDES_DATA = [];
+let BANNER_AUTOSLIDE_TIMER = null;
+
+const DEFAULT_BANNER_SLIDES = [
+  {
+    banner_id: "BNR-01",
+    title: "Selamat Datang di Digiasha Monitoring System",
+    description: "Aplikasi monitoring terpadu, presensi cerdas, dan support operasional karyawan.",
+    image_url: "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80",
+    tag: "DIGIASHA UPDATE",
+    tag_bg: "bg-teal-500 text-slate-950"
+  },
+  {
+    banner_id: "BNR-02",
+    title: "SOP Presensi Lapangan & Geofence Radius 100m",
+    description: "Lakukan absensi kedatangan tepat waktu sebelum 09:00 waktu setempat.",
+    image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80",
+    tag: "SOP OPERASIONAL",
+    tag_bg: "bg-emerald-500 text-slate-950"
+  },
+  {
+    banner_id: "BNR-03",
+    title: "Pusat Layanan Support Operasional & Memo",
+    description: "Ajukan klaim biaya operasional, memo pengajuan, dan perizinan dalam satu aplikasi.",
+    image_url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1000&q=80",
+    tag: "LAYANAN KARYAWAN",
+    tag_bg: "bg-indigo-500 text-white"
+  }
+];
+
+async function initBannerCarousel() {
+  if (BANNER_AUTOSLIDE_TIMER) {
+    clearInterval(BANNER_AUTOSLIDE_TIMER);
+    BANNER_AUTOSLIDE_TIMER = null;
+  }
+
+  BANNER_SLIDES_DATA = DEFAULT_BANNER_SLIDES;
+
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("m_announcement")
+        .select("*")
+        .eq("is_active", true)
+        .order("order_seq", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        BANNER_SLIDES_DATA = data.map((b, idx) => ({
+          ...b,
+          tag: b.title.includes("SOP") ? "SOP OPERASIONAL" : (b.title.includes("Layanan") || b.title.includes("Biaya") ? "LAYANAN KARYAWAN" : "DIGIASHA UPDATE"),
+          tag_bg: idx % 3 === 0 ? "bg-teal-500 text-slate-950" : (idx % 3 === 1 ? "bg-emerald-500 text-slate-950" : "bg-indigo-500 text-white")
+        }));
+      }
+    } catch (e) {
+      console.warn("Using fallback banner data:", e);
+    }
+  }
+
+  renderBannerCarousel();
+  startBannerAutoslide();
+}
+
+function renderBannerCarousel() {
+  const track = document.getElementById("banner-carousel-track");
+  const dotsContainer = document.getElementById("banner-carousel-dots");
+  const indicator = document.getElementById("carousel-indicator-text");
+
+  if (!track || !BANNER_SLIDES_DATA || BANNER_SLIDES_DATA.length === 0) return;
+
+  track.innerHTML = BANNER_SLIDES_DATA.map((slide, idx) => `
+    <div class="w-full h-full shrink-0 relative select-none">
+      <img src="${slide.image_url}" alt="${slide.title}" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80'">
+      <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent flex flex-col justify-end p-3.5 sm:p-4 text-white">
+        <span class="px-2 py-0.5 ${slide.tag_bg || 'bg-teal-500 text-slate-950'} font-bold rounded text-[9px] w-fit mb-1 shadow-sm uppercase tracking-wider">${slide.tag || 'INFO'}</span>
+        <h4 class="font-bold text-xs sm:text-sm line-clamp-1 text-white">${slide.title}</h4>
+        <p class="text-[10px] sm:text-xs text-slate-300 line-clamp-1 mt-0.5">${slide.description || ''}</p>
+      </div>
+    </div>
+  `).join("");
+
+  if (dotsContainer) {
+    dotsContainer.innerHTML = BANNER_SLIDES_DATA.map((_, idx) => `
+      <button onclick="goToBannerSlide(${idx})" class="${idx === CURRENT_BANNER_INDEX ? 'w-5 h-1.5 bg-teal-400' : 'w-2 h-1.5 bg-white/50 hover:bg-white'} rounded-full transition-all duration-300"></button>
+    `).join("");
+  }
+
+  if (indicator) {
+    indicator.innerText = `${CURRENT_BANNER_INDEX + 1} / ${BANNER_SLIDES_DATA.length}`;
+  }
+
+  goToBannerSlide(CURRENT_BANNER_INDEX);
+}
+
+function goToBannerSlide(index) {
+  if (!BANNER_SLIDES_DATA || BANNER_SLIDES_DATA.length === 0) return;
+  if (index < 0) index = BANNER_SLIDES_DATA.length - 1;
+  if (index >= BANNER_SLIDES_DATA.length) index = 0;
+
+  CURRENT_BANNER_INDEX = index;
+  const track = document.getElementById("banner-carousel-track");
+  const dotsContainer = document.getElementById("banner-carousel-dots");
+  const indicator = document.getElementById("carousel-indicator-text");
+
+  if (track) {
+    track.style.transform = `translateX(-${CURRENT_BANNER_INDEX * 100}%)`;
+  }
+
+  if (dotsContainer) {
+    const dots = dotsContainer.querySelectorAll("button");
+    dots.forEach((dot, idx) => {
+      if (idx === CURRENT_BANNER_INDEX) {
+        dot.className = "w-5 h-1.5 rounded-full bg-teal-400 transition-all duration-300";
+      } else {
+        dot.className = "w-2 h-1.5 rounded-full bg-white/50 hover:bg-white transition-all duration-300";
+      }
+    });
+  }
+
+  if (indicator) {
+    indicator.innerText = `${CURRENT_BANNER_INDEX + 1} / ${BANNER_SLIDES_DATA.length}`;
+  }
+}
+
+function nextBannerSlide() {
+  goToBannerSlide(CURRENT_BANNER_INDEX + 1);
+}
+
+function prevBannerSlide() {
+  goToBannerSlide(CURRENT_BANNER_INDEX - 1);
+}
+
+function startBannerAutoslide() {
+  if (BANNER_AUTOSLIDE_TIMER) clearInterval(BANNER_AUTOSLIDE_TIMER);
+  BANNER_AUTOSLIDE_TIMER = setInterval(() => {
+    nextBannerSlide();
+  }, 4500);
+}
+
 // Controller Dashboard
 async function initDashboard() {
   if (!CURRENT_USER) return;
@@ -1077,16 +1219,26 @@ async function initDashboard() {
     ? CURRENT_USER.permissions
     : (typeof getPermissionsForRole === "function" ? getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER) : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"]));
 
+  // Render & filter modul operasional sesuai hak akses
   ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "izin", "persetujuan", "history", "settings"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) {
       if (key === "izin") {
-        btn.style.display = "flex"; // Modul Izin selalu tersedia untuk seluruh karyawan
+        btn.style.display = "flex"; // Modul Izin selalu tersedia
       } else {
         btn.style.display = perms.includes(key) ? "flex" : "none";
       }
     }
   });
+
+  // Tampilkan/sembunyikan grup admin
+  const adminBox = document.getElementById("box-group-admin");
+  if (adminBox) {
+    adminBox.style.display = perms.includes("settings") ? "block" : "none";
+  }
+
+  // Inisialisasi Banner Slideshow Berita
+  await initBannerCarousel();
 
   // Sinkronkan status presensi hari ini
   await fetchTodayAbsenStatus();
@@ -1096,6 +1248,293 @@ async function initDashboard() {
     fetchPendingApprovalCount();
   }
 }
+
+// =========================================================================
+// DIGIASHA SUPPORT HUB MODAL CONTROLLER (EXPANSION READY)
+// =========================================================================
+function openSupportModal(type) {
+  const modal = document.getElementById("modal-digi-support");
+  const iconBox = document.getElementById("support-modal-icon-bg");
+  const icon = document.getElementById("support-modal-icon");
+  const title = document.getElementById("support-modal-title");
+  const badge = document.getElementById("support-modal-badge");
+  const content = document.getElementById("support-modal-content");
+  const footer = document.getElementById("support-modal-footer");
+
+  if (!modal || !content) return;
+
+  const userNip = CURRENT_USER?.nip || "-";
+  const userNama = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || "Karyawan";
+  const userCabang = CURRENT_USER?.cabang || "Head Office";
+
+  if (type === "expense_claim") {
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-base";
+    if (icon) icon.className = "fa-solid fa-money-bill-wave text-emerald-400";
+    if (title) title.innerText = "Pengajuan Biaya Operasional (Reimbursement)";
+    if (badge) badge.innerText = "Klaim Biaya BBM / Tol / Parkir / Ops Lapangan";
+
+    content.innerHTML = `
+      <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] text-emerald-950 flex items-start space-x-2">
+        <i class="fa-solid fa-circle-info text-emerald-600 mt-0.5 shrink-0"></i>
+        <span>Layanan pengajuan klaim biaya operasional kunjungan lapangan. Lampirkan foto kuitansi/struk transaksi yang sah.</span>
+      </div>
+
+      <form onsubmit="handleSupportSubmit('expense_claim', event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">NIP & Nama Pemohon:</label>
+            <input type="text" readonly value="${userNip} - ${userNama}" class="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 font-bold text-slate-700 text-xs truncate" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Cabang:</label>
+            <input type="text" readonly value="${userCabang}" class="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-700 text-xs" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Kategori Biaya: <span class="text-rose-500">*</span></label>
+          <select id="support-input-expense-category" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 text-xs">
+            <option value="BBM & Bensin">⛽ BBM & Bahan Bakar Operasional</option>
+            <option value="Tol & Parkir">🛣️ Biaya Tol & Tiket Parkir Lapangan</option>
+            <option value="Transportasi & Akomodasi">🏨 Transportasi Tiket / Penginapan Dinas</option>
+            <option value="Service Kendaraan & Pulsa">🔧 Servis Rutin Kendaraan & Pulsa/Data</option>
+            <option value="Biaya Operasional Lainnya">📦 Biaya Operasional / Pembelian Lainnya</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nominal Biaya (Rp): <span class="text-rose-500">*</span></label>
+            <input type="number" id="support-input-expense-amount" required min="1000" placeholder="Contoh: 150000" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 text-xs" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Transaksi: <span class="text-rose-500">*</span></label>
+            <input type="date" id="support-input-expense-date" required value="${new Date().toISOString().slice(0,10)}" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 text-xs" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Keterangan / Rincian Keperluan: <span class="text-rose-500">*</span></label>
+          <textarea id="support-input-expense-notes" required rows="2" placeholder="Jelaskan detail kunjungan dan rincian penggunaan biaya..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 text-xs"></textarea>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+          <label class="block font-semibold text-slate-700 mb-1">Foto Struk / Bukti Pembayaran: <span class="text-rose-500">*</span></label>
+          <input type="file" id="support-input-expense-file" accept="image/*" class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700" />
+        </div>
+
+        <div class="pt-2 flex space-x-2">
+          <button type="button" onclick="closeSupportModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" class="w-2/3 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Kirim Pengajuan Biaya</span>
+          </button>
+        </div>
+      </form>
+    `;
+  } else if (type === "internal_memo") {
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-base";
+    if (icon) icon.className = "fa-solid fa-file-lines text-blue-400";
+    if (title) title.innerText = "Pembuatan Memo Pengajuan Internal";
+    if (badge) badge.innerText = "Internal Memo & Permohonan Resmi";
+
+    content.innerHTML = `
+      <div class="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-950 flex items-start space-x-2">
+        <i class="fa-solid fa-circle-info text-blue-600 mt-0.5 shrink-0"></i>
+        <span>Gunakan form memo internal ini untuk permohonan persetujuan divisi, pengadaan perlengkapan, atau permohonan dinas ke manajemen.</span>
+      </div>
+
+      <form onsubmit="handleSupportSubmit('internal_memo', event)" class="space-y-3">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Perihal / Judul Memo: <span class="text-rose-500">*</span></label>
+          <input type="text" id="support-input-memo-subject" required placeholder="Contoh: Permohonan Pengadaan Alat GPS & Banner Display Cabang" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 text-xs" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Ditujukan Kepada: <span class="text-rose-500">*</span></label>
+            <input type="text" id="support-input-memo-to" required placeholder="Contoh: Branch Manager / HRGA" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 text-xs" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tingkat Urgensi:</label>
+            <select id="support-input-memo-priority" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 text-xs">
+              <option value="Normal">🟢 Normal</option>
+              <option value="Penting">🟡 Penting</option>
+              <option value="Sangat Mendesak">🔴 Sangat Mendesak</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Isi & Latar Belakang Pengajuan: <span class="text-rose-500">*</span></label>
+          <textarea id="support-input-memo-body" required rows="4" placeholder="Tuliskan secara lengkap rincian latar belakang, kebutuhan, dan dasar permohonan memo..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 text-xs"></textarea>
+        </div>
+
+        <div class="pt-2 flex space-x-2">
+          <button type="button" onclick="closeSupportModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" class="w-2/3 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Simpan & Kirim Memo</span>
+          </button>
+        </div>
+      </form>
+    `;
+  } else if (type === "employee_loan") {
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-base";
+    if (icon) icon.className = "fa-solid fa-hand-holding-dollar text-amber-400";
+    if (title) title.innerText = "Pengajuan Pinjaman Karyawan (Kasbon / Loan)";
+    if (badge) badge.innerText = "Fasilitas Pinjaman Darurat Karyawan";
+
+    content.innerHTML = `
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-950 flex items-start space-x-2">
+        <i class="fa-solid fa-circle-info text-amber-600 mt-0.5 shrink-0"></i>
+        <span>Fasilitas pinjaman karyawan / kasbon operasional darurat Digiasha. Pengajuan akan diteruskan ke komite manajemen untuk verifikasi.</span>
+      </div>
+
+      <form onsubmit="handleSupportSubmit('employee_loan', event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Jumlah Pinjaman (Rp): <span class="text-rose-500">*</span></label>
+            <input type="number" id="support-input-loan-amount" required min="100000" step="50000" placeholder="Contoh: 1000000" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 text-xs" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tenor Pemotongan Gaji:</label>
+            <select id="support-input-loan-tenor" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 text-xs">
+              <option value="1 Bulan">1 Bulan (Gaji Bulan Depan)</option>
+              <option value="2 Bulan">2 Bulan Angsuran</option>
+              <option value="3 Bulan">3 Bulan Angsuran</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tujuan / Keperluan Pinjaman: <span class="text-rose-500">*</span></label>
+          <textarea id="support-input-loan-reason" required rows="3" placeholder="Sebutkan keperluan darurat pengajuan pinjaman..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 text-xs"></textarea>
+        </div>
+
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600">
+          <i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i>
+          Dengan mengajukan form ini, pemohon menyetujui skema pemotongan payroll gaji sesuai tenor yang disepakati.
+        </div>
+
+        <div class="pt-2 flex space-x-2">
+          <button type="button" onclick="closeSupportModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" class="w-2/3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Ajukan Pinjaman</span>
+          </button>
+        </div>
+      </form>
+    `;
+  } else if (type === "helpdesk_support") {
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-base";
+    if (icon) icon.className = "fa-solid fa-headset text-purple-400";
+    if (title) title.innerText = "IT & Operational Helpdesk Support";
+    if (badge) badge.innerText = "Pusat Bantuan & Panduan Sistem Digiasha";
+
+    content.innerHTML = `
+      <div class="space-y-3">
+        <div class="p-3 bg-purple-50 border border-purple-200 rounded-2xl text-[11px] text-purple-950">
+          <h5 class="font-bold mb-1 flex items-center space-x-1.5 text-purple-900">
+            <i class="fa-solid fa-shield-heart text-purple-600"></i>
+            <span>Bantuan Sistem Lapangan Digiasha</span>
+          </h5>
+          <p>Jika Anda mengalami kendala teknis (GPS error, kamera selfie tidak muncul, salah login, atau sinkronisasi data), hubungi tim support operasional:</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2">
+          <a href="https://wa.me/6281234567890?text=Halo%20Tim%20Support%20Digiasha,%20saya%20mengalami%20kendala" target="_blank" class="p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-2xl flex items-center space-x-3 transition">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg shrink-0">
+              <i class="fa-brands fa-whatsapp"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <span class="font-bold text-xs text-emerald-950 block">Hotline WhatsApp IT Support</span>
+              <span class="text-[10px] text-emerald-700">Respon cepat hari kerja 08:00 - 18:00 WIB</span>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square text-emerald-600 text-xs"></i>
+          </a>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center text-lg shrink-0">
+              <i class="fa-solid fa-envelope"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <span class="font-bold text-xs text-slate-800 block">Email Support Resmi</span>
+              <span class="text-[10px] text-slate-500">support@digiasha.my.id</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-100 rounded-2xl text-[11px] text-slate-600 space-y-1">
+          <strong class="text-slate-800 block">Tips Cepat Kendala Presensi:</strong>
+          <p>1. Pastikan izin lokasi GPS di browser disetel ke "Allow" / "Izinkan".</p>
+          <p>2. Pastikan jam perangkat Anda sinkron otomatis dengan waktu jaringan.</p>
+          <p>3. Jika layar tidak berganti, lakukan Refresh browser atau Clear Cache.</p>
+        </div>
+      </div>
+    `;
+  } else if (type === "attendance_summary" || type === "work_calendar") {
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-slate-500/20 text-slate-300 flex items-center justify-center text-base";
+    if (icon) icon.className = "fa-solid fa-calendar-check text-teal-400";
+    if (title) title.innerText = type === "attendance_summary" ? "Rekapitulasi Presensi & Jam Kerja" : "Kalender Kerja & Hari Libur";
+    if (badge) badge.innerText = "Monitoring Presensi Karyawan";
+
+    content.innerHTML = `
+      <div class="space-y-3">
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] text-slate-700">
+          <div class="flex justify-between items-center mb-1">
+            <span class="font-bold text-xs text-slate-900">${userNama}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800">${userCabang}</span>
+          </div>
+          <p class="text-[10px] text-slate-500">NIP: ${userNip} | Jabatan: ${CURRENT_USER?.role || CURRENT_USER?.jabatan || '-'}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl">
+            <span class="text-[10px] text-emerald-600 font-bold block uppercase">Batas Jam Masuk</span>
+            <span class="text-sm font-black text-emerald-800 mt-0.5 block">09:00:00</span>
+            <span class="text-[9px] text-emerald-600">Waktu Kantor Setempat</span>
+          </div>
+          <div class="p-3 bg-blue-50 border border-blue-200 rounded-2xl">
+            <span class="text-[10px] text-blue-600 font-bold block uppercase">Radius Geofence</span>
+            <span class="text-sm font-black text-blue-800 mt-0.5 block">Maks 100m</span>
+            <span class="text-[9px] text-blue-600">Absen Masuk Kantor</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-900">
+          <i class="fa-solid fa-lightbulb text-amber-600 mr-1"></i>
+          Gunakan menu <strong>Riwayat Aktivitas</strong> untuk melihat log absensi dan perizinan harian Anda secara lengkap.
+        </div>
+      </div>
+    `;
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeSupportModal() {
+  const modal = document.getElementById("modal-digi-support");
+  if (modal) modal.classList.add("hidden");
+}
+
+function handleSupportSubmit(type, e) {
+  e.preventDefault();
+  closeSupportModal();
+  
+  const typeNameMap = {
+    "expense_claim": "Klaim Biaya Operasional",
+    "internal_memo": "Memo Pengajuan Internal",
+    "employee_loan": "Pinjaman Karyawan (Kasbon)"
+  };
+
+  showCenterAlertModal({
+    title: "Pengajuan Terkirim",
+    message: `Permohonan ${typeNameMap[type] || 'Layanan Support'} Anda berhasil disimpan dan diteruskan ke tim Finance & Operasional Digiasha.`,
+    type: "success"
+  });
+}
+
 
 // =========================================================================
 // POPUP TENGAH (CENTER ALERT DIALOG)
@@ -5691,6 +6130,7 @@ function copySummaryText() {
 // IN-APP MANAGEMENT / SETTINGS CONTROLLER (SUPER ADMIN)
 // =========================================================================
 let SETTINGS_EMPLOYEES_DATA = [];
+let SETTINGS_BANNERS_DATA = [];
 let SETTINGS_GPS_DATA = [];
 let SETTINGS_CURRENT_DEALER_ID = null;
 let SETTINGS_CURRENT_OFFICE_ID = null;
@@ -5698,6 +6138,7 @@ let SETTINGS_CURRENT_OFFICE_ID = null;
 async function initSettingsScreen() {
   switchSettingsTab("emp");
   loadEmployeesForSettings();
+  loadBannersForSettings();
   loadDealerSettings();
   loadOfficeLocationsForSettings();
   loadGpsInventoryForSettings();
@@ -5706,7 +6147,7 @@ async function initSettingsScreen() {
 }
 
 function switchSettingsTab(tab) {
-  const tabs = ["emp", "dealer", "office", "gps", "role"];
+  const tabs = ["emp", "banner", "dealer", "office", "gps", "role"];
   tabs.forEach(t => {
     const el = document.getElementById(`settings-tab-${t}`);
     const btn = document.getElementById(`tab-btn-${t}`);
@@ -5726,8 +6167,196 @@ function switchSettingsTab(tab) {
     if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
       renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
     }
+  } else if (tab === "banner") {
+    loadBannersForSettings();
   } else if (tab === "role") {
     loadRolePermissionsSettings();
+  }
+}
+
+// ---------------- TAB: BANNER BERITA & INFORMASI (ADMIN) ----------------
+async function loadBannersForSettings() {
+  const container = document.getElementById("banner-settings-list-container");
+  if (!container) return;
+
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("m_announcement")
+        .select("*")
+        .order("order_seq", { ascending: true });
+
+      if (!error && data) {
+        SETTINGS_BANNERS_DATA = data;
+        renderBannerSettingsList(SETTINGS_BANNERS_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Error load banners:", e);
+    }
+  }
+
+  SETTINGS_BANNERS_DATA = DEFAULT_BANNER_SLIDES;
+  renderBannerSettingsList(SETTINGS_BANNERS_DATA);
+}
+
+function renderBannerSettingsList(list) {
+  const container = document.getElementById("banner-settings-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <i class="fa-solid fa-bullhorn text-2xl mb-1 text-slate-300 block"></i>
+        Belum ada banner informasi yang dibuat.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(item => {
+    const isActive = item.is_active !== false && String(item.is_active) !== "false";
+    return `
+      <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-teal-300 transition">
+        <div class="flex items-center space-x-3 min-w-0 flex-1">
+          <img src="${item.image_url}" alt="${item.title}" class="w-16 h-12 object-cover rounded-xl shrink-0 bg-slate-100 border border-slate-200" onerror="this.src='https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=300&q=80'">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-2">
+              <span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-700">#${item.order_seq || 1}</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}">
+                ${isActive ? '● Aktif' : '○ Nonaktif'}
+              </span>
+            </div>
+            <h5 class="font-bold text-xs text-slate-900 line-clamp-1 mt-0.5">${item.title}</h5>
+            <p class="text-[10px] text-slate-500 line-clamp-1">${item.description || '-'}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-1.5 self-end sm:self-center shrink-0">
+          <button type="button" onclick="openEditBannerModal('${item.banner_id}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center space-x-1">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Edit</span>
+          </button>
+          <button type="button" onclick="handleDeleteBanner('${item.banner_id}')" class="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs transition" title="Hapus Banner">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddBannerModal() {
+  document.getElementById("banner-modal-title").innerText = "Tambah Banner Informasi";
+  document.getElementById("banner-input-id").value = "";
+  document.getElementById("banner-input-title").value = "";
+  document.getElementById("banner-input-desc").value = "";
+  document.getElementById("banner-input-image").value = "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80";
+  document.getElementById("banner-input-order").value = (SETTINGS_BANNERS_DATA.length + 1).toString();
+  document.getElementById("banner-input-active").value = "true";
+  document.getElementById("modal-banner-edit").classList.remove("hidden");
+}
+
+function openEditBannerModal(bannerId) {
+  const item = SETTINGS_BANNERS_DATA.find(b => b.banner_id === bannerId);
+  if (!item) return;
+
+  document.getElementById("banner-modal-title").innerText = "Edit Banner Informasi";
+  document.getElementById("banner-input-id").value = item.banner_id;
+  document.getElementById("banner-input-title").value = item.title;
+  document.getElementById("banner-input-desc").value = item.description || "";
+  document.getElementById("banner-input-image").value = item.image_url;
+  document.getElementById("banner-input-order").value = item.order_seq || 1;
+  document.getElementById("banner-input-active").value = (item.is_active !== false).toString();
+  document.getElementById("modal-banner-edit").classList.remove("hidden");
+}
+
+function closeBannerModal() {
+  document.getElementById("modal-banner-edit").classList.add("hidden");
+}
+
+async function handleBannerFileUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  showToast("Mengunggah foto poster...", "info", 1500);
+  try {
+    const compressed = await compressImage(file, 1200, 0.85);
+    const fileName = `banner_${Date.now()}.jpg`;
+    const publicUrl = await uploadToSupabaseStorage(compressed, "banners", fileName);
+    if (publicUrl) {
+      document.getElementById("banner-input-image").value = publicUrl;
+      showToast("Foto banner berhasil diunggah!", "success", 1500);
+    } else {
+      document.getElementById("banner-input-image").value = compressed;
+      showToast("Foto berhasil dimuat.", "success", 1500);
+    }
+  } catch (err) {
+    console.error("Upload error:", err);
+    showToast("Gagal mengunggah foto: " + err.message, "error", 2000);
+  }
+}
+
+async function handleSaveBanner(e) {
+  e.preventDefault();
+  const idVal = document.getElementById("banner-input-id").value;
+  const title = document.getElementById("banner-input-title").value.trim();
+  const desc = document.getElementById("banner-input-desc").value.trim();
+  const imageUrl = document.getElementById("banner-input-image").value.trim();
+  const orderSeq = parseInt(document.getElementById("banner-input-order").value, 10) || 1;
+  const isActive = document.getElementById("banner-input-active").value === "true";
+
+  const bannerId = idVal || `BNR-${Date.now().toString().slice(-6)}`;
+  const payload = {
+    banner_id: bannerId,
+    title: title,
+    description: desc,
+    image_url: imageUrl,
+    order_seq: orderSeq,
+    is_active: isActive,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-banner");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_announcement")
+        .upsert([payload]);
+      if (error) throw error;
+    }
+
+    closeBannerModal();
+    showToast("Banner informasi berhasil disimpan!", "success", 1500);
+    await loadBannersForSettings();
+  } catch (err) {
+    alert("Gagal menyimpan banner: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+async function handleDeleteBanner(bannerId) {
+  if (!confirm("Apakah Anda yakin ingin menghapus banner ini?")) return;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("m_announcement")
+        .delete()
+        .eq("banner_id", bannerId);
+      if (error) throw error;
+    }
+
+    showToast("Banner berhasil dihapus!", "success", 1500);
+    await loadBannersForSettings();
+  } catch (err) {
+    alert("Gagal menghapus banner: " + err.message);
   }
 }
 

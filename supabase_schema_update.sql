@@ -134,8 +134,35 @@ CREATE POLICY "Allow anon all on tr_absensi_log" ON public.tr_absensi_log FOR AL
 DROP POLICY IF EXISTS "Allow anon all on tr_izin_log" ON public.tr_izin_log;
 CREATE POLICY "Allow anon all on tr_izin_log" ON public.tr_izin_log FOR ALL TO anon USING (true) WITH CHECK (true);
 
+-- 5. TABEL BANNER INFORMASI & BERITA DASHBOARD (m_announcement)
+CREATE TABLE IF NOT EXISTS public.m_announcement (
+    banner_id VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(150) NOT NULL,
+    description TEXT,
+    image_url TEXT NOT NULL,
+    action_link TEXT,
+    order_seq INT DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.m_announcement ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on m_announcement" ON public.m_announcement;
+CREATE POLICY "Allow anon all on m_announcement" ON public.m_announcement FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Starter Sample Data Banner Berita jika belum ada
+INSERT INTO public.m_announcement (banner_id, title, description, image_url, order_seq, is_active)
+VALUES 
+  ('BNR-01', 'Selamat Datang di Digiasha Monitoring System', 'Aplikasi terpadu monitoring lapangan, presensi cerdas, dan support operasional karyawan.', 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80', 1, true),
+  ('BNR-02', 'SOP Presensi Lapangan & Geofence 100m', 'Pastikan GPS perangkat Anda akurat sebelum melakukan absensi kedatangan tepat waktu (maksimal 09:00 WIB/WITA/WIT).', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80', 2, true),
+  ('BNR-03', 'Pusat Layanan & Support Operasional', 'Fitur pengajuan biaya operasional, memo pengajuan, dan perizinan terpusat kini semakin mudah.', 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1000&q=80', 3, true)
+ON CONFLICT (banner_id) DO NOTHING;
+
 -- Verifikasi Komentar Tabel
 COMMENT ON TABLE public.m_employee IS 'Tabel Master Karyawan dan Kredensial Login';
 COMMENT ON TABLE public.m_role_permission IS 'Tabel Konfigurasi Akses Menu Berdasarkan Role';
 COMMENT ON TABLE public.tr_absensi_log IS 'Tabel Rekapitulasi Presensi Kehadiran dan Kepulangan Lapangan';
 COMMENT ON TABLE public.tr_izin_log IS 'Tabel Pengajuan Izin Karyawan dan Pusat Approval PIC';
+COMMENT ON TABLE public.m_announcement IS 'Tabel Banner Informasi & Berita Slide Show Dashboard';
+

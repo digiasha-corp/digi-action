@@ -429,16 +429,35 @@
           <i class="fa-solid fa-arrow-right text-xs"></i>
         </button>
 
-        <button type="button" onclick="handleLogout()" class="w-full py-2 text-slate-500 hover:text-red-600 font-semibold rounded-xl text-xs transition text-center">
-          Batal & Keluar (Logout)
-        </button>
-      </form>
+  <!-- MODAL LAYANAN & SUPPORT KARYAWAN (DIGI-SUPPORT) -->
+  <div id="modal-digi-support" class="fixed inset-0 bg-slate-900/65 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div id="support-modal-icon-bg" class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-base">
+            <i id="support-modal-icon" class="fa-solid fa-hand-holding-dollar"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs sm:text-sm" id="support-modal-title">Layanan Support Karyawan</h4>
+            <span class="text-[10px] text-emerald-300 font-medium" id="support-modal-badge">Digiasha Support Hub</span>
+          </div>
+        </div>
+        <button type="button" onclick="closeSupportModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+
+      <div class="p-4 overflow-y-auto space-y-3.5 text-xs flex-1" id="support-modal-content">
+        <!-- Content injected dynamically via openSupportModal(type) in app.js -->
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0" id="support-modal-footer">
+        <button type="button" onclick="closeSupportModal()" class="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl text-xs">Tutup</button>
+      </div>
     </div>
   </div>
 
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260911_v40"></script>
-  <script src="app.js?v=20260911_v40"></script>
+  <script src="config.js?v=20260911_v41"></script>
+  <script src="app.js?v=20260911_v41"></script>
 </body>
 </html>

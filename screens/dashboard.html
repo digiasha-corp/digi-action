@@ -1,135 +1,308 @@
-<div class="space-y-4">
-  <!-- Banner Presensi Cepat -->
-  <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between gap-2">
-    <div class="min-w-0">
-      <span class="text-[10px] text-emerald-100 uppercase tracking-wider font-bold block" id="dash-presensi-status-label">Kehadiran Hari Ini</span>
-      <h4 class="text-xs font-bold truncate" id="dash-presensi-status-sub">Presensi & Perizinan Karyawan</h4>
+<div class="space-y-4 pb-12">
+  <!-- 1. BAR PRESENSI CEPAT (PALING ATAS) -->
+  <div class="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 rounded-3xl p-4 text-white shadow-lg border border-teal-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden">
+    <!-- Decorative background glow -->
+    <div class="absolute -right-8 -top-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+    
+    <div class="flex items-center space-x-3 min-w-0 z-10">
+      <div class="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center text-xl shrink-0 shadow-inner">
+        <i class="fa-solid fa-fingerprint"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-[10px] text-emerald-300 uppercase tracking-wider font-bold" id="dash-presensi-status-label">Presensi Hari Ini</span>
+        </div>
+        <h4 class="text-xs sm:text-sm font-bold truncate text-white" id="dash-presensi-status-sub">Siap Melakukan Presensi</h4>
+      </div>
     </div>
-    <button type="button" id="dash-btn-presensi" onclick="openAbsenChoiceModal()" class="px-3.5 py-2 bg-white text-teal-800 hover:bg-emerald-50 rounded-xl text-xs font-bold shrink-0 shadow flex items-center space-x-1.5 transition active:scale-95">
-      <i class="fa-solid fa-fingerprint text-emerald-600"></i>
-      <span id="dash-btn-presensi-text">Presensi Online</span>
-    </button>
+
+    <div class="flex items-center space-x-2 z-10 shrink-0">
+      <button type="button" id="dash-btn-presensi" onclick="openAbsenChoiceModal()" class="flex-1 sm:flex-initial px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-md flex items-center justify-center space-x-2 transition active:scale-95">
+        <i class="fa-solid fa-camera text-slate-900"></i>
+        <span id="dash-btn-presensi-text">Presensi Online</span>
+      </button>
+      <button type="button" onclick="selectIzinChoice()" class="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-teal-200 border border-white/10 rounded-xl text-xs font-semibold transition active:scale-95" title="Ajukan Izin / WFA">
+        <i class="fa-solid fa-file-pen"></i>
+      </button>
+    </div>
   </div>
 
-  <div>
-    <h4 class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">Pilih Modul Aktivitas</h4>
-    <div class="grid grid-cols-2 gap-2.5" id="main-menu-grid">
-      
-      <!-- MENU IZIN (WFA, Datang Terlambat, Cuti, Sakit) -->
-      <button id="menu-btn-izin" onclick="loadScreen('izin')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-teal-500 transition">
-        <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-file-signature"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Pengajuan Izin</div>
-          <div class="text-[10px] text-slate-400 leading-tight">WFA, Terlambat, Cuti, Sakit</div>
-        </div>
-      </button>
-
-      <!-- MENU PERSETUJUAN (Approval Hub) -->
-      <button id="menu-btn-persetujuan" onclick="loadScreen('persetujuan')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-indigo-500 transition relative">
-        <div class="flex items-center justify-between">
-          <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
-            <i class="fa-solid fa-stamp"></i>
-          </div>
-          <span id="badge-pending-approval-count" class="hidden text-[10px] bg-rose-500 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">0</span>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Persetujuan</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Pusat approval PIC & atasan</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-priority" onclick="loadScreen('priority')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Priority Visit</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Scorecard & prioritas mitra</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-assignment" onclick="loadScreen('assignment')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-bullhorn"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Assign Concern</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Tandai concern visit mitra</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-visit" onclick="loadScreen('visit')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-clipboard-check"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Laporan Visit Mitra</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Input regular & unit OVD</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-onboarding" onclick="loadScreen('onboarding')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-user-plus"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Visit Calon Mitra</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Input onboarding baru</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-pipeline" onclick="loadScreen('pipeline')" class="bg-white p-3.5 rounded-2xl border border-teal-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-teal-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center text-base">
-          <i class="fa-solid fa-bars-progress"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Pipeline Onboarding</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Progres & folder dokumen</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-gps" onclick="loadScreen('gps')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-satellite-dish"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">GPS Maintenance</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Pasang / ganti / cabut GPS</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-fac" onclick="loadScreen('fac')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-tower-broadcast"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Laporan GPS (FAC)</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Monitoring sinyal harian</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-history" onclick="loadScreen('history')" class="bg-white p-3.5 rounded-2xl border border-orange-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-orange-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-clock-rotate-left"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Riwayat Aktivitas</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Log visit, calon mitra & GPS</div>
-        </div>
-      </button>
-
-      <button id="menu-btn-settings" onclick="loadScreen('settings')" class="bg-white p-3.5 rounded-2xl border border-indigo-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-indigo-400 transition">
-        <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-sliders"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">Pengaturan (Admin)</div>
-          <div class="text-[10px] text-slate-400 leading-tight">Kelola Akun, Area & GPS</div>
-        </div>
-      </button>
-
+  <!-- 2. SLIDE SHOW BERITA & INFORMASI (BANNER CAROUSEL) -->
+  <div class="relative">
+    <div class="flex justify-between items-center mb-1.5 px-0.5">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1.5">
+        <i class="fa-solid fa-bullhorn text-teal-600"></i>
+        <span>Informasi & Pengumuman</span>
+      </span>
+      <span class="text-[10px] text-slate-400 font-medium" id="carousel-indicator-text">1 / 3</span>
     </div>
+
+    <div class="relative overflow-hidden rounded-3xl bg-slate-900 shadow-md aspect-[21/9] sm:aspect-[24/9] border border-slate-200/80 group">
+      <!-- Carousel Track / Container -->
+      <div id="banner-carousel-track" class="w-full h-full flex transition-transform duration-500 ease-out">
+        <!-- Slide 1 -->
+        <div class="w-full h-full shrink-0 relative">
+          <img src="https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80" alt="Digiasha Monitoring" class="w-full h-full object-cover">
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-4 text-white">
+            <span class="px-2 py-0.5 bg-teal-500 text-slate-950 font-bold rounded text-[9px] w-fit mb-1 shadow-sm">DIGIASHA UPDATE</span>
+            <h4 class="font-bold text-xs sm:text-sm line-clamp-1">Selamat Datang di Digiasha Monitoring System</h4>
+            <p class="text-[10px] sm:text-xs text-slate-300 line-clamp-1 mt-0.5">Aplikasi monitoring terpadu, presensi cerdas, dan support operasional karyawan.</p>
+          </div>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="w-full h-full shrink-0 relative">
+          <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80" alt="SOP Presensi" class="w-full h-full object-cover">
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-4 text-white">
+            <span class="px-2 py-0.5 bg-emerald-500 text-slate-950 font-bold rounded text-[9px] w-fit mb-1 shadow-sm">SOP OPERASIONAL</span>
+            <h4 class="font-bold text-xs sm:text-sm line-clamp-1">SOP Presensi Lapangan & Geofence Radius 100m</h4>
+            <p class="text-[10px] sm:text-xs text-slate-300 line-clamp-1 mt-0.5">Lakukan absensi kedatangan tepat waktu sebelum 09:00 waktu setempat.</p>
+          </div>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="w-full h-full shrink-0 relative">
+          <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1000&q=80" alt="Layanan Support" class="w-full h-full object-cover">
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-4 text-white">
+            <span class="px-2 py-0.5 bg-indigo-500 text-white font-bold rounded text-[9px] w-fit mb-1 shadow-sm">LAYANAN KARYAWAN</span>
+            <h4 class="font-bold text-xs sm:text-sm line-clamp-1">Pusat Layanan Support Operasional & Memo</h4>
+            <p class="text-[10px] sm:text-xs text-slate-300 line-clamp-1 mt-0.5">Ajukan biaya operasional, memo pengajuan, dan izin WFA kini dalam satu aplikasi.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Carousel Navigation Buttons -->
+      <button onclick="prevBannerSlide()" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-950/60 hover:bg-slate-950 text-white flex items-center justify-center text-xs backdrop-blur-xs transition opacity-75 group-hover:opacity-100">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <button onclick="nextBannerSlide()" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-950/60 hover:bg-slate-950 text-white flex items-center justify-center text-xs backdrop-blur-xs transition opacity-75 group-hover:opacity-100">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+
+      <!-- Carousel Dots Indicator -->
+      <div id="banner-carousel-dots" class="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex space-x-1.5 z-20">
+        <button onclick="goToBannerSlide(0)" class="w-5 h-1.5 rounded-full bg-teal-400 transition-all"></button>
+        <button onclick="goToBannerSlide(1)" class="w-2 h-1.5 rounded-full bg-white/50 hover:bg-white transition-all"></button>
+        <button onclick="goToBannerSlide(2)" class="w-2 h-1.5 rounded-full bg-white/50 hover:bg-white transition-all"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. KUMPULAN MENU TERKELOMPOK (COMPACT ICON GRID) -->
+  <div class="space-y-4">
+
+    <!-- [GRUP 1] OPERASIONAL LAPANGAN (FIELD OPS) -->
+    <div class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+      <div class="flex items-center justify-between mb-3 px-1">
+        <div class="flex items-center space-x-2">
+          <div class="w-2 h-3.5 bg-teal-600 rounded-full"></div>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Operasional Lapangan</h4>
+        </div>
+        <span class="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full font-semibold">Field Team</span>
+      </div>
+
+      <div class="grid grid-cols-4 gap-2 text-center" id="group-field-ops">
+        
+        <!-- Priority Visit -->
+        <button id="menu-btn-priority" onclick="loadScreen('priority')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-amber-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-amber-700">Priority</span>
+          <span class="text-[9px] text-slate-400">Scorecard</span>
+        </button>
+
+        <!-- Assign Concern -->
+        <button id="menu-btn-assignment" onclick="loadScreen('assignment')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-purple-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-bullhorn"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-purple-700">Assign</span>
+          <span class="text-[9px] text-slate-400">Concern</span>
+        </button>
+
+        <!-- Laporan Visit Mitra -->
+        <button id="menu-btn-visit" onclick="loadScreen('visit')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-blue-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-blue-700">Visit Mitra</span>
+          <span class="text-[9px] text-slate-400">Input Form</span>
+        </button>
+
+        <!-- Visit Calon Mitra -->
+        <button id="menu-btn-onboarding" onclick="loadScreen('onboarding')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-teal-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-user-plus"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-teal-700">Calon Mitra</span>
+          <span class="text-[9px] text-slate-400">Onboarding</span>
+        </button>
+
+        <!-- Pipeline Onboarding -->
+        <button id="menu-btn-pipeline" onclick="loadScreen('pipeline')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-cyan-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-bars-progress"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-cyan-700">Pipeline</span>
+          <span class="text-[9px] text-slate-400">Dokumen</span>
+        </button>
+
+        <!-- GPS Maintenance -->
+        <button id="menu-btn-gps" onclick="loadScreen('gps')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-emerald-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-satellite-dish"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-emerald-700">GPS Maint</span>
+          <span class="text-[9px] text-slate-400">Pasang/Cabut</span>
+        </button>
+
+        <!-- Laporan GPS (FAC) -->
+        <button id="menu-btn-fac" onclick="loadScreen('fac')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-sky-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-tower-broadcast"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-sky-700">Sinyal FAC</span>
+          <span class="text-[9px] text-slate-400">Monitoring</span>
+        </button>
+
+        <!-- Riwayat Log -->
+        <button id="menu-btn-history" onclick="loadScreen('history')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-orange-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-orange-700">Riwayat</span>
+          <span class="text-[9px] text-slate-400">Log Aktivitas</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- [GRUP 2] PRESENSI & WORKFLOW PERSETUJUAN -->
+    <div class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+      <div class="flex items-center justify-between mb-3 px-1">
+        <div class="flex items-center space-x-2">
+          <div class="w-2 h-3.5 bg-indigo-600 rounded-full"></div>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Presensi & Persetujuan</h4>
+        </div>
+        <span class="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full font-semibold">Workflow</span>
+      </div>
+
+      <div class="grid grid-cols-4 gap-2 text-center">
+        
+        <!-- Pengajuan Izin -->
+        <button id="menu-btn-izin" onclick="loadScreen('izin')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-teal-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-600 to-cyan-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-file-signature"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-teal-700">Pengajuan Izin</span>
+          <span class="text-[9px] text-slate-400">WFA / Cuti</span>
+        </button>
+
+        <!-- Persetujuan PIC -->
+        <button id="menu-btn-persetujuan" onclick="loadScreen('persetujuan')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-indigo-50/60 transition active:scale-95 relative">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition relative">
+            <i class="fa-solid fa-stamp"></i>
+            <span id="badge-pending-approval-count" class="hidden absolute -top-1.5 -right-1.5 text-[9px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded-full shadow border-2 border-white">0</span>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-indigo-700">Persetujuan</span>
+          <span class="text-[9px] text-slate-400">Approval Hub</span>
+        </button>
+
+        <!-- Rekap Presensi & Jam Kerja -->
+        <button onclick="openSupportModal('attendance_summary')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-calendar-check"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-slate-900">Rekap Absen</span>
+          <span class="text-[9px] text-slate-400">Statistik</span>
+        </button>
+
+        <!-- Kalender Libur & Jadwal -->
+        <button onclick="openSupportModal('work_calendar')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-calendar-days"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-rose-700">Jadwal Kerja</span>
+          <span class="text-[9px] text-slate-400">Kalender</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- [GRUP 3] LAYANAN & SUPPORT KARYAWAN (DIGIASHA SUPPORT) -->
+    <div class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+      <div class="flex items-center justify-between mb-3 px-1">
+        <div class="flex items-center space-x-2">
+          <div class="w-2 h-3.5 bg-emerald-600 rounded-full"></div>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Layanan & Support Karyawan</h4>
+        </div>
+        <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold">Digi-Support</span>
+      </div>
+
+      <div class="grid grid-cols-4 gap-2 text-center" id="group-support-ops">
+        
+        <!-- Pengajuan Biaya (Reimbursement / Expense Claim) -->
+        <button id="menu-btn-support-expense" onclick="openSupportModal('expense_claim')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-emerald-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-money-bill-wave"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-emerald-700">Klaim Biaya</span>
+          <span class="text-[9px] text-slate-400">Reimburse/Ops</span>
+        </button>
+
+        <!-- Pembuatan Memo Pengajuan (Internal Memo) -->
+        <button id="menu-btn-support-memo" onclick="openSupportModal('internal_memo')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-blue-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-file-lines"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-blue-700">Memo Internal</span>
+          <span class="text-[9px] text-slate-400">Pengajuan Surat</span>
+        </button>
+
+        <!-- Pinjaman Karyawan (Cash Advance / Loan) -->
+        <button id="menu-btn-support-loan" onclick="openSupportModal('employee_loan')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-amber-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-amber-700">Pinjaman</span>
+          <span class="text-[9px] text-slate-400">Kasbon / Loan</span>
+        </button>
+
+        <!-- IT Helpdesk & Panduan SOP -->
+        <button id="menu-btn-support-helpdesk" onclick="openSupportModal('helpdesk_support')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-purple-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-headset"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-purple-700">Helpdesk</span>
+          <span class="text-[9px] text-slate-400">Bantuan & SOP</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- [GRUP 4] ADMINISTRASI & SISTEM (ADMIN & MANAGEMENT) -->
+    <div id="box-group-admin" class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+      <div class="flex items-center justify-between mb-3 px-1">
+        <div class="flex items-center space-x-2">
+          <div class="w-2 h-3.5 bg-slate-800 rounded-full"></div>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Administrasi & Sistem</h4>
+        </div>
+        <span class="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">Admin Panel</span>
+      </div>
+
+      <div class="grid grid-cols-4 gap-2 text-center">
+        <!-- Pengaturan Admin -->
+        <button id="menu-btn-settings" onclick="loadScreen('settings')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-indigo-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-indigo-700">Pengaturan</span>
+          <span class="text-[9px] text-slate-400">Master & Banner</span>
+        </button>
+      </div>
+    </div>
+
   </div>
 </div>
