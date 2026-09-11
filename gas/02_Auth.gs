@@ -194,7 +194,8 @@ function handleLogin(identifier, password) {
                 cabang: emp.cabang || "HEAD OFFICE",
                 area_cover: emp.area_cover || "",
                 atasan_nip: emp.atasan_nip || "",
-                atasan_nama: emp.atasan_nama || ""
+                atasan_nama: emp.atasan_nama || "",
+                status_ganti_pass: emp.status_ganti_pass === true || String(emp.status_ganti_pass).toLowerCase() === "true" || cleanPass === "Password123!"
               }
             };
           }

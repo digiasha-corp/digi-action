@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v43";
+const APP_BUILD_VERSION = "20260911_v44";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1060,6 +1060,13 @@ async function handleLoginSubmit(e) {
                 resolvedPerms = ["priority", "izin"];
               }
 
+              const isMustChangePass = (
+                emp.status_ganti_pass === true ||
+                String(emp.status_ganti_pass).toLowerCase() === "true" ||
+                passHash === "Password123!" ||
+                password === "Password123!"
+              );
+
               authUser = {
                 nip: emp.nip || "-",
                 nama: emp.nama_lengkap || "Karyawan Digiasha",
@@ -1071,7 +1078,8 @@ async function handleLoginSubmit(e) {
                 cabang: emp.cabang || "HEAD OFFICE",
                 area_cover: emp.area_cover || "",
                 atasan_nip: emp.atasan_nip || "",
-                atasan_nama: emp.atasan_nama || ""
+                atasan_nama: emp.atasan_nama || "",
+                status_ganti_pass: isMustChangePass
               };
             }
           }
@@ -1086,6 +1094,9 @@ async function handleLoginSubmit(e) {
       const res = await callApi("login", { identifier, password });
       if (res && res.success && res.user) {
         authUser = res.user;
+        if (authUser.status_ganti_pass === undefined) {
+          authUser.status_ganti_pass = (password === "Password123!");
+        }
       } else {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
