@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v45";
+const APP_BUILD_VERSION = "20260911_v46";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6534,6 +6534,7 @@ function renderEmployeeList(list) {
             <span>${emp.cabang || "-"}</span>
             <span>•</span>
             <span>Area: <strong class="text-indigo-900">${emp.area_cover || 'Semua Area'}</strong></span>
+            ${emp.atasan_nama ? `<span>•</span><span>Atasan: <strong class="text-slate-700">${emp.atasan_nama}</strong></span>` : ''}
           </div>
         </div>
         <button type="button" onclick="openEditEmployeeModal('${emp.nip}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
@@ -6557,6 +6558,26 @@ function populateEmployeeRoleOptions(selectedRoleId = "R-04") {
   }).join('');
 }
 
+function populateEmployeeAtasanOptions(currentNip = null, selectedAtasanNip = "") {
+  const select = document.getElementById("emp-input-atasan");
+  if (!select) return;
+
+  const allEmployees = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) 
+    ? SETTINGS_EMPLOYEES_DATA 
+    : (APP_STATE.employees || []);
+
+  const eligible = allEmployees.filter(e => !currentNip || String(e.nip).trim() !== String(currentNip).trim());
+
+  let optionsHtml = '<option value="">-- Tidak Ada / Atasan Tertinggi --</option>';
+  optionsHtml += eligible.map(e => {
+    const isSel = String(e.nip).trim() === String(selectedAtasanNip || "").trim();
+    const roleTitle = e.role_id || e.jabatan || "";
+    return `<option value="${e.nip}" data-nama="${e.nama_lengkap || ''}" ${isSel ? 'selected' : ''}>${e.nama_lengkap} (${e.nip})${roleTitle ? ' - ' + roleTitle : ''}</option>`;
+  }).join("");
+
+  select.innerHTML = optionsHtml;
+}
+
 function openAddEmployeeModal() {
   document.getElementById("modal-emp-title").innerText = "Tambah Karyawan Baru";
   document.getElementById("emp-input-nip").value = "";
@@ -6565,6 +6586,7 @@ function openAddEmployeeModal() {
   document.getElementById("emp-input-email").value = "";
   document.getElementById("emp-input-cabang").value = "Head Office";
   populateEmployeeRoleOptions("R-04");
+  populateEmployeeAtasanOptions(null, "");
   document.getElementById("emp-input-area").value = "";
   document.getElementById("emp-input-password").value = "Password123!";
   document.getElementById("emp-input-status").value = "AKTIF";
@@ -6583,6 +6605,7 @@ function openEditEmployeeModal(nip) {
   document.getElementById("emp-input-email").value = emp.email || "";
   document.getElementById("emp-input-cabang").value = emp.cabang || "";
   populateEmployeeRoleOptions(emp.role_id || "R-04");
+  populateEmployeeAtasanOptions(emp.nip, emp.atasan_nip || "");
   document.getElementById("emp-input-area").value = emp.area_cover || "";
   document.getElementById("emp-input-password").value = "";
   document.getElementById("emp-input-status").value = (emp.status_aktif === "AKTIF" || emp.status_aktif === true) ? "AKTIF" : "NONAKTIF";
@@ -6608,6 +6631,17 @@ async function handleSaveEmployee(e) {
   const pass = document.getElementById("emp-input-password").value.trim();
   const status = document.getElementById("emp-input-status").value;
 
+  const atasanSelect = document.getElementById("emp-input-atasan");
+  const atasanNip = atasanSelect ? atasanSelect.value.trim() : "";
+  let atasanNama = "";
+  if (atasanNip && atasanSelect.selectedIndex >= 0) {
+    atasanNama = atasanSelect.options[atasanSelect.selectedIndex].getAttribute("data-nama") || "";
+    if (!atasanNama) {
+      const matchAtasan = (SETTINGS_EMPLOYEES_DATA || []).find(x => String(x.nip).trim() === atasanNip);
+      if (matchAtasan) atasanNama = matchAtasan.nama_lengkap || "";
+    }
+  }
+
   const btn = document.getElementById("btn-save-emp");
   const origText = btn.innerHTML;
   btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
@@ -6628,6 +6662,8 @@ async function handleSaveEmployee(e) {
       role_id: roleId,
       area_cover: areaCover,
       status_aktif: status,
+      atasan_nip: atasanNip || null,
+      atasan_nama: atasanNama || null,
       password_hash: pass || existingEmp?.password_hash || "Password123!",
       status_ganti_pass: shouldRequirePasswordChange,
       updated_at: new Date().toISOString()
@@ -6655,6 +6691,14 @@ async function handleSaveEmployee(e) {
     if (APP_STATE.employees) {
       const match = APP_STATE.employees.find(x => String(x.nip).trim() === nip);
       if (match) Object.assign(match, payload);
+    }
+
+    if (CURRENT_USER && String(CURRENT_USER.nip).trim() === String(nip).trim()) {
+      CURRENT_USER.atasan_nip = atasanNip || "";
+      CURRENT_USER.atasan_nama = atasanNama || "";
+      try {
+        localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+      } catch (e) {}
     }
 
     showToast("Data karyawan berhasil disimpan!", "success", 1500);
