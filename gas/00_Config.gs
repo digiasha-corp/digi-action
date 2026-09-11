@@ -44,6 +44,7 @@ const CONFIG = {
     FAC_AUDIT: "TR_GPS_FAC_CHECK",
     PRIORITY_LOG: "LOG_PRIORITY_DAILY",
     ABSENSI: "TR_ABSENSI_LOG",
+    IZIN: "TR_IZIN_LOG",
     AUDIT_TRAIL: "SYS_AUDIT_TRAIL"
   },
 
@@ -58,7 +59,7 @@ const CONFIG = {
 // 2. HELPER SHEET & AUDIT TRAIL
 // =========================================================================
 function getSheet(sheetName) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_DB_ID);
+  const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
@@ -85,7 +86,7 @@ function setupAllDatabaseSheetHeaders() {
   
   const schema = {
     [CONFIG.SHEETS.EMPLOYEE]: [
-      "nip", "email", "nama_lengkap", "jabatan", "cabang", "area_cover", "password", "status_ganti_pass", "role_id", "status_aktif"
+      "nip", "email", "nama_lengkap", "jabatan", "cabang", "area_cover", "password", "status_ganti_pass", "role_id", "status_aktif", "atasan_nip", "atasan_nama"
     ],
     [CONFIG.SHEETS.DEALER]: [
       "dealer_id", "dealer_name", "owner_name", "cabang", "area_cover", "productivity", "status", "tanggal_kerjasama", "last_visit_date", "aging_visit_mitra", "urgent_units_count", "priority_level", "priority_score", "priority_reason"
@@ -115,8 +116,18 @@ function setupAllDatabaseSheetHeaders() {
       "check_id", "timestamp", "user_id", "no_fasilitas", "imei", "status_gps", "keterangan"
     ],
     [CONFIG.SHEETS.ABSENSI]: [
-      "absen_id", "timestamp", "nip", "nama_karyawan", "tipe_absen", "office_name", "lat", "long", "distance_meter", "selfie_photo_url", "status_presensi"
+      "absen_id", "timestamp", "nip", "nama_karyawan", "jenis_absen", "cabang", "lat", "long", "nearest_office", "distance_meter", "status_geofence", "menit_terlambat", "status_kehadiran", "selfie_photo_url"
     ],
+    [CONFIG.SHEETS.IZIN]: [
+      "izin_id", "timestamp", "nip", "nama", "cabang", "jenis_izin", "tgl_mulai", "tgl_selesai", "catatan", "lat", "long", "selfie_url", "pic_approval_nip", "pic_approval_nama", "status_approval", "approved_at", "approved_by", "catatan_approval"
+    ],
+    [CONFIG.SHEETS.PRIORITY_LOG]: [
+      "log_id", "log_date", "log_time", "entity_type", "entity_id", "entity_name", "cabang", "priority_level", "priority_score", "priority_reason", "aging_visit", "lifetime_days", "overdue_days", "gps_status", "is_h3_jto", "urgent_units_count", "concern_notes"
+    ],
+    [CONFIG.SHEETS.AUDIT_TRAIL]: [
+      "log_id", "timestamp", "user_id", "action", "detail_info", "device_info"
+    ]
+  };
     [CONFIG.SHEETS.PRIORITY_LOG]: [
       "log_id", "log_date", "log_time", "entity_type", "entity_id", "entity_name", "cabang", "priority_level", "priority_score", "priority_reason", "aging_visit", "lifetime_days", "overdue_days", "gps_status", "is_h3_jto", "urgent_units_count", "concern_notes"
     ],

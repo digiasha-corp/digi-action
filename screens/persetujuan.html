@@ -1,0 +1,102 @@
+<div class="space-y-4">
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+    <div>
+      <span class="text-[10px] uppercase font-bold text-indigo-300 block">Approval Hub</span>
+      <h3 class="text-sm font-bold">Pusat Persetujuan Pengajuan</h3>
+      <p class="text-[11px] text-slate-300 mt-0.5" id="approval-pic-info">-</p>
+    </div>
+    <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl text-indigo-300">
+      <i class="fa-solid fa-stamp"></i>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="flex border-b border-slate-200 bg-white rounded-2xl p-1 shadow-sm gap-1">
+    <button type="button" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-xs flex items-center justify-center space-x-1.5 transition">
+      <i class="fa-solid fa-user-clock text-xs"></i>
+      <span>Personalia (Izin & Cuti)</span>
+      <span id="tab-personalia-count" class="ml-1 text-[9px] px-1.5 py-0.2 rounded-full bg-white/20 text-white">0</span>
+    </button>
+  </div>
+
+  <!-- Filter Status Buttons -->
+  <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 text-xs">
+    <button type="button" onclick="filterApprovals('PENDING')" id="btn-filter-PENDING" class="approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-slate-900 text-white shadow-xs shrink-0 transition">
+      Menunggu Respon (<span id="count-filter-pending">0</span>)
+    </button>
+    <button type="button" onclick="filterApprovals('ALL')" id="btn-filter-ALL" class="approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0 transition">
+      Semua Riwayat
+    </button>
+    <button type="button" onclick="filterApprovals('APPROVED')" id="btn-filter-APPROVED" class="approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0 transition">
+      Disetujui
+    </button>
+    <button type="button" onclick="filterApprovals('REJECTED')" id="btn-filter-REJECTED" class="approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0 transition">
+      Ditolak
+    </button>
+  </div>
+
+  <!-- Container Daftar Pengajuan -->
+  <div id="approval-list-container" class="space-y-3">
+    <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+      <i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-700"></i>
+      <span>Memuat daftar permohonan persetujuan...</span>
+    </div>
+  </div>
+
+  <!-- MODAL AKSI PERSETUJUAN (APPROVE / REJECT) -->
+  <div id="modal-process-approval" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      <div class="text-center">
+        <div id="modal-appr-icon-box" class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-2">
+          <i id="modal-appr-icon" class="fa-solid fa-check"></i>
+        </div>
+        <h4 class="font-bold text-sm text-slate-900" id="modal-appr-title">Konfirmasi Persetujuan</h4>
+        <p class="text-[11px] text-slate-500 mt-0.5" id="modal-appr-sub">Pengajuan oleh Karyawan</p>
+      </div>
+
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Jenis Izin:</span>
+          <span id="modal-appr-jenis" class="font-bold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Periode / Waktu:</span>
+          <span id="modal-appr-periode" class="font-semibold text-slate-700">-</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block">Alasan / Catatan:</span>
+          <div id="modal-appr-catatan" class="font-medium text-slate-800 mt-0.5 p-2 bg-white rounded-lg border border-slate-200 text-[11px] max-h-20 overflow-y-auto">-</div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Catatan Tambahan Approver (Opsional):</label>
+        <input type="text" id="modal-appr-input-notes" placeholder="Contoh: Disetujui, harap selesaikan tugas sebelum cuti" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-600" />
+      </div>
+
+      <div class="flex space-x-2 pt-1">
+        <button type="button" onclick="closeProcessApprovalModal()" class="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="button" id="btn-confirm-approval-action" onclick="executeApprovalAction()" class="w-2/3 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95">
+          Konfirmasi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PREVIEW FOTO SELFIE PERMOHONAN -->
+  <div id="modal-preview-foto" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl overflow-hidden max-w-sm w-full shadow-2xl flex flex-col">
+      <div class="p-3 bg-slate-900 text-white flex justify-between items-center text-xs font-bold">
+        <span>Foto Selfie Lampiran</span>
+        <button type="button" onclick="closeFotoPreviewModal()" class="text-white/80 hover:text-white p-1"><i class="fa-solid fa-xmark text-sm"></i></button>
+      </div>
+      <div class="p-3 bg-slate-900 flex items-center justify-center">
+        <img id="img-modal-preview-full" src="" alt="Lampiran Foto" class="max-h-80 w-auto rounded-xl object-contain shadow" />
+      </div>
+      <div class="p-3 bg-slate-50 text-right">
+        <button type="button" onclick="closeFotoPreviewModal()" class="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-xl">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>

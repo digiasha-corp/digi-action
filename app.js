@@ -130,8 +130,17 @@ let MASTER_DEALER_PRIORITY_DATA = [];
 let FAC_GPS_MONITORING_DATA = [];
 
 let CURRENT_USER_GEO = { lat: -6.295218, long: 106.638482, accuracy: 25, nearestOffice: null, distanceToOffice: 0, isInsideRadius: false };
-let ACTIVE_ABSEN_TYPE = null;
+let ACTIVE_ABSEN_TYPE = "Absen Datang";
+let TODAY_ABSEN_STATUS = "BELUM_ABSEN"; // BELUM_ABSEN, SUDAH_DATANG, SUDAH_PULANG
 let CURRENT_ABSEN_SELFIE_BASE64 = null;
+
+// State Modul Izin & Approval
+let SELECTED_IZIN_CATEGORY = "WFA";
+let CURRENT_IZIN_GEO = { lat: -6.295218, long: 106.638482, accuracy: 25 };
+let APPROVALS_CACHE = [];
+let ACTIVE_APPROVAL_FILTER = "PENDING";
+let PENDING_APPROVAL_ACTION_PAYLOAD = null;
+let CENTER_ALERT_CALLBACK = null;
 
 let PRIORITY_ACTIVE_FILTER = "ALL";
 let PRIORITY_VISIT_STATUS_FILTER = "ALL";
@@ -679,18 +688,146 @@ async function callApi(action, data = {}) {
   return { success: false, message: "Backend database belum terkonfigurasi." };
 }
 
-// Sinkronisasi Data Master dari Google Spreadsheet
+// Router Screen SPA Terpadu
+async function loadScreen(screenName) {
+  const container = document.getElementById("main-view-container");
+  const topbar = document.getElementById("topbar");
+  const btnBack = document.getElementById("btn-back-home");
+  const title = document.getElementById("topbar-title");
+  const sub = document.getElementById("topbar-sub");
+
+  // Auth Guard: Jika belum login dan mencoba buka selain login, redirect ke login
+  if (!CURRENT_USER && screenName !== "login") {
+    screenName = "login";
+  }
+
+  if (screenName === "login") {
+    topbar.classList.add("hidden");
+  } else {
+    topbar.classList.remove("hidden");
+    const areaSuffix = CURRENT_USER.area_cover ? ` • Area: ${CURRENT_USER.area_cover}` : "";
+    sub.innerText = `${CURRENT_USER.nama} • ${CURRENT_USER.role}${areaSuffix}`;
+    if (screenName === "dashboard") {
+      btnBack.classList.add("hidden");
+      title.innerText = "Digiasha Monitoring";
+    } else {
+      btnBack.classList.remove("hidden");
+      const titles = {
+        visit: "Laporan Visit Mitra",
+        onboarding: "Visit Calon Mitra",
+        gps: "GPS Maintenance",
+        priority: "Priority Visit",
+        assignment: "Assign Concern Visit",
+        fac: "Laporan GPS (FAC)",
+        absensi: "Presensi Kehadiran",
+        izin: "Pengajuan Izin",
+        persetujuan: "Pusat Persetujuan"
+      };
+      title.innerText = titles[screenName] || "Monitoring";
+    }
+  }
+
+  container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-800"></i>Memuat halaman...</div>';
+
+  try {
+    if (!screenCache[screenName]) {
+      const res = await fetch(`screens/${screenName}.html`);
+      if (!res.ok) throw new Error("Gagal mengambil file screen");
+      screenCache[screenName] = await res.text();
+    }
+    container.innerHTML = screenCache[screenName];
+
+    // Inisialisasi controller tiap modul
+    if (screenName === "dashboard") initDashboard();
+    if (screenName === "priority") {
+      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
+        syncMasterDataFromApi().then(() => renderPriorityList());
+      } else {
+        renderPriorityList();
+      }
+    }
+    if (screenName === "assignment") populateAssignDealerOptions();
+    if (screenName === "visit") populateVisitDealerOptions();
+    if (screenName === "gps") initGpsScreen();
+    if (screenName === "fac") { renderLegendFilters(); renderFacGpsList(); }
+    if (screenName === "absensi") initAbsensiScreen();
+    if (screenName === "izin") initIzinScreen();
+    if (screenName === "persetujuan") initPersetujuanScreen();
+
+    window.scrollTo(0, 0);
+  } catch (err) {
+    container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-xs">Error memuat layar: ${err.message}</div>`;
+  }
+}
+
+// Sinkronisasi Data Master dari Database (Supabase 100% Direct dengan GAS Fallback)
 async function syncMasterDataFromApi() {
   try {
-    const res = await callApi("getMasterData");
-    if (res && res.success) {
-      let rawDealers = res.dealers || [];
-      let rawUnits = res.units || [];
-      let rawAssignments = res.assignments || [];
+    let rawDealers = [];
+    let rawUnits = [];
+    let rawAssignments = [];
+    let idleGps = [];
 
+    // 1. Ambil Langsung dari Supabase REST API
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      try {
+        const headers = {
+          "apikey": CONFIG.SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+        };
+
+        const [dlrRes, unitRes, locRes, gpsRes] = await Promise.all([
+          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_dealer?select=*`, { headers }),
+          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_facility_unit?select=*`, { headers }),
+          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_work_location?select=*`, { headers }),
+          fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_gps_device?select=*`, { headers })
+        ]);
+
+        if (dlrRes.ok) rawDealers = await dlrRes.json();
+        if (unitRes.ok) rawUnits = await unitRes.json();
+        if (locRes.ok) {
+          const locs = await locRes.json();
+          if (Array.isArray(locs) && locs.length > 0) {
+            OFFICE_LOCATIONS = locs.map(l => ({
+              location_id: l.location_id || "LOC",
+              name: l.name || "Kantor",
+              lat: Number(l.lat),
+              long: Number(l.long),
+              maxRadiusMeter: Number(l.max_radius_meter || 100),
+              address: l.address || ""
+            }));
+          }
+        }
+        if (gpsRes.ok) {
+          const gpsList = await gpsRes.json();
+          idleGps = (gpsList || []).map(g => ({
+            imei: g.imei,
+            tipe: g.posisi_stock || "Stok Cabang",
+            status_device: g.status_device || "TERSEDIA",
+            posisi_stock: g.posisi_stock || "Stok Cabang"
+          }));
+        }
+      } catch (errSup) {
+        console.warn("Direct Supabase fetch error, fallback to GAS API:", errSup);
+      }
+    }
+
+    // 2. Fallback ke Google Apps Script API jika belum dapat dari Supabase
+    if (rawDealers.length === 0) {
+      const res = await callApi("getMasterData");
+      if (res && res.success) {
+        rawDealers = res.dealers || [];
+        rawUnits = res.units || [];
+        rawAssignments = res.assignments || [];
+        idleGps = res.idleGps || [];
+        if (res.workLocations && Array.isArray(res.workLocations) && res.workLocations.length > 0) {
+          OFFICE_LOCATIONS = res.workLocations;
+        }
+      }
+    }
+
+    if (rawDealers.length > 0 || rawUnits.length > 0) {
       // Hak Akses Berdasarkan Coverage Area:
-      // Jika user Super Admin atau area_cover bernilai kosong / 'ALL' / '*', user dapat mengakses seluruh mitra.
-      // Jika memiliki area_cover spesifik (mendukung multi-area dengan koma, misal: 'TNG-1, TNG-2'), lakukan filter scoping.
       const isSuper = !CURRENT_USER || 
         CURRENT_USER.role === "Super Admin" || 
         CURRENT_USER.role_id === "R-01" || 
@@ -717,10 +854,22 @@ async function syncMasterDataFromApi() {
           rawAssignments = rawAssignments.filter(a => allowedDealerNames.has(String(a.dealer_name).trim().toLowerCase()));
         }
       }
+          rawDealers = rawDealers.filter(d => {
+            const dArea = String(d.area_cover || "").trim().toLowerCase();
+            const dBranch = String(d.cabang || "").trim().toLowerCase();
+            const matchArea = userAreas.length > 0 && userAreas.some(a => dArea.includes(a) || a.includes(dArea));
+            const matchBranch = userBranch && userBranch !== "head office" && dBranch === userBranch;
+            return matchArea || matchBranch;
+          });
+          const allowedDealerNames = new Set(rawDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
+          rawUnits = rawUnits.filter(u => allowedDealerNames.has(String(u.dealer_name).trim().toLowerCase()));
+          rawAssignments = rawAssignments.filter(a => allowedDealerNames.has(String(a.dealer_name).trim().toLowerCase()));
+        }
+      }
 
       APP_STATE.dealers = rawDealers;
       APP_STATE.units = rawUnits;
-      APP_STATE.idleGps = res.idleGps || [];
+      APP_STATE.idleGps = idleGps;
       APP_STATE.assignments = rawAssignments;
 
       // Sinkronkan daftar lokasi kantor geofence jika ada dari API
@@ -774,7 +923,7 @@ async function syncMasterDataFromApi() {
 }
 
 // =========================================================================
-// ROUTER & SCREEN LOADER
+// UI HELPERS & SESSIONS
 // =========================================================================
 async function loadScreen(screenName) {
   const container = document.getElementById("main-view-container");
@@ -790,7 +939,7 @@ async function loadScreen(screenName) {
 
   // Force Password Change Guard: Jika user wajib ganti password, cegah buka screen lain
   if (CURRENT_USER && (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") && screenName !== "login") {
-    openForceChangePassModal();
+    if (typeof openForceChangePassModal === "function") openForceChangePassModal();
     return;
   }
 
@@ -816,6 +965,8 @@ async function loadScreen(screenName) {
         assignment: "Assign Concern Visit",
         fac: "Laporan GPS (FAC)",
         absensi: "Presensi Kehadiran",
+        izin: "Pengajuan Izin",
+        persetujuan: "Pusat Persetujuan",
         settings: "In-App Management",
         history: "Riwayat Aktivitas PIC"
       };
@@ -827,7 +978,8 @@ async function loadScreen(screenName) {
 
   try {
     if (!screenCache[screenName]) {
-      const res = await fetch(`screens/${screenName}.html?v=${APP_BUILD_VERSION}`, { cache: "no-store" });
+      const vParam = typeof APP_BUILD_VERSION !== "undefined" ? `?v=${APP_BUILD_VERSION}` : `?v=${Date.now()}`;
+      const res = await fetch(`screens/${screenName}.html${vParam}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Gagal mengambil file screen");
       screenCache[screenName] = await res.text();
     }
@@ -844,17 +996,19 @@ async function loadScreen(screenName) {
     }
     if (screenName === "assignment") populateAssignDealerOptions();
     if (screenName === "visit") populateVisitDealerOptions();
-    if (screenName === "onboarding") initOnboardingScreen();
-    if (screenName === "pipeline") initPipeline();
+    if (screenName === "onboarding" && typeof initOnboardingScreen === "function") initOnboardingScreen();
+    if (screenName === "pipeline" && typeof initPipeline === "function") initPipeline();
     if (screenName === "gps") initGpsScreen();
     if (screenName === "fac") {
-      initFacMonitoringData();
+      if (typeof initFacMonitoringData === "function") initFacMonitoringData();
       renderLegendFilters();
       renderFacGpsList();
     }
-    if (screenName === "absensi") acquireAbsenLocation();
-    if (screenName === "settings") initSettingsScreen();
-    if (screenName === "history") initHistory();
+    if (screenName === "absensi") initAbsensiScreen();
+    if (screenName === "izin") initIzinScreen();
+    if (screenName === "persetujuan") initPersetujuanScreen();
+    if (screenName === "settings" && typeof initSettingsScreen === "function") initSettingsScreen();
+    if (screenName === "history" && typeof initHistory === "function") initHistory();
 
     window.scrollTo(0, 0);
   } catch (err) {
@@ -902,18 +1056,91 @@ async function handleLoginSubmit(e) {
   submitBtn.disabled = true;
 
   try {
-    const res = await callApi("login", { identifier, password });
+    let authUser = null;
+
+    // 1. Coba Autentikasi Langsung ke Supabase REST API (Cepat & Realtime)
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      try {
+        const cleanId = encodeURIComponent(identifier);
+        const url = `${CONFIG.SUPABASE_URL}/rest/v1/m_employee?or=(nip.eq.${cleanId},email.eq.${cleanId})`;
+        const sbRes = await fetch(url, {
+          method: "GET",
+          headers: {
+            "apikey": CONFIG.SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+          }
+        });
+        if (sbRes.ok) {
+          const empList = await sbRes.json();
+          if (Array.isArray(empList) && empList.length > 0) {
+            const emp = empList[0];
+            const passHash = String(emp.password_hash || emp.password || "").trim();
+            if (passHash === password) {
+              const rawStatus = String(emp.status_aktif || "AKTIF").toUpperCase();
+              if (rawStatus === "INACTIVE" || rawStatus === "NON-ACTIVE" || rawStatus === "NONAKTIF" || rawStatus === "TIDAK AKTIF") {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                alert("Gagal Login: Akun Anda berstatus non-aktif. Hubungi Administrator.");
+                return;
+              }
+
+              const rawRoleId = String(emp.role_id || "R-01").trim();
+              let resolvedRoleName = emp.jabatan || rawRoleId;
+              let resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "izin", "persetujuan"];
+
+              if (rawRoleId === "R-01" || rawRoleId.toLowerCase().includes("admin")) {
+                resolvedRoleName = "Admin";
+              } else if (rawRoleId === "R-02" || rawRoleId.toLowerCase().includes("branch manager") || rawRoleId.toLowerCase().includes("bm")) {
+                resolvedRoleName = "Branch Manager";
+                resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "persetujuan", "izin"];
+              } else if (rawRoleId === "R-03" || rawRoleId.toLowerCase().includes("fac")) {
+                resolvedRoleName = "FAC";
+                resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "izin"];
+              } else if (rawRoleId === "R-04" || rawRoleId.toLowerCase().includes("other")) {
+                resolvedRoleName = "Other";
+                resolvedPerms = ["priority", "izin"];
+              }
+
+              authUser = {
+                nip: emp.nip || "-",
+                nama: emp.nama_lengkap || "Karyawan Digiasha",
+                email: emp.email || "",
+                jabatan: emp.jabatan || "-",
+                role_id: rawRoleId,
+                role: resolvedRoleName,
+                permissions: resolvedPerms,
+                cabang: emp.cabang || "HEAD OFFICE",
+                area_cover: emp.area_cover || "",
+                atasan_nip: emp.atasan_nip || "",
+                atasan_nama: emp.atasan_nama || ""
+              };
+            }
+          }
+        }
+      } catch (errSup) {
+        console.warn("Supabase direct auth skipped, falling back to GAS:", errSup);
+      }
+    }
+
+    // 2. Fallback ke Google Apps Script API jika belum berhasil lewat Supabase
+    if (!authUser) {
+      const res = await callApi("login", { identifier, password });
+      if (res && res.success && res.user) {
+        authUser = res.user;
+      } else {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        alert("Gagal Login: " + (res?.message || "Akun tidak terdaftar atau kata sandi salah."));
+        return;
+      }
+    }
+
     submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
 
-    if (!res || !res.success) {
-      alert("Gagal Login: " + (res?.message || "Akun tidak terdaftar atau kata sandi salah."));
-      return;
-    }
-
-    CURRENT_USER = res.user;
+    CURRENT_USER = authUser;
     try {
-      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(res.user));
+      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(authUser));
     } catch (err) {}
 
     if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
@@ -938,7 +1165,7 @@ function handleLogout() {
 }
 
 // Controller Dashboard
-function initDashboard() {
+async function initDashboard() {
   if (!CURRENT_USER) return;
   const uName = CURRENT_USER.nama || CURRENT_USER.nama_lengkap || CURRENT_USER.email || "Pengguna";
   const uRole = CURRENT_USER.role || CURRENT_USER.role_id || "Karyawan";
@@ -953,24 +1180,269 @@ function initDashboard() {
   const roleEl = document.getElementById("badge-role");
   if (roleEl) roleEl.innerText = uRole;
 
-  const perms = getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER);
+  const perms = (Array.isArray(CURRENT_USER.permissions) && CURRENT_USER.permissions.length > 0)
+    ? CURRENT_USER.permissions
+    : (typeof getPermissionsForRole === "function" ? getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER) : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"]));
 
-  ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"].forEach(key => {
+  ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "izin", "persetujuan", "history", "settings"].forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
-    if (btn) btn.style.display = perms.includes(key) ? "flex" : "none";
+    if (btn) {
+      if (key === "izin") {
+        btn.style.display = "flex"; // Modul Izin selalu tersedia untuk seluruh karyawan
+      } else {
+        btn.style.display = perms.includes(key) ? "flex" : "none";
+      }
+    }
   });
+
+  // Sinkronkan status presensi hari ini
+  await fetchTodayAbsenStatus();
+
+  // Sinkronkan jumlah permohonan persetujuan yang menunggu
+  if (perms.includes("persetujuan")) {
+    fetchPendingApprovalCount();
+  }
 }
 
 // =========================================================================
-// GEOFENCE & ABSENSI
+// POPUP TENGAH (CENTER ALERT DIALOG)
 // =========================================================================
-function openAbsenChoiceModal() { document.getElementById("modal-absen-choice").classList.remove("hidden"); }
-function closeAbsenChoiceModal() { document.getElementById("modal-absen-choice").classList.add("hidden"); }
+function showCenterAlertModal({ title, message, type = "success", detailsHtml = "", onClose = null }) {
+  const modal = document.getElementById("modal-center-alert");
+  if (!modal) {
+    alert(`${title}: ${message}`);
+    if (onClose) onClose();
+    return;
+  }
+
+  const iconBox = document.getElementById("center-alert-icon-box");
+  const icon = document.getElementById("center-alert-icon");
+  const titleEl = document.getElementById("center-alert-title");
+  const msgEl = document.getElementById("center-alert-message");
+  const detailsEl = document.getElementById("center-alert-details");
+  const btnClose = document.getElementById("btn-close-center-alert");
+
+  CENTER_ALERT_CALLBACK = onClose;
+
+  if (titleEl) titleEl.innerText = title;
+  if (msgEl) msgEl.innerText = message;
+
+  if (type === "success") {
+    if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
+    if (icon) icon.className = "fa-solid fa-circle-check";
+    if (btnClose) btnClose.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95";
+  } else if (type === "warning") {
+    if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
+    if (icon) icon.className = "fa-solid fa-clock";
+    if (btnClose) btnClose.className = "w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95";
+  } else {
+    if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
+    if (icon) icon.className = "fa-solid fa-circle-xmark";
+    if (btnClose) btnClose.className = "w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95";
+  }
+
+  if (detailsHtml && detailsEl) {
+    detailsEl.innerHTML = detailsHtml;
+    detailsEl.classList.remove("hidden");
+  } else if (detailsEl) {
+    detailsEl.classList.add("hidden");
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeCenterAlertModal() {
+  const modal = document.getElementById("modal-center-alert");
+  if (modal) modal.classList.add("hidden");
+  if (typeof CENTER_ALERT_CALLBACK === "function") {
+    const cb = CENTER_ALERT_CALLBACK;
+    CENTER_ALERT_CALLBACK = null;
+    cb();
+  }
+}
+
+// Helper Toast Notification Auto-Close (Untuk notifikasi ringkas)
+function showToast(message, type = "success", durationMs = 1500) {
+  let toast = document.getElementById("global-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "global-toast";
+    document.body.appendChild(toast);
+  }
+
+  const bgStyles = {
+    success: "bg-emerald-600 text-white shadow-emerald-600/30",
+    error: "bg-rose-600 text-white shadow-rose-600/30",
+    warning: "bg-amber-500 text-white shadow-amber-500/30",
+    info: "bg-slate-900 text-white shadow-slate-900/30"
+  };
+
+  const iconMap = {
+    success: '<i class="fa-solid fa-circle-check text-sm"></i>',
+    error: '<i class="fa-solid fa-triangle-exclamation text-sm"></i>',
+    warning: '<i class="fa-solid fa-circle-exclamation text-sm"></i>',
+    info: '<i class="fa-solid fa-circle-info text-sm"></i>'
+  };
+
+  toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-100 translate-y-0 ${bgStyles[type] || bgStyles.info}`;
+  toast.innerHTML = `${iconMap[type] || ''} <span>${message}</span>`;
+
+  setTimeout(() => {
+    toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-0 translate-y-[-10px] ${bgStyles[type] || bgStyles.info}`;
+  }, durationMs);
+}
+
+// =========================================================================
+// PRESENSI ONLINE & ABSENSI ENGINE (ABSEN DATANG / ABSEN PULANG)
+// =========================================================================
+
+// Cek status absensi hari ini ke Supabase / server
+async function fetchTodayAbsenStatus() {
+  if (!CURRENT_USER) return;
+  const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
+  const todayKey = `DIGIASHA_ABSEN_${CURRENT_USER.nip}_${new Date().toISOString().slice(0, 10)}`;
+  const localSaved = localStorage.getItem(todayKey);
+  if (localSaved) {
+    TODAY_ABSEN_STATUS = localSaved;
+  }
+
+  try {
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const url = `${CONFIG.SUPABASE_URL}/rest/v1/tr_absensi_log?nip=eq.${encodeURIComponent(CURRENT_USER.nip)}&timestamp=gte.${todayIso}T00:00:00&order=timestamp.asc`;
+      const res = await fetch(url, {
+        headers: {
+          "apikey": CONFIG.SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+        }
+      });
+      if (res.ok) {
+        const logs = await res.json();
+        let hasDatang = false;
+        let hasPulang = false;
+        if (Array.isArray(logs)) {
+          logs.forEach(l => {
+            const j = String(l.jenis_absen || "").toLowerCase();
+            if (j.includes("datang") || j.includes("masuk")) hasDatang = true;
+            if (j.includes("pulang")) hasPulang = true;
+          });
+        }
+        if (hasPulang) TODAY_ABSEN_STATUS = "SUDAH_PULANG";
+        else if (hasDatang) TODAY_ABSEN_STATUS = "SUDAH_DATANG";
+        else TODAY_ABSEN_STATUS = "BELUM_ABSEN";
+        localStorage.setItem(todayKey, TODAY_ABSEN_STATUS);
+      }
+    } else {
+      const res = await callApi("getTodayAbsenStatus", {
+        nip: CURRENT_USER.nip,
+        cabang: CURRENT_USER.cabang,
+        timezone: clientTz
+      });
+      if (res && res.success) {
+        TODAY_ABSEN_STATUS = res.status || "BELUM_ABSEN";
+        localStorage.setItem(todayKey, TODAY_ABSEN_STATUS);
+      }
+    }
+  } catch (e) {
+    console.warn("Gagal cek status absensi online:", e);
+  }
+
+  updateDashboardPresensiUI();
+}
+
+function updateDashboardPresensiUI() {
+  const labelEl = document.getElementById("dash-presensi-status-label");
+  const subEl = document.getElementById("dash-presensi-status-sub");
+  const btnText = document.getElementById("dash-btn-presensi-text");
+
+  if (TODAY_ABSEN_STATUS === "SUDAH_PULANG") {
+    if (labelEl) labelEl.innerText = "Presensi Selesai";
+    if (subEl) subEl.innerText = "Anda telah absen datang & pulang hari ini";
+    if (btnText) btnText.innerText = "Presensi Selesai";
+  } else if (TODAY_ABSEN_STATUS === "SUDAH_DATANG") {
+    if (labelEl) labelEl.innerText = "Sudah Absen Datang";
+    if (subEl) subEl.innerText = "Siap untuk Absen Pulang kerja";
+    if (btnText) btnText.innerText = "Presensi Online";
+  } else {
+    if (labelEl) labelEl.innerText = "Kehadiran Hari Ini";
+    if (subEl) subEl.innerText = "Presensi & Perizinan Karyawan";
+    if (btnText) btnText.innerText = "Presensi Online";
+  }
+}
+
+function openAbsenChoiceModal() {
+  const modal = document.getElementById("modal-absen-choice");
+  if (!modal) return;
+
+  const btnTitle = document.getElementById("btn-choice-absen-title");
+  const btnDesc = document.getElementById("btn-choice-absen-desc");
+  const btnIcon = document.getElementById("btn-choice-absen-icon");
+  const btnBadge = document.getElementById("btn-choice-absen-badge");
+
+  if (TODAY_ABSEN_STATUS === "SUDAH_DATANG") {
+    if (btnTitle) btnTitle.innerText = "Absen Pulang";
+    if (btnDesc) btnDesc.innerText = "Presensi kepulangan kerja harian (Geotag lokasi)";
+    if (btnIcon) btnIcon.className = "fa-solid fa-door-open text-amber-400";
+    if (btnBadge) btnBadge.classList.add("hidden");
+  } else if (TODAY_ABSEN_STATUS === "SUDAH_PULANG") {
+    if (btnTitle) btnTitle.innerText = "Absen Pulang";
+    if (btnDesc) btnDesc.innerText = "Presensi hari ini sudah lengkap selesai";
+    if (btnIcon) btnIcon.className = "fa-solid fa-circle-check text-emerald-400";
+    if (btnBadge) { btnBadge.innerText = "Selesai"; btnBadge.classList.remove("hidden"); }
+  } else {
+    if (btnTitle) btnTitle.innerText = "Absen Datang";
+    if (btnDesc) btnDesc.innerText = "Presensi masuk harian (Wajib radius kantor)";
+    if (btnIcon) btnIcon.className = "fa-solid fa-building text-emerald-400";
+    if (btnBadge) btnBadge.classList.add("hidden");
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeAbsenChoiceModal() {
+  const modal = document.getElementById("modal-absen-choice");
+  if (modal) modal.classList.add("hidden");
+}
+
+function handleChoiceAbsenClick() {
+  closeAbsenChoiceModal();
+  if (TODAY_ABSEN_STATUS === "SUDAH_DATANG") {
+    selectAbsenType("Absen Pulang");
+  } else {
+    selectAbsenType("Absen Datang");
+  }
+}
 
 function selectAbsenType(type) {
   ACTIVE_ABSEN_TYPE = type;
   closeAbsenChoiceModal();
   loadScreen("absensi");
+}
+
+function selectIzinChoice() {
+  closeAbsenChoiceModal();
+  loadScreen("izin");
+}
+
+function initAbsensiScreen() {
+  const bannerTitle = document.getElementById("absen-type-title");
+  const bannerIcon = document.getElementById("absen-type-icon");
+  const banner = document.getElementById("absen-type-banner");
+  const boxDist = document.getElementById("box-distance-office");
+
+  if (bannerTitle) bannerTitle.innerText = ACTIVE_ABSEN_TYPE || "Absen Datang";
+
+  if (ACTIVE_ABSEN_TYPE === "Absen Pulang") {
+    if (banner) banner.className = "p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-amber-700 transition-colors";
+    if (bannerIcon) bannerIcon.className = "fa-solid fa-door-open text-2xl text-amber-200";
+    if (boxDist) boxDist.classList.add("hidden"); // Absen pulang tidak wajib di kantor
+  } else {
+    if (banner) banner.className = "p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-slate-900 transition-colors";
+    if (bannerIcon) bannerIcon.className = "fa-solid fa-building text-2xl text-emerald-400";
+    if (boxDist) boxDist.classList.remove("hidden");
+  }
+
+  acquireAbsenLocation();
 }
 
 function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
@@ -988,22 +1460,6 @@ function acquireAbsenLocation() {
   const distDisplay = document.getElementById("absen-distance-display");
   const officeNameDisplay = document.getElementById("absen-office-name");
   const badge = document.getElementById("absen-geofence-badge");
-  const banner = document.getElementById("absen-type-banner");
-  const bannerTitle = document.getElementById("absen-type-title");
-  const bannerIcon = document.getElementById("absen-type-icon");
-  const boxDist = document.getElementById("box-distance-office");
-
-  if (bannerTitle) bannerTitle.innerText = ACTIVE_ABSEN_TYPE || "Masuk Kantor";
-
-  if (ACTIVE_ABSEN_TYPE === "Masuk Kantor") {
-    if (banner) banner.className = "p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-slate-900";
-    if (bannerIcon) bannerIcon.className = "fa-solid fa-building text-2xl text-emerald-400";
-    if (boxDist) boxDist.classList.remove("hidden");
-  } else {
-    if (banner) banner.className = "p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-teal-700";
-    if (bannerIcon) bannerIcon.className = "fa-solid fa-route text-2xl text-teal-200";
-    if (boxDist) boxDist.classList.add("hidden");
-  }
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -1025,7 +1481,7 @@ function acquireAbsenLocation() {
         if (coordsDisplay) coordsDisplay.innerText = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
         if (officeNameDisplay) officeNameDisplay.innerText = nearest.name;
 
-        if (ACTIVE_ABSEN_TYPE === "Masuk Kantor") {
+        if (ACTIVE_ABSEN_TYPE === "Absen Datang") {
           if (distDisplay) distDisplay.innerText = `${nearest.distance} Meter (Maks ${nearest.maxRadiusMeter}m)`;
           if (nearest.distance <= nearest.maxRadiusMeter) {
             CURRENT_USER_GEO.isInsideRadius = true;
@@ -1035,8 +1491,9 @@ function acquireAbsenLocation() {
             if (badge) { badge.innerText = `Di Luar Radius (${nearest.distance}m)`; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-red-100 text-red-800"; }
           }
         } else {
+          // Absen Pulang: Bebas geolokasi kantor
           CURRENT_USER_GEO.isInsideRadius = true;
-          if (badge) { badge.innerText = "Geotag Terverifikasi"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800"; }
+          if (badge) { badge.innerText = "Geotag Terkunci (Bebas Radius)"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800"; }
         }
       },
       () => {
@@ -1091,6 +1548,7 @@ function compressImage(file, maxDimension = 1024, quality = 0.75) {
   });
 }
 
+// Handler Foto Selfie Presensi -> Auto Submit
 async function handleAbsenSelfieSelected(input) {
   if (input.files && input.files[0]) {
     const compressed = await compressImage(input.files[0], 1024, 0.75);
@@ -1101,8 +1559,16 @@ async function handleAbsenSelfieSelected(input) {
 
     const triggerBtn = document.getElementById("btn-trigger-absen-selfie");
     const previewCard = document.getElementById("preview-absen-selfie-card");
+    const loadingOverlay = document.getElementById("absen-submitting-overlay");
+
     if (triggerBtn) triggerBtn.classList.add("hidden");
     if (previewCard) previewCard.classList.remove("hidden");
+    if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+
+    // Langsung jalankan submit otomatis tanpa perlu press button kirim
+    setTimeout(() => {
+      handleAbsenSubmit();
+    }, 400);
   }
 }
 
@@ -1113,75 +1579,319 @@ function removeAbsenSelfie() {
 
   const triggerBtn = document.getElementById("btn-trigger-absen-selfie");
   const previewCard = document.getElementById("preview-absen-selfie-card");
+  const loadingOverlay = document.getElementById("absen-submitting-overlay");
+
   if (triggerBtn) triggerBtn.classList.remove("hidden");
   if (previewCard) previewCard.classList.add("hidden");
+  if (loadingOverlay) loadingOverlay.classList.add("hidden");
 }
 
-// Helper Toast Notification Auto-Close
-function showToast(message, type = "success", durationMs = 1500) {
-  let toast = document.getElementById("global-toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "global-toast";
-    document.body.appendChild(toast);
-  }
+async function handleAbsenSubmit() {
+  const isDatang = (ACTIVE_ABSEN_TYPE === "Absen Datang" || ACTIVE_ABSEN_TYPE === "Masuk Kantor");
 
-  const bgStyles = {
-    success: "bg-emerald-600 text-white shadow-emerald-600/30",
-    error: "bg-rose-600 text-white shadow-rose-600/30",
-    warning: "bg-amber-500 text-white shadow-amber-500/30",
-    info: "bg-slate-900 text-white shadow-slate-900/30"
-  };
-
-  const iconMap = {
-    success: '<i class="fa-solid fa-circle-check text-sm"></i>',
-    error: '<i class="fa-solid fa-triangle-exclamation text-sm"></i>',
-    warning: '<i class="fa-solid fa-circle-exclamation text-sm"></i>',
-    info: '<i class="fa-solid fa-circle-info text-sm"></i>'
-  };
-
-  toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-100 translate-y-0 ${bgStyles[type] || bgStyles.info}`;
-  toast.innerHTML = `${iconMap[type] || ''} <span>${message}</span>`;
-
-  setTimeout(() => {
-    toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-0 translate-y-[-10px] ${bgStyles[type] || bgStyles.info}`;
-  }, durationMs);
-}
-
-async function handleAbsenSubmit(e) {
-  e.preventDefault();
-  if (ACTIVE_ABSEN_TYPE === "Masuk Kantor" && !CURRENT_USER_GEO.isInsideRadius) {
-    showToast(`Lokasi di luar radius (${CURRENT_USER_GEO.distanceToOffice}m / Maks 100m)`, "error", 2500);
+  // Validasi geofence radius hanya untuk Absen Datang
+  if (isDatang && !CURRENT_USER_GEO.isInsideRadius) {
+    removeAbsenSelfie();
+    showCenterAlertModal({
+      title: "Absensi Gagal",
+      message: `Lokasi Anda berada di luar radius kantor (${CURRENT_USER_GEO.distanceToOffice} Meter / Maks 100m). Silakan dekati kantor dan perbarui titik GPS.`,
+      type: "error"
+    });
     return;
   }
+
   if (!CURRENT_ABSEN_SELFIE_BASE64) {
-    showToast("Wajib mengambil foto selfie kehadiran!", "warning", 2000);
+    removeAbsenSelfie();
+    showCenterAlertModal({
+      title: "Absensi Gagal",
+      message: "Foto selfie kehadiran belum berhasil diambil. Silakan coba kembali.",
+      type: "error"
+    });
     return;
   }
 
-  const submitBtn = e.target.querySelector('button[type="submit"]');
-  const originalText = submitBtn ? submitBtn.innerHTML : "Kirim Presensi Sekarang";
-  if (submitBtn) {
-    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Menyimpan Presensi...';
-    submitBtn.disabled = true;
-  }
-
-  const catatan = document.getElementById("absen-input-catatan")?.value.trim() || "-";
   const selfieData = CURRENT_ABSEN_SELFIE_BASE64;
+  const loadingOverlay = document.getElementById("absen-submitting-overlay");
 
-  try {
+    const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
     const res = await callApi("submitAbsensi", {
       nip: CURRENT_USER?.nip || "-",
       nama: CURRENT_USER?.nama || "-",
       role: CURRENT_USER?.role || "-",
       cabang: CURRENT_USER?.cabang || "-",
-      jenis_absen: ACTIVE_ABSEN_TYPE || "Masuk Kantor",
+      jenis_absen: ACTIVE_ABSEN_TYPE || "Absen Datang",
       lokasi_kantor: CURRENT_USER_GEO.nearestOffice?.name || "Kantor Pusat",
       distance_meters: CURRENT_USER_GEO.distanceToOffice || 0,
+      max_radius: CURRENT_USER_GEO.nearestOffice?.maxRadiusMeter || 100,
       lat: CURRENT_USER_GEO.lat || 0,
       long: CURRENT_USER_GEO.long || 0,
-      catatan: catatan,
+      timezone: clientTz,
       selfie_base64: selfieData
+    });
+
+    if (loadingOverlay) loadingOverlay.classList.add("hidden");
+
+    if (!res || !res.success) {
+      removeAbsenSelfie();
+      showCenterAlertModal({
+        title: "Absensi Gagal",
+        message: res?.message || "Terjadi kesalahan server saat menyimpan absensi.",
+        type: "error"
+      });
+      return;
+    }
+
+    // Perbarui status presensi hari ini
+    const todayKey = `DIGIASHA_ABSEN_${CURRENT_USER.nip}_${new Date().toISOString().slice(0, 10)}`;
+    if (isDatang) {
+      TODAY_ABSEN_STATUS = "SUDAH_DATANG";
+    } else {
+      TODAY_ABSEN_STATUS = "SUDAH_PULANG";
+    }
+    localStorage.setItem(todayKey, TODAY_ABSEN_STATUS);
+
+    // Buka Pop-up Tengah Hasil Presensi
+    const isLate = res.isLate === true || res.status_kehadiran === "TERLAMBAT";
+    const titleText = isDatang ? "Absensi Kedatangan Berhasil" : "Absensi Kepulangan Berhasil";
+    let messageText = res.message;
+    if (isDatang && isLate) {
+      messageText = `Anda Terlambat ${res.lateMinutes || 0} Menit (Jam Masuk: ${res.timeStr || ''})`;
+    } else if (isDatang) {
+      messageText = `Kehadiran Tepat Waktu tercatat pada ${res.timeStr || ''}`;
+    }
+
+    showCenterAlertModal({
+      title: titleText,
+      message: messageText,
+      type: isLate ? "warning" : "success",
+      onClose: () => {
+        loadScreen("dashboard");
+      }
+    });
+
+  } catch (err) {
+    if (loadingOverlay) loadingOverlay.classList.add("hidden");
+    removeAbsenSelfie();
+    showCenterAlertModal({
+      title: "Absensi Gagal",
+      message: "Gagal terhubung ke server: " + err.message,
+      type: "error"
+    });
+  }
+}
+
+// =========================================================================
+// MODUL PENGAJUAN IZIN (WFA, TERLAMBAT, CUTI, SAKIT)
+// =========================================================================
+function initIzinScreen() {
+  if (!CURRENT_USER) return;
+  const userInfo = document.getElementById("izin-user-info");
+  if (userInfo) userInfo.innerText = `${CURRENT_USER.nama} (${CURRENT_USER.nip}) • ${CURRENT_USER.cabang}`;
+
+  const approverEl = document.getElementById("izin-pic-approval-name");
+  if (approverEl) approverEl.innerText = CURRENT_USER.atasan_nama ? `${CURRENT_USER.atasan_nama} (${CURRENT_USER.atasan_nip || 'Atasan Langsung'})` : "Supervisor / Branch Manager";
+
+  // Set default dates untuk date range
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const tglMulai = document.getElementById("izin-tgl-mulai");
+  const tglSelesai = document.getElementById("izin-tgl-selesai");
+  if (tglMulai) tglMulai.value = todayStr;
+  if (tglSelesai) tglSelesai.value = todayStr;
+
+  acquireIzinLocation();
+  selectIzinCategory("WFA");
+}
+
+function acquireIzinLocation() {
+  const coordsDisplay = document.getElementById("izin-coords-display");
+  const badge = document.getElementById("izin-geo-badge");
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const crd = pos.coords;
+        CURRENT_IZIN_GEO.lat = crd.latitude;
+        CURRENT_IZIN_GEO.long = crd.longitude;
+        CURRENT_IZIN_GEO.accuracy = crd.accuracy;
+        if (coordsDisplay) coordsDisplay.innerText = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
+        if (badge) { badge.innerText = "GPS Terkunci"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800"; }
+      },
+      () => {
+        if (coordsDisplay) coordsDisplay.innerText = "-6.295217, 106.638591 (Default)";
+        if (badge) { badge.innerText = "GPS Default"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700"; }
+      },
+      { enableHighAccuracy: true, timeout: 6000 }
+    );
+  }
+}
+
+function selectIzinCategory(category) {
+  SELECTED_IZIN_CATEGORY = category;
+
+  // Update styles tombol kategori
+  const categories = ["WFA", "Terlambat", "Cuti", "Sakit"];
+  categories.forEach(c => {
+    const btn = document.getElementById(`btn-cat-${c}`);
+    if (btn) {
+      if ((c === "Terlambat" && category === "Datang Terlambat") || c === category) {
+        btn.className = "izin-cat-btn p-3 rounded-xl border-2 border-teal-600 bg-teal-50/50 shadow-xs text-left flex items-center space-x-2.5 transition";
+      } else {
+        btn.className = "izin-cat-btn p-3 rounded-xl border border-slate-200 text-left hover:border-slate-300 bg-slate-50 flex items-center space-x-2.5 transition";
+      }
+    }
+  });
+
+  const boxDateRange = document.getElementById("box-izin-date-range");
+  const boxJamTiba = document.getElementById("box-izin-jam-tiba");
+  const boxSelfie = document.getElementById("box-izin-selfie");
+  const boxManualSubmit = document.getElementById("box-izin-manual-submit");
+  const labelCatatan = document.getElementById("label-catatan-izin");
+  const btnSubmitText = document.getElementById("btn-submit-izin-text");
+
+  if (category === "WFA") {
+    if (boxDateRange) boxDateRange.classList.add("hidden");
+    if (boxJamTiba) boxJamTiba.classList.add("hidden");
+    if (boxSelfie) boxSelfie.classList.remove("hidden");
+    if (boxManualSubmit) boxManualSubmit.classList.add("hidden");
+    if (labelCatatan) labelCatatan.innerText = "Rencana Aktivitas & Catatan WFA *";
+  } else if (category === "Datang Terlambat") {
+    if (boxDateRange) boxDateRange.classList.add("hidden");
+    if (boxJamTiba) boxJamTiba.classList.remove("hidden");
+    if (boxSelfie) boxSelfie.classList.remove("hidden");
+    if (boxManualSubmit) boxManualSubmit.classList.add("hidden");
+    if (labelCatatan) labelCatatan.innerText = "Alasan Datang Terlambat *";
+  } else if (category === "Cuti") {
+    if (boxDateRange) boxDateRange.classList.remove("hidden");
+    if (boxJamTiba) boxJamTiba.classList.add("hidden");
+    if (boxSelfie) boxSelfie.classList.add("hidden");
+    if (boxManualSubmit) boxManualSubmit.classList.remove("hidden");
+    if (labelCatatan) labelCatatan.innerText = "Alasan & Keterangan Cuti *";
+    if (btnSubmitText) btnSubmitText.innerText = "Kirim Pengajuan Cuti";
+  } else if (category === "Sakit") {
+    if (boxDateRange) boxDateRange.classList.remove("hidden");
+    if (boxJamTiba) boxJamTiba.classList.add("hidden");
+    if (boxSelfie) boxSelfie.classList.add("hidden");
+    if (boxManualSubmit) boxManualSubmit.classList.remove("hidden");
+    if (labelCatatan) labelCatatan.innerText = "Keterangan Sakit / Gejala *";
+    if (btnSubmitText) btnSubmitText.innerText = "Kirim Pengajuan Izin Sakit";
+  }
+}
+
+// Handler Foto Selfie Izin -> Auto Submit untuk WFA & Datang Terlambat
+async function handleIzinSelfieSelected(input) {
+  const catatan = document.getElementById("izin-input-catatan")?.value.trim();
+  if (!catatan) {
+    input.value = "";
+    showCenterAlertModal({
+      title: "Catatan Wajib Diisi",
+      message: "Silakan tuliskan catatan/alasan pengajuan terlebih dahulu sebelum mengambil foto selfie.",
+      type: "warning"
+    });
+    return;
+  }
+
+  if (input.files && input.files[0]) {
+    const compressed = await compressImage(input.files[0], 1024, 0.75);
+
+    const imgPreview = document.getElementById("img-izin-selfie-preview");
+    if (imgPreview) imgPreview.src = compressed;
+
+    const triggerBtn = document.getElementById("btn-trigger-izin-selfie");
+    const previewCard = document.getElementById("preview-izin-selfie-card");
+    const loadingOverlay = document.getElementById("izin-submitting-overlay");
+
+    if (triggerBtn) triggerBtn.classList.add("hidden");
+    if (previewCard) previewCard.classList.remove("hidden");
+    if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+
+    let fullCatatan = catatan;
+    if (SELECTED_IZIN_CATEGORY === "Datang Terlambat") {
+      const jamTiba = document.getElementById("izin-input-jam-tiba")?.value || "-";
+      fullCatatan = `[Est. Tiba: ${jamTiba}] ${catatan}`;
+    }
+
+    try {
+      const res = await callApi("submitIzin", {
+        nip: CURRENT_USER?.nip || "-",
+        nama: CURRENT_USER?.nama || "-",
+        cabang: CURRENT_USER?.cabang || "-",
+        jenis_izin: SELECTED_IZIN_CATEGORY,
+        catatan: fullCatatan,
+        lat: CURRENT_IZIN_GEO.lat || 0,
+        long: CURRENT_IZIN_GEO.long || 0,
+        selfie_base64: compressed,
+        pic_approval_nip: CURRENT_USER?.atasan_nip || "-",
+        pic_approval_nama: CURRENT_USER?.atasan_nama || "Atasan Langsung"
+      });
+
+      if (loadingOverlay) loadingOverlay.classList.add("hidden");
+
+      if (!res || !res.success) {
+        showCenterAlertModal({
+          title: "Pengajuan Gagal",
+          message: res?.message || "Gagal mengirimkan permohonan izin ke server.",
+          type: "error"
+        });
+        if (triggerBtn) triggerBtn.classList.remove("hidden");
+        if (previewCard) previewCard.classList.add("hidden");
+        return;
+      }
+
+      showCenterAlertModal({
+        title: "Pengajuan Terkirim",
+        message: `Permohonan Izin "${SELECTED_IZIN_CATEGORY}" berhasil diajukan dan diteruskan ke PIC Approval (${CURRENT_USER.atasan_nama || 'Atasan Langsung'}).`,
+        type: "success",
+        onClose: () => {
+          loadScreen("dashboard");
+        }
+      });
+
+    } catch (err) {
+      if (loadingOverlay) loadingOverlay.classList.add("hidden");
+      if (triggerBtn) triggerBtn.classList.remove("hidden");
+      if (previewCard) previewCard.classList.add("hidden");
+      showCenterAlertModal({
+        title: "Pengajuan Gagal",
+        message: "Koneksi terputus: " + err.message,
+        type: "error"
+      });
+    }
+  }
+}
+
+// Handler Submit Manual untuk Cuti & Sakit
+async function handleIzinManualSubmit(e) {
+  e.preventDefault();
+  const catatan = document.getElementById("izin-input-catatan")?.value.trim();
+  const tglMulai = document.getElementById("izin-tgl-mulai")?.value;
+  const tglSelesai = document.getElementById("izin-tgl-selesai")?.value;
+
+  if (!catatan) {
+    showCenterAlertModal({ title: "Catatan Wajib", message: "Harap isi keterangan alasan permohonan.", type: "warning" });
+    return;
+  }
+
+  const submitBtn = document.getElementById("btn-submit-izin-manual");
+  const originalText = submitBtn ? submitBtn.innerHTML : "Kirim Pengajuan Izin";
+  if (submitBtn) {
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Mengirim Pengajuan...';
+    submitBtn.disabled = true;
+  }
+
+  try {
+    const res = await callApi("submitIzin", {
+      nip: CURRENT_USER?.nip || "-",
+      nama: CURRENT_USER?.nama || "-",
+      cabang: CURRENT_USER?.cabang || "-",
+      jenis_izin: SELECTED_IZIN_CATEGORY,
+      tgl_mulai: tglMulai,
+      tgl_selesai: tglSelesai,
+      catatan: catatan,
+      lat: CURRENT_IZIN_GEO.lat || 0,
+      long: CURRENT_IZIN_GEO.long || 0,
+      selfie_base64: null,
+      pic_approval_nip: CURRENT_USER?.atasan_nip || "-",
+      pic_approval_nama: CURRENT_USER?.atasan_nama || "Atasan Langsung"
     });
 
     if (submitBtn) {
@@ -1189,23 +1899,400 @@ async function handleAbsenSubmit(e) {
       submitBtn.disabled = false;
     }
 
-    // Reset state absensi
-    removeAbsenSelfie();
-    const inputCatatan = document.getElementById("absen-input-catatan");
-    if (inputCatatan) inputCatatan.value = "";
+    if (!res || !res.success) {
+      showCenterAlertModal({
+        title: "Pengajuan Gagal",
+        message: res?.message || "Gagal mengirimkan permohonan ke server.",
+        type: "error"
+      });
+      return;
+    }
 
-    showToast(`Presensi "${ACTIVE_ABSEN_TYPE || 'Masuk Kantor'}" Berhasil Disimpan!`, "success", 1200);
-    setTimeout(() => {
-      loadScreen("dashboard");
-    }, 1000);
+    showCenterAlertModal({
+      title: "Pengajuan Berhasil",
+      message: `Permohonan "${SELECTED_IZIN_CATEGORY}" (${tglMulai} s/d ${tglSelesai}) berhasil diteruskan ke PIC Approval (${CURRENT_USER.atasan_nama || 'Atasan Langsung'}).`,
+      type: "success",
+      onClose: () => {
+        loadScreen("dashboard");
+      }
+    });
+
   } catch (err) {
     if (submitBtn) {
       submitBtn.innerHTML = originalText;
       submitBtn.disabled = false;
     }
-    showToast("Gagal kirim presensi: " + err.message, "error", 2000);
+    showCenterAlertModal({
+      title: "Pengajuan Gagal",
+      message: "Gagal terhubung: " + err.message,
+      type: "error"
+    });
   }
 }
+
+// =========================================================================
+// PUSAT PERSETUJUAN / APPROVAL HUB CONTROLLER
+// =========================================================================
+function initPersetujuanScreen() {
+  if (!CURRENT_USER) return;
+  const picInfo = document.getElementById("approval-pic-info");
+  if (picInfo) picInfo.innerText = `PIC Approver: ${CURRENT_USER.nama} (${CURRENT_USER.nip}) • ${CURRENT_USER.role}`;
+
+  fetchApprovalList();
+}
+
+async function fetchApprovalList() {
+  const container = document.getElementById("approval-list-container");
+  if (!container) return;
+
+  container.innerHTML = '<div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-700"></i>Memuat daftar persetujuan...</div>';
+
+  try {
+    let approvals = [];
+
+    // 1. Coba ambil langsung dari Supabase REST API
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      try {
+        const isAdmin = String(CURRENT_USER.role || "").toLowerCase().includes("admin");
+        const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
+        const queryUrl = isAdmin 
+          ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?select=*&order=timestamp.desc`
+          : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&order=timestamp.desc`;
+
+        const sbRes = await fetch(queryUrl, {
+          headers: {
+            "apikey": CONFIG.SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+          }
+        });
+        if (sbRes.ok) {
+          approvals = await sbRes.json();
+        }
+      } catch (errSup) {
+        console.warn("Direct Supabase fetchApprovalList error:", errSup);
+      }
+    }
+
+    // 2. Fallback ke GAS jika Supabase belum mengembalikan data
+    if (approvals.length === 0) {
+      const res = await callApi("getApprovalList", {
+        nip: CURRENT_USER.nip,
+        role: CURRENT_USER.role
+      });
+      if (res && res.success) {
+        approvals = res.approvals || [];
+      }
+    }
+
+    APPROVALS_CACHE = approvals || [];
+    renderApprovalList();
+    updateApprovalBadgeCounts();
+
+  } catch (err) {
+    container.innerHTML = `<div class="p-5 text-center text-xs text-rose-600 bg-rose-50 rounded-2xl border border-rose-200">Error memuat data: ${err.message}</div>`;
+  }
+}
+
+async function fetchPendingApprovalCount() {
+  if (!CURRENT_USER) return;
+  try {
+    let pendingCount = 0;
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      const isAdmin = String(CURRENT_USER.role || "").toLowerCase().includes("admin");
+      const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
+      const queryUrl = isAdmin
+        ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?status_approval=eq.PENDING&select=izin_id`
+        : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&select=izin_id`;
+
+      const sbRes = await fetch(queryUrl, {
+        headers: {
+          "apikey": CONFIG.SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+        }
+      });
+      if (sbRes.ok) {
+        const rows = await sbRes.json();
+        pendingCount = Array.isArray(rows) ? rows.length : 0;
+      }
+    } else {
+      const res = await callApi("getApprovalList", {
+        nip: CURRENT_USER.nip,
+        role: CURRENT_USER.role
+      });
+      if (res && res.success && Array.isArray(res.approvals)) {
+        pendingCount = res.approvals.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING").length;
+      }
+    }
+
+    const badge = document.getElementById("badge-pending-approval-count");
+    if (badge) {
+      badge.innerText = pendingCount;
+      if (pendingCount > 0) badge.classList.remove("hidden");
+      else badge.classList.add("hidden");
+    }
+  } catch (e) {}
+}
+
+function updateApprovalBadgeCounts() {
+  const pendingCount = APPROVALS_CACHE.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING").length;
+  const countFilterPending = document.getElementById("count-filter-pending");
+  const tabCount = document.getElementById("tab-personalia-count");
+  const dashBadge = document.getElementById("badge-pending-approval-count");
+
+  if (countFilterPending) countFilterPending.innerText = pendingCount;
+  if (tabCount) tabCount.innerText = pendingCount;
+  if (dashBadge) {
+    dashBadge.innerText = pendingCount;
+    if (pendingCount > 0) dashBadge.classList.remove("hidden");
+    else dashBadge.classList.add("hidden");
+  }
+}
+
+function filterApprovals(filterType) {
+  ACTIVE_APPROVAL_FILTER = filterType;
+
+  // Update button active styles
+  ["PENDING", "ALL", "APPROVED", "REJECTED"].forEach(f => {
+    const btn = document.getElementById(`btn-filter-${f}`);
+    if (btn) {
+      if (f === filterType) {
+        btn.className = "approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-slate-900 text-white shadow-xs shrink-0 transition";
+      } else {
+        btn.className = "approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0 transition";
+      }
+    }
+  });
+
+  renderApprovalList();
+}
+
+function renderApprovalList() {
+  const container = document.getElementById("approval-list-container");
+  if (!container) return;
+
+  let filtered = APPROVALS_CACHE;
+  if (ACTIVE_APPROVAL_FILTER === "PENDING") {
+    filtered = filtered.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING");
+  } else if (ACTIVE_APPROVAL_FILTER === "APPROVED") {
+    filtered = filtered.filter(a => String(a.status_approval || "").toUpperCase() === "APPROVED");
+  } else if (ACTIVE_APPROVAL_FILTER === "REJECTED") {
+    filtered = filtered.filter(a => String(a.status_approval || "").toUpperCase() === "REJECTED");
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400 space-y-1.5">
+        <i class="fa-solid fa-inbox text-3xl text-slate-300 mb-1"></i>
+        <p class="text-xs font-bold text-slate-600">Tidak ada pengajuan permohonan</p>
+        <span class="text-[10px]">Daftar pengajuan izin karyawan akan tampil di sini</span>
+      </div>
+    `;
+    return;
+  }
+
+  const categoryBadges = {
+    "WFA": { bg: "bg-teal-50 text-teal-700 border-teal-200", icon: "fa-laptop-house" },
+    "Datang Terlambat": { bg: "bg-amber-50 text-amber-700 border-amber-200", icon: "fa-clock" },
+    "Cuti": { bg: "bg-blue-50 text-blue-700 border-blue-200", icon: "fa-calendar-check" },
+    "Sakit": { bg: "bg-rose-50 text-rose-700 border-rose-200", icon: "fa-hospital-user" }
+  };
+
+  container.innerHTML = filtered.map(a => {
+    const isPending = String(a.status_approval || "").toUpperCase() === "PENDING";
+    const isApproved = String(a.status_approval || "").toUpperCase() === "APPROVED";
+    const isRejected = String(a.status_approval || "").toUpperCase() === "REJECTED";
+
+    const badgeStyle = isPending
+      ? "bg-amber-100 text-amber-800 border-amber-200"
+      : (isApproved ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-rose-100 text-rose-800 border-rose-200");
+
+    const statusLabel = isPending ? "Menunggu Respon" : (isApproved ? "Disetujui" : "Ditolak");
+    const catConfig = categoryBadges[a.jenis_izin] || { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: "fa-file" };
+
+    const periodeText = (a.tgl_mulai && a.tgl_selesai && a.tgl_mulai !== a.tgl_selesai)
+      ? `${a.tgl_mulai} s/d ${a.tgl_selesai}`
+      : (a.tgl_mulai || a.timestamp?.slice(0, 10) || "-");
+
+    const selfieThumbnail = a.selfie_url ? `
+      <div class="mt-2.5 flex items-center space-x-2 p-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition" onclick="openFotoPreviewModal('${a.selfie_url}')">
+        <img src="${a.selfie_url}" alt="Selfie" class="w-9 h-9 rounded-lg object-cover shadow-xs" />
+        <div class="min-w-0 flex-1">
+          <span class="text-[11px] font-bold text-slate-800 block">Lampiran Foto Selfie</span>
+          <span class="text-[9px] text-teal-700 font-semibold flex items-center"><i class="fa-solid fa-magnifying-glass mr-1"></i>Klik untuk perbesar</span>
+        </div>
+      </div>
+    ` : '';
+
+    const actionButtons = isPending ? `
+      <div class="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 mt-2.5">
+        <button type="button" onclick="openProcessApprovalModal('${a.izin_id}', 'REJECTED')" class="py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center space-x-1 transition active:scale-95">
+          <i class="fa-solid fa-xmark"></i>
+          <span>Tolak</span>
+        </button>
+        <button type="button" onclick="openProcessApprovalModal('${a.izin_id}', 'APPROVED')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center justify-center space-x-1 transition active:scale-95">
+          <i class="fa-solid fa-check"></i>
+          <span>Setujui</span>
+        </button>
+      </div>
+    ` : `
+      <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+        <span>Direspon oleh: <strong class="text-slate-600">${a.approved_by || 'Atasan'}</strong></span>
+        <span>${a.approved_at ? a.approved_at.slice(0, 16) : ''}</span>
+      </div>
+      ${a.catatan_approval && a.catatan_approval !== '-' ? `
+        <div class="mt-1 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-600 italic">
+          Catatan: "${a.catatan_approval}"
+        </div>
+      ` : ''}
+    `;
+
+    return `
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <h4 class="font-bold text-slate-900 text-sm leading-tight truncate">${a.nama}</h4>
+            <p class="text-[10px] text-slate-400 mt-0.5">NIP: ${a.nip} • ${a.cabang}</p>
+          </div>
+          <span class="text-[9px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${badgeStyle}">${statusLabel}</span>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <span class="px-2 py-0.5 rounded-lg border text-[10px] font-bold flex items-center space-x-1 ${catConfig.bg}">
+            <i class="fa-solid ${catConfig.icon}"></i>
+            <span>${a.jenis_izin}</span>
+          </span>
+          <span class="text-[10px] text-slate-500"><i class="fa-solid fa-calendar mr-1"></i>${periodeText}</span>
+        </div>
+
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-700">
+          <span class="text-[9px] text-slate-400 font-bold block uppercase mb-0.5">Keterangan / Alasan:</span>
+          <p class="font-medium whitespace-pre-line leading-relaxed">${a.catatan || '-'}</p>
+        </div>
+
+        ${selfieThumbnail}
+        ${actionButtons}
+      </div>
+    `;
+  }).join("");
+}
+
+function openProcessApprovalModal(izinId, actionType) {
+  const item = APPROVALS_CACHE.find(a => a.izin_id === izinId);
+  if (!item) return;
+
+  PENDING_APPROVAL_ACTION_PAYLOAD = {
+    izin_id: izinId,
+    status: actionType,
+    approver_nip: CURRENT_USER.nip,
+    approver_name: CURRENT_USER.nama
+  };
+
+  const modal = document.getElementById("modal-process-approval");
+  const iconBox = document.getElementById("modal-appr-icon-box");
+  const icon = document.getElementById("modal-appr-icon");
+  const title = document.getElementById("modal-appr-title");
+  const sub = document.getElementById("modal-appr-sub");
+  const jenis = document.getElementById("modal-appr-jenis");
+  const periode = document.getElementById("modal-appr-periode");
+  const catatan = document.getElementById("modal-appr-catatan");
+  const btnConfirm = document.getElementById("btn-confirm-approval-action");
+  const inputNotes = document.getElementById("modal-appr-input-notes");
+
+  if (inputNotes) inputNotes.value = "";
+  if (jenis) jenis.innerText = `${item.jenis_izin} (${item.nama})`;
+  if (periode) periode.innerText = item.tgl_mulai ? `${item.tgl_mulai} s/d ${item.tgl_selesai || item.tgl_mulai}` : item.timestamp;
+  if (catatan) catatan.innerText = item.catatan || "-";
+
+  if (actionType === "APPROVED") {
+    if (title) title.innerText = "Setujui Permohonan Izin";
+    if (sub) sub.innerText = `Anda akan menyetujui pengajuan ${item.nama}`;
+    if (iconBox) iconBox.className = "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-2";
+    if (icon) icon.className = "fa-solid fa-check";
+    if (btnConfirm) {
+      btnConfirm.className = "w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95";
+      btnConfirm.innerText = "Ya, Setujui";
+    }
+  } else {
+    if (title) title.innerText = "Tolak Permohonan Izin";
+    if (sub) sub.innerText = `Anda akan menolak pengajuan ${item.nama}`;
+    if (iconBox) iconBox.className = "w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl mx-auto mb-2";
+    if (icon) icon.className = "fa-solid fa-xmark";
+    if (btnConfirm) {
+      btnConfirm.className = "w-2/3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95";
+      btnConfirm.innerText = "Ya, Tolak Permohonan";
+    }
+  }
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeProcessApprovalModal() {
+  const modal = document.getElementById("modal-process-approval");
+  if (modal) modal.classList.add("hidden");
+  PENDING_APPROVAL_ACTION_PAYLOAD = null;
+}
+
+async function executeApprovalAction() {
+  if (!PENDING_APPROVAL_ACTION_PAYLOAD) return;
+  const inputNotes = document.getElementById("modal-appr-input-notes")?.value.trim() || "-";
+  const btnConfirm = document.getElementById("btn-confirm-approval-action");
+  const originalText = btnConfirm ? btnConfirm.innerHTML : "Konfirmasi";
+
+  if (btnConfirm) {
+    btnConfirm.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Memproses...';
+    btnConfirm.disabled = true;
+  }
+
+  try {
+    const res = await callApi("processApproval", {
+      ...PENDING_APPROVAL_ACTION_PAYLOAD,
+      catatan_approval: inputNotes
+    });
+
+    if (btnConfirm) {
+      btnConfirm.innerHTML = originalText;
+      btnConfirm.disabled = false;
+    }
+
+    closeProcessApprovalModal();
+
+    if (!res || !res.success) {
+      showCenterAlertModal({
+        title: "Gagal Memproses",
+        message: res?.message || "Terjadi kesalahan saat memproses approval.",
+        type: "error"
+      });
+      return;
+    }
+
+    showToast(res.message || "Status approval berhasil diperbarui!", "success", 1500);
+    fetchApprovalList();
+  } catch (err) {
+    if (btnConfirm) {
+      btnConfirm.innerHTML = originalText;
+      btnConfirm.disabled = false;
+    }
+    closeProcessApprovalModal();
+    showCenterAlertModal({
+      title: "Gagal Memproses",
+      message: "Koneksi terputus: " + err.message,
+      type: "error"
+    });
+  }
+}
+
+function openFotoPreviewModal(url) {
+  const modal = document.getElementById("modal-preview-foto");
+  const img = document.getElementById("img-modal-preview-full");
+  if (img) img.src = url;
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeFotoPreviewModal() {
+  const modal = document.getElementById("modal-preview-foto");
+  if (modal) modal.classList.add("hidden");
+}
+
 
 // =========================================================================
 // PRIORITY VISIT SCORING ENGINE (BY UNIT & BY DEALER)

@@ -534,3 +534,212 @@ function saveAssignmentData(payload) {
 function handleSaveAssignment(data) {
   return saveAssignmentData(data);
 }
+
+// =========================================================================
+// 6. MODUL PENGAJUAN IZIN & PERSETUJUAN (APPROVAL HUB)
+// =========================================================================
+function submitIzinServer(payload) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
+    let sheet = ss.getSheetByName(CONFIG.SHEETS.IZIN || "TR_IZIN_LOG");
+    const now = new Date();
+    const timeZone = typeof resolveEmployeeTimeZone === "function" 
+      ? resolveEmployeeTimeZone(payload.cabang, "", payload.timezone) 
+      : "Asia/Jakarta";
+    const timestampStr = Utilities.formatDate(now, timeZone, "yyyy-MM-dd HH:mm:ss");
+    const izinId = "IZN-" + Utilities.formatDate(now, timeZone, "yyyyMMdd-HHmmss") + "-" + Math.floor(Math.random() * 100);
+
+    const standardHeaders = [
+      "izin_id", "timestamp", "nip", "nama", "cabang", "jenis_izin", 
+      "tgl_mulai", "tgl_selesai", "catatan", "lat", "long", "selfie_url", 
+      "pic_approval_nip", "pic_approval_nama", "status_approval", 
+      "approved_at", "approved_by", "catatan_approval"
+    ];
+
+    if (!sheet) {
+      sheet = ss.insertSheet(CONFIG.SHEETS.IZIN || "TR_IZIN_LOG");
+      sheet.appendRow(standardHeaders);
+      sheet.setFrozenRows(1);
+    } else if (sheet.getLastRow() === 0) {
+      sheet.appendRow(standardHeaders);
+      sheet.setFrozenRows(1);
+    }
+
+    const rowData = [
+      izinId,
+      timestampStr,
+      payload.nip || "-",
+      payload.nama || "Karyawan",
+      payload.cabang || "-",
+      payload.jenis_izin || "WFA",
+      payload.tgl_mulai || Utilities.formatDate(now, timeZone, "yyyy-MM-dd"),
+      payload.tgl_selesai || payload.tgl_mulai || Utilities.formatDate(now, timeZone, "yyyy-MM-dd"),
+      payload.catatan || "-",
+      Number(payload.lat || 0),
+      Number(payload.long || 0),
+      payload.selfie_url || payload.selfie_photo_url || "",
+      payload.pic_approval_nip || "-",
+      payload.pic_approval_nama || "Atasan Langsung",
+      "PENDING",
+      "",
+      "",
+      ""
+    ];
+
+    sheet.appendRow(rowData);
+
+    // Sync to Supabase
+    if (typeof sendToSupabase === "function") {
+      sendToSupabase("tr_izin_log", [{
+        izin_id: izinId,
+        timestamp: timestampStr,
+        nip: payload.nip || "-",
+        nama: payload.nama || "Karyawan",
+        cabang: payload.cabang || "-",
+        jenis_izin: payload.jenis_izin || "WFA",
+        tgl_mulai: payload.tgl_mulai || Utilities.formatDate(now, timeZone, "yyyy-MM-dd"),
+        tgl_selesai: payload.tgl_selesai || payload.tgl_mulai || Utilities.formatDate(now, timeZone, "yyyy-MM-dd"),
+        catatan: payload.catatan || "-",
+        lat: Number(payload.lat || 0),
+        long: Number(payload.long || 0),
+        selfie_url: payload.selfie_url || payload.selfie_photo_url || "",
+        pic_approval_nip: payload.pic_approval_nip || "-",
+        pic_approval_nama: payload.pic_approval_nama || "Atasan Langsung",
+        status_approval: "PENDING"
+      }]);
+    }
+
+    if (typeof recordAuditTrail === "function") {
+      recordAuditTrail(payload.nip, "SUBMIT_IZIN", `Pengajuan ${payload.jenis_izin} -> PIC: ${payload.pic_approval_nama}`, `GPS: ${payload.lat || 0}, ${payload.long || 0}`);
+    }
+
+    return {
+      success: true,
+      izinId: izinId,
+      message: `Pengajuan Izin "${payload.jenis_izin}" berhasil dikirimkan ke PIC Approval (${payload.pic_approval_nama || 'Atasan Langsung'}).`
+    };
+  } catch (err) {
+    Logger.log("Error submitIzinServer: " + err.toString());
+    return { success: false, message: "Gagal memproses pengajuan izin: " + err.toString() };
+  }
+}
+
+function getApprovalListServer(approverNip, userRole) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.IZIN || "TR_IZIN_LOG");
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return { success: true, approvals: [] };
+    }
+
+    const rows = sheet.getDataRange().getValues();
+    const approvals = [];
+    const cleanApproverNip = String(approverNip || "").trim().toLowerCase();
+    const isAdmin = String(userRole || "").toLowerCase().includes("admin");
+
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const targetApprover = String(r[12] || "").trim().toLowerCase();
+      
+      // Filter hanya untuk PIC approval bersangkutan (atau admin jika ada)
+      if (isAdmin || targetApprover === cleanApproverNip || targetApprover.replace(/^0+/, '') === cleanApproverNip.replace(/^0+/, '')) {
+        approvals.push({
+          row_index: i + 1,
+          izin_id: String(r[0] || ""),
+          timestamp: String(r[1] || ""),
+          nip: String(r[2] || ""),
+          nama: String(r[3] || ""),
+          cabang: String(r[4] || ""),
+          jenis_izin: String(r[5] || "WFA"),
+          tgl_mulai: String(r[6] || ""),
+          tgl_selesai: String(r[7] || ""),
+          catatan: String(r[8] || "-"),
+          lat: Number(r[9] || 0),
+          long: Number(r[10] || 0),
+          selfie_url: String(r[11] || ""),
+          pic_approval_nip: String(r[12] || ""),
+          pic_approval_nama: String(r[13] || ""),
+          status_approval: String(r[14] || "PENDING").trim().toUpperCase(),
+          approved_at: String(r[15] || ""),
+          approved_by: String(r[16] || ""),
+          catatan_approval: String(r[17] || "")
+        });
+      }
+    }
+
+    // Urutkan dari yang terbaru
+    approvals.sort((a, b) => (b.timestamp > a.timestamp ? 1 : -1));
+
+    return {
+      success: true,
+      approvals: approvals
+    };
+  } catch (err) {
+    Logger.log("Error getApprovalListServer: " + err.toString());
+    return { success: false, message: "Gagal memuat daftar persetujuan: " + err.toString(), approvals: [] };
+  }
+}
+
+function processApprovalServer(payload) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.IZIN || "TR_IZIN_LOG");
+    if (!sheet) return { success: false, message: "Sheet TR_IZIN_LOG tidak ditemukan." };
+
+    const rows = sheet.getDataRange().getValues();
+    const targetIzinId = String(payload.izin_id || "").trim();
+    let rowIndex = -1;
+
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === targetIzinId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      return { success: false, message: "Data pengajuan izin tidak ditemukan." };
+    }
+
+    const now = new Date();
+    const timeZone = "Asia/Jakarta";
+    const timestampStr = Utilities.formatDate(now, timeZone, "yyyy-MM-dd HH:mm:ss");
+    const status = String(payload.status || "APPROVED").toUpperCase();
+    const approverName = String(payload.approver_name || payload.approverName || "Atasan Langsung");
+    const catatanApproval = String(payload.catatan_approval || payload.notes || "-");
+
+    // Update kolom status_approval (col 15), approved_at (col 16), approved_by (col 17), catatan_approval (col 18)
+    sheet.getRange(rowIndex, 15, 1, 4).setValues([[
+      status,
+      timestampStr,
+      approverName,
+      catatanApproval
+    ]]);
+
+    // Sync to Supabase
+    if (typeof sendToSupabase === "function") {
+      sendToSupabase("tr_izin_log", [{
+        izin_id: targetIzinId,
+        status_approval: status,
+        approved_at: timestampStr,
+        approved_by: approverName,
+        catatan_approval: catatanApproval
+      }], "izin_id");
+    }
+
+    if (typeof recordAuditTrail === "function") {
+      recordAuditTrail(payload.approver_nip, "PROCESS_APPROVAL", `${status} -> Izin ID: ${targetIzinId}`, catatanApproval);
+    }
+
+    return {
+      success: true,
+      izin_id: targetIzinId,
+      status: status,
+      message: `Pengajuan izin berhasil ${status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}.`
+    };
+  } catch (err) {
+    Logger.log("Error processApprovalServer: " + err.toString());
+    return { success: false, message: "Gagal memperbarui status persetujuan: " + err.toString() };
+  }
+}
+

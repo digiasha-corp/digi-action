@@ -2,12 +2,12 @@
   <!-- Banner Presensi Cepat -->
   <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between gap-2">
     <div class="min-w-0">
-      <span class="text-[10px] text-emerald-100 uppercase tracking-wider font-bold block">Kehadiran Hari Ini</span>
-      <h4 class="text-xs font-bold truncate">Absensi Lapangan / Kantor</h4>
+      <span class="text-[10px] text-emerald-100 uppercase tracking-wider font-bold block" id="dash-presensi-status-label">Kehadiran Hari Ini</span>
+      <h4 class="text-xs font-bold truncate" id="dash-presensi-status-sub">Presensi & Perizinan Karyawan</h4>
     </div>
-    <button type="button" onclick="openAbsenChoiceModal()" class="px-3.5 py-2 bg-white text-teal-800 hover:bg-emerald-50 rounded-xl text-xs font-bold shrink-0 shadow flex items-center space-x-1.5 transition">
+    <button type="button" id="dash-btn-presensi" onclick="openAbsenChoiceModal()" class="px-3.5 py-2 bg-white text-teal-800 hover:bg-emerald-50 rounded-xl text-xs font-bold shrink-0 shadow flex items-center space-x-1.5 transition active:scale-95">
       <i class="fa-solid fa-fingerprint text-emerald-600"></i>
-      <span>Buka Absen</span>
+      <span id="dash-btn-presensi-text">Presensi Online</span>
     </button>
   </div>
 
@@ -15,6 +15,31 @@
     <h4 class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">Pilih Modul Aktivitas</h4>
     <div class="grid grid-cols-2 gap-2.5" id="main-menu-grid">
       
+      <!-- MENU IZIN (WFA, Datang Terlambat, Cuti, Sakit) -->
+      <button id="menu-btn-izin" onclick="loadScreen('izin')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-teal-500 transition">
+        <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-file-signature"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Pengajuan Izin</div>
+          <div class="text-[10px] text-slate-400 leading-tight">WFA, Terlambat, Cuti, Sakit</div>
+        </div>
+      </button>
+
+      <!-- MENU PERSETUJUAN (Approval Hub) -->
+      <button id="menu-btn-persetujuan" onclick="loadScreen('persetujuan')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-indigo-500 transition relative">
+        <div class="flex items-center justify-between">
+          <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
+            <i class="fa-solid fa-stamp"></i>
+          </div>
+          <span id="badge-pending-approval-count" class="hidden text-[10px] bg-rose-500 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">0</span>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">Persetujuan</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Pusat approval PIC & atasan</div>
+        </div>
+      </button>
+
       <button id="menu-btn-priority" onclick="loadScreen('priority')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-left flex flex-col justify-between h-28 hover:border-slate-400 transition">
         <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
           <i class="fa-solid fa-triangle-exclamation"></i>

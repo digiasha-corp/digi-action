@@ -26,15 +26,17 @@ function handleLogin(identifier, password) {
   
   const headers = data[0].map(h => String(h).trim().toLowerCase());
 
-  const idxEmail = headers.indexOf("email");
-  const idxNip = headers.indexOf("nip");
-  const idxPass = headers.findIndex(h => h.includes("pass") || h.includes("sandi"));
-  const idxNama = headers.findIndex(h => h.includes("nama"));
-  const idxJabatan = headers.findIndex(h => h.includes("jabatan"));
-  const idxRole = headers.findIndex(h => h === "role_id" || h.includes("role"));
+  const idxNip = headers.findIndex(h => h === "nip" || h === "nik" || h === "user_id" || h === "userid" || (h.includes("nip") && !h.includes("atasan") && !h.includes("spv")));
+  const idxEmail = headers.findIndex(h => h === "email" || h.includes("email") || h.includes("mail"));
+  const idxPass = headers.findIndex(h => h === "password" || h === "password_hash" || h.includes("password") || h.includes("pass") || h.includes("sandi"));
+  const idxNama = headers.findIndex(h => (h === "nama" || h === "nama_lengkap" || h.includes("nama") || h.includes("name")) && !h.includes("atasan") && !h.includes("spv"));
+  const idxJabatan = headers.findIndex(h => h === "jabatan" || h.includes("jabatan") || h.includes("position") || h.includes("role_name"));
+  const idxRole = headers.findIndex(h => h === "role_id" || h === "role" || (h.includes("role") && !h.includes("name")));
   const idxCabang = headers.findIndex(h => h.includes("branch") || h.includes("cabang"));
   const idxAreaCover = headers.findIndex(h => h.includes("area_cover") || h.includes("area"));
-  const idxStatus = headers.findIndex(h => h.includes("status_aktif") || h === "status");
+  const idxStatus = headers.findIndex(h => h.includes("status_aktif") || h === "status" || h.includes("status"));
+  const idxAtasanNip = headers.findIndex(h => h === "atasan_nip" || h.includes("atasan_nip") || h.includes("spv_nip") || h.includes("pic_approval_nip") || (h.includes("atasan") && h.includes("nip")));
+  const idxAtasanNama = headers.findIndex(h => h === "atasan_nama" || h.includes("atasan_nama") || h.includes("nama_atasan") || h.includes("spv_nama") || h.includes("pic_approval_nama") || (h.includes("atasan") && (h.includes("nama") || h.includes("name"))));
 
   const cleanId = String(identifier).trim().toLowerCase();
   const cleanPass = String(password).trim();
@@ -88,9 +90,11 @@ function handleLogin(identifier, password) {
       const areaCoverVal = idxAreaCover !== -1 ? String(row[idxAreaCover] || "").trim() : "";
       const rawRoleId = idxRole !== -1 ? String(row[idxRole] || "").trim() : "";
       const jabatanVal = idxJabatan !== -1 ? String(row[idxJabatan] || "").trim() : "";
+      const atasanNipVal = idxAtasanNip !== -1 ? String(row[idxAtasanNip] || "").trim() : "";
+      const atasanNamaVal = idxAtasanNama !== -1 ? String(row[idxAtasanNama] || "").trim() : "";
 
       let resolvedRoleName = rawRoleId;
-      let resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+      let resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"];
 
       if (rolesMap[rawRoleId]) {
         resolvedRoleName = rolesMap[rawRoleId].role_name || rawRoleId;
@@ -99,10 +103,10 @@ function handleLogin(identifier, password) {
         }
       } else if (rawRoleId === "R-01" || rawRoleId.toLowerCase().includes("admin")) {
         resolvedRoleName = "Admin";
-        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"];
       } else if (rawRoleId === "R-02" || rawRoleId.toLowerCase().includes("branch manager") || rawRoleId.toLowerCase().includes("bm")) {
         resolvedRoleName = "Branch Manager";
-        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps"];
+        resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "persetujuan"];
       } else if (rawRoleId === "R-03" || rawRoleId.toLowerCase().includes("fac")) {
         resolvedRoleName = "FAC";
         resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
@@ -124,9 +128,80 @@ function handleLogin(identifier, password) {
           role: resolvedRoleName,
           permissions: resolvedPerms,
           cabang: (idxCabang !== -1 ? row[idxCabang] : "") || "HEAD OFFICE",
-          area_cover: areaCoverVal
+          area_cover: areaCoverVal,
+          atasan_nip: atasanNipVal,
+          atasan_nama: atasanNamaVal
         }
       };
+    }
+  }
+
+  // Fallback: Jika tidak ditemukan di Spreadsheet, cek langsung ke Supabase m_employee
+  if (typeof SUPABASE_CONFIG !== "undefined" && SUPABASE_CONFIG.URL && SUPABASE_CONFIG.ANON_KEY) {
+    try {
+      const url = `${SUPABASE_CONFIG.URL}/rest/v1/m_employee?or=(nip.eq.${encodeURIComponent(identifier)},email.eq.${encodeURIComponent(identifier)})`;
+      const res = UrlFetchApp.fetch(url, {
+        method: "get",
+        headers: {
+          "apikey": SUPABASE_CONFIG.ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+        },
+        muteHttpExceptions: true
+      });
+      if (res.getResponseCode() === 200) {
+        const empList = JSON.parse(res.getContentText());
+        if (empList && empList.length > 0) {
+          const emp = empList[0];
+          const pass = String(emp.password_hash || emp.password || "").trim();
+          if (pass === cleanPass) {
+            const rawStatus = String(emp.status_aktif || "AKTIF").toUpperCase();
+            if (rawStatus === "INACTIVE" || rawStatus === "NON-ACTIVE" || rawStatus === "NONAKTIF" || rawStatus === "TIDAK AKTIF") {
+              return { success: false, message: "Akun Anda berstatus non-aktif. Hubungi Administrator." };
+            }
+
+            const rawRoleId = String(emp.role_id || "R-01").trim();
+            let resolvedRoleName = emp.jabatan || rawRoleId;
+            let resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"];
+
+            if (rolesMap[rawRoleId]) {
+              resolvedRoleName = rolesMap[rawRoleId].role_name || rawRoleId;
+              if (rolesMap[rawRoleId].permissions && rolesMap[rawRoleId].permissions.length > 0) {
+                resolvedPerms = rolesMap[rawRoleId].permissions;
+              }
+            } else if (rawRoleId === "R-01" || rawRoleId.toLowerCase().includes("admin")) {
+              resolvedRoleName = "Admin";
+            } else if (rawRoleId === "R-02" || rawRoleId.toLowerCase().includes("branch manager") || rawRoleId.toLowerCase().includes("bm")) {
+              resolvedRoleName = "Branch Manager";
+              resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "persetujuan"];
+            } else if (rawRoleId === "R-03" || rawRoleId.toLowerCase().includes("fac")) {
+              resolvedRoleName = "FAC";
+              resolvedPerms = ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+            } else if (rawRoleId === "R-04" || rawRoleId.toLowerCase().includes("other")) {
+              resolvedRoleName = "Other";
+              resolvedPerms = ["priority"];
+            }
+
+            return {
+              success: true,
+              user: {
+                nip: emp.nip || "-",
+                nama: emp.nama_lengkap || "Karyawan Digiasha",
+                email: emp.email || "",
+                jabatan: emp.jabatan || "",
+                role_id: rawRoleId,
+                role: resolvedRoleName,
+                permissions: resolvedPerms,
+                cabang: emp.cabang || "HEAD OFFICE",
+                area_cover: emp.area_cover || "",
+                atasan_nip: emp.atasan_nip || "",
+                atasan_nama: emp.atasan_nama || ""
+              }
+            };
+          }
+        }
+      }
+    } catch (errSup) {
+      Logger.log("Supabase login fallback error: " + errSup.toString());
     }
   }
 

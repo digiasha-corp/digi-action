@@ -126,13 +126,19 @@ function doPost(e) {
       }
     }
 
+    else if (action === "getTodayAbsenStatus") {
+      if (typeof getTodayAbsenStatusServer === "function") {
+        result = getTodayAbsenStatusServer(payload.nip || payload.user_id);
+      }
+    }
+
     else if (action === "submitAbsensi") {
       let selfieUrl = "";
       if (payload.selfie_base64) {
         if (typeof uploadAbsensiSelfie === "function") {
           selfieUrl = uploadAbsensiSelfie(payload.nip || payload.user_id || payload.userId || "USER", payload.selfie_base64);
         } else if (typeof uploadBase64ToDrive === "function") {
-          selfieUrl = uploadBase64ToDrive(payload.selfie_base64, (CONFIG.DRIVE_FOLDERS && CONFIG.DRIVE_FOLDERS.ABSENSI_ID) || "1O3fuqC9zIv6zlIqkH76ae3shMOKodCUV", (payload.nip || payload.user_id || "USER") + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd"));
+          selfieUrl = uploadBase64ToDrive(payload.selfie_base64, (CONFIG.DRIVE_FOLDERS && CONFIG.DRIVE_FOLDERS.ABSENSI_ID) || "1O3fuqC9zIv6zlIqkH76ae3shMOKodCUV", (payload.nip || payload.user_id || "USER") + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss"));
         }
       }
       payload.selfie_url = selfieUrl;
@@ -142,6 +148,33 @@ function doPost(e) {
         result = submitAbsensiServer(payload);
       } else if (typeof handleSubmitAbsensi === "function") {
         result = handleSubmitAbsensi(payload);
+      }
+    }
+
+    else if (action === "submitIzin") {
+      let selfieUrl = "";
+      if (payload.selfie_base64) {
+        if (typeof uploadAbsensiSelfie === "function") {
+          selfieUrl = uploadAbsensiSelfie("IZIN_" + (payload.nip || "USER"), payload.selfie_base64);
+        } else if (typeof uploadBase64ToDrive === "function") {
+          selfieUrl = uploadBase64ToDrive(payload.selfie_base64, (CONFIG.DRIVE_FOLDERS && CONFIG.DRIVE_FOLDERS.ABSENSI_ID) || "1O3fuqC9zIv6zlIqkH76ae3shMOKodCUV", "IZIN_" + (payload.nip || "USER") + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss"));
+        }
+      }
+      payload.selfie_url = selfieUrl;
+      if (typeof submitIzinServer === "function") {
+        result = submitIzinServer(payload);
+      }
+    }
+
+    else if (action === "getApprovalList") {
+      if (typeof getApprovalListServer === "function") {
+        result = getApprovalListServer(payload.nip || payload.user_id, payload.role);
+      }
+    }
+
+    else if (action === "processApproval") {
+      if (typeof processApprovalServer === "function") {
+        result = processApprovalServer(payload);
       }
     }
 
@@ -163,29 +196,81 @@ function doPost(e) {
 }
 
 // =========================================================================
-// 3. HANDLER STANDAR ABSENSI PRESENSI
+// 3. HANDLER STANDAR ABSENSI PRESENSI & PERIZINAN
 // =========================================================================
+
+// Helper Resolusi Timezone Indonesia (WIB, WITA, WIT) Berdasarkan Cabang / Lokasi Kantor / Parameter Klien
+function resolveEmployeeTimeZone(cabang, officeName, clientTz) {
+  if (clientTz && (clientTz.includes("Makassar") || clientTz.includes("Jayapura") || clientTz.includes("Jakarta") || clientTz.includes("Ujung_Pandang"))) {
+    return clientTz;
+  }
+  const text = (String(cabang || "") + " " + String(officeName || "")).toUpperCase();
+  // WIT (UTC+9)
+  if (text.includes("JAYAPURA") || text.includes("AMBON") || text.includes("PAPUA") || text.includes("MALUKU") || text.includes("SORONG") || text.includes("MANOKWARI") || text.includes("TIMIKA") || text.includes("MERAUKE") || text.includes("BIAK")) {
+    return "Asia/Jayapura";
+  }
+  // WITA (UTC+8)
+  if (text.includes("MAKASSAR") || text.includes("BALIKPAPAN") || text.includes("BANJARMASIN") || text.includes("SAMARINDA") || text.includes("MANADO") || text.includes("PALU") || text.includes("KENDARI") || text.includes("GORONTALO") || text.includes("DENPASAR") || text.includes("BALI") || text.includes("MATARAM") || text.includes("LOMBOK") || text.includes("KUPANG") || text.includes("SULAWESI") || text.includes("KALIMANTAN") || text.includes("NTB") || text.includes("NTT")) {
+    return "Asia/Makassar";
+  }
+  // Default WIB (UTC+7)
+  return "Asia/Jakarta";
+}
+
 function submitAbsensiServer(payload) {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
     let sheet = ss.getSheetByName(CONFIG.SHEETS.ABSENSI || "TR_ABSENSI_LOG");
-    const absenId = "ABS-" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd-HHmmss");
     const now = new Date();
+    
+    // Resolusi Timezone Lokal Sesuai Lokasi / Cabang Karyawan (WIB / WITA / WIT)
+    const timeZone = resolveEmployeeTimeZone(payload.cabang, payload.lokasi_kantor || payload.nearest_office, payload.timezone);
+    const tzAbbr = timeZone === "Asia/Jayapura" ? "WIT" : (timeZone === "Asia/Makassar" ? "WITA" : "WIB");
+
+    const timestampStr = Utilities.formatDate(now, timeZone, "yyyy-MM-dd HH:mm:ss");
+    const dateTodayStr = Utilities.formatDate(now, timeZone, "yyyy-MM-dd");
+    const hourStr = Utilities.formatDate(now, timeZone, "HH");
+    const minStr = Utilities.formatDate(now, timeZone, "mm");
+    const timeStr = `${hourStr}:${minStr} ${tzAbbr}`;
+
+    const jenisAbsen = payload.jenis_absen || "Absen Datang";
+    const isDatang = jenisAbsen === "Absen Datang" || jenisAbsen === "Masuk Kantor";
+    const distanceMeter = Number(payload.distance_meters || payload.distance_meter || 0);
+    const maxRadius = Number(payload.max_radius || 100);
+
+    // 1. Verifikasi Geofence hanya untuk Absen Datang
+    if (isDatang && distanceMeter > maxRadius) {
+      return {
+        success: false,
+        message: `Lokasi Anda berada di luar radius kantor terdaftar (${distanceMeter} Meter / Maks ${maxRadius}m).`
+      };
+    }
+
+    // 2. Kalkulasi Jam Masuk 09:00 Waktu Setempat (WIB/WITA/WIT) untuk Absen Datang
+    const currentMinutes = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
+    const targetMinutes = 9 * 60; // 09:00:00 waktu lokal
+    const isLate = isDatang && currentMinutes > targetMinutes;
+    const lateMinutes = isLate ? (currentMinutes - targetMinutes) : 0;
+
+    let statusKehadiran = "PULANG";
+    let messageText = `Absensi Kepulangan Berhasil (${timeStr})`;
+
+    if (isDatang) {
+      if (isLate) {
+        statusKehadiran = "TERLAMBAT";
+        messageText = `Absensi Kedatangan Berhasil, Anda Terlambat ${lateMinutes} Menit (${timeStr})`;
+      } else {
+        statusKehadiran = "TEPAT_WAKTU";
+        messageText = `Absensi Kedatangan Berhasil (Tepat Waktu - ${timeStr})`;
+      }
+    }
+
+    const absenId = "ABS-" + Utilities.formatDate(now, timeZone, "yyyyMMdd-HHmmss") + "-" + Math.floor(Math.random() * 100);
 
     const standardHeaders = [
-      "absen_id", 
-      "timestamp", 
-      "user_id", 
-      "user_name", 
-      "role", 
-      "cabang", 
-      "jenis_absen", 
-      "nearest_office", 
-      "distance_meter", 
-      "lat", 
-      "long", 
-      "catatan", 
-      "selfie_url"
+      "absen_id", "timestamp", "nip", "nama_karyawan", "jenis_absen", 
+      "cabang", "lat", "long", "nearest_office", "distance_meter", 
+      "status_geofence", "menit_terlambat", "status_kehadiran", "selfie_photo_url"
     ];
 
     if (!sheet) {
@@ -197,44 +282,125 @@ function submitAbsensiServer(payload) {
       sheet.setFrozenRows(1);
     }
 
-    const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), standardHeaders.length)).getValues()[0].map(h => String(h).trim().toLowerCase());
-    
-    const rowMap = {
-      "absen_id": absenId,
-      "timestamp": now,
-      "user_id": payload.nip || payload.user_id || payload.userId || "-",
-      "nip": payload.nip || payload.user_id || payload.userId || "-",
-      "user_name": payload.nama || payload.user_name || payload.userName || "-",
-      "nama": payload.nama || payload.user_name || payload.userName || "-",
-      "role": payload.role || "-",
-      "cabang": payload.cabang || "-",
-      "jenis_absen": payload.jenis_absen || "Masuk Kantor",
-      "nearest_office": payload.lokasi_kantor || payload.nearest_office || "-",
-      "lokasi_kantor": payload.lokasi_kantor || payload.nearest_office || "-",
-      "distance_meter": Number(payload.distance_meters || payload.distance_meter || 0),
-      "distance_meters": Number(payload.distance_meters || payload.distance_meter || 0),
-      "lat": Number(payload.lat || 0),
-      "long": Number(payload.long || 0),
-      "catatan": payload.catatan || "-",
-      "selfie_url": payload.selfie_url || payload.selfie_photo_url || ""
-    };
+    const rowData = [
+      absenId,
+      timestampStr,
+      payload.nip || payload.user_id || "-",
+      payload.nama || payload.user_name || "Karyawan",
+      isDatang ? "Absen Datang" : "Absen Pulang",
+      payload.cabang || "-",
+      Number(payload.lat || 0),
+      Number(payload.long || 0),
+      payload.lokasi_kantor || payload.nearest_office || "-",
+      distanceMeter,
+      isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "N/A",
+      lateMinutes,
+      statusKehadiran,
+      payload.selfie_url || payload.selfie_photo_url || ""
+    ];
 
-    const newRow = headers.map(h => (rowMap[h] !== undefined ? rowMap[h] : ""));
-    sheet.appendRow(newRow);
+    sheet.appendRow(rowData);
+
+    // Sync to Supabase jika tersedia
+    if (typeof sendToSupabase === "function") {
+      sendToSupabase("tr_absensi_log", [{
+        absen_id: absenId,
+        timestamp: timestampStr,
+        nip: payload.nip || payload.user_id || "-",
+        nama_karyawan: payload.nama || payload.user_name || "Karyawan",
+        jenis_absen: isDatang ? "Absen Datang" : "Absen Pulang",
+        cabang: payload.cabang || "-",
+        lat: Number(payload.lat || 0),
+        long: Number(payload.long || 0),
+        nearest_office: payload.lokasi_kantor || payload.nearest_office || "-",
+        distance_meter: distanceMeter,
+        status_geofence: isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "N/A",
+        menit_terlambat: lateMinutes,
+        status_kehadiran: statusKehadiran,
+        selfie_photo_url: payload.selfie_url || payload.selfie_photo_url || ""
+      }]);
+    }
 
     if (typeof recordAuditTrail === "function") {
       recordAuditTrail(
         payload.nip || payload.user_id || payload.nama, 
         "SUBMIT_ABSENSI", 
-        "Absensi: " + (payload.jenis_absen || 'Masuk Kantor') + " (" + (payload.distance_meters || payload.distance_meter || 0) + "m)", 
-        "GPS: " + (payload.lat || 0) + ", " + (payload.long || 0)
+        `${isDatang ? 'Absen Datang' : 'Absen Pulang'} (${statusKehadiran} - ${tzAbbr}) - ${distanceMeter}m`, 
+        `GPS: ${payload.lat || 0}, ${payload.long || 0}`
       );
     }
 
-    return { success: true, absenId: absenId, selfieUrl: rowMap.selfie_url, message: "Presensi kehadiran berhasil disimpan." };
+    return { 
+      success: true, 
+      absenId: absenId, 
+      jenis_absen: isDatang ? "Absen Datang" : "Absen Pulang",
+      status_kehadiran: statusKehadiran,
+      isLate: isLate,
+      lateMinutes: lateMinutes,
+      timeZone: timeZone,
+      tzAbbr: tzAbbr,
+      timeStr: timeStr,
+      message: messageText 
+    };
   } catch (err) {
     Logger.log("Error submitAbsensiServer: " + err.toString());
     return { success: false, message: "Gagal menyimpan absensi: " + err.toString() };
+  }
+}
+
+function getTodayAbsenStatusServer(nip, cabang, clientTz) {
+  try {
+    if (!nip) return { success: true, status: "BELUM_ABSEN", hasAbsenDatang: false, hasAbsenPulang: false };
+    const ss = SpreadsheetApp.openById(CONFIG.MAIN_SPREADSHEET_ID || SPREADSHEET_DB_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.ABSENSI || "TR_ABSENSI_LOG");
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return { success: true, status: "BELUM_ABSEN", hasAbsenDatang: false, hasAbsenPulang: false };
+    }
+
+    const timeZone = resolveEmployeeTimeZone(cabang, "", clientTz);
+    const todayDateStr = Utilities.formatDate(new Date(), timeZone, "yyyy-MM-dd");
+    const rows = sheet.getDataRange().getValues();
+    const cleanNip = String(nip).trim().toLowerCase();
+
+    let hasDatang = false;
+    let hasPulang = false;
+    let datangTime = "";
+    let pulangTime = "";
+
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const r = rows[i];
+      const rTime = String(r[1] || "");
+      const rNip = String(r[2] || "").trim().toLowerCase();
+      const rJenis = String(r[4] || "").toLowerCase();
+
+      if (rTime.startsWith(todayDateStr) && (rNip === cleanNip || rNip.replace(/^0+/, '') === cleanNip.replace(/^0+/, ''))) {
+        if (rJenis.includes("datang") || rJenis.includes("masuk")) {
+          hasDatang = true;
+          if (!datangTime) datangTime = rTime.substring(11, 16);
+        } else if (rJenis.includes("pulang")) {
+          hasPulang = true;
+          if (!pulangTime) pulangTime = rTime.substring(11, 16);
+        }
+      }
+    }
+
+    let overallStatus = "BELUM_ABSEN";
+    if (hasPulang) {
+      overallStatus = "SUDAH_PULANG";
+    } else if (hasDatang) {
+      overallStatus = "SUDAH_DATANG";
+    }
+
+    return {
+      success: true,
+      status: overallStatus,
+      hasAbsenDatang: hasDatang,
+      hasAbsenPulang: hasPulang,
+      datangTime: datangTime,
+      pulangTime: pulangTime
+    };
+  } catch (err) {
+    return { success: false, message: err.toString(), status: "BELUM_ABSEN" };
   }
 }
 

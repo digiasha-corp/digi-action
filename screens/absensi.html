@@ -1,13 +1,14 @@
-<div class="space-y-3.5">
-  <div id="absen-type-banner" class="p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-slate-900">
+<div class="space-y-3.5 relative">
+  <div id="absen-type-banner" class="p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-slate-900 transition-colors duration-300">
     <div>
-      <span class="text-[10px] uppercase font-bold opacity-80 block">Formulir Presensi</span>
-      <h3 class="text-sm font-bold" id="absen-type-title">Masuk Kantor</h3>
+      <span class="text-[10px] uppercase font-bold opacity-80 block">Presensi Kehadiran</span>
+      <h3 class="text-sm font-bold" id="absen-type-title">Absen Datang</h3>
     </div>
     <i id="absen-type-icon" class="fa-solid fa-building text-2xl text-emerald-400"></i>
   </div>
 
-  <form onsubmit="handleAbsenSubmit(event)" class="space-y-3.5">
+  <div class="space-y-3.5">
+    <!-- Verifikasi Lokasi & Geotag -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2.5">
       <div class="flex items-center justify-between border-b border-slate-100 pb-2">
         <span class="text-xs font-bold text-slate-800 uppercase">Verifikasi Lokasi & Geotag</span>
@@ -31,56 +32,59 @@
         </div>
       </div>
 
-      <button type="button" onclick="acquireAbsenLocation()" class="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center space-x-1">
+      <button type="button" onclick="acquireAbsenLocation()" class="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center space-x-1 transition active:scale-95">
         <i class="fa-solid fa-location-crosshairs"></i>
         <span>Perbarui Titik GPS</span>
       </button>
     </div>
 
+    <!-- Kamera Selfie & Auto-Submit -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2.5">
       <div class="border-b border-slate-100 pb-2">
-        <span class="text-xs font-bold text-slate-800 uppercase block">Foto Selfie Kehadiran <span class="text-red-500">*</span></span>
-        <p class="text-[10px] text-amber-700 font-semibold mt-0.5"><i class="fa-solid fa-circle-exclamation mr-1"></i>Ambil foto selfie kelihatan badan / setengah badan (Bukan close-up wajah).</p>
+        <span class="text-xs font-bold text-slate-800 uppercase block">Foto Selfie Presensi <span class="text-red-500">*</span></span>
+        <p class="text-[10px] text-amber-700 font-semibold mt-0.5"><i class="fa-solid fa-camera mr-1"></i>Ambil foto selfie jelas kelihatan badan / wajah. Presensi langsung tersimpan otomatis.</p>
       </div>
 
-      <div id="btn-trigger-absen-selfie" onclick="triggerCameraInput('file-absen-selfie')" class="border-2 border-dashed border-slate-300 hover:border-teal-600 rounded-2xl p-6 text-center cursor-pointer hover:bg-slate-50 transition">
-        <i class="fa-solid fa-camera text-3xl text-slate-400 mb-1.5 block"></i>
-        <p class="text-xs text-slate-700 font-bold">Buka Kamera Selfie</p>
-        <span class="text-[10px] text-slate-400">Klik untuk mengambil foto selfie langsung</span>
+      <div id="btn-trigger-absen-selfie" onclick="triggerCameraInput('file-absen-selfie')" class="border-2 border-dashed border-teal-400 bg-teal-50/40 hover:bg-teal-50 rounded-2xl p-7 text-center cursor-pointer transition">
+        <div class="w-12 h-12 bg-white rounded-2xl shadow-sm text-teal-600 flex items-center justify-center text-2xl mx-auto mb-2">
+          <i class="fa-solid fa-camera"></i>
+        </div>
+        <p class="text-xs text-slate-800 font-bold">Buka Kamera Selfie</p>
+        <span class="text-[10px] text-slate-500 mt-0.5 block">Klik untuk ambil foto & kirim otomatis</span>
         <input type="file" id="file-absen-selfie" accept="image/*" capture="user" class="hidden" onchange="handleAbsenSelfieSelected(this)" />
       </div>
 
-      <!-- PREVIEW MENGGANTIKAN TOMBOL KAMERA -->
+      <!-- PREVIEW KETIKA SUBMITTING -->
       <div id="preview-absen-selfie-card" class="hidden relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-900">
-        <img id="img-absen-selfie-preview" src="" alt="Selfie Preview" class="w-full h-56 object-cover" />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-between p-3">
+        <img id="img-absen-selfie-preview" src="" alt="Selfie Preview" class="w-full h-64 object-cover" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-between p-3.5">
           <div class="flex justify-end">
             <span class="text-[10px] bg-emerald-500/90 text-white font-bold px-2.5 py-1 rounded-lg backdrop-blur-xs flex items-center space-x-1 shadow">
               <i class="fa-solid fa-circle-check"></i>
               <span>Foto Selfie Siap</span>
             </span>
           </div>
-          <div class="flex items-center justify-between gap-2">
-            <button type="button" onclick="triggerCameraInput('file-absen-selfie')" class="flex-1 py-2 bg-white/95 hover:bg-white text-slate-900 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow active:scale-95 transition">
-              <i class="fa-solid fa-camera-rotate"></i>
-              <span>Foto Ulang</span>
-            </button>
-            <button type="button" onclick="removeAbsenSelfie()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center shadow active:scale-95 transition">
-              <i class="fa-solid fa-trash"></i>
-            </button>
+          <div class="bg-black/60 backdrop-blur-md rounded-xl p-2.5 text-center text-white">
+            <p class="text-xs font-bold flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-circle-notch fa-spin text-emerald-400"></i>
+              <span>Mengirim Presensi Otomatis...</span>
+            </p>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
+  <!-- OVERLAY LOADING PROSES SUBMIT -->
+  <div id="absen-submitting-overlay" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white p-5 rounded-3xl shadow-2xl flex flex-col items-center space-y-3 max-w-xs text-center">
+      <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+      </div>
       <div>
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Catatan Kehadiran (Opsional)</label>
-        <input type="text" id="absen-input-catatan" placeholder="Contoh: Menuju meeting showroom" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-slate-900" />
+        <h4 class="font-bold text-xs text-slate-800">Menyimpan Presensi...</h4>
+        <p class="text-[10px] text-slate-400 mt-0.5">Memverifikasi titik lokasi & jam server</p>
       </div>
     </div>
-
-    <button type="submit" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm shadow-md flex items-center justify-center space-x-2 transition">
-      <i class="fa-solid fa-paper-plane"></i>
-      <span>Kirim Rekap Absensi</span>
-    </button>
-  </form>
+  </div>
 </div>

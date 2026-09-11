@@ -38,37 +38,61 @@
 
   <!-- ================= MODALS GLOBAL ================= -->
 
-  <!-- MODAL ABSENSI -->
+  <!-- MODAL PRESENSI ONLINE & PERIZINAN -->
   <div id="modal-absen-choice" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4">
       <div class="text-center">
         <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center text-xl mx-auto mb-2">
           <i class="fa-solid fa-fingerprint"></i>
         </div>
-        <h4 class="font-bold text-sm text-slate-900">Pilih Jenis Absensi</h4>
-        <p class="text-[11px] text-slate-400 mt-0.5">Tentukan kehadiran Anda saat ini</p>
+        <h4 class="font-bold text-sm text-slate-900">Presensi & Perizinan Online</h4>
+        <p class="text-[11px] text-slate-400 mt-0.5">Pilih aktivitas kehadiran atau pengajuan izin</p>
       </div>
       <div class="grid grid-cols-1 gap-2.5">
-        <button type="button" onclick="selectAbsenType('Masuk Kantor')" class="p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm">
-          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
-            <i class="fa-solid fa-building text-emerald-400"></i>
+        <!-- Opsi 1: Absen Datang / Absen Pulang (Dinamis) -->
+        <button id="btn-choice-absen-main" type="button" onclick="handleChoiceAbsenClick()" class="p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm">
+          <div id="btn-choice-absen-icon-bg" class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+            <i id="btn-choice-absen-icon" class="fa-solid fa-building text-emerald-400"></i>
           </div>
-          <div class="min-w-0">
-            <span class="font-bold text-xs block">Masuk Kantor</span>
-            <span class="text-[10px] text-slate-300">Wajib radius 100m dari kantor terdaftar</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between">
+              <span id="btn-choice-absen-title" class="font-bold text-xs block">Absen Datang</span>
+              <span id="btn-choice-absen-badge" class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 hidden">Selesai</span>
+            </div>
+            <span id="btn-choice-absen-desc" class="text-[10px] text-slate-300 line-clamp-1">Presensi masuk harian (Wajib radius kantor)</span>
           </div>
         </button>
-        <button type="button" onclick="selectAbsenType('Mulai Aktivitas')" class="p-3.5 bg-teal-700 hover:bg-teal-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm">
+
+        <!-- Opsi 2: Izin (WFA, Datang Terlambat, Cuti, Sakit) -->
+        <button id="btn-choice-izin" type="button" onclick="selectIzinChoice()" class="p-3.5 bg-teal-700 hover:bg-teal-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm">
           <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
-            <i class="fa-solid fa-route text-teal-200"></i>
+            <i class="fa-solid fa-file-signature text-teal-200"></i>
           </div>
-          <div class="min-w-0">
-            <span class="font-bold text-xs block">Mulai Aktivitas</span>
-            <span class="text-[10px] text-teal-100">Kunci geotag langsung dari lokasi</span>
+          <div class="min-w-0 flex-1">
+            <span class="font-bold text-xs block">Izin</span>
+            <span class="text-[10px] text-teal-100 line-clamp-1">Pengajuan WFA, Datang Terlambat, Cuti, Sakit</span>
           </div>
         </button>
       </div>
-      <button type="button" onclick="closeAbsenChoiceModal()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs">Batal</button>
+      <button type="button" onclick="closeAbsenChoiceModal()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition">Batal</button>
+    </div>
+  </div>
+
+  <!-- MODAL POPUP TENGAH (CENTER ALERT DIALOG) -->
+  <div id="modal-center-alert" class="fixed inset-0 bg-slate-900/65 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 text-center animate-in fade-in zoom-in-95 duration-200">
+      <div id="center-alert-icon-box" class="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner">
+        <i id="center-alert-icon" class="fa-solid fa-circle-check"></i>
+      </div>
+      <div>
+        <h4 id="center-alert-title" class="text-base font-bold text-slate-900">Absensi Berhasil</h4>
+        <p id="center-alert-message" class="text-xs text-slate-600 mt-1.5 leading-relaxed">-</p>
+      </div>
+      <div id="center-alert-details" class="hidden p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] text-slate-700 space-y-1 text-left">
+      </div>
+      <button type="button" id="btn-close-center-alert" onclick="closeCenterAlertModal()" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95">
+        Oke, Mengerti
+      </button>
     </div>
   </div>
 
