@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v44";
+const APP_BUILD_VERSION = "20260911_v45";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -58,7 +58,7 @@ const ALL_APP_MODULES = [
   { key: "onboarding", title: "Visit Calon Mitra", desc: "Input onboarding baru", icon: "fa-user-plus", category: "Operasional Lapangan" },
   { key: "pipeline", title: "Pipeline Onboarding", desc: "Progres & folder dokumen", icon: "fa-bars-progress", category: "Operasional Lapangan" },
   { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish", category: "Operasional Lapangan" },
-  { key: "fac", title: "Laporan GPS (FAC)", desc: "Monitoring sinyal harian", icon: "fa-tower-broadcast", category: "Operasional Lapangan" },
+  { key: "fac", title: "Report GPS", desc: "Monitoring sinyal GPS harian", icon: "fa-tower-broadcast", category: "Operasional Lapangan" },
   { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
 
   // 2. Presensi & Persetujuan
@@ -922,7 +922,7 @@ async function loadScreen(screenName) {
         gps: "GPS Maintenance",
         priority: "Priority Visit",
         assignment: "Assign Concern Visit",
-        fac: "Laporan GPS (FAC)",
+        fac: "Report GPS",
         absensi: "Presensi Kehadiran",
         izin: "Pengajuan Izin",
         persetujuan: "Pusat Persetujuan",
