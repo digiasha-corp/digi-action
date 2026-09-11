@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v42";
+const APP_BUILD_VERSION = "20260911_v43";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -21,45 +21,60 @@ const DEFAULT_ROLE_PERMISSIONS = {
     icon: "fa-crown",
     color: "purple",
     badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
-    desc: "Akses penuh seluruh modul, kelola karyawan, area mitra, geofence, dan parameter sistem.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"]
+    desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, dan pengaturan sistem.",
+    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "izin", "persetujuan", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "settings"]
   },
   "R-02": {
     name: "Branch Manager / Supervisor",
     icon: "fa-user-tie",
     color: "blue",
     badgeBg: "bg-blue-100 text-blue-800 border border-blue-200",
-    desc: "Monitoring cabang, kelola prioritas, penugasan concern, kunjungan mitra & calon mitra, serta pipeline.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history"]
+    desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, dan layanan support karyawan.",
+    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "izin", "persetujuan", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support"]
   },
   "R-03": {
     name: "FAC Officer",
     icon: "fa-satellite-dish",
     color: "cyan",
     badgeBg: "bg-cyan-100 text-cyan-800 border border-cyan-200",
-    desc: "Monitoring dan operasional GPS armada dealer, penanganan unit bermasalah, dan laporan berkala FAC.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history"]
+    desc: "Monitoring dan operasional GPS armada dealer, laporan berkala FAC, dan support karyawan.",
+    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "izin", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "helpdesk_support"]
   },
   "R-04": {
     name: "Field PIC",
     icon: "fa-person-walking",
     color: "emerald",
     badgeBg: "bg-emerald-100 text-emerald-800 border border-emerald-200",
-    desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, dan cek GPS.",
-    permissions: ["priority", "visit", "onboarding", "pipeline", "gps", "history"]
+    desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, presensi, dan klaim biaya.",
+    permissions: ["priority", "visit", "onboarding", "pipeline", "gps", "history", "izin", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "helpdesk_support"]
   }
 };
 
 const ALL_APP_MODULES = [
-  { key: "priority", title: "Priority Visit", desc: "Scorecard & prioritas mitra", icon: "fa-triangle-exclamation" },
-  { key: "assignment", title: "Assign Concern", desc: "Tandai concern visit mitra", icon: "fa-bullhorn" },
-  { key: "visit", title: "Laporan Visit Mitra", desc: "Input regular & unit OVD", icon: "fa-clipboard-check" },
-  { key: "onboarding", title: "Visit Calon Mitra", desc: "Input onboarding baru", icon: "fa-user-plus" },
-  { key: "pipeline", title: "Pipeline Onboarding", desc: "Progres & folder dokumen", icon: "fa-bars-progress" },
-  { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish" },
-  { key: "fac", title: "Laporan GPS (FAC)", desc: "Monitoring sinyal harian", icon: "fa-tower-broadcast" },
-  { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left" },
-  { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area & GPS", icon: "fa-sliders" }
+  // 1. Operasional Lapangan
+  { key: "priority", title: "Priority Visit", desc: "Scorecard & prioritas mitra", icon: "fa-triangle-exclamation", category: "Operasional Lapangan" },
+  { key: "assignment", title: "Assign Concern", desc: "Tandai concern visit mitra", icon: "fa-bullhorn", category: "Operasional Lapangan" },
+  { key: "visit", title: "Laporan Visit Mitra", desc: "Input regular & unit OVD", icon: "fa-clipboard-check", category: "Operasional Lapangan" },
+  { key: "onboarding", title: "Visit Calon Mitra", desc: "Input onboarding baru", icon: "fa-user-plus", category: "Operasional Lapangan" },
+  { key: "pipeline", title: "Pipeline Onboarding", desc: "Progres & folder dokumen", icon: "fa-bars-progress", category: "Operasional Lapangan" },
+  { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish", category: "Operasional Lapangan" },
+  { key: "fac", title: "Laporan GPS (FAC)", desc: "Monitoring sinyal harian", icon: "fa-tower-broadcast", category: "Operasional Lapangan" },
+  { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
+
+  // 2. Presensi & Persetujuan
+  { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit", icon: "fa-file-signature", category: "Presensi & Persetujuan" },
+  { key: "persetujuan", title: "Persetujuan (Approval Hub)", desc: "Pusat persetujuan permohonan", icon: "fa-stamp", category: "Presensi & Persetujuan" },
+  { key: "attendance_summary", title: "Rekap Absen & Jam Kerja", desc: "Statistik & rekapitulasi presensi", icon: "fa-calendar-check", category: "Presensi & Persetujuan" },
+  { key: "work_calendar", title: "Jadwal Kerja & Kalender", desc: "Kalender kerja & jam masuk 09:00", icon: "fa-calendar-days", category: "Presensi & Persetujuan" },
+
+  // 3. Layanan & Support Karyawan
+  { key: "expense_claim", title: "Klaim Biaya (Reimbursement)", desc: "Pengajuan biaya BBM/Tol/Ops", icon: "fa-money-bill-wave", category: "Layanan & Support" },
+  { key: "internal_memo", title: "Memo Pengajuan Internal", desc: "Pembuatan surat memo resmi", icon: "fa-file-lines", category: "Layanan & Support" },
+  { key: "employee_loan", title: "Pinjaman Karyawan (Kasbon)", desc: "Fasilitas pinjaman darurat karyawan", icon: "fa-hand-holding-dollar", category: "Layanan & Support" },
+  { key: "helpdesk_support", title: "IT & Helpdesk Support", desc: "Bantuan kendala sistem & SOP", icon: "fa-headset", category: "Layanan & Support" },
+
+  // 4. Administrasi & Sistem
+  { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS & Banner", icon: "fa-sliders", category: "Administrasi & Sistem" }
 ];
 
 let ROLE_PERMISSIONS_STATE = (() => {
@@ -1270,8 +1285,15 @@ async function initDashboard() {
     ? CURRENT_USER.permissions
     : (typeof getPermissionsForRole === "function" ? getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER) : (ROLE_PERMISSIONS[CURRENT_USER.role] || ROLE_PERMISSIONS[CURRENT_USER.role_id] || ["priority", "assignment", "visit", "onboarding", "gps", "fac", "persetujuan"]));
 
-  // Render & filter modul operasional sesuai hak akses
-  ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "izin", "persetujuan", "history", "settings"].forEach(key => {
+  // Render & filter seluruh modul aplikasi sesuai hak akses role
+  const allModulesList = [
+    "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+    "izin", "persetujuan", "attendance_summary", "work_calendar",
+    "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+    "settings"
+  ];
+
+  allModulesList.forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) {
       if (key === "izin") {
@@ -1281,6 +1303,20 @@ async function initDashboard() {
       }
     }
   });
+
+  // Periksa apakah setiap grup kartu memiliki tombol yang aktif
+  const checkGroupVisibility = (boxId, groupContainerId) => {
+    const box = document.getElementById(boxId);
+    const container = document.getElementById(groupContainerId);
+    if (box && container) {
+      const visibleButtons = container.querySelectorAll("button:not([style*='display: none'])");
+      box.style.display = visibleButtons.length > 0 ? "block" : "none";
+    }
+  };
+
+  checkGroupVisibility("box-group-field", "group-field-ops");
+  checkGroupVisibility("box-group-workflow", "group-workflow-ops");
+  checkGroupVisibility("box-group-support", "group-support-ops");
 
   // Tampilkan/sembunyikan grup admin
   const adminBox = document.getElementById("box-group-admin");
@@ -7084,19 +7120,35 @@ function loadRolePermissionsSettings() {
     const rolePerms = role.permissions || [];
     const isCoreRole = ["R-01"].includes(roleId);
 
-    const modulesHtml = ALL_APP_MODULES.map(mod => {
-      const isChecked = rolePerms.includes(mod.key);
-      return `
-        <label class="flex items-start space-x-2.5 p-2.5 bg-slate-50 hover:bg-purple-50/50 rounded-xl border border-slate-200 hover:border-purple-300 cursor-pointer transition select-none">
-          <input type="checkbox" name="role_perm_${roleId}" value="${mod.key}" ${isChecked ? 'checked' : ''} class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer" />
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center space-x-1.5">
-              <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
-              <span class="text-xs font-bold text-slate-800">${mod.title}</span>
+    // Kelompokkan modul berdasarkan kategori
+    const categories = ["Operasional Lapangan", "Presensi & Persetujuan", "Layanan & Support", "Administrasi & Sistem"];
+    const groupedModulesHtml = categories.map(cat => {
+      const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
+      if (catMods.length === 0) return "";
+
+      const itemsHtml = catMods.map(mod => {
+        const isChecked = rolePerms.includes(mod.key);
+        return `
+          <label class="flex items-start space-x-2.5 p-2 bg-slate-50 hover:bg-purple-50/50 rounded-xl border border-slate-200 hover:border-purple-300 cursor-pointer transition select-none">
+            <input type="checkbox" name="role_perm_${roleId}" value="${mod.key}" ${isChecked ? 'checked' : ''} class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer" />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center space-x-1.5">
+                <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
+                <span class="text-xs font-bold text-slate-800">${mod.title}</span>
+              </div>
+              <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
             </div>
-            <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
+          </label>
+        `;
+      }).join('');
+
+      return `
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">${cat}</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            ${itemsHtml}
           </div>
-        </label>
+        </div>
       `;
     }).join('');
 
@@ -7132,8 +7184,8 @@ function loadRolePermissionsSettings() {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          ${modulesHtml}
+        <div class="space-y-3">
+          ${groupedModulesHtml}
         </div>
       </div>
     `;

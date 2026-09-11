@@ -93,7 +93,7 @@
   <div class="space-y-4">
 
     <!-- [GRUP 1] OPERASIONAL LAPANGAN (FIELD OPS) -->
-    <div class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+    <div id="box-group-field" class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
       <div class="flex items-center justify-between mb-3 px-1">
         <div class="flex items-center space-x-2">
           <div class="w-2 h-3.5 bg-teal-600 rounded-full"></div>
@@ -180,7 +180,7 @@
     </div>
 
     <!-- [GRUP 2] PRESENSI & WORKFLOW PERSETUJUAN -->
-    <div class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+    <div id="box-group-workflow" class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
       <div class="flex items-center justify-between mb-3 px-1">
         <div class="flex items-center space-x-2">
           <div class="w-2 h-3.5 bg-indigo-600 rounded-full"></div>
@@ -189,7 +189,7 @@
         <span class="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full font-semibold">Workflow</span>
       </div>
 
-      <div class="grid grid-cols-4 gap-2 text-center">
+      <div class="grid grid-cols-4 gap-2 text-center" id="group-workflow-ops">
         
         <!-- Pengajuan Izin -->
         <button id="menu-btn-izin" onclick="loadScreen('izin')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-teal-50/60 transition active:scale-95">
@@ -211,7 +211,7 @@
         </button>
 
         <!-- Rekap Presensi & Jam Kerja -->
-        <button onclick="openSupportModal('attendance_summary')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
+        <button id="menu-btn-attendance_summary" onclick="openSupportModal('attendance_summary')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-calendar-check"></i>
           </div>
@@ -220,7 +220,7 @@
         </button>
 
         <!-- Kalender Libur & Jadwal -->
-        <button onclick="openSupportModal('work_calendar')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
+        <button id="menu-btn-work_calendar" onclick="openSupportModal('work_calendar')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-calendar-days"></i>
           </div>
@@ -232,7 +232,7 @@
     </div>
 
     <!-- [GRUP 3] LAYANAN & SUPPORT KARYAWAN (DIGIASHA SUPPORT) -->
-    <div class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
+    <div id="box-group-support" class="bg-white rounded-3xl p-3.5 shadow-xs border border-slate-200/80">
       <div class="flex items-center justify-between mb-3 px-1">
         <div class="flex items-center space-x-2">
           <div class="w-2 h-3.5 bg-emerald-600 rounded-full"></div>
@@ -244,7 +244,7 @@
       <div class="grid grid-cols-4 gap-2 text-center" id="group-support-ops">
         
         <!-- Pengajuan Biaya (Reimbursement / Expense Claim) -->
-        <button id="menu-btn-support-expense" onclick="openSupportModal('expense_claim')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-emerald-50/60 transition active:scale-95">
+        <button id="menu-btn-expense_claim" onclick="openSupportModal('expense_claim')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-emerald-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-money-bill-wave"></i>
           </div>
@@ -253,7 +253,7 @@
         </button>
 
         <!-- Pembuatan Memo Pengajuan (Internal Memo) -->
-        <button id="menu-btn-support-memo" onclick="openSupportModal('internal_memo')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-blue-50/60 transition active:scale-95">
+        <button id="menu-btn-internal_memo" onclick="openSupportModal('internal_memo')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-blue-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-file-lines"></i>
           </div>
@@ -262,7 +262,7 @@
         </button>
 
         <!-- Pinjaman Karyawan (Cash Advance / Loan) -->
-        <button id="menu-btn-support-loan" onclick="openSupportModal('employee_loan')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-amber-50/60 transition active:scale-95">
+        <button id="menu-btn-employee_loan" onclick="openSupportModal('employee_loan')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-amber-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-hand-holding-dollar"></i>
           </div>
@@ -271,7 +271,7 @@
         </button>
 
         <!-- IT Helpdesk & Panduan SOP -->
-        <button id="menu-btn-support-helpdesk" onclick="openSupportModal('helpdesk_support')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-purple-50/60 transition active:scale-95">
+        <button id="menu-btn-helpdesk_support" onclick="openSupportModal('helpdesk_support')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-purple-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-headset"></i>
           </div>
