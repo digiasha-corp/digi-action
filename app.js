@@ -534,30 +534,157 @@ async function supabaseSubmitGpsMaintenance(data) {
   return { success: true, maintId };
 }
 
+function resolveClientTimeZone(cabang, officeName, clientTz) {
+  if (clientTz && (clientTz.includes("Makassar") || clientTz.includes("Jayapura") || clientTz.includes("Jakarta") || clientTz.includes("Ujung_Pandang"))) {
+    return clientTz;
+  }
+  const text = (String(cabang || "") + " " + String(officeName || "")).toUpperCase();
+  if (text.includes("JAYAPURA") || text.includes("AMBON") || text.includes("PAPUA") || text.includes("MALUKU") || text.includes("SORONG") || text.includes("MANOKWARI") || text.includes("TIMIKA") || text.includes("MERAUKE") || text.includes("BIAK")) {
+    return "Asia/Jayapura";
+  }
+  if (text.includes("MAKASSAR") || text.includes("BALIKPAPAN") || text.includes("BANJARMASIN") || text.includes("SAMARINDA") || text.includes("MANADO") || text.includes("PALU") || text.includes("KENDARI") || text.includes("GORONTALO") || text.includes("DENPASAR") || text.includes("BALI") || text.includes("MATARAM") || text.includes("LOMBOK") || text.includes("KUPANG") || text.includes("SULAWESI") || text.includes("KALIMANTAN") || text.includes("NTB") || text.includes("NTT")) {
+    return "Asia/Makassar";
+  }
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
+}
+
 async function supabaseSubmitAbsensi(data) {
   if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
 
-  const absenId = `ABS-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  const timeZone = resolveClientTimeZone(data.cabang, data.lokasi_kantor, data.timezone);
+  const tzAbbr = timeZone === "Asia/Jayapura" ? "WIT" : (timeZone === "Asia/Makassar" ? "WITA" : "WIB");
+
+  const now = new Date();
+  const timeFormatter = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false });
+  const [hourStr, minStr] = timeFormatter.format(now).split(":");
+  const currentMinutes = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
+  const targetMinutes = 9 * 60; // Batas jam masuk 09:00:00
+
+  const jenisAbsen = data.jenis_absen || "Absen Datang";
+  const isDatang = jenisAbsen === "Absen Datang" || jenisAbsen === "Masuk Kantor";
+  const distanceMeter = Number(data.distance_meters || data.distance_meter || 0);
+  const maxRadius = Number(data.max_radius || 100);
+
+  // 1. Verifikasi Geofence hanya untuk Absen Datang
+  if (isDatang && distanceMeter > maxRadius) {
+    return {
+      success: false,
+      message: `Lokasi Anda berada di luar radius kantor terdaftar (${distanceMeter} Meter / Maks ${maxRadius}m).`
+    };
+  }
+
+  // 2. Kalkulasi Keterlambatan Absen Datang (Jam Masuk 09:00 Waktu Setempat)
+  const isLate = isDatang && currentMinutes > targetMinutes;
+  const lateMinutes = isLate ? (currentMinutes - targetMinutes) : 0;
+  const timeStr = `${hourStr}:${minStr} ${tzAbbr}`;
+
+  let statusKehadiran = "PULANG";
+  let messageText = `Absensi Kepulangan Berhasil (${timeStr})`;
+
+  if (isDatang) {
+    if (isLate) {
+      statusKehadiran = "TERLAMBAT";
+      messageText = `Absensi Kedatangan Berhasil, Anda Terlambat ${lateMinutes} Menit (${timeStr})`;
+    } else {
+      statusKehadiran = "TEPAT_WAKTU";
+      messageText = `Absensi Kedatangan Berhasil (Tepat Waktu - ${timeStr})`;
+    }
+  }
+
+  const absenId = `ABS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const selfieUrl = data.selfie_base64 
-    ? await uploadToSupabaseStorage(data.selfie_base64, "absensi", `ABS-${data.nip}`)
+    ? await uploadToSupabaseStorage(data.selfie_base64, "absensi", `ABS-${data.nip}-${Date.now()}`)
     : "";
 
-  await supabaseClient.from("tr_absensi_log").insert([{
+  const insertPayload = {
     absen_id: absenId,
-    nip: data.nip,
-    nama_karyawan: data.nama,
-    role: data.role,
-    cabang: data.cabang,
-    jenis_absen: data.jenis_absen,
-    lokasi_kantor: data.lokasi_kantor,
-    distance_meters: data.distance_meters,
-    lat: data.lat,
-    long: data.long,
-    catatan: data.catatan,
+    timestamp: now.toISOString(),
+    nip: data.nip || "-",
+    nama_karyawan: data.nama || "-",
+    jenis_absen: isDatang ? "Absen Datang" : "Absen Pulang",
+    cabang: data.cabang || "-",
+    lat: Number(data.lat || 0),
+    long: Number(data.long || 0),
+    nearest_office: data.lokasi_kantor || "-",
+    distance_meter: distanceMeter,
+    status_geofence: isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "N/A",
+    menit_terlambat: lateMinutes,
+    status_kehadiran: statusKehadiran,
     selfie_photo_url: selfieUrl
-  }]);
+  };
 
-  return { success: true, absenId };
+  const { error } = await supabaseClient.from("tr_absensi_log").insert([insertPayload]);
+  if (error) throw error;
+
+  return {
+    success: true,
+    absenId: absenId,
+    jenis_absen: isDatang ? "Absen Datang" : "Absen Pulang",
+    status_kehadiran: statusKehadiran,
+    isLate: isLate,
+    lateMinutes: lateMinutes,
+    timeZone: timeZone,
+    tzAbbr: tzAbbr,
+    timeStr: timeStr,
+    message: messageText
+  };
+}
+
+async function supabaseSubmitIzin(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const timeZone = resolveClientTimeZone(data.cabang, "", data.timezone);
+  const now = new Date();
+  const izinId = `IZN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const selfieUrl = data.selfie_base64
+    ? await uploadToSupabaseStorage(data.selfie_base64, "absensi", `IZIN-${data.nip}-${Date.now()}`)
+    : "";
+
+  const payload = {
+    izin_id: izinId,
+    timestamp: now.toISOString(),
+    nip: data.nip || "-",
+    nama: data.nama || "Karyawan",
+    cabang: data.cabang || "-",
+    jenis_izin: data.jenis_izin || "WFA",
+    tgl_mulai: data.tgl_mulai || now.toISOString().slice(0, 10),
+    tgl_selesai: data.tgl_selesai || data.tgl_mulai || now.toISOString().slice(0, 10),
+    catatan: data.catatan || "-",
+    lat: Number(data.lat || 0),
+    long: Number(data.long || 0),
+    selfie_url: selfieUrl,
+    pic_approval_nip: data.pic_approval_nip || "-",
+    pic_approval_nama: data.pic_approval_nama || "Atasan Langsung",
+    status_approval: "PENDING"
+  };
+
+  const { error } = await supabaseClient.from("tr_izin_log").insert([payload]);
+  if (error) throw error;
+
+  return {
+    success: true,
+    izinId: izinId,
+    message: `Pengajuan Izin "${data.jenis_izin}" berhasil dikirimkan ke PIC Approval (${data.pic_approval_nama || 'Atasan Langsung'}).`
+  };
+}
+
+async function supabaseProcessApproval(data) {
+  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+
+  const updateData = {
+    status_approval: data.decision,
+    approved_at: new Date().toISOString(),
+    approved_by: data.approverNama || "Atasan",
+    catatan_approval: data.note || "-"
+  };
+
+  const { error } = await supabaseClient
+    .from("tr_izin_log")
+    .update(updateData)
+    .eq("izin_id", data.izin_id);
+
+  if (error) throw error;
+  return { success: true, message: `Permohonan berhasil di-${data.decision === 'APPROVED' ? 'Setujui' : 'Tolak'}.` };
 }
 
 async function supabaseSubmitOnboarding(data) {
