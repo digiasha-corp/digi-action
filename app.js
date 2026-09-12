@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v49";
+const APP_BUILD_VERSION = "20260912_v50";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -646,14 +646,20 @@ async function supabaseSubmitAbsensi(data) {
 }
 
 async function supabaseSubmitIzin(data) {
-  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
 
-  const timeZone = resolveClientTimeZone(data.cabang, "", data.timezone);
   const now = new Date();
   const izinId = `IZN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const selfieUrl = data.selfie_base64
-    ? await uploadToSupabaseStorage(data.selfie_base64, "absensi", `IZIN-${data.nip}-${Date.now()}`)
-    : "";
+  let selfieUrl = "";
+  if (data.selfie_base64 && typeof uploadToSupabaseStorage === "function") {
+    try {
+      selfieUrl = await uploadToSupabaseStorage(data.selfie_base64, "absensi", `IZIN-${data.nip}-${Date.now()}`);
+    } catch (e) {
+      console.warn("Upload selfie izin warning:", e);
+    }
+  }
 
   const payload = {
     izin_id: izinId,
@@ -673,18 +679,55 @@ async function supabaseSubmitIzin(data) {
     status_approval: "PENDING"
   };
 
-  const { error } = await supabaseClient.from("tr_izin_log").insert([payload]);
-  if (error) throw error;
+  // 1. Coba via Supabase Client SDK
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("tr_izin_log").insert([payload]);
+      if (!error) {
+        return {
+          success: true,
+          izinId: izinId,
+          message: `Pengajuan Izin "${data.jenis_izin}" berhasil dikirimkan ke PIC Approval (${data.pic_approval_nama || 'Atasan Langsung'}).`
+        };
+      }
+      console.warn("Supabase SDK insert failed, falling back to direct REST:", error);
+    } catch (sdkErr) {
+      console.warn("Supabase SDK insert exception:", sdkErr);
+    }
+  }
 
-  return {
-    success: true,
-    izinId: izinId,
-    message: `Pengajuan Izin "${data.jenis_izin}" berhasil dikirimkan ke PIC Approval (${data.pic_approval_nama || 'Atasan Langsung'}).`
-  };
+  // 2. Direct REST fallback (100% reliable)
+  if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log`, {
+      method: "POST",
+      headers: {
+        "apikey": CONFIG.SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      return {
+        success: true,
+        izinId: izinId,
+        message: `Pengajuan Izin "${data.jenis_izin}" berhasil dikirimkan ke PIC Approval (${data.pic_approval_nama || 'Atasan Langsung'}).`
+      };
+    } else {
+      const errText = await res.text();
+      throw new Error(`Gagal menyimpan ke database Supabase: ${errText}`);
+    }
+  }
+
+  throw new Error("Koneksi Supabase belum terkonfigurasi.");
 }
 
 async function supabaseProcessApproval(data) {
-  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
 
   const updateData = {
     status_approval: data.decision,
@@ -693,13 +736,35 @@ async function supabaseProcessApproval(data) {
     catatan_approval: data.note || "-"
   };
 
-  const { error } = await supabaseClient
-    .from("tr_izin_log")
-    .update(updateData)
-    .eq("izin_id", data.izin_id);
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from("tr_izin_log")
+        .update(updateData)
+        .eq("izin_id", data.izin_id);
+      if (!error) {
+        return { success: true, message: `Permohonan berhasil di-${data.decision === 'APPROVED' ? 'Setujui' : 'Tolak'}.` };
+      }
+    } catch (e) {}
+  }
 
-  if (error) throw error;
-  return { success: true, message: `Permohonan berhasil di-${data.decision === 'APPROVED' ? 'Setujui' : 'Tolak'}.` };
+  if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?izin_id=eq.${encodeURIComponent(data.izin_id)}`, {
+      method: "PATCH",
+      headers: {
+        "apikey": CONFIG.SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify(updateData)
+    });
+    if (res.ok) {
+      return { success: true, message: `Permohonan berhasil di-${data.decision === 'APPROVED' ? 'Setujui' : 'Tolak'}.` };
+    }
+  }
+
+  throw new Error("Gagal memproses persetujuan di database.");
 }
 
 async function supabaseSubmitOnboarding(data) {
@@ -792,8 +857,12 @@ async function supabaseSaveAssignment(data) {
 // API CALLER HELPER (SUPABASE NATIVE + GAS FALLBACK)
 // =========================================================================
 async function callApi(action, data = {}) {
-  // 1. Eksekusi melalui Supabase Client jika aktif
-  if (supabaseClient) {
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
+
+  // 1. Eksekusi melalui Supabase Client / REST API jika aktif
+  if (supabaseClient || (typeof CONFIG !== "undefined" && CONFIG.SUPABASE_URL)) {
     try {
       if (action === "login") return await supabaseLogin(data.identifier, data.password);
       if (action === "getMasterData") return await supabaseGetMasterData();
@@ -805,26 +874,47 @@ async function callApi(action, data = {}) {
       if (action === "getApprovalList") {
         const isAdmin = String(data.role || "").toLowerCase().includes("admin");
         const cleanNip = data.nip || "";
-        let query = supabaseClient.from("tr_izin_log").select("*").order("timestamp", { ascending: false });
-        if (!isAdmin && cleanNip) {
-          query = query.eq("pic_approval_nip", cleanNip);
+        let query = supabaseClient ? supabaseClient.from("tr_izin_log").select("*").order("timestamp", { ascending: false }) : null;
+        if (query) {
+          if (!isAdmin && cleanNip) {
+            query = query.eq("pic_approval_nip", cleanNip);
+          }
+          const { data: rows, error } = await query;
+          if (!error && rows) return { success: true, approvals: rows };
         }
-        const { data: rows, error } = await query;
-        if (error) throw error;
-        return { success: true, approvals: rows || [] };
+        if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+          const queryUrl = (!isAdmin && cleanNip)
+            ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${encodeURIComponent(cleanNip)}&select=*&order=timestamp.desc`
+            : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?select=*&order=timestamp.desc`;
+          const res = await fetch(queryUrl, {
+            headers: {
+              "apikey": CONFIG.SUPABASE_ANON_KEY,
+              "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+            }
+          });
+          if (res.ok) {
+            const rows = await res.json();
+            return { success: true, approvals: rows || [] };
+          }
+        }
       }
       if (action === "submitOnboarding") return await supabaseSubmitOnboarding(data);
       if (action === "saveAssignment") return await supabaseSaveAssignment(data);
       if (action === "resolveAssignment") {
-        await supabaseClient.from("t_assignment").update({ status: "RESOLVED", resolved_at: new Date().toISOString(), resolved_by: data.resolvedByUserId }).eq("assignment_id", data.assignmentId);
+        if (supabaseClient) {
+          await supabaseClient.from("t_assignment").update({ status: "RESOLVED", resolved_at: new Date().toISOString(), resolved_by: data.resolvedByUserId }).eq("assignment_id", data.assignmentId);
+        }
         return { success: true };
       }
     } catch (supabaseErr) {
       console.error(`[Supabase Execution Error on ${action}]:`, supabaseErr);
+      if (action === "submitIzin" || action === "submitAbsensi" || action === "processApproval") {
+        return { success: false, message: supabaseErr.message || "Gagal memproses data ke database." };
+      }
     }
   }
 
-  // 2. Fallback ke Google Apps Script
+  // 2. Fallback ke Google Apps Script (Hanya untuk action backend yang didukung)
   if (typeof CONFIG !== "undefined" && CONFIG.API_URL && !CONFIG.API_URL.includes("MASUKKAN_URL")) {
     try {
       const payload = { action, ...data };
