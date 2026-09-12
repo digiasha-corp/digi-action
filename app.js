@@ -2884,21 +2884,10 @@ const REKAP_DAY_NAMES_ID = [
 async function initRekapAbsenScreen() {
   if (!CURRENT_USER) return;
 
-  if (!REKAP_SELECTED_NIP) {
-    REKAP_SELECTED_NIP = CURRENT_USER.nip;
-    REKAP_SELECTED_NAME = CURRENT_USER.nama;
-  }
+  REKAP_SELECTED_NIP = CURRENT_USER.nip;
+  REKAP_SELECTED_NAME = CURRENT_USER.nama;
 
-  // Update info user di header banner
-  const nameEl = document.getElementById("rekap-employee-name");
-  const subEl = document.getElementById("rekap-employee-sub");
-  if (nameEl) nameEl.innerText = REKAP_SELECTED_NAME || CURRENT_USER.nama;
-  if (subEl) subEl.innerText = `NIP: ${REKAP_SELECTED_NIP} • ${CURRENT_USER.cabang || "-"}`;
-
-  // Cek apakah user punya hak atasan/admin untuk memilih bawahan
-  setupRekapTeamFilter();
-
-  // Load data dan render kalender
+  // Load data dan render kalender absensi user sendiri
   await fetchAndRenderRekapCalendar();
 }
 

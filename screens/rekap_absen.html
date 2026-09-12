@@ -1,42 +1,4 @@
-<div class="space-y-4 pb-12">
-  <!-- Top Navigation & Header Banner -->
-  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-800 text-white rounded-3xl p-4.5 shadow-md border border-slate-700/50">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center space-x-2.5">
-        <button type="button" onclick="loadScreen('dashboard')" class="w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition">
-          <i class="fa-solid fa-arrow-left text-sm"></i>
-        </button>
-        <div>
-          <span class="text-[10px] uppercase font-bold tracking-widest text-teal-300 block">Presensi & Perizinan</span>
-          <h2 class="text-base font-extrabold text-white leading-tight">Rekap Absensi Karyawan</h2>
-        </div>
-      </div>
-      <button type="button" onclick="refreshRekapCalendar()" class="w-9 h-9 rounded-2xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 flex items-center justify-center transition active:scale-95" title="Refresh Data">
-        <i class="fa-solid fa-rotate text-sm" id="rekap-refresh-icon"></i>
-      </button>
-    </div>
-
-    <!-- Filter NIP / User (jika atasan/admin) -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/10 text-xs">
-      <div class="flex items-center space-x-2">
-        <div class="w-7 h-7 rounded-full bg-teal-500/30 text-teal-300 flex items-center justify-center font-bold text-xs">
-          <i class="fa-solid fa-user-check"></i>
-        </div>
-        <div>
-          <div class="font-bold text-white text-xs leading-none" id="rekap-employee-name">-</div>
-          <div class="text-[10px] text-slate-300 mt-0.5" id="rekap-employee-sub">NIP: -</div>
-        </div>
-      </div>
-
-      <!-- Selector jika punya akses bawahan -->
-      <div id="rekap-team-filter-wrapper" class="hidden">
-        <select id="rekap-team-select" onchange="handleRekapUserChange(this.value)" class="w-full sm:w-auto bg-slate-800/90 border border-slate-600 text-slate-200 text-xs rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-teal-400 focus:outline-none">
-          <option value="">Saya Sendiri</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
+<div class="space-y-3.5 pb-12">
   <!-- Month Navigation Bar -->
   <div class="bg-white rounded-2xl p-3 shadow-xs border border-slate-200/80 flex items-center justify-between">
     <button type="button" onclick="changeRekapMonth(-1)" class="w-9 h-9 rounded-xl hover:bg-slate-100 active:scale-95 text-slate-700 flex items-center justify-center transition border border-slate-200">
@@ -47,6 +9,9 @@
       <h3 class="text-sm font-extrabold text-slate-800" id="rekap-month-label">September 2026</h3>
       <button type="button" onclick="jumpToCurrentMonth()" class="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 transition">
         Hari Ini
+      </button>
+      <button type="button" onclick="refreshRekapCalendar()" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 flex items-center justify-center transition ml-1" title="Refresh">
+        <i class="fa-solid fa-rotate text-xs" id="rekap-refresh-icon"></i>
       </button>
     </div>
 
