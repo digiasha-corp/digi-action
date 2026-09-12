@@ -3089,7 +3089,7 @@ function renderRekapCalendarGrid(year, month) {
 
   // Slot kosong awal sebelum tanggal 1
   for (let i = 0; i < startOffset; i++) {
-    html += `<div class="p-1 min-h-[58px] sm:min-h-[72px] rounded-xl bg-slate-50/40 border border-dashed border-slate-100 opacity-30 pointer-events-none"></div>`;
+    html += `<div class="aspect-square rounded-2xl bg-slate-50/30 border border-dashed border-slate-100 opacity-20 pointer-events-none"></div>`;
   }
 
   // Render masing-masing tanggal 1 s/d totalDays
@@ -3138,25 +3138,13 @@ function renderRekapCalendarGrid(year, month) {
     else if (evalResult.category === "ALPHA") countAlpha++;
 
     // Hari ini border ring
-    const todayRing = isToday ? "ring-2 ring-teal-500 shadow-sm font-black" : "";
+    const todayRing = isToday ? "ring-2.5 ring-teal-600 shadow-md font-black" : "";
 
     html += `
-      <div onclick="openRekapDayModal('${dateStr}')" class="group relative p-1.5 min-h-[58px] sm:min-h-[72px] rounded-xl border flex flex-col justify-between cursor-pointer transition-all duration-150 transform hover:-translate-y-0.5 hover:shadow-md active:scale-95 ${evalResult.bgClass} ${evalResult.borderClass} ${todayRing}">
-        <!-- Header Cell: Angka Tanggal & Mini Indicator -->
-        <div class="flex items-center justify-between">
-          <span class="text-xs sm:text-sm font-extrabold ${evalResult.numClass}">
-            ${d}
-          </span>
-          ${evalResult.badgeDot}
-        </div>
-
-        <!-- Body Cell: Mini Label Status -->
-        <div class="mt-1">
-          <span class="text-[9px] sm:text-[10px] font-bold leading-tight block truncate ${evalResult.textClass}">
-            ${evalResult.shortLabel}
-          </span>
-          ${evalResult.subTime ? `<span class="text-[8px] sm:text-[9px] opacity-75 font-mono block truncate">${evalResult.subTime}</span>` : ""}
-        </div>
+      <div onclick="openRekapDayModal('${dateStr}')" class="aspect-square flex items-center justify-center rounded-2xl border cursor-pointer transition-all duration-150 transform hover:-translate-y-0.5 hover:shadow-md active:scale-95 ${evalResult.bgClass} ${evalResult.borderClass} ${todayRing}">
+        <span class="text-sm sm:text-base font-black ${evalResult.numClass}">
+          ${d}
+        </span>
       </div>
     `;
   }
