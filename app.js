@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v50";
+const APP_BUILD_VERSION = "20260912_v51";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -729,11 +729,16 @@ async function supabaseProcessApproval(data) {
     supabaseClient = getSupabaseClient();
   }
 
+  const rawDecision = String(data.decision || data.status || data.actionType || "APPROVED").toUpperCase();
+  const finalStatus = (rawDecision.includes("APPROV") || rawDecision.includes("SETUJU")) ? "APPROVED" : "REJECTED";
+  const approverName = data.approver_name || data.approverNama || data.approved_by || CURRENT_USER?.nama || "Atasan";
+  const approverNotes = data.catatan_approval || data.note || "-";
+
   const updateData = {
-    status_approval: data.decision,
+    status_approval: finalStatus,
     approved_at: new Date().toISOString(),
-    approved_by: data.approverNama || "Atasan",
-    catatan_approval: data.note || "-"
+    approved_by: approverName,
+    catatan_approval: approverNotes
   };
 
   if (supabaseClient) {
@@ -743,9 +748,15 @@ async function supabaseProcessApproval(data) {
         .update(updateData)
         .eq("izin_id", data.izin_id);
       if (!error) {
-        return { success: true, message: `Permohonan berhasil di-${data.decision === 'APPROVED' ? 'Setujui' : 'Tolak'}.` };
+        return { 
+          success: true, 
+          status: finalStatus,
+          message: `Permohonan berhasil di-${finalStatus === 'APPROVED' ? 'Setujui' : 'Tolak'}.` 
+        };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Supabase SDK approval update warning:", e);
+    }
   }
 
   if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
@@ -760,7 +771,11 @@ async function supabaseProcessApproval(data) {
       body: JSON.stringify(updateData)
     });
     if (res.ok) {
-      return { success: true, message: `Permohonan berhasil di-${data.decision === 'APPROVED' ? 'Setujui' : 'Tolak'}.` };
+      return { 
+        success: true, 
+        status: finalStatus,
+        message: `Permohonan berhasil di-${finalStatus === 'APPROVED' ? 'Setujui' : 'Tolak'}.` 
+      };
     }
   }
 
@@ -2784,9 +2799,16 @@ async function executeApprovalAction() {
   }
 
   try {
+    const actionDecision = PENDING_APPROVAL_ACTION_PAYLOAD.status || PENDING_APPROVAL_ACTION_PAYLOAD.decision || "APPROVED";
     const res = await callApi("processApproval", {
       ...PENDING_APPROVAL_ACTION_PAYLOAD,
-      catatan_approval: inputNotes
+      decision: actionDecision,
+      status: actionDecision,
+      approver_name: CURRENT_USER?.nama || "Atasan",
+      approverNama: CURRENT_USER?.nama || "Atasan",
+      approver_nip: CURRENT_USER?.nip || "-",
+      catatan_approval: inputNotes,
+      note: inputNotes
     });
 
     if (btnConfirm) {
