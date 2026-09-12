@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v51";
+const APP_BUILD_VERSION = "20260912_v58";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -8717,76 +8717,80 @@ function loadRolePermissionsSettings() {
     const rolePerms = role.permissions || [];
     const isCoreRole = ["R-01"].includes(roleId);
 
-    // Kelompokkan modul berdasarkan kategori
-    const categories = ["Operasional Lapangan", "Presensi & Persetujuan", "Layanan & Support", "Administrasi & Sistem"];
-    const groupedModulesHtml = categories.map(cat => {
-      const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
-      if (catMods.length === 0) return "";
-
-      const itemsHtml = catMods.map(mod => {
-        const isChecked = rolePerms.includes(mod.key);
-        return `
-          <label class="flex items-start space-x-2.5 p-2 bg-slate-50 hover:bg-purple-50/50 rounded-xl border border-slate-200 hover:border-purple-300 cursor-pointer transition select-none">
-            <input type="checkbox" name="role_perm_${roleId}" value="${mod.key}" ${isChecked ? 'checked' : ''} class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer" />
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center space-x-1.5">
-                <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
-                <span class="text-xs font-bold text-slate-800">${mod.title}</span>
-              </div>
-              <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
-            </div>
-          </label>
-        `;
-      }).join('');
-
-      return `
-        <div class="space-y-1.5">
-          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">${cat}</span>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            ${itemsHtml}
-          </div>
-        </div>
-      `;
-    }).join('');
-
     return `
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-        <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 flex-wrap gap-2">
-          <div class="flex items-center space-x-2.5 min-w-0">
-            <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-base shrink-0">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5 sm:p-4 hover:border-purple-200 transition">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-lg shrink-0">
               <i class="fa-solid ${role.icon || 'fa-user-gear'}"></i>
             </div>
             <div class="min-w-0">
               <div class="flex items-center space-x-2 flex-wrap">
-                <span class="text-xs font-bold text-slate-900">${role.name}</span>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${role.badgeBg || 'bg-purple-100 text-purple-800 border border-purple-200'}">${roleId}</span>
+                <span class="text-xs sm:text-sm font-bold text-slate-900">${role.name}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${role.badgeBg || 'bg-purple-100 text-purple-800 border border-purple-200'}">${roleId}</span>
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  <i class="fa-solid fa-shield-halved mr-1 text-[9px] text-purple-600"></i>${rolePerms.length} Modul Aktif
+                </span>
               </div>
-              <p class="text-[10px] text-slate-500 mt-0.5">${role.desc || '-'}</p>
+              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-1 max-w-lg">${role.desc || '-'}</p>
             </div>
           </div>
-          <div class="flex items-center space-x-1.5 shrink-0 flex-wrap">
-            <button type="button" onclick="openEditRoleInfoModal('${roleId}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 flex items-center space-x-1 transition" title="Ubah Nama & Info Role">
-              <i class="fa-solid fa-pen text-[10px]"></i>
-              <span>Edit Info</span>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button type="button" onclick="openEditRoleInfoModal('${roleId}')" class="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 text-purple-700 font-bold rounded-xl text-xs border border-purple-200 flex items-center space-x-1.5 transition shadow-2xs">
+              <i class="fa-solid fa-pen-to-square text-xs"></i>
+              <span>Edit Info & Akses</span>
             </button>
             ${!isCoreRole ? `
-              <button type="button" onclick="deleteCustomRole('${roleId}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs border border-rose-200 flex items-center space-x-1 transition" title="Hapus Role">
-                <i class="fa-solid fa-trash-can text-[10px]"></i>
+              <button type="button" onclick="deleteCustomRole('${roleId}')" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs border border-rose-200 flex items-center justify-center transition" title="Hapus Role">
+                <i class="fa-solid fa-trash-can text-xs"></i>
               </button>
             ` : ''}
-            <button type="button" onclick="saveRolePermissions('${roleId}')" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center space-x-1.5 transition">
-              <i class="fa-solid fa-floppy-disk text-xs"></i>
-              <span>Simpan Hak Akses</span>
-            </button>
           </div>
-        </div>
-
-        <div class="space-y-3">
-          ${groupedModulesHtml}
         </div>
       </div>
     `;
   }).join('');
+}
+
+function renderModalModulesChecklist(selectedKeys = []) {
+  const container = document.getElementById("role-modal-modules-container");
+  if (!container) return;
+
+  const categories = ["Operasional Lapangan", "Presensi & Persetujuan", "Layanan & Support", "Administrasi & Sistem"];
+  container.innerHTML = categories.map(cat => {
+    const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
+    if (catMods.length === 0) return "";
+
+    const itemsHtml = catMods.map(mod => {
+      const isChecked = selectedKeys.includes(mod.key);
+      return `
+        <label class="flex items-start space-x-2.5 p-2 bg-slate-50 hover:bg-purple-50/50 rounded-xl border border-slate-200 hover:border-purple-300 cursor-pointer transition select-none">
+          <input type="checkbox" name="modal_role_perm" value="${mod.key}" ${isChecked ? 'checked' : ''} class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer" />
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
+              <span class="text-xs font-bold text-slate-800">${mod.title}</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
+          </div>
+        </label>
+      `;
+    }).join('');
+
+    return `
+      <div class="space-y-1.5">
+        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">${cat}</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectAllRoleModalModules(checked) {
+  const cbs = document.querySelectorAll('input[name="modal_role_perm"]');
+  cbs.forEach(cb => cb.checked = !!checked);
 }
 
 let ROLE_EDIT_MODE = "add"; // "add" | "edit"
@@ -8811,6 +8815,10 @@ function openAddRoleModal() {
   document.getElementById("role-input-desc").value = "";
   document.getElementById("role-input-icon").value = "fa-user-gear";
   document.getElementById("role-input-color").value = "purple";
+
+  // Default permissions for new role
+  renderModalModulesChecklist(["priority", "visit", "onboarding", "pipeline", "gps", "history"]);
+
   document.getElementById("modal-role-create-edit").classList.remove("hidden");
 }
 
@@ -8829,6 +8837,10 @@ function openEditRoleInfoModal(roleId) {
   document.getElementById("role-input-desc").value = role.desc || "";
   document.getElementById("role-input-icon").value = role.icon || "fa-user-gear";
   document.getElementById("role-input-color").value = role.color || "purple";
+
+  // Render module checklists for this role
+  renderModalModulesChecklist(role.permissions || []);
+
   document.getElementById("modal-role-create-edit").classList.remove("hidden");
 }
 
@@ -8848,6 +8860,10 @@ function handleSaveRoleInfo(e) {
     alert("Kode Role ID dan Nama Role wajib diisi!");
     return;
   }
+
+  // Ambil pilihan hak akses modul dari checklist di dalam modal
+  const checkedCheckboxes = document.querySelectorAll('input[name="modal_role_perm"]:checked');
+  const selectedPermissions = Array.from(checkedCheckboxes).map(cb => cb.value);
 
   const badgeColorMap = {
     purple: "bg-purple-100 text-purple-800 border border-purple-200",
@@ -8872,7 +8888,7 @@ function handleSaveRoleInfo(e) {
       color: color,
       badgeBg: badgeBg,
       desc: desc || "Role kustom pengguna",
-      permissions: ["priority", "visit", "onboarding", "pipeline", "gps", "history"]
+      permissions: selectedPermissions
     };
     showToast(`Role baru ${name} (${id}) berhasil ditambahkan!`, "success", 2000);
   } else {
@@ -8882,7 +8898,8 @@ function handleSaveRoleInfo(e) {
     ROLE_PERMISSIONS_STATE[id].icon = icon;
     ROLE_PERMISSIONS_STATE[id].color = color;
     ROLE_PERMISSIONS_STATE[id].badgeBg = badgeBg;
-    showToast(`Informasi role ${name} (${id}) berhasil diperbarui!`, "success", 2000);
+    ROLE_PERMISSIONS_STATE[id].permissions = selectedPermissions;
+    showToast(`Role ${name} (${id}) & hak akses berhasil diperbarui!`, "success", 2000);
   }
 
   localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
@@ -8892,11 +8909,21 @@ function handleSaveRoleInfo(e) {
     supabaseClient.from("m_role_permission").upsert({
       role_id: id,
       role_name: name,
-      permission_keys: roleObj?.permissions || [],
+      permission_keys: selectedPermissions,
       updated_at: new Date().toISOString()
     }, { onConflict: "role_id" }).then(({ error }) => {
       if (error) console.warn("Error sync role to supabase:", error);
     });
+  }
+
+  // If current logged-in user is under this role, sync and update dashboard immediately
+  const uRole = CURRENT_USER?.role || CURRENT_USER?.role_id;
+  if (uRole === id || CURRENT_USER?.role_id === id || (CURRENT_USER?.jabatan && CURRENT_USER.jabatan.includes(name))) {
+    CURRENT_USER.permissions = selectedPermissions;
+    try {
+      localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+    } catch (e) {}
+    if (typeof initDashboard === "function") initDashboard();
   }
 
   closeRoleModal();
@@ -8905,6 +8932,34 @@ function handleSaveRoleInfo(e) {
   if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
     renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
   }
+}
+
+async function resetRolePermissionsToDefault() {
+  if (!confirm("Kembalikan seluruh hak akses dan matriks role ke standar default sistem?")) return;
+  
+  ROLE_PERMISSIONS_STATE = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
+  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+  if (supabaseClient) {
+    try {
+      const rows = Object.keys(ROLE_PERMISSIONS_STATE).map(k => ({
+        role_id: k,
+        role_name: ROLE_PERMISSIONS_STATE[k].name,
+        permission_keys: ROLE_PERMISSIONS_STATE[k].permissions,
+        updated_at: new Date().toISOString()
+      }));
+      await supabaseClient.from("m_role_permission").upsert(rows, { onConflict: "role_id" });
+    } catch (e) {
+      console.warn("Error reset role to supabase:", e);
+    }
+  }
+
+  loadRolePermissionsSettings();
+  populateEmployeeRoleOptions();
+  if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
+    renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
+  }
+  showToast("Matriks hak akses role berhasil direset ke default!", "success", 2000);
 }
 
 async function deleteCustomRole(roleId) {

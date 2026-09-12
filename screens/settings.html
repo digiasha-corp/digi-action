@@ -471,59 +471,87 @@
 
 <!-- ================= MODAL TAMBAH / EDIT INFO ROLE ================= -->
 <div id="modal-role-create-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
-  <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-    <div class="p-4 bg-purple-700 text-white flex justify-between items-center">
+  <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div class="p-4 bg-purple-700 text-white flex justify-between items-center shrink-0">
       <div>
-        <h4 id="modal-role-title" class="font-bold text-sm">Tambah Role Baru</h4>
-        <p class="text-[10px] text-purple-100">Atur kode role, nama jabatan, dan identitas visual</p>
+        <h4 id="modal-role-title" class="font-bold text-sm">Edit Role & Hak Akses</h4>
+        <p class="text-[10px] text-purple-100">Atur informasi role, kode, serta daftar menu yang dapat diakses</p>
       </div>
-      <button onclick="closeRoleModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      <button type="button" onclick="closeRoleModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
     </div>
-    <form id="form-role-create-edit" onsubmit="handleSaveRoleInfo(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Kode Role ID:</label>
-          <input type="text" id="role-input-id" required placeholder="Contoh: R-05" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold uppercase" />
+    <form id="form-role-create-edit" onsubmit="handleSaveRoleInfo(event)" class="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs">
+      <!-- 1. IDENTITAS ROLE -->
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Informasi & Identitas Role</span>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Kode Role ID:</label>
+            <input type="text" id="role-input-id" required placeholder="Contoh: R-05" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-mono font-bold uppercase text-slate-900" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tema Warna Badge:</label>
+            <select id="role-input-color" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-semibold">
+              <option value="purple">Ungu (Purple)</option>
+              <option value="blue">Biru (Blue)</option>
+              <option value="cyan">Cyan / Toska</option>
+              <option value="emerald">Hijau (Emerald)</option>
+              <option value="amber">Kuning / Oranye (Amber)</option>
+              <option value="rose">Merah (Rose)</option>
+              <option value="indigo">Indigo / Gelap</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nama Role / Jabatan:</label>
+            <input type="text" id="role-input-name" required placeholder="Contoh: Area Coordinator" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Pilihan Ikon Role:</label>
+            <select id="role-input-icon" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-semibold">
+              <option value="fa-crown">👑 Crown (Super Admin / Direksi)</option>
+              <option value="fa-user-tie">👔 User Tie (Manager / Supervisor)</option>
+              <option value="fa-user-gear">⚙️ User Gear (Operasional / Teknis)</option>
+              <option value="fa-satellite-dish">📡 Satellite Dish (FAC / GPS)</option>
+              <option value="fa-person-walking">🚶 Person Walking (Field PIC / Lapangan)</option>
+              <option value="fa-user-shield">🛡️ User Shield (Keamanan / Verifikator)</option>
+              <option value="fa-user-check">✅ User Check (Reviewer / Komite)</option>
+              <option value="fa-file-invoice">📑 File Invoice (Finance / Kasir)</option>
+              <option value="fa-building">🏢 Building (Cabang / Office)</option>
+              <option value="fa-laptop">💻 Laptop (Backoffice / Data Entry)</option>
+            </select>
+          </div>
         </div>
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Tema Warna Badge:</label>
-          <select id="role-input-color" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold">
-            <option value="purple">Ungu (Purple)</option>
-            <option value="blue">Biru (Blue)</option>
-            <option value="cyan">Cyan / Toska</option>
-            <option value="emerald">Hijau (Emerald)</option>
-            <option value="amber">Kuning / Oranye (Amber)</option>
-            <option value="rose">Merah (Rose)</option>
-            <option value="indigo">Indigo / Gelap</option>
-          </select>
+          <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat Wewenang:</label>
+          <textarea id="role-input-desc" rows="2" placeholder="Jelaskan ruang lingkup wewenang role ini..." class="w-full bg-white border border-slate-300 rounded-xl p-2.5"></textarea>
         </div>
       </div>
-      <div>
-        <label class="block font-semibold text-slate-700 mb-1">Nama Role / Jabatan:</label>
-        <input type="text" id="role-input-name" required placeholder="Contoh: Area Coordinator / Admin Finance" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" />
+
+      <!-- 2. HAK AKSES MENU & MODUL -->
+      <div class="space-y-2 pt-1">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-1.5">
+          <span class="text-[11px] font-extrabold text-purple-900 uppercase tracking-wider flex items-center">
+            <i class="fa-solid fa-shield-halved text-purple-600 mr-1.5"></i>Hak Akses Menu & Modul
+          </span>
+          <div class="flex items-center space-x-2 text-[10px] font-bold">
+            <button type="button" onclick="selectAllRoleModalModules(true)" class="text-purple-700 hover:text-purple-900 hover:underline">Pilih Semua</button>
+            <span class="text-slate-300">|</span>
+            <button type="button" onclick="selectAllRoleModalModules(false)" class="text-slate-500 hover:text-slate-700 hover:underline">Hapus Semua</button>
+          </div>
+        </div>
+        <div id="role-modal-modules-container" class="space-y-3 pt-1">
+          <!-- Modul checklist per kategori di-render dinamis via JS -->
+        </div>
       </div>
-      <div>
-        <label class="block font-semibold text-slate-700 mb-1">Pilihan Ikon Role:</label>
-        <select id="role-input-icon" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold">
-          <option value="fa-crown">👑 Crown (Super Admin / Direksi)</option>
-          <option value="fa-user-tie">👔 User Tie (Manager / Supervisor)</option>
-          <option value="fa-user-gear">⚙️ User Gear (Operasional / Teknis)</option>
-          <option value="fa-satellite-dish">📡 Satellite Dish (FAC / GPS)</option>
-          <option value="fa-person-walking">🚶 Person Walking (Field PIC / Lapangan)</option>
-          <option value="fa-user-shield">🛡️ User Shield (Keamanan / Verifikator)</option>
-          <option value="fa-user-check">✅ User Check (Reviewer / Komite)</option>
-          <option value="fa-file-invoice">📑 File Invoice (Finance / Kasir)</option>
-          <option value="fa-building">🏢 Building (Cabang / Office)</option>
-          <option value="fa-laptop">💻 Laptop (Backoffice / Data Entry)</option>
-        </select>
-      </div>
-      <div>
-        <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat Wewenang:</label>
-        <textarea id="role-input-desc" rows="2" placeholder="Jelaskan ruang lingkup wewenang role ini..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5"></textarea>
-      </div>
-      <div class="pt-3 border-t border-slate-200 flex space-x-2">
-        <button type="button" onclick="closeRoleModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
-        <button type="submit" id="btn-save-role-info" class="w-2/3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow transition">Simpan Role</button>
+
+      <!-- FOOTER SUBMIT -->
+      <div class="pt-3 border-t border-slate-200 flex space-x-2 sticky bottom-0 bg-white">
+        <button type="button" onclick="closeRoleModal()" class="w-1/3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-role-info" class="w-2/3 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow transition flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-floppy-disk text-xs"></i>
+          <span>Simpan Perubahan Role</span>
+        </button>
       </div>
     </form>
   </div>
