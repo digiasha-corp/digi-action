@@ -1,0 +1,275 @@
+<div class="space-y-3.5 pb-12">
+  <!-- SEARCHABLE DROPDOWN PIC SELECTOR CARD -->
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-3 relative z-30">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-bold">
+          <i class="fa-solid fa-users-viewfinder"></i>
+        </div>
+        <div>
+          <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Monitoring Absensi PIC</h3>
+          <p class="text-[10px] text-slate-400">Pilih PIC untuk memantau rekapitulasi kehadiran</p>
+        </div>
+      </div>
+      <button type="button" onclick="loadScreen('dashboard')" class="text-xs text-slate-400 hover:text-slate-700 p-1 rounded-lg">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Input Searchable Dropdown -->
+    <div class="relative" id="rekap-tim-search-wrapper">
+      <div class="relative flex items-center">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-xs pointer-events-none"></i>
+        <input
+          type="text"
+          id="rekap-tim-search-input"
+          placeholder="Ketik nama, NIP, atau cabang PIC..."
+          autocomplete="off"
+          onfocus="openRekapTimSearchDropdown()"
+          oninput="filterRekapTimSearch(this.value)"
+          class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-9 pr-9 py-2.5 text-xs font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition outline-none"
+        />
+        <button
+          type="button"
+          id="rekap-tim-clear-btn"
+          onclick="clearRekapTimSelection()"
+          class="hidden absolute right-3 text-slate-400 hover:text-slate-600 text-xs p-1"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Dropdown Results Floating Box -->
+      <div
+        id="rekap-tim-dropdown-list"
+        class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto z-50 divide-y divide-slate-100"
+      >
+        <!-- Diisi via JS loadTeamPicOptions -->
+      </div>
+    </div>
+
+    <!-- Active PIC Profile Card (Muncul saat PIC terpilih) -->
+    <div id="rekap-tim-active-pic-card" class="hidden p-3 rounded-2xl bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200/80 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <div id="rekap-tim-pic-avatar" class="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+          PIC
+        </div>
+        <div class="min-w-0">
+          <h4 id="rekap-tim-pic-name" class="font-extrabold text-xs text-slate-900 truncate">Nama PIC</h4>
+          <p id="rekap-tim-pic-sub" class="text-[10px] text-slate-500 truncate">NIP: - • Cabang: -</p>
+        </div>
+      </div>
+      <button type="button" onclick="focusRekapTimSearch()" class="text-[10px] font-bold text-violet-700 bg-white border border-violet-200 hover:bg-violet-50 px-2.5 py-1 rounded-xl shrink-0 transition active:scale-95">
+        Ganti PIC
+      </button>
+    </div>
+  </div>
+
+  <!-- EMPTY STATE (JIKA BELUM ADA PIC YANG DIPILIH) -->
+  <div id="rekap-tim-empty-state" class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 space-y-3 shadow-xs">
+    <div class="w-14 h-14 rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center text-2xl mx-auto">
+      <i class="fa-solid fa-user-gear"></i>
+    </div>
+    <div class="space-y-1">
+      <h4 class="font-extrabold text-sm text-slate-800">Silakan Pilih PIC Terlebih Dahulu</h4>
+      <p class="text-xs text-slate-400 max-w-xs mx-auto">Gunakan kotak pencarian di atas untuk memilih karyawan yang ingin Anda pantau kalender kehadirannya.</p>
+    </div>
+  </div>
+
+  <!-- CONTAINER KALENDER & STATISTIK (MUNCUL SETELAH PIC DIPILIH) -->
+  <div id="rekap-tim-content-container" class="hidden space-y-3.5">
+    <!-- Month Navigation Bar -->
+    <div class="bg-white rounded-2xl p-3 shadow-xs border border-slate-200/80 flex items-center justify-between">
+      <button type="button" onclick="changeRekapTimMonth(-1)" class="w-9 h-9 rounded-xl hover:bg-slate-100 active:scale-95 text-slate-700 flex items-center justify-center transition border border-slate-200">
+        <i class="fa-solid fa-chevron-left text-xs"></i>
+      </button>
+      
+      <div class="flex items-center space-x-2">
+        <h3 class="text-sm font-extrabold text-slate-800" id="rekap-tim-month-label">September 2026</h3>
+        <button type="button" onclick="jumpToCurrentRekapTimMonth()" class="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 transition">
+          Hari Ini
+        </button>
+        <button type="button" onclick="refreshRekapTimCalendar()" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 flex items-center justify-center transition ml-1" title="Refresh">
+          <i class="fa-solid fa-rotate text-xs" id="rekap-tim-refresh-icon"></i>
+        </button>
+      </div>
+
+      <button type="button" onclick="changeRekapTimMonth(1)" class="w-9 h-9 rounded-xl hover:bg-slate-100 active:scale-95 text-slate-700 flex items-center justify-center transition border border-slate-200">
+        <i class="fa-solid fa-chevron-right text-xs"></i>
+      </button>
+    </div>
+
+    <!-- Statistik Rekapitulasi Bulan Terpilih (6 Kategori Prioritas) -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <!-- 1. Tepat Waktu -->
+      <div class="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase text-emerald-800 block truncate">Tepat Waktu</span>
+          <div class="flex items-baseline space-x-1">
+            <span class="text-lg font-black text-emerald-900 leading-none" id="tim-stat-tepat-waktu">0</span>
+            <span class="text-[10px] text-emerald-700">hari</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Terlambat / Izin > 09:00 -->
+      <div class="bg-rose-50/80 border border-rose-200/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase text-rose-800 block truncate">Terlambat / >09</span>
+          <div class="flex items-baseline space-x-1">
+            <span class="text-lg font-black text-rose-900 leading-none" id="tim-stat-terlambat">0</span>
+            <span class="text-[10px] text-rose-700">hari</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. WFH / Izin Terlambat < 09:00 -->
+      <div class="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid fa-laptop-house"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase text-amber-800 block truncate">WFH / Izin &le;09</span>
+          <div class="flex items-baseline space-x-1">
+            <span class="text-lg font-black text-amber-900 leading-none" id="tim-stat-wfh-ontime">0</span>
+            <span class="text-[10px] text-amber-700">hari</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Cuti -->
+      <div class="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid fa-plane-departure"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase text-blue-800 block truncate">Cuti</span>
+          <div class="flex items-baseline space-x-1">
+            <span class="text-lg font-black text-blue-900 leading-none" id="tim-stat-cuti">0</span>
+            <span class="text-[10px] text-blue-700">hari</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Sakit -->
+      <div class="bg-slate-100/90 border border-slate-300/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid fa-heart-pulse"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase text-slate-700 block truncate">Sakit</span>
+          <div class="flex items-baseline space-x-1">
+            <span class="text-lg font-black text-slate-800 leading-none" id="tim-stat-sakit">0</span>
+            <span class="text-[10px] text-slate-600">hari</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Belum Absen / Alpha -->
+      <div class="bg-red-50/80 border border-red-200/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-red-100 text-red-700 flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase text-red-800 block truncate">Belum Absen / Alpha</span>
+          <div class="flex items-baseline space-x-1">
+            <span class="text-lg font-black text-red-900 leading-none" id="tim-stat-alpha">0</span>
+            <span class="text-[10px] text-red-700">hari</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kalender Grid Card -->
+    <div class="bg-white rounded-3xl p-3.5 shadow-sm border border-slate-200/80 space-y-3">
+      <!-- Header Hari: Sen s/d Min -->
+      <div class="grid grid-cols-7 text-center font-bold text-[11px] text-slate-400 py-1 border-b border-slate-100">
+        <div>SEN</div>
+        <div>SEL</div>
+        <div>RAB</div>
+        <div>KAM</div>
+        <div>JUM</div>
+        <div class="text-amber-500">SAB</div>
+        <div class="text-red-500">MIN</div>
+      </div>
+
+      <!-- Container Hari-hari Kalender (di-render via JS) -->
+      <div id="rekap-tim-calendar-grid" class="grid grid-cols-7 gap-1.5 min-h-[280px]">
+        <!-- Diisi via JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL DETAIL PRESENSI & PERIZINAN HARIAN PIC TERPILIH -->
+<!-- ========================================================================= -->
+<div id="modal-rekap-tim-day-detail" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <!-- Header Modal -->
+    <div id="rekap-tim-modal-header" class="p-4.5 text-white flex items-center justify-between bg-slate-900">
+      <div>
+        <span class="text-[10px] uppercase font-bold tracking-widest opacity-80 block" id="rekap-tim-modal-day-name">Senin</span>
+        <h3 class="text-base font-extrabold" id="rekap-tim-modal-date-full">14 September 2026</h3>
+      </div>
+      <button type="button" onclick="closeRekapTimDayModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Body Modal -->
+    <div class="p-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
+      <!-- Status Banner Utama -->
+      <div id="rekap-tim-modal-status-box" class="p-3 rounded-2xl flex items-center space-x-3 border bg-slate-50 border-slate-200">
+        <div id="rekap-tim-modal-status-icon" class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 bg-slate-200 text-slate-700">
+          <i class="fa-solid fa-circle-question"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold uppercase tracking-wider block" id="rekap-tim-modal-status-label">Status Presensi</span>
+          <p class="text-xs font-semibold mt-0.5 leading-snug" id="rekap-tim-modal-status-desc">-</p>
+        </div>
+      </div>
+
+      <!-- Detail Absensi (Masuk & Pulang) -->
+      <div class="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs space-y-2.5">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <span class="text-xs font-bold text-slate-800 uppercase flex items-center">
+            <i class="fa-solid fa-fingerprint text-teal-600 mr-1.5"></i>Log Presensi Masuk / Pulang
+          </span>
+          <span id="rekap-tim-modal-absen-badge" class="text-[9px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-600">-</span>
+        </div>
+
+        <div id="rekap-tim-modal-absen-content" class="space-y-2 text-xs">
+          <!-- Diisi via JS -->
+        </div>
+      </div>
+
+      <!-- Detail Perizinan / Cuti / WFH (jika ada) -->
+      <div id="rekap-tim-modal-izin-wrapper" class="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs space-y-2.5">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <span class="text-xs font-bold text-slate-800 uppercase flex items-center">
+            <i class="fa-solid fa-file-lines text-blue-600 mr-1.5"></i>Log Pengajuan Izin / Cuti
+          </span>
+          <span id="rekap-tim-modal-izin-badge" class="text-[9px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-600">-</span>
+        </div>
+
+        <div id="rekap-tim-modal-izin-content" class="space-y-2 text-xs">
+          <!-- Diisi via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Modal -->
+    <div class="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+      <button type="button" onclick="closeRekapTimDayModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-bold text-xs rounded-xl transition">
+        Tutup
+      </button>
+    </div>
+  </div>
+</div>

@@ -189,7 +189,7 @@
         <span class="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full font-semibold">Workflow</span>
       </div>
 
-      <div class="grid grid-cols-4 gap-2 text-center" id="group-workflow-ops">
+      <div class="grid grid-cols-4 sm:grid-cols-5 gap-2 text-center" id="group-workflow-ops">
         
         <!-- Pengajuan Izin -->
         <button id="menu-btn-izin" onclick="loadScreen('izin')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-teal-50/60 transition active:scale-95">
@@ -210,13 +210,22 @@
           <span class="text-[9px] text-slate-400">Approval Hub</span>
         </button>
 
-        <!-- Rekap Presensi & Jam Kerja -->
+        <!-- Rekap Presensi & Jam Kerja Pribadi -->
         <button id="menu-btn-attendance_summary" onclick="loadScreen('rekap_absen')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-slate-50 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-calendar-check"></i>
           </div>
           <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-slate-900">Rekap Absen</span>
-          <span class="text-[9px] text-slate-400">Statistik</span>
+          <span class="text-[9px] text-slate-400">Saya Sendiri</span>
+        </button>
+
+        <!-- Presensi Tim (Searchable PIC) -->
+        <button id="menu-btn-rekap_tim" onclick="loadScreen('rekap_tim')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-violet-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-800 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-users-viewfinder"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-violet-700">Presensi Tim</span>
+          <span class="text-[9px] text-slate-400">Monitoring PIC</span>
         </button>
 
         <!-- Kalender Libur & Jadwal -->
