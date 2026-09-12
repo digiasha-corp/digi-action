@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260911_v48";
+const APP_BUILD_VERSION = "20260912_v49";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -800,6 +800,19 @@ async function callApi(action, data = {}) {
       if (action === "submitVisit") return await supabaseSubmitVisit(data);
       if (action === "submitGpsMaintenance") return await supabaseSubmitGpsMaintenance(data);
       if (action === "submitAbsensi") return await supabaseSubmitAbsensi(data);
+      if (action === "submitIzin") return await supabaseSubmitIzin(data);
+      if (action === "processApproval") return await supabaseProcessApproval(data);
+      if (action === "getApprovalList") {
+        const isAdmin = String(data.role || "").toLowerCase().includes("admin");
+        const cleanNip = data.nip || "";
+        let query = supabaseClient.from("tr_izin_log").select("*").order("timestamp", { ascending: false });
+        if (!isAdmin && cleanNip) {
+          query = query.eq("pic_approval_nip", cleanNip);
+        }
+        const { data: rows, error } = await query;
+        if (error) throw error;
+        return { success: true, approvals: rows || [] };
+      }
       if (action === "submitOnboarding") return await supabaseSubmitOnboarding(data);
       if (action === "saveAssignment") return await supabaseSaveAssignment(data);
       if (action === "resolveAssignment") {
