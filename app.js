@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v58";
+const APP_BUILD_VERSION = "20260912_v59";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -14,7 +14,7 @@ let CURRENT_USER = (() => {
   }
 })();
 
-// Definisi Matriks Role & Hak Akses Standar
+// Definisi Matriks Role & Hak Akses Standar (17 Modul Sesuai Menu Aplikasi)
 const DEFAULT_ROLE_PERMISSIONS = {
   "R-01": {
     name: "Super Admin",
@@ -22,7 +22,12 @@ const DEFAULT_ROLE_PERMISSIONS = {
     color: "purple",
     badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
     desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, dan pengaturan sistem.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "izin", "persetujuan", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "settings"]
+    permissions: [
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+      "izin", "persetujuan", "attendance_summary", "rekap_tim",
+      "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+      "settings"
+    ]
   },
   "R-02": {
     name: "Branch Manager / Supervisor",
@@ -30,7 +35,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     color: "blue",
     badgeBg: "bg-blue-100 text-blue-800 border border-blue-200",
     desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, dan layanan support karyawan.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "izin", "persetujuan", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support"]
+    permissions: [
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history",
+      "izin", "persetujuan", "attendance_summary", "rekap_tim",
+      "expense_claim", "internal_memo", "employee_loan", "helpdesk_support"
+    ]
   },
   "R-03": {
     name: "FAC Officer",
@@ -38,7 +47,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     color: "cyan",
     badgeBg: "bg-cyan-100 text-cyan-800 border border-cyan-200",
     desc: "Monitoring dan operasional GPS armada dealer, laporan berkala FAC, dan support karyawan.",
-    permissions: ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "izin", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "helpdesk_support"]
+    permissions: [
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+      "izin", "attendance_summary",
+      "expense_claim", "internal_memo", "helpdesk_support"
+    ]
   },
   "R-04": {
     name: "Field PIC",
@@ -46,7 +59,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     color: "emerald",
     badgeBg: "bg-emerald-100 text-emerald-800 border border-emerald-200",
     desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, presensi, dan klaim biaya.",
-    permissions: ["priority", "visit", "onboarding", "pipeline", "gps", "history", "izin", "attendance_summary", "work_calendar", "expense_claim", "internal_memo", "helpdesk_support"]
+    permissions: [
+      "priority", "visit", "onboarding", "pipeline", "gps", "history",
+      "izin", "attendance_summary",
+      "expense_claim", "internal_memo", "helpdesk_support"
+    ]
   }
 };
 
@@ -62,10 +79,10 @@ const ALL_APP_MODULES = [
   { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
 
   // 2. Presensi & Persetujuan
-  { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit", icon: "fa-file-signature", category: "Presensi & Persetujuan" },
-  { key: "persetujuan", title: "Persetujuan (Approval Hub)", desc: "Pusat persetujuan permohonan", icon: "fa-stamp", category: "Presensi & Persetujuan" },
-  { key: "attendance_summary", title: "Rekap Absen & Jam Kerja", desc: "Statistik & rekapitulasi presensi", icon: "fa-calendar-check", category: "Presensi & Persetujuan" },
-  { key: "work_calendar", title: "Jadwal Kerja & Kalender", desc: "Kalender kerja & jam masuk 09:00", icon: "fa-calendar-days", category: "Presensi & Persetujuan" },
+  { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit, Terlambat", icon: "fa-file-signature", category: "Presensi & Persetujuan" },
+  { key: "persetujuan", title: "Persetujuan (Approval Hub)", desc: "Pusat persetujuan permohonan staf", icon: "fa-stamp", category: "Presensi & Persetujuan" },
+  { key: "attendance_summary", title: "Rekap Absen", desc: "Kalender presensi saya sendiri", icon: "fa-calendar-check", category: "Presensi & Persetujuan" },
+  { key: "rekap_tim", title: "Presensi Tim", desc: "Monitoring presensi staf / PIC lain", icon: "fa-users-viewfinder", category: "Presensi & Persetujuan" },
 
   // 3. Layanan & Support Karyawan
   { key: "expense_claim", title: "Klaim Biaya (Reimbursement)", desc: "Pengajuan biaya BBM/Tol/Ops", icon: "fa-money-bill-wave", category: "Layanan & Support" },
@@ -74,7 +91,7 @@ const ALL_APP_MODULES = [
   { key: "helpdesk_support", title: "IT & Helpdesk Support", desc: "Bantuan kendala sistem & SOP", icon: "fa-headset", category: "Layanan & Support" },
 
   // 4. Administrasi & Sistem
-  { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS & Banner", icon: "fa-sliders", category: "Administrasi & Sistem" }
+  { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS, Banner & Role", icon: "fa-sliders", category: "Administrasi & Sistem" }
 ];
 
 let ROLE_PERMISSIONS_STATE = (() => {
@@ -84,7 +101,21 @@ let ROLE_PERMISSIONS_STATE = (() => {
       const parsed = JSON.parse(saved);
       const merged = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
       Object.keys(parsed).forEach(k => {
-        if (merged[k]) merged[k].permissions = parsed[k].permissions || merged[k].permissions;
+        if (merged[k]) {
+          let perms = (parsed[k].permissions || merged[k].permissions).filter(p => p !== "work_calendar");
+          if ((k === "R-01" || k === "R-02") && !perms.includes("rekap_tim")) {
+            perms.push("rekap_tim");
+          }
+          merged[k].permissions = perms;
+          if (parsed[k].name) merged[k].name = parsed[k].name;
+          if (parsed[k].desc) merged[k].desc = parsed[k].desc;
+          if (parsed[k].icon) merged[k].icon = parsed[k].icon;
+          if (parsed[k].color) merged[k].color = parsed[k].color;
+          if (parsed[k].badgeBg) merged[k].badgeBg = parsed[k].badgeBg;
+        } else {
+          merged[k] = parsed[k];
+          merged[k].permissions = (merged[k].permissions || []).filter(p => p !== "work_calendar");
+        }
       });
       return merged;
     }
@@ -1423,10 +1454,10 @@ async function initDashboard() {
     String(CURRENT_USER.role || "").toLowerCase().includes("supervisor")
   );
 
-  // Render & filter seluruh modul aplikasi sesuai hak akses role
+  // Render & filter seluruh modul aplikasi sesuai hak akses role (17 modul)
   const allModulesList = [
     "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
-    "izin", "persetujuan", "attendance_summary", "rekap_tim", "work_calendar",
+    "izin", "persetujuan", "attendance_summary", "rekap_tim",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
     "settings"
   ];
@@ -1434,13 +1465,7 @@ async function initDashboard() {
   allModulesList.forEach(key => {
     const btn = document.getElementById(`menu-btn-${key}`);
     if (btn) {
-      if (key === "izin" || key === "attendance_summary" || key === "work_calendar" || key === "helpdesk_support") {
-        btn.style.display = "flex"; // Modul esensial selalu tersedia
-      } else if (key === "persetujuan" || key === "rekap_tim") {
-        btn.style.display = (isSuperAdminOrBM || perms.includes("persetujuan") || perms.includes("rekap_tim")) ? "flex" : "none";
-      } else {
-        btn.style.display = perms.includes(key) ? "flex" : "none";
-      }
+      btn.style.display = perms.includes(key) ? "flex" : "none";
     }
   });
 
@@ -9033,10 +9058,12 @@ async function syncRolePermissionsFromSupabase() {
       permsData.forEach(r => {
         const rId = String(r.role_id || "").trim();
         if (!rId) return;
+        let perms = Array.isArray(r.permission_keys) ? r.permission_keys.filter(p => p !== "work_calendar") : [];
+        if ((rId === "R-01" || rId === "R-02") && !perms.includes("rekap_tim")) {
+          perms.push("rekap_tim");
+        }
         if (ROLE_PERMISSIONS_STATE[rId]) {
-          if (Array.isArray(r.permission_keys)) {
-            ROLE_PERMISSIONS_STATE[rId].permissions = r.permission_keys;
-          }
+          ROLE_PERMISSIONS_STATE[rId].permissions = perms;
           if (r.role_name) ROLE_PERMISSIONS_STATE[rId].name = r.role_name;
         } else {
           ROLE_PERMISSIONS_STATE[rId] = {
@@ -9045,7 +9072,7 @@ async function syncRolePermissionsFromSupabase() {
             color: "purple",
             badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
             desc: `Role ${r.role_name || rId}`,
-            permissions: Array.isArray(r.permission_keys) ? r.permission_keys : []
+            permissions: perms
           };
         }
       });
@@ -9071,15 +9098,6 @@ async function syncRolePermissionsFromSupabase() {
   } catch (err) {
     console.warn("Gagal sinkronisasi m_role_permission:", err);
   }
-}
-
-function resetRolePermissionsToDefault() {
-  if (!confirm("Kembalikan seluruh konfigurasi hak akses role ke pengaturan default sistem?")) return;
-  ROLE_PERMISSIONS_STATE = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
-  localStorage.removeItem("DIGIASHA_ROLE_PERMS");
-  loadRolePermissionsSettings();
-  populateEmployeeRoleOptions();
-  showToast("Hak akses seluruh role telah dikembalikan ke default!", "success", 2000);
 }
 
 // =========================================================================
