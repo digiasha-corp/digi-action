@@ -1,14 +1,29 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v60";
+const APP_BUILD_VERSION = "20260912_v61";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
 let CURRENT_USER = (() => {
   try {
     const saved = localStorage.getItem("DIGIASHA_AUTH_USER");
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      const u = JSON.parse(saved);
+      const uRole = String(u.role || u.role_id || u.jabatan || "").toLowerCase();
+      // Self-heal: jika role adalah Admin / Super Admin dan permissions terpotong (< 15)
+      if ((uRole.includes("admin") || u.role_id === "R-01") && (!Array.isArray(u.permissions) || u.permissions.length < 15)) {
+        u.permissions = [
+          "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+          "izin", "persetujuan", "attendance_summary", "rekap_tim",
+          "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+          "settings"
+        ];
+        try { localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(u)); } catch (e) {}
+      }
+      return u;
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -94,6 +109,20 @@ const ALL_APP_MODULES = [
   { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS, Banner & Role", icon: "fa-sliders", category: "Administrasi & Sistem" }
 ];
 
+function parseRolePermissions(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try {
+      const p = JSON.parse(raw);
+      if (Array.isArray(p)) return p;
+    } catch (e) {
+      return raw.split(",").map(s => s.trim().replace(/^["'\[\]]+|["'\[\]]+$/g, "")).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 let ROLE_PERMISSIONS_STATE = (() => {
   try {
     const saved = localStorage.getItem("DIGIASHA_ROLE_PERMS");
@@ -102,9 +131,15 @@ let ROLE_PERMISSIONS_STATE = (() => {
       const merged = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
       Object.keys(parsed).forEach(k => {
         if (merged[k]) {
-          let perms = (parsed[k].permissions || merged[k].permissions).filter(p => p !== "work_calendar");
-          if ((k === "R-01" || k === "R-02") && !perms.includes("rekap_tim")) {
-            perms.push("rekap_tim");
+          let perms = parseRolePermissions(parsed[k].permissions || merged[k].permissions).filter(p => p !== "work_calendar");
+          // Self-heal Super Admin (R-01) if it had corrupted partial permissions (< 15)
+          if (k === "R-01" && perms.length < 15) {
+            perms = Array.from(new Set([...perms, ...DEFAULT_ROLE_PERMISSIONS["R-01"].permissions]));
+          }
+          if (k === "R-02") {
+            if (!perms.includes("rekap_tim")) perms.push("rekap_tim");
+            if (!perms.includes("attendance_summary")) perms.push("attendance_summary");
+            if (!perms.includes("persetujuan")) perms.push("persetujuan");
           }
           merged[k].permissions = perms;
           if (parsed[k].name) merged[k].name = parsed[k].name;
@@ -114,7 +149,7 @@ let ROLE_PERMISSIONS_STATE = (() => {
           if (parsed[k].badgeBg) merged[k].badgeBg = parsed[k].badgeBg;
         } else {
           merged[k] = parsed[k];
-          merged[k].permissions = (merged[k].permissions || []).filter(p => p !== "work_calendar");
+          merged[k].permissions = parseRolePermissions(merged[k].permissions).filter(p => p !== "work_calendar");
         }
       });
       return merged;
@@ -127,18 +162,36 @@ function getPermissionsForRole(roleKey, userObj = null) {
   const roleId = String(userObj?.role_id || roleKey || "").trim();
   const roleName = String(userObj?.role || userObj?.jabatan || roleKey || "").trim();
 
-  if (ROLE_PERMISSIONS_STATE[roleId] && Array.isArray(ROLE_PERMISSIONS_STATE[roleId].permissions) && ROLE_PERMISSIONS_STATE[roleId].permissions.length > 0) {
-    return ROLE_PERMISSIONS_STATE[roleId].permissions;
+  // 1. Direct match by roleId in ROLE_PERMISSIONS_STATE
+  if (ROLE_PERMISSIONS_STATE[roleId]) {
+    const perms = parseRolePermissions(ROLE_PERMISSIONS_STATE[roleId].permissions);
+    if (perms.length > 0) return perms;
   }
-  const match = Object.values(ROLE_PERMISSIONS_STATE).find(r => r.name.toLowerCase() === roleName.toLowerCase() || r.name.toLowerCase().includes(roleName.toLowerCase()) || roleName.toLowerCase().includes(r.name.toLowerCase()));
-  if (match && Array.isArray(match.permissions) && match.permissions.length > 0) {
-    return match.permissions;
+
+  // 2. Direct match for Admin / Super Admin (R-01)
+  if (roleName.toLowerCase().includes("admin") || roleId.toLowerCase().includes("admin") || roleId === "R-01") {
+    if (ROLE_PERMISSIONS_STATE["R-01"]) {
+      const perms = parseRolePermissions(ROLE_PERMISSIONS_STATE["R-01"].permissions);
+      if (perms.length > 0) return perms;
+    }
+    return DEFAULT_ROLE_PERMISSIONS["R-01"].permissions;
   }
+
+  const match = Object.values(ROLE_PERMISSIONS_STATE).find(r => 
+    r.name.toLowerCase() === roleName.toLowerCase() || 
+    r.name.toLowerCase().includes(roleName.toLowerCase()) || 
+    roleName.toLowerCase().includes(r.name.toLowerCase())
+  );
+  if (match) {
+    const perms = parseRolePermissions(match.permissions);
+    if (perms.length > 0) return perms;
+  }
+
   if (userObj && Array.isArray(userObj.permissions) && userObj.permissions.length > 0) {
     return userObj.permissions;
   }
 
-  return ["priority", "visit", "onboarding", "pipeline", "gps", "history"];
+  return DEFAULT_ROLE_PERMISSIONS["R-04"].permissions;
 }
 
 // Hak Akses Modul per Role (Legacy Fallback)
@@ -311,15 +364,16 @@ async function supabaseLogin(identifier, password) {
     return { success: false, message: "Akun Anda saat ini berstatus NONAKTIF. Hubungi Administrator." };
   }
 
-  let permissions = ROLE_PERMISSIONS[user.role_id] || ROLE_PERMISSIONS[user.jabatan] || ["priority", "assignment", "visit", "onboarding", "gps", "fac"];
+  let permissions = getPermissionsForRole(user.role_id, user);
   try {
     const { data: rolePerms } = await supabaseClient
       .from("m_role_permission")
-      .select("permission_keys")
-      .eq("role_id", user.role_id)
+      .select("*")
+      .eq("role_id", user.role_id || "R-01")
       .limit(1);
-    if (rolePerms && rolePerms.length > 0 && Array.isArray(rolePerms[0].permission_keys)) {
-      permissions = rolePerms[0].permission_keys;
+    if (rolePerms && rolePerms.length > 0) {
+      const parsed = parseRolePermissions(rolePerms[0].permissions || rolePerms[0].permission_keys);
+      if (parsed.length > 0) permissions = parsed;
     }
   } catch (e) {}
 
@@ -8934,7 +8988,8 @@ async function handleApplyBulkRoleAssign(e) {
     updatedRoles.push({
       role_id: roleId,
       role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
-      permission_keys: currentPerms,
+      permissions: JSON.stringify(currentPerms),
+      description: ROLE_PERMISSIONS_STATE[roleId].desc || "",
       updated_at: new Date().toISOString()
     });
   });
@@ -9089,7 +9144,8 @@ function handleSaveRoleInfo(e) {
     supabaseClient.from("m_role_permission").upsert({
       role_id: id,
       role_name: name,
-      permission_keys: selectedPermissions,
+      permissions: JSON.stringify(selectedPermissions),
+      description: desc || "",
       updated_at: new Date().toISOString()
     }, { onConflict: "role_id" }).then(({ error }) => {
       if (error) console.warn("Error sync role to supabase:", error);
@@ -9125,7 +9181,8 @@ async function resetRolePermissionsToDefault() {
       const rows = Object.keys(ROLE_PERMISSIONS_STATE).map(k => ({
         role_id: k,
         role_name: ROLE_PERMISSIONS_STATE[k].name,
-        permission_keys: ROLE_PERMISSIONS_STATE[k].permissions,
+        permissions: JSON.stringify(ROLE_PERMISSIONS_STATE[k].permissions),
+        description: ROLE_PERMISSIONS_STATE[k].desc || "",
         updated_at: new Date().toISOString()
       }));
       await supabaseClient.from("m_role_permission").upsert(rows, { onConflict: "role_id" });
@@ -9183,7 +9240,8 @@ async function saveRolePermissions(roleId) {
         .upsert({
           role_id: roleId,
           role_name: roleObj?.name || roleId,
-          permission_keys: selected,
+          permissions: JSON.stringify(selected),
+          description: roleObj?.desc || "",
           updated_at: new Date().toISOString()
         }, { onConflict: "role_id" });
       if (error) console.warn("Supabase m_role_permission error:", error);
@@ -9205,37 +9263,99 @@ async function saveRolePermissions(roleId) {
   }
 }
 
+async function seedDefaultRolesToSupabase() {
+  if (!supabaseClient) return;
+  try {
+    const rows = Object.keys(DEFAULT_ROLE_PERMISSIONS).map(roleId => {
+      const def = DEFAULT_ROLE_PERMISSIONS[roleId];
+      const existing = ROLE_PERMISSIONS_STATE[roleId]?.permissions;
+      const perms = (existing && existing.length >= def.permissions.length) ? existing : def.permissions;
+      return {
+        role_id: roleId,
+        role_name: def.name,
+        permissions: JSON.stringify(perms),
+        description: def.desc || "",
+        updated_at: new Date().toISOString()
+      };
+    });
+    const { error } = await supabaseClient.from("m_role_permission").upsert(rows, { onConflict: "role_id" });
+    if (!error) {
+      console.log("Sukses seed seluruh default roles ke Supabase m_role_permission!");
+    } else {
+      console.warn("Error seedDefaultRolesToSupabase:", error);
+    }
+  } catch (e) {
+    console.warn("Exception seedDefaultRolesToSupabase:", e);
+  }
+}
+
 async function syncRolePermissionsFromSupabase() {
   if (!supabaseClient) return;
   try {
     const { data: permsData, error } = await supabaseClient.from("m_role_permission").select("*");
-    if (!error && permsData && permsData.length > 0) {
+    
+    if (!error) {
+      if (!permsData || permsData.length === 0) {
+        console.log("Tabel m_role_permission kosong di Supabase. Melakukan inisialisasi awal...");
+        await seedDefaultRolesToSupabase();
+        return;
+      }
+
+      let needsUpdateToSupabase = false;
+
       permsData.forEach(r => {
         const rId = String(r.role_id || "").trim();
         if (!rId) return;
-        let perms = Array.isArray(r.permission_keys) ? r.permission_keys.filter(p => p !== "work_calendar") : [];
-        if ((rId === "R-01" || rId === "R-02") && !perms.includes("rekap_tim")) {
-          perms.push("rekap_tim");
+
+        let perms = parseRolePermissions(r.permissions || r.permission_keys);
+        perms = perms.filter(p => p !== "work_calendar");
+
+        // Jika R-01 di database hanya punya menu lama / tidak lengkap (< 15), lengkapi ke 17 modul
+        if (rId === "R-01" && perms.length < 15) {
+          DEFAULT_ROLE_PERMISSIONS["R-01"].permissions.forEach(p => {
+            if (!perms.includes(p)) perms.push(p);
+          });
+          needsUpdateToSupabase = true;
         }
+
+        // Jika R-02 di database belum ada modul esensial baru
+        if (rId === "R-02") {
+          ["rekap_tim", "attendance_summary", "persetujuan"].forEach(p => {
+            if (!perms.includes(p)) perms.push(p);
+          });
+        }
+
         if (ROLE_PERMISSIONS_STATE[rId]) {
           ROLE_PERMISSIONS_STATE[rId].permissions = perms;
           if (r.role_name) ROLE_PERMISSIONS_STATE[rId].name = r.role_name;
+          if (r.description) ROLE_PERMISSIONS_STATE[rId].desc = r.description;
         } else {
           ROLE_PERMISSIONS_STATE[rId] = {
             name: r.role_name || rId,
             icon: "fa-user-gear",
             color: "purple",
             badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
-            desc: `Role ${r.role_name || rId}`,
+            desc: r.description || `Role ${r.role_name || rId}`,
             permissions: perms
           };
         }
       });
+
+      // Periksa apakah ada role default (R-01, R-02, R-03, R-04) yang belum tersimpan di Supabase
+      const missingDefaultRoles = Object.keys(DEFAULT_ROLE_PERMISSIONS).filter(k => 
+        !permsData.some(r => String(r.role_id || "").trim() === k)
+      );
+
+      if (missingDefaultRoles.length > 0 || needsUpdateToSupabase) {
+        console.log("Melengkapi role default ke database Supabase:", missingDefaultRoles);
+        await seedDefaultRolesToSupabase();
+      }
+
       try {
         localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
       } catch (e) {}
 
-      // Refresh CURRENT_USER permissions if logged in
+      // Refresh CURRENT_USER permissions jika user sedang login
       if (CURRENT_USER) {
         const uRole = CURRENT_USER.role || CURRENT_USER.role_id || CURRENT_USER.jabatan;
         const freshPerms = getPermissionsForRole(CURRENT_USER.role_id || uRole, CURRENT_USER);
@@ -9243,7 +9363,8 @@ async function syncRolePermissionsFromSupabase() {
         try {
           localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
         } catch (e) {}
-        // Refresh dashboard buttons if on dashboard
+        
+        // Refresh tombol dashboard jika elemen dashboard ada
         const nameEl = document.getElementById("dash-user-name");
         if (nameEl) {
           initDashboard();
