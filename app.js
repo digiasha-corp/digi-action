@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v61";
+const APP_BUILD_VERSION = "20260912_v62";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -11,10 +11,10 @@ let CURRENT_USER = (() => {
     if (saved) {
       const u = JSON.parse(saved);
       const uRole = String(u.role || u.role_id || u.jabatan || "").toLowerCase();
-      // Self-heal: jika role adalah Admin / Super Admin dan permissions terpotong (< 15)
-      if ((uRole.includes("admin") || u.role_id === "R-01") && (!Array.isArray(u.permissions) || u.permissions.length < 15)) {
+      // Self-heal: jika role adalah Admin / Super Admin dan permissions terpotong (< 16)
+      if ((uRole.includes("admin") || u.role_id === "R-01") && (!Array.isArray(u.permissions) || u.permissions.length < 16)) {
         u.permissions = [
-          "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+          "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
           "izin", "persetujuan", "attendance_summary", "rekap_tim",
           "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
           "settings"
@@ -29,7 +29,7 @@ let CURRENT_USER = (() => {
   }
 })();
 
-// Definisi Matriks Role & Hak Akses Standar (17 Modul Sesuai Menu Aplikasi)
+// Definisi Matriks Role & Hak Akses Standar (18 Modul Sesuai Menu Aplikasi)
 const DEFAULT_ROLE_PERMISSIONS = {
   "R-01": {
     name: "Super Admin",
@@ -38,7 +38,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
     desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, dan pengaturan sistem.",
     permissions: [
-      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
       "izin", "persetujuan", "attendance_summary", "rekap_tim",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
       "settings"
@@ -51,7 +51,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     badgeBg: "bg-blue-100 text-blue-800 border border-blue-200",
     desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, dan layanan support karyawan.",
     permissions: [
-      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history",
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "laporan_activity",
       "izin", "persetujuan", "attendance_summary", "rekap_tim",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support"
     ]
@@ -92,6 +92,7 @@ const ALL_APP_MODULES = [
   { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish", category: "Operasional Lapangan" },
   { key: "fac", title: "Report GPS", desc: "Monitoring sinyal GPS harian", icon: "fa-tower-broadcast", category: "Operasional Lapangan" },
   { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
+  { key: "laporan_activity", title: "Laporan Activity", desc: "Monitoring kunjungan PIC & cabang", icon: "fa-chart-line", category: "Operasional Lapangan" },
 
   // 2. Presensi & Persetujuan
   { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit, Terlambat", icon: "fa-file-signature", category: "Presensi & Persetujuan" },
@@ -1133,7 +1134,8 @@ async function loadScreen(screenName) {
         history: "Riwayat Aktivitas PIC",
         rekap_absen: "Rekap Presensi & Kalender",
         attendance_summary: "Rekap Presensi & Kalender",
-        rekap_tim: "Presensi Tim & Monitoring PIC"
+        rekap_tim: "Presensi Tim & Monitoring PIC",
+        laporan_activity: "Laporan Activity & Monitoring Kunjungan"
       };
       title.innerText = titles[screenName] || "Monitoring";
     }
@@ -1174,6 +1176,7 @@ async function loadScreen(screenName) {
     if (screenName === "persetujuan") initPersetujuanScreen();
     if (screenName === "rekap_absen" || screenName === "attendance_summary") initRekapAbsenScreen();
     if (screenName === "rekap_tim") initRekapTimScreen();
+    if (screenName === "laporan_activity") initLaporanActivityScreen();
     if (screenName === "settings" && typeof initSettingsScreen === "function") initSettingsScreen();
     if (screenName === "history" && typeof initHistory === "function") initHistory();
 
@@ -1508,9 +1511,9 @@ async function initDashboard() {
     String(CURRENT_USER.role || "").toLowerCase().includes("supervisor")
   );
 
-  // Render & filter seluruh modul aplikasi sesuai hak akses role (17 modul)
+  // Render & filter seluruh modul aplikasi sesuai hak akses role (18 modul)
   const allModulesList = [
-    "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
+    "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
     "izin", "persetujuan", "attendance_summary", "rekap_tim",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
     "settings"
@@ -9310,18 +9313,23 @@ async function syncRolePermissionsFromSupabase() {
         let perms = parseRolePermissions(r.permissions || r.permission_keys);
         perms = perms.filter(p => p !== "work_calendar");
 
-        // Jika R-01 di database hanya punya menu lama / tidak lengkap (< 15), lengkapi ke 17 modul
-        if (rId === "R-01" && perms.length < 15) {
+        // Jika R-01 di database hanya punya menu lama / tidak lengkap (< 16), lengkapi ke 18 modul
+        if (rId === "R-01") {
           DEFAULT_ROLE_PERMISSIONS["R-01"].permissions.forEach(p => {
-            if (!perms.includes(p)) perms.push(p);
+            if (!perms.includes(p)) {
+              perms.push(p);
+              needsUpdateToSupabase = true;
+            }
           });
-          needsUpdateToSupabase = true;
         }
 
         // Jika R-02 di database belum ada modul esensial baru
         if (rId === "R-02") {
-          ["rekap_tim", "attendance_summary", "persetujuan"].forEach(p => {
-            if (!perms.includes(p)) perms.push(p);
+          ["rekap_tim", "attendance_summary", "persetujuan", "laporan_activity"].forEach(p => {
+            if (!perms.includes(p)) {
+              perms.push(p);
+              needsUpdateToSupabase = true;
+            }
           });
         }
 
@@ -11018,6 +11026,652 @@ async function handleForceChangePasswordSubmit(e) {
     submitBtn.innerHTML = origText;
     submitBtn.disabled = false;
   }
+}
+
+// =========================================================================
+// LAPORAN ACTIVITY & MONITORING KUNJUNGAN CONTROLLER
+// =========================================================================
+let LAP_ACT_START_DATE = "";
+let LAP_ACT_END_DATE = "";
+let LAP_ACT_CABANG_FILTER = "ALL";
+let LAP_ACT_PIC_FILTER = "ALL";
+let LAP_ACT_LIST_TAB = "ALL";
+let LAP_ACT_RAW_VISITS = [];
+let LAP_ACT_RAW_ONBOARDINGS = [];
+let LAP_ACT_RAW_UNIT_CHECKS = [];
+let LAP_ACT_RAW_DEALERS = [];
+let LAP_ACT_RAW_FACILITY_UNITS = [];
+let LAP_ACT_EMPLOYEES = [];
+let LAP_ACT_FILTERED_ITEMS = [];
+
+async function initLaporanActivityScreen() {
+  const now = new Date();
+  const past7 = new Date();
+  past7.setDate(now.getDate() - 6);
+
+  LAP_ACT_START_DATE = getLocalDateString(past7);
+  LAP_ACT_END_DATE = getLocalDateString(now);
+
+  const startInput = document.getElementById("lap-act-start-date");
+  const endInput = document.getElementById("lap-act-end-date");
+  if (startInput) startInput.value = LAP_ACT_START_DATE;
+  if (endInput) endInput.value = LAP_ACT_END_DATE;
+
+  await loadActivityFilterDropdowns();
+  await fetchActivityReportData();
+}
+
+function setActivityDatePreset(preset) {
+  const now = new Date();
+  let startD = new Date();
+
+  if (preset === "7_DAYS") {
+    startD.setDate(now.getDate() - 6);
+  } else if (preset === "THIS_MONTH") {
+    startD = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (preset === "30_DAYS") {
+    startD.setDate(now.getDate() - 29);
+  }
+
+  LAP_ACT_START_DATE = getLocalDateString(startD);
+  LAP_ACT_END_DATE = getLocalDateString(now);
+
+  const startInput = document.getElementById("lap-act-start-date");
+  const endInput = document.getElementById("lap-act-end-date");
+  if (startInput) startInput.value = LAP_ACT_START_DATE;
+  if (endInput) endInput.value = LAP_ACT_END_DATE;
+
+  applyActivityFilters();
+}
+
+async function loadActivityFilterDropdowns() {
+  try {
+    let empList = [];
+    if (Array.isArray(window.ALL_EMPLOYEES_CACHE) && window.ALL_EMPLOYEES_CACHE.length > 0) {
+      empList = window.ALL_EMPLOYEES_CACHE;
+    } else if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_employee?select=nip,nama_lengkap,jabatan,cabang,role_id&order=nama_lengkap.asc`, {
+        headers: {
+          "apikey": CONFIG.SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+        }
+      });
+      if (res.ok) {
+        empList = await res.json();
+        window.ALL_EMPLOYEES_CACHE = empList;
+      }
+    }
+    LAP_ACT_EMPLOYEES = empList || [];
+
+    const branchSet = new Set();
+    LAP_ACT_EMPLOYEES.forEach(e => {
+      if (e.cabang && e.cabang.trim() && e.cabang !== "-") branchSet.add(e.cabang.trim());
+    });
+
+    if (Array.isArray(MASTER_DEALER_PRIORITY_DATA)) {
+      MASTER_DEALER_PRIORITY_DATA.forEach(d => {
+        if (d.cabang && d.cabang.trim()) branchSet.add(d.cabang.trim());
+      });
+    }
+
+    const cabangSelect = document.getElementById("lap-act-filter-cabang");
+    if (cabangSelect) {
+      const sortedBranches = Array.from(branchSet).sort();
+      let optHtml = '<option value="ALL">Semua Cabang</option>';
+      sortedBranches.forEach(b => {
+        optHtml += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+      });
+      cabangSelect.innerHTML = optHtml;
+      cabangSelect.value = LAP_ACT_CABANG_FILTER;
+    }
+
+    populateActivityPicOptions();
+  } catch (err) {
+    console.warn("Gagal load filter dropdowns activity:", err);
+  }
+}
+
+function handleActivityCabangChange() {
+  const cabangSelect = document.getElementById("lap-act-filter-cabang");
+  if (cabangSelect) LAP_ACT_CABANG_FILTER = cabangSelect.value;
+  populateActivityPicOptions();
+  applyActivityFilters();
+}
+
+function populateActivityPicOptions() {
+  const picSelect = document.getElementById("lap-act-filter-pic");
+  if (!picSelect) return;
+
+  let pics = LAP_ACT_EMPLOYEES;
+  if (LAP_ACT_CABANG_FILTER && LAP_ACT_CABANG_FILTER !== "ALL") {
+    pics = pics.filter(e => String(e.cabang || "").trim().toLowerCase() === LAP_ACT_CABANG_FILTER.toLowerCase());
+  }
+
+  let optHtml = '<option value="ALL">Semua PIC</option>';
+  pics.forEach(p => {
+    const nama = p.nama_lengkap || p.nama || p.nip;
+    optHtml += `<option value="${p.nip}">${escapeHtml(nama)} (${escapeHtml(p.nip)})</option>`;
+  });
+  picSelect.innerHTML = optHtml;
+  picSelect.value = "ALL";
+  LAP_ACT_PIC_FILTER = "ALL";
+}
+
+async function fetchActivityReportData(forceRefresh = false) {
+  const refreshIcon = document.getElementById("lap-act-refresh-icon");
+  if (refreshIcon) refreshIcon.classList.add("fa-spin");
+
+  if (!supabaseClient) {
+    if (refreshIcon) refreshIcon.classList.remove("fa-spin");
+    return;
+  }
+
+  try {
+    const [resVisits, resOnb, resUnits, resDlr, resFac] = await Promise.all([
+      supabaseClient.from("tr_laporan_visit").select("*").order("created_at", { ascending: false }).limit(2000),
+      supabaseClient.from("tr_onboarding_log").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabaseClient.from("tr_visit_unit_check").select("*").limit(5000),
+      supabaseClient.from("m_dealer").select("dealer_id,dealer_name,cabang,status"),
+      supabaseClient.from("m_facility_unit").select("no_fasilitas,nopol,dealer_name,status_unit,cabang")
+    ]);
+
+    LAP_ACT_RAW_VISITS = resVisits.data || [];
+    LAP_ACT_RAW_ONBOARDINGS = resOnb.data || [];
+    LAP_ACT_RAW_UNIT_CHECKS = resUnits.data || [];
+    LAP_ACT_RAW_DEALERS = resDlr.data || [];
+    LAP_ACT_RAW_FACILITY_UNITS = resFac.data || [];
+
+    applyActivityFilters();
+  } catch (err) {
+    console.error("Gagal mengambil data laporan activity:", err);
+  } finally {
+    if (refreshIcon) refreshIcon.classList.remove("fa-spin");
+  }
+}
+
+function refreshActivityReportData() {
+  fetchActivityReportData(true);
+}
+
+function applyActivityFilters() {
+  const cabangSelect = document.getElementById("lap-act-filter-cabang");
+  const picSelect = document.getElementById("lap-act-filter-pic");
+  const startInput = document.getElementById("lap-act-start-date");
+  const endInput = document.getElementById("lap-act-end-date");
+
+  if (cabangSelect) LAP_ACT_CABANG_FILTER = cabangSelect.value;
+  if (picSelect) LAP_ACT_PIC_FILTER = picSelect.value;
+  if (startInput && startInput.value) LAP_ACT_START_DATE = startInput.value;
+  if (endInput && endInput.value) LAP_ACT_END_DATE = endInput.value;
+
+  // Build employee lookup
+  const empMap = {};
+  LAP_ACT_EMPLOYEES.forEach(e => {
+    empMap[e.nip] = e;
+  });
+
+  // Build dealer lookup
+  const dealerMap = {};
+  LAP_ACT_RAW_DEALERS.forEach(d => {
+    if (d.dealer_name) dealerMap[d.dealer_name.trim().toLowerCase()] = d;
+  });
+
+  // Filter Visits (Visit Mitra)
+  const filteredVisits = LAP_ACT_RAW_VISITS.filter(v => {
+    const vDateStr = getLocalDateString(new Date(v.created_at));
+    if (LAP_ACT_START_DATE && vDateStr < LAP_ACT_START_DATE) return false;
+    if (LAP_ACT_END_DATE && vDateStr > LAP_ACT_END_DATE) return false;
+
+    if (LAP_ACT_PIC_FILTER !== "ALL" && v.nip !== LAP_ACT_PIC_FILTER) return false;
+
+    if (LAP_ACT_CABANG_FILTER !== "ALL") {
+      const picCabang = (empMap[v.nip]?.cabang || "").trim().toLowerCase();
+      const dlrCabang = (dealerMap[(v.dealer_name || "").trim().toLowerCase()]?.cabang || "").trim().toLowerCase();
+      const targetCabang = LAP_ACT_CABANG_FILTER.toLowerCase();
+      if (picCabang !== targetCabang && dlrCabang !== targetCabang) return false;
+    }
+
+    return true;
+  });
+
+  // Filter Onboardings (Visit Calon Mitra)
+  const filteredOnboardings = LAP_ACT_RAW_ONBOARDINGS.filter(o => {
+    const oDateStr = getLocalDateString(new Date(o.created_at));
+    if (LAP_ACT_START_DATE && oDateStr < LAP_ACT_START_DATE) return false;
+    if (LAP_ACT_END_DATE && oDateStr > LAP_ACT_END_DATE) return false;
+
+    if (LAP_ACT_PIC_FILTER !== "ALL" && o.nip !== LAP_ACT_PIC_FILTER) return false;
+
+    if (LAP_ACT_CABANG_FILTER !== "ALL") {
+      const picCabang = (empMap[o.nip]?.cabang || "").trim().toLowerCase();
+      const oCabang = (o.cabang || "").trim().toLowerCase();
+      const targetCabang = LAP_ACT_CABANG_FILTER.toLowerCase();
+      if (picCabang !== targetCabang && oCabang !== targetCabang) return false;
+    }
+
+    return true;
+  });
+
+  // 1. SCORECARD: TOTAL KUNJUNGAN
+  const countVisits = filteredVisits.length;
+  const countOnb = filteredOnboardings.length;
+  const totalKunjungan = countVisits + countOnb;
+
+  const totalEl = document.getElementById("scorecard-total-kunjungan");
+  const bkVisitEl = document.getElementById("scorecard-breakdown-visit");
+  const bkOnbEl = document.getElementById("scorecard-breakdown-onb");
+  if (totalEl) totalEl.innerText = totalKunjungan;
+  if (bkVisitEl) bkVisitEl.innerText = `Mitra: ${countVisits}`;
+  if (bkOnbEl) bkOnbEl.innerText = `Calon Mitra: ${countOnb}`;
+
+  // 2. SCORECARD: JUMLAH MITRA TERKUNJUNGI & RASIO
+  const visitedMitraSet = new Set();
+  filteredVisits.forEach(v => {
+    if (v.dealer_name && v.dealer_name.trim()) {
+      visitedMitraSet.add(v.dealer_name.trim().toLowerCase());
+    }
+  });
+  const uniqueVisitedMitraCount = visitedMitraSet.size;
+
+  // Total active dealers in scope
+  const activeDealersInScope = LAP_ACT_RAW_DEALERS.filter(d => {
+    const st = String(d.status || "").toLowerCase();
+    const isActive = st !== "non-aktif" && !st.includes("tutup");
+    if (!isActive) return false;
+    if (LAP_ACT_CABANG_FILTER !== "ALL") {
+      return String(d.cabang || "").trim().toLowerCase() === LAP_ACT_CABANG_FILTER.toLowerCase();
+    }
+    return true;
+  });
+  const totalActiveDealers = activeDealersInScope.length || 0;
+  const ratioMitraPct = totalActiveDealers > 0 
+    ? ((uniqueVisitedMitraCount / totalActiveDealers) * 100).toFixed(1)
+    : 0;
+
+  const mitraCountEl = document.getElementById("scorecard-mitra-terkunjungi");
+  const mitraRatioEl = document.getElementById("scorecard-ratio-mitra");
+  if (mitraCountEl) mitraCountEl.innerText = uniqueVisitedMitraCount;
+  if (mitraRatioEl) mitraRatioEl.innerText = `${uniqueVisitedMitraCount} / ${totalActiveDealers} (${ratioMitraPct}%)`;
+
+  // 3. SCORECARD: JUMLAH UNIT FASILITAS TERKUNJUNGI (HASIL: UNIT TERLIHAT) & RASIO
+  const filteredVisitIdSet = new Set(filteredVisits.map(v => v.visit_id));
+  
+  const liveFacilityMap = {};
+  const liveUnitsInScope = LAP_ACT_RAW_FACILITY_UNITS.filter(u => {
+    const st = String(u.status_unit || "live").toLowerCase();
+    const isLive = !st || st.includes("live") || st.includes("aktif");
+    if (!isLive) return false;
+    if (LAP_ACT_CABANG_FILTER !== "ALL") {
+      const uCabang = (u.cabang || dealerMap[(u.dealer_name || "").trim().toLowerCase()]?.cabang || "").trim().toLowerCase();
+      if (uCabang && uCabang !== LAP_ACT_CABANG_FILTER.toLowerCase()) return false;
+    }
+    return true;
+  });
+  liveUnitsInScope.forEach(u => {
+    if (u.no_fasilitas) liveFacilityMap[u.no_fasilitas.trim().toLowerCase()] = u;
+    if (u.nopol) liveFacilityMap[u.nopol.trim().toLowerCase()] = u;
+  });
+
+  const uniqueVisibleUnitsSet = new Set();
+  LAP_ACT_RAW_UNIT_CHECKS.forEach(chk => {
+    if (!filteredVisitIdSet.has(chk.visit_id)) return;
+    const st = String(chk.status_keberadaan || "").toLowerCase();
+    const isVisible = st === "ya" || st.includes("terlihat");
+    if (!isVisible) return;
+
+    const noFas = (chk.no_fasilitas || "").trim().toLowerCase();
+    const nopol = (chk.nopol || "").trim().toLowerCase();
+    
+    const isLiveUnit = (noFas && liveFacilityMap[noFas]) || (nopol && liveFacilityMap[nopol]);
+    if (isLiveUnit) {
+      const unitKey = noFas || nopol;
+      if (unitKey) uniqueVisibleUnitsSet.add(unitKey);
+    }
+  });
+
+  const uniqueVisibleUnitsCount = uniqueVisibleUnitsSet.size;
+  const totalLiveUnits = liveUnitsInScope.length || 0;
+  const ratioUnitPct = totalLiveUnits > 0
+    ? ((uniqueVisibleUnitsCount / totalLiveUnits) * 100).toFixed(1)
+    : 0;
+
+  const unitCountEl = document.getElementById("scorecard-unit-terlihat");
+  const unitRatioEl = document.getElementById("scorecard-ratio-unit");
+  if (unitCountEl) unitCountEl.innerText = uniqueVisibleUnitsCount;
+  if (unitRatioEl) unitRatioEl.innerText = `${uniqueVisibleUnitsCount} / ${totalLiveUnits} (${ratioUnitPct}%)`;
+
+  // 4. RENDER MATRIX TABLE (HORIZONTALLY SCROLLABLE WITH STICKY LEFT COLUMN)
+  renderActivityDailyMatrix(filteredVisits, filteredOnboardings);
+
+  // 5. RENDER DRILL-DOWN ACTIVITY LIST
+  prepareActivityFilteredItems(filteredVisits, filteredOnboardings, empMap);
+}
+
+function renderActivityDailyMatrix(visits, onboardings) {
+  const thead = document.getElementById("lap-act-matrix-thead");
+  const tbody = document.getElementById("lap-act-matrix-tbody");
+  if (!thead || !tbody) return;
+
+  // Build dates between LAP_ACT_START_DATE and LAP_ACT_END_DATE
+  const dates = [];
+  const start = new Date(LAP_ACT_START_DATE);
+  const end = new Date(LAP_ACT_END_DATE);
+
+  if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+    const cur = new Date(start);
+    let countDays = 0;
+    while (cur <= end && countDays < 62) {
+      dates.push(getLocalDateString(cur));
+      cur.setDate(cur.getDate() + 1);
+      countDays++;
+    }
+  } else {
+    dates.push(getLocalDateString(new Date()));
+  }
+
+  // Count visits per date
+  const visitCounts = {};
+  const onbCounts = {};
+  dates.forEach(d => {
+    visitCounts[d] = 0;
+    onbCounts[d] = 0;
+  });
+
+  visits.forEach(v => {
+    const dStr = getLocalDateString(new Date(v.created_at));
+    if (visitCounts[dStr] !== undefined) visitCounts[dStr]++;
+  });
+
+  onboardings.forEach(o => {
+    const dStr = getLocalDateString(new Date(o.created_at));
+    if (onbCounts[dStr] !== undefined) onbCounts[dStr]++;
+  });
+
+  const dayNamesIndo = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const todayStr = getLocalDateString(new Date());
+
+  // 1. Build THEAD
+  let theadHtml = `
+    <tr>
+      <th class="sticky left-0 bg-slate-100 z-20 px-3.5 py-2.5 font-bold text-slate-700 text-xs border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[150px]">
+        Aktivitas
+      </th>
+  `;
+
+  dates.forEach(dStr => {
+    const d = new Date(dStr);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dayName = dayNamesIndo[d.getDay()];
+    const isToday = dStr === todayStr;
+
+    theadHtml += `
+      <th class="px-3 py-2 text-center font-bold text-slate-700 whitespace-nowrap min-w-[65px] border-r border-slate-100 ${isToday ? 'bg-teal-50 text-teal-900 border-teal-200' : ''}">
+        <div class="text-[11px] ${isToday ? 'font-extrabold text-teal-800' : ''}">${dd}/${mm}</div>
+        <div class="text-[9px] font-normal ${isToday ? 'text-teal-600 font-bold' : 'text-slate-400'}">${dayName}</div>
+      </th>
+    `;
+  });
+
+  theadHtml += `
+      <th class="px-4 py-2 text-center font-black text-teal-900 bg-teal-50/90 whitespace-nowrap min-w-[90px]">
+        <div class="text-[11px]">Total</div>
+        <div class="text-[9px] font-normal text-teal-700">Periode</div>
+      </th>
+    </tr>
+  `;
+  thead.innerHTML = theadHtml;
+
+  // 2. Build TBODY (3 Rows: Visit Mitra, Visit Calon Mitra, Total Kunjungan)
+  let totalAllVisits = 0;
+  let totalAllOnb = 0;
+
+  // Row 1: Visit Mitra
+  let row1Html = `
+    <tr class="hover:bg-slate-50/70 transition">
+      <td class="sticky left-0 bg-white z-10 px-3.5 py-2.5 font-bold text-slate-800 text-xs border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] whitespace-nowrap">
+        <div class="flex items-center space-x-2">
+          <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs shrink-0">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </div>
+          <span>Visit Mitra</span>
+        </div>
+      </td>
+  `;
+  dates.forEach(dStr => {
+    const c = visitCounts[dStr] || 0;
+    totalAllVisits += c;
+    const isToday = dStr === todayStr;
+    const cellClass = isToday ? 'bg-teal-50/30' : '';
+    const badge = c > 0
+      ? `<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[11px]">${c}</span>`
+      : `<span class="text-slate-300 font-mono text-[11px]">-</span>`;
+    row1Html += `<td class="px-3 py-2.5 text-center border-r border-slate-100 ${cellClass}">${badge}</td>`;
+  });
+  row1Html += `
+      <td class="px-4 py-2.5 text-center font-black text-blue-700 bg-blue-50/50">
+        <span class="px-2.5 py-0.5 rounded-full bg-blue-600 text-white font-black text-xs">${totalAllVisits}</span>
+      </td>
+    </tr>
+  `;
+
+  // Row 2: Visit Calon Mitra
+  let row2Html = `
+    <tr class="hover:bg-slate-50/70 transition">
+      <td class="sticky left-0 bg-white z-10 px-3.5 py-2.5 font-bold text-slate-800 text-xs border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] whitespace-nowrap">
+        <div class="flex items-center space-x-2">
+          <div class="w-6 h-6 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center text-xs shrink-0">
+            <i class="fa-solid fa-user-plus"></i>
+          </div>
+          <span>Visit Calon Mitra</span>
+        </div>
+      </td>
+  `;
+  dates.forEach(dStr => {
+    const c = onbCounts[dStr] || 0;
+    totalAllOnb += c;
+    const isToday = dStr === todayStr;
+    const cellClass = isToday ? 'bg-teal-50/30' : '';
+    const badge = c > 0
+      ? `<span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-bold text-[11px]">${c}</span>`
+      : `<span class="text-slate-300 font-mono text-[11px]">-</span>`;
+    row2Html += `<td class="px-3 py-2.5 text-center border-r border-slate-100 ${cellClass}">${badge}</td>`;
+  });
+  row2Html += `
+      <td class="px-4 py-2.5 text-center font-black text-teal-700 bg-teal-50/50">
+        <span class="px-2.5 py-0.5 rounded-full bg-teal-600 text-white font-black text-xs">${totalAllOnb}</span>
+      </td>
+    </tr>
+  `;
+
+  // Row 3: Total Kunjungan (Grand Total)
+  let grandTotal = totalAllVisits + totalAllOnb;
+  let row3Html = `
+    <tr class="bg-slate-50 font-extrabold border-t border-slate-200">
+      <td class="sticky left-0 bg-slate-100 z-10 px-3.5 py-2.5 font-black text-slate-900 text-xs border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] whitespace-nowrap">
+        <div class="flex items-center space-x-2">
+          <div class="w-6 h-6 rounded-lg bg-slate-800 text-white flex items-center justify-center text-xs shrink-0">
+            <i class="fa-solid fa-calculator"></i>
+          </div>
+          <span>Total Kunjungan</span>
+        </div>
+      </td>
+  `;
+  dates.forEach(dStr => {
+    const c = (visitCounts[dStr] || 0) + (onbCounts[dStr] || 0);
+    const isToday = dStr === todayStr;
+    const cellClass = isToday ? 'bg-teal-100/50' : '';
+    const badge = c > 0
+      ? `<span class="font-extrabold text-slate-900 text-xs">${c}</span>`
+      : `<span class="text-slate-300 font-mono text-[11px]">-</span>`;
+    row3Html += `<td class="px-3 py-2.5 text-center border-r border-slate-200 ${cellClass}">${badge}</td>`;
+  });
+  row3Html += `
+      <td class="px-4 py-2.5 text-center font-black text-white bg-teal-700">
+        <span class="text-sm font-black">${grandTotal}</span>
+      </td>
+    </tr>
+  `;
+
+  tbody.innerHTML = row1Html + row2Html + row3Html;
+}
+
+function prepareActivityFilteredItems(visits, onboardings, empMap) {
+  const list = [];
+
+  visits.forEach(v => {
+    const emp = empMap[v.nip] || {};
+    list.push({
+      id: v.visit_id,
+      type: "VISIT",
+      typeLabel: "Visit Mitra",
+      icon: "fa-clipboard-check",
+      iconColor: "text-blue-600 bg-blue-50 border-blue-200",
+      title: v.dealer_name || "Mitra",
+      picName: emp.nama_lengkap || emp.nama || v.nip,
+      picNip: v.nip,
+      picCabang: emp.cabang || "-",
+      notes: v.catatan_visit || v.tindak_lanjut_concern || "-",
+      createdAt: v.created_at,
+      dateObj: new Date(v.created_at),
+      photoUrl: v.showroom_photo_url || null
+    });
+  });
+
+  onboardings.forEach(o => {
+    const emp = empMap[o.nip] || {};
+    const parsed = typeof parseOnboardingRecord === "function" ? parseOnboardingRecord(o) : {};
+    const title = o.nama_usaha || o.nama_pemohon || parsed.namaUsaha || "Calon Mitra";
+    const photoUrl = o.selfie_photo_url || o.foto_showroom_url || null;
+
+    list.push({
+      id: o.onboarding_id,
+      type: "ONBOARDING",
+      typeLabel: "Visit Calon Mitra",
+      icon: "fa-user-plus",
+      iconColor: "text-teal-600 bg-teal-50 border-teal-200",
+      title: title,
+      picName: emp.nama_lengkap || emp.nama || o.nip,
+      picNip: o.nip,
+      picCabang: emp.cabang || o.cabang || "-",
+      notes: o.catatan || parsed.catatan || "-",
+      createdAt: o.created_at,
+      dateObj: new Date(o.created_at),
+      photoUrl: photoUrl
+    });
+  });
+
+  // Sort descending by created_at
+  list.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
+  LAP_ACT_FILTERED_ITEMS = list;
+
+  renderActivityDrilldownList();
+}
+
+function setActivityListTab(tab) {
+  LAP_ACT_LIST_TAB = tab;
+
+  const btnAll = document.getElementById("tab-act-all");
+  const btnVisit = document.getElementById("tab-act-visit");
+  const btnOnb = document.getElementById("tab-act-onb");
+
+  [
+    { el: btnAll, id: "ALL" },
+    { el: btnVisit, id: "VISIT" },
+    { el: btnOnb, id: "ONB" }
+  ].forEach(item => {
+    if (!item.el) return;
+    if (item.id === tab) {
+      item.el.className = "px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 text-white transition";
+    } else {
+      item.el.className = "px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
+    }
+  });
+
+  renderActivityDrilldownList();
+}
+
+function renderActivityDrilldownList() {
+  const container = document.getElementById("lap-act-cards-container");
+  const countEl = document.getElementById("lap-act-list-count");
+  if (!container) return;
+
+  let items = LAP_ACT_FILTERED_ITEMS;
+  if (LAP_ACT_LIST_TAB === "VISIT") {
+    items = items.filter(i => i.type === "VISIT");
+  } else if (LAP_ACT_LIST_TAB === "ONB") {
+    items = items.filter(i => i.type === "ONBOARDING");
+  }
+
+  if (countEl) countEl.innerText = `Menampilkan ${items.length} kunjungan`;
+
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="py-10 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+        <i class="fa-solid fa-folder-open text-2xl mb-2 text-slate-300 block"></i>
+        <p class="text-xs font-bold text-slate-600">Tidak ada data aktivitas</p>
+        <p class="text-[10px] text-slate-400 mt-0.5">Coba sesuaikan filter cabang, PIC, atau rentang tanggal</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = "";
+  items.slice(0, 50).forEach(item => {
+    const photoBadge = item.photoUrl
+      ? `<a href="${item.photoUrl}" target="_blank" class="w-10 h-10 rounded-xl overflow-hidden border border-slate-200 shrink-0 block hover:opacity-80 transition shadow-2xs">
+          <img src="${item.photoUrl}" alt="Bukti" class="w-full h-full object-cover" />
+         </a>`
+      : '';
+
+    html += `
+      <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition space-y-2">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-xl ${item.iconColor} border flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid ${item.icon}"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center space-x-1.5">
+                <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">${item.typeLabel}</span>
+                <span class="text-[9px] text-slate-400">•</span>
+                <span class="text-[9px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded">${item.picCabang}</span>
+              </div>
+              <h5 class="font-extrabold text-xs text-slate-900 truncate">${item.title}</h5>
+            </div>
+          </div>
+          ${photoBadge}
+        </div>
+
+        <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 flex items-center justify-between text-[10px]">
+          <div class="flex items-center space-x-1.5 text-slate-600 truncate">
+            <i class="fa-solid fa-user text-slate-400"></i>
+            <span class="font-bold text-slate-800">${item.picName}</span>
+            <span class="text-slate-400 font-mono">(${item.picNip})</span>
+          </div>
+          <div class="text-slate-400 shrink-0 font-medium ml-2">
+            ${formatDisplayDate(item.createdAt)}
+          </div>
+        </div>
+
+        ${item.notes && item.notes !== '-' ? `
+          <div class="text-[10px] text-slate-500 line-clamp-2 italic px-1">
+            "${item.notes}"
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+
+  if (items.length > 50) {
+    html += `
+      <div class="py-2.5 text-center text-[11px] text-slate-400 bg-slate-50 rounded-xl">
+        Menampilkan 50 data teratas dari total ${items.length} data. Saring filter tanggal untuk rincian lebih spesifik.
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
 }
 
 // =========================================================================

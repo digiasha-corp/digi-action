@@ -1,0 +1,202 @@
+<div class="space-y-4 pb-16">
+
+  <!-- 1. HEADER & FILTER SECTION -->
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 text-white flex items-center justify-center text-base shadow-sm">
+          <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div>
+          <h3 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">Laporan Activity</h3>
+          <p class="text-[10px] text-slate-400">Monitoring kunjungan mitra, calon mitra & fasilitas</p>
+        </div>
+      </div>
+      <button type="button" onclick="loadScreen('dashboard')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition" title="Kembali ke Dashboard">
+        <i class="fa-solid fa-xmark text-base"></i>
+      </button>
+    </div>
+
+    <!-- Filter Form Controls -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <!-- Filter Cabang -->
+      <div class="space-y-1">
+        <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+          <i class="fa-solid fa-building text-teal-600 mr-1"></i>Cabang
+        </label>
+        <select id="lap-act-filter-cabang" onchange="handleActivityCabangChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition outline-none">
+          <option value="ALL">Semua Cabang</option>
+        </select>
+      </div>
+
+      <!-- Filter PIC -->
+      <div class="space-y-1">
+        <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+          <i class="fa-solid fa-user text-teal-600 mr-1"></i>Field PIC
+        </label>
+        <select id="lap-act-filter-pic" onchange="applyActivityFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition outline-none">
+          <option value="ALL">Semua PIC</option>
+        </select>
+      </div>
+
+      <!-- Filter Date Range -->
+      <div class="space-y-1 sm:col-span-1">
+        <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+          <i class="fa-solid fa-calendar-days text-teal-600 mr-1"></i>Periode Tanggal
+        </label>
+        <div class="grid grid-cols-2 gap-1.5">
+          <input type="date" id="lap-act-start-date" onchange="applyActivityFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] font-bold text-slate-800 focus:bg-white focus:border-teal-500 outline-none" />
+          <input type="date" id="lap-act-end-date" onchange="applyActivityFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] font-bold text-slate-800 focus:bg-white focus:border-teal-500 outline-none" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Date Filter Presets -->
+    <div class="flex items-center justify-between pt-1 text-[11px]">
+      <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <button type="button" onclick="setActivityDatePreset('7_DAYS')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition whitespace-nowrap active:scale-95">
+          7 Hari
+        </button>
+        <button type="button" onclick="setActivityDatePreset('THIS_MONTH')" class="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold transition whitespace-nowrap active:scale-95">
+          Bulan Ini
+        </button>
+        <button type="button" onclick="setActivityDatePreset('30_DAYS')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition whitespace-nowrap active:scale-95">
+          30 Hari
+        </button>
+      </div>
+      <button type="button" onclick="refreshActivityReportData(true)" class="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold flex items-center space-x-1.5 shadow-xs transition active:scale-95 shrink-0">
+        <i class="fa-solid fa-arrows-rotate text-xs" id="lap-act-refresh-icon"></i>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. SUMMARY SCORECARDS (3 METRICS) -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    
+    <!-- Scorecard 1: Total Kunjungan -->
+    <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl p-4 shadow-sm relative overflow-hidden">
+      <div class="absolute -right-4 -bottom-4 text-white/10 text-7xl font-black pointer-events-none">
+        <i class="fa-solid fa-clipboard-check"></i>
+      </div>
+      <div class="relative z-10 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] uppercase font-extrabold tracking-wider bg-white/20 px-2 py-0.5 rounded-full">Total Kunjungan</span>
+          <i class="fa-solid fa-route text-white/80 text-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-3xl font-black tracking-tight" id="scorecard-total-kunjungan">0</h2>
+          <p class="text-[11px] text-blue-100 mt-0.5">Aktivitas visit mitra & calon mitra</p>
+        </div>
+        <div class="pt-2 border-t border-white/20 flex items-center justify-between text-[10px] text-blue-100 font-medium">
+          <span id="scorecard-breakdown-visit">Mitra: 0</span>
+          <span id="scorecard-breakdown-onb">Calon Mitra: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scorecard 2: Jumlah Mitra Terkunjungi & Rasio -->
+    <div class="bg-gradient-to-br from-teal-500 to-emerald-600 text-white rounded-3xl p-4 shadow-sm relative overflow-hidden">
+      <div class="absolute -right-4 -bottom-4 text-white/10 text-7xl font-black pointer-events-none">
+        <i class="fa-solid fa-handshake"></i>
+      </div>
+      <div class="relative z-10 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] uppercase font-extrabold tracking-wider bg-white/20 px-2 py-0.5 rounded-full">Mitra Terkunjungi</span>
+          <i class="fa-solid fa-store text-white/80 text-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-3xl font-black tracking-tight" id="scorecard-mitra-terkunjungi">0</h2>
+          <p class="text-[11px] text-teal-100 mt-0.5">Dealer unik yang telah dikunjungi</p>
+        </div>
+        <div class="pt-2 border-t border-white/20 flex items-center justify-between text-[10px] text-teal-100 font-medium">
+          <span>Rasio Cakupan:</span>
+          <span class="font-extrabold text-white" id="scorecard-ratio-mitra">0 / 0 (0%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scorecard 3: Jumlah Unit Fasilitas Terkunjungi (Hasil: Unit Terlihat) & Rasio -->
+    <div class="bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-3xl p-4 shadow-sm relative overflow-hidden">
+      <div class="absolute -right-4 -bottom-4 text-white/10 text-7xl font-black pointer-events-none">
+        <i class="fa-solid fa-car-side"></i>
+      </div>
+      <div class="relative z-10 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] uppercase font-extrabold tracking-wider bg-white/20 px-2 py-0.5 rounded-full">Unit Terlihat</span>
+          <i class="fa-solid fa-eye text-white/80 text-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-3xl font-black tracking-tight" id="scorecard-unit-terlihat">0</h2>
+          <p class="text-[11px] text-amber-100 mt-0.5">Fasilitas unik terverifikasi ada</p>
+        </div>
+        <div class="pt-2 border-t border-white/20 flex items-center justify-between text-[10px] text-amber-100 font-medium">
+          <span>Rasio Cakupan Unit:</span>
+          <span class="font-extrabold text-white" id="scorecard-ratio-unit">0 / 0 (0%)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3. DAILY ACTIVITY MATRIX SECTION (SCROLLABLE TABLE) -->
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center space-x-2">
+        <div class="w-2.5 h-4 bg-teal-600 rounded-full"></div>
+        <div>
+          <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider">Matriks Harian Kunjungan</h4>
+          <p class="text-[10px] text-slate-400">Tabel aktivitas per tanggal (geser ke samping untuk melihat seluruh hari)</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-1.5 text-[10px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-medium">
+        <i class="fa-solid fa-arrows-left-right text-slate-400"></i>
+        <span>Scroll horizontal aktif</span>
+      </div>
+    </div>
+
+    <!-- HORIZONTALLY SCROLLABLE TABLE CONTAINER WITH PINNED LEFT ACTIVITY COLUMN -->
+    <div class="w-full overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+      <table class="min-w-max w-full border-collapse text-left text-xs" id="lap-act-matrix-table">
+        <thead id="lap-act-matrix-thead" class="bg-slate-50 text-slate-700 border-b border-slate-200">
+          <!-- Dynamic Thead injected via JS -->
+        </thead>
+        <tbody id="lap-act-matrix-tbody" class="divide-y divide-slate-100 bg-white">
+          <tr>
+            <td colspan="5" class="py-8 text-center text-xs text-slate-400">
+              <i class="fa-solid fa-circle-notch fa-spin text-base block mb-1 text-teal-600"></i>
+              Menghitung matriks aktivitas...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4. LOG DRILL-DOWN / RINCIAN AKTIVITAS -->
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-2.5 h-4 bg-indigo-600 rounded-full"></div>
+        <div>
+          <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider">Daftar Aktivitas Terfilter</h4>
+          <p class="text-[10px] text-slate-400" id="lap-act-list-count">Menampilkan 0 kunjungan</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-1">
+        <button type="button" onclick="setActivityListTab('ALL')" id="tab-act-all" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 text-white transition">Semua</button>
+        <button type="button" onclick="setActivityListTab('VISIT')" id="tab-act-visit" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Mitra</button>
+        <button type="button" onclick="setActivityListTab('ONB')" id="tab-act-onb" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Calon Mitra</button>
+      </div>
+    </div>
+
+    <!-- Cards Container -->
+    <div class="space-y-2.5" id="lap-act-cards-container">
+      <div class="py-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base block mb-1 text-indigo-600"></i>
+        Memuat daftar rincian kunjungan...
+      </div>
+    </div>
+  </div>
+
+</div>
