@@ -134,8 +134,12 @@
         </h4>
         <p class="text-[10px] text-purple-700">Tentukan menu dan fitur yang dapat diakses oleh masing-masing Role</p>
       </div>
-      <div class="flex items-center space-x-2">
-        <button type="button" onclick="openAddRoleModal()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 transition shrink-0">
+      <div class="flex items-center space-x-2 flex-wrap gap-y-1.5">
+        <button type="button" onclick="openBulkAssignRoleModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 transition shrink-0">
+          <i class="fa-solid fa-layer-group text-xs"></i>
+          <span>Tambah Menu ke Banyak Role</span>
+        </button>
+        <button type="button" onclick="openAddRoleModal()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 transition shrink-0">
           <i class="fa-solid fa-plus text-xs"></i>
           <span>Tambah Role Baru</span>
         </button>
@@ -556,4 +560,70 @@
     </form>
   </div>
 </div>
+
+<!-- ================= MODAL TAMBAH MENU KE BANYAK ROLE SEKALIGUS ================= -->
+<div id="modal-bulk-assign-role" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div class="p-4 bg-indigo-700 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-sm">Tambah Menu ke Banyak Role Sekaligus</h4>
+          <p class="text-[10px] text-indigo-100">Pilih menu dan target role. Menu baru akan ditambahkan tanpa menghapus menu lama</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeBulkAssignRoleModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+
+    <form id="form-bulk-assign-role" onsubmit="handleApplyBulkRoleAssign(event)" class="p-4 flex-1 overflow-y-auto space-y-4 text-xs">
+      <!-- 1. PILIH ROLE TARGET -->
+      <div class="p-3.5 bg-indigo-50/50 border border-indigo-200 rounded-2xl space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-extrabold text-indigo-950 uppercase tracking-wider flex items-center">
+            <i class="fa-solid fa-users text-indigo-600 mr-1.5"></i>1. Pilih Target Role
+          </span>
+          <div class="flex items-center space-x-2 text-[10px] font-bold">
+            <button type="button" onclick="selectAllBulkRoles(true)" class="text-indigo-700 hover:text-indigo-900 hover:underline">Pilih Semua</button>
+            <span class="text-slate-300">|</span>
+            <button type="button" onclick="selectAllBulkRoles(false)" class="text-slate-500 hover:text-slate-700 hover:underline">Hapus Semua</button>
+          </div>
+        </div>
+        <p class="text-[10px] text-indigo-700">Pilih satu atau lebih role yang akan ditambahkan menu baru:</p>
+        <div id="bulk-roles-list-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- 2. PILIH MENU / MODUL YANG INGIN DITAMBAHKAN -->
+      <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-extrabold text-slate-900 uppercase tracking-wider flex items-center">
+            <i class="fa-solid fa-cubes text-purple-600 mr-1.5"></i>2. Pilih Menu / Modul yang Ditambahkan
+          </span>
+          <div class="flex items-center space-x-2 text-[10px] font-bold">
+            <button type="button" onclick="selectAllBulkModules(true)" class="text-purple-700 hover:text-purple-900 hover:underline">Pilih Semua</button>
+            <span class="text-slate-300">|</span>
+            <button type="button" onclick="selectAllBulkModules(false)" class="text-slate-500 hover:text-slate-700 hover:underline">Hapus Semua</button>
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-500">Menu yang dicentang akan otomatis ditambahkan ke role yang dipilih (jika role belum memilikinya):</p>
+        <div id="bulk-modules-list-container" class="space-y-3">
+          <!-- Rendered dynamically via JS per category -->
+        </div>
+      </div>
+
+      <!-- FOOTER SUBMIT -->
+      <div class="pt-3 border-t border-slate-200 flex space-x-2 sticky bottom-0 bg-white">
+        <button type="button" onclick="closeBulkAssignRoleModal()" class="w-1/3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-apply-bulk-assign" class="w-2/3 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow transition flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-plus-circle text-xs"></i>
+          <span>Terapkan Tambah Menu ke Role Terpilih</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 

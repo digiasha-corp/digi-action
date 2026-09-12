@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260912_v59";
+const APP_BUILD_VERSION = "20260912_v60";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -8816,6 +8816,161 @@ function renderModalModulesChecklist(selectedKeys = []) {
 function selectAllRoleModalModules(checked) {
   const cbs = document.querySelectorAll('input[name="modal_role_perm"]');
   cbs.forEach(cb => cb.checked = !!checked);
+}
+
+// ================= BULK ASSIGN MENU KE BANYAK ROLE =================
+function openBulkAssignRoleModal() {
+  const roleContainer = document.getElementById("bulk-roles-list-container");
+  const moduleContainer = document.getElementById("bulk-modules-list-container");
+  if (!roleContainer || !moduleContainer) return;
+
+  // 1. Render Roles Checkbox List
+  const roleKeys = Object.keys(ROLE_PERMISSIONS_STATE);
+  roleContainer.innerHTML = roleKeys.map(roleId => {
+    const role = ROLE_PERMISSIONS_STATE[roleId];
+    const permCount = (role.permissions || []).length;
+    return `
+      <label class="flex items-center space-x-2.5 p-2 bg-white rounded-xl border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/30 cursor-pointer transition select-none">
+        <input type="checkbox" name="bulk_target_role" value="${roleId}" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer" />
+        <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs shrink-0">
+          <i class="fa-solid ${role.icon || 'fa-user-gear'}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-1.5 flex-wrap">
+            <span class="text-xs font-bold text-slate-900 truncate">${role.name}</span>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold ${role.badgeBg || 'bg-slate-100 text-slate-700'}">${roleId}</span>
+          </div>
+          <span class="text-[10px] text-slate-400">${permCount} modul aktif saat ini</span>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  // 2. Render Modules Checkbox List per Kategori
+  const categories = ["Operasional Lapangan", "Presensi & Persetujuan", "Layanan & Support", "Administrasi & Sistem"];
+  moduleContainer.innerHTML = categories.map(cat => {
+    const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
+    if (catMods.length === 0) return "";
+
+    const itemsHtml = catMods.map(mod => {
+      return `
+        <label class="flex items-start space-x-2.5 p-2 bg-white hover:bg-purple-50/50 rounded-xl border border-slate-200 hover:border-purple-300 cursor-pointer transition select-none">
+          <input type="checkbox" name="bulk_target_module" value="${mod.key}" class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer" />
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
+              <span class="text-xs font-bold text-slate-800">${mod.title}</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
+          </div>
+        </label>
+      `;
+    }).join('');
+
+    return `
+      <div class="space-y-1.5">
+        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">${cat}</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const modal = document.getElementById("modal-bulk-assign-role");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeBulkAssignRoleModal() {
+  const modal = document.getElementById("modal-bulk-assign-role");
+  if (modal) modal.classList.add("hidden");
+}
+
+function selectAllBulkRoles(checked) {
+  const cbs = document.querySelectorAll('input[name="bulk_target_role"]');
+  cbs.forEach(cb => cb.checked = !!checked);
+}
+
+function selectAllBulkModules(checked) {
+  const cbs = document.querySelectorAll('input[name="bulk_target_module"]');
+  cbs.forEach(cb => cb.checked = !!checked);
+}
+
+async function handleApplyBulkRoleAssign(e) {
+  e.preventDefault();
+
+  const selectedRoleCbs = document.querySelectorAll('input[name="bulk_target_role"]:checked');
+  const selectedModuleCbs = document.querySelectorAll('input[name="bulk_target_module"]:checked');
+
+  const selectedRoleIds = Array.from(selectedRoleCbs).map(cb => cb.value);
+  const selectedModuleKeys = Array.from(selectedModuleCbs).map(cb => cb.value);
+
+  if (selectedRoleIds.length === 0) {
+    alert("Silakan pilih minimal 1 role tujuan!");
+    return;
+  }
+
+  if (selectedModuleKeys.length === 0) {
+    alert("Silakan pilih minimal 1 menu/modul yang ingin ditambahkan!");
+    return;
+  }
+
+  let totalNewAdded = 0;
+  const updatedRoles = [];
+
+  // Terapkan penambahan (additive: tidak menimpa, hanya menambahkan jika belum ada)
+  selectedRoleIds.forEach(roleId => {
+    if (!ROLE_PERMISSIONS_STATE[roleId]) return;
+    const currentPerms = Array.from(ROLE_PERMISSIONS_STATE[roleId].permissions || []);
+
+    selectedModuleKeys.forEach(modKey => {
+      if (!currentPerms.includes(modKey)) {
+        currentPerms.push(modKey);
+        totalNewAdded++;
+      }
+    });
+
+    ROLE_PERMISSIONS_STATE[roleId].permissions = currentPerms;
+    updatedRoles.push({
+      role_id: roleId,
+      role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
+      permission_keys: currentPerms,
+      updated_at: new Date().toISOString()
+    });
+  });
+
+  // Simpan ke localStorage
+  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+  // Simpan ke Supabase jika tersedia
+  if (supabaseClient && updatedRoles.length > 0) {
+    try {
+      await supabaseClient.from("m_role_permission").upsert(updatedRoles, { onConflict: "role_id" });
+    } catch (err) {
+      console.warn("Supabase upsert error on bulk role assign:", err);
+    }
+  }
+
+  // Jika role user yang sedang login terpengaruh, sync permissions dan update dashboard
+  if (CURRENT_USER) {
+    const uRole = CURRENT_USER.role || CURRENT_USER.role_id;
+    if (selectedRoleIds.includes(uRole) || selectedRoleIds.includes(CURRENT_USER.role_id)) {
+      const activeRoleId = CURRENT_USER.role_id || uRole;
+      if (ROLE_PERMISSIONS_STATE[activeRoleId]) {
+        CURRENT_USER.permissions = ROLE_PERMISSIONS_STATE[activeRoleId].permissions;
+        try {
+          localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+        } catch (err) {}
+        if (typeof initDashboard === "function") initDashboard();
+      }
+    }
+  }
+
+  closeBulkAssignRoleModal();
+  loadRolePermissionsSettings();
+  populateEmployeeRoleOptions();
+
+  showToast(`Berhasil menambahkan ${selectedModuleKeys.length} menu ke ${selectedRoleIds.length} role terpilih (${totalNewAdded} hak akses baru berhasil diberikan)!`, "success", 3000);
 }
 
 let ROLE_EDIT_MODE = "add"; // "add" | "edit"
