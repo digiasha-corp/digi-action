@@ -328,12 +328,51 @@ SELECT cron.schedule(
   $$SELECT recalculate_all_priorities()$$
 );
 
--- 4. PASTIKAN TABEL log_priority_daily DAPAT DIBACA OLEH ROLE ANON/AUTHENTICATED (RLS)
+-- 4. PASTIKAN TABEL log_priority_daily DAPAT DIBACA & DIUPDATE OLEH ROLE ANON/AUTHENTICATED (RLS)
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'log_priority_daily') THEN
     ALTER TABLE log_priority_daily ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Allow select log_priority_daily" ON log_priority_daily;
     CREATE POLICY "Allow select log_priority_daily" ON log_priority_daily FOR SELECT USING (true);
+
+    DROP POLICY IF EXISTS "Allow update log_priority_daily" ON log_priority_daily;
+    CREATE POLICY "Allow update log_priority_daily" ON log_priority_daily FOR UPDATE USING (true) WITH CHECK (true);
+
+    DROP POLICY IF EXISTS "Allow insert log_priority_daily" ON log_priority_daily;
+    CREATE POLICY "Allow insert log_priority_daily" ON log_priority_daily FOR INSERT WITH CHECK (true);
   END IF;
 END $$;
+
+-- 5. FUNCTION HELPER UNTUK UPDATE FOLLOW-UP (is_fu) DENGAN SECURITY DEFINER
+CREATE OR REPLACE FUNCTION mark_priority_fu(
+  p_entity_type TEXT,
+  p_entity_name_or_id TEXT,
+  p_nip TEXT,
+  p_visit_id TEXT,
+  p_log_date DATE DEFAULT CURRENT_DATE
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF UPPER(p_entity_type) = 'DEALER' THEN
+    UPDATE log_priority_daily
+    SET is_fu = true, fu_at = NOW(), fu_by = p_nip, fu_visit_id = p_visit_id
+    WHERE log_date = p_log_date
+      AND entity_type = 'DEALER'
+      AND (entity_name ILIKE '%' || p_entity_name_or_id || '%' OR entity_id = p_entity_name_or_id);
+  ELSIF UPPER(p_entity_type) = 'UNIT' THEN
+    UPDATE log_priority_daily
+    SET is_fu = true, fu_at = NOW(), fu_by = p_nip, fu_visit_id = p_visit_id
+    WHERE log_date = p_log_date
+      AND entity_type = 'UNIT'
+      AND (entity_id = p_entity_name_or_id OR entity_name ILIKE '%' || p_entity_name_or_id || '%');
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION mark_priority_fu TO anon, authenticated, service_role;
+
+

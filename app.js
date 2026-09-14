@@ -607,32 +607,42 @@ async function supabaseSubmitVisit(data) {
       for (const u of data.unit_check_list) {
         const isVisible = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
         if (isVisible && u.no_fasilitas) {
-          await supabaseClient.from("log_priority_daily")
-            .update({
-              is_fu: true,
-              fu_at: nowIso,
-              fu_by: resolvedNip,
-              fu_visit_id: visitId
-            })
-            .eq("log_date", todayDate)
-            .eq("entity_type", "UNIT")
-            .eq("entity_id", u.no_fasilitas);
+          try {
+            await supabaseClient.rpc("mark_priority_fu", {
+              p_entity_type: "UNIT",
+              p_entity_name_or_id: u.no_fasilitas,
+              p_nip: resolvedNip,
+              p_visit_id: visitId,
+              p_log_date: todayDate
+            });
+          } catch(e) {
+            await supabaseClient.from("log_priority_daily")
+              .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId })
+              .eq("log_date", todayDate)
+              .eq("entity_type", "UNIT")
+              .eq("entity_id", u.no_fasilitas);
+          }
         }
       }
     }
 
     // B. Update Dealer (Solve jika Kunjungan Showroom dan/atau Bertemu Owner)
     if (isDealerSolved) {
-      await supabaseClient.from("log_priority_daily")
-        .update({
-          is_fu: true,
-          fu_at: nowIso,
-          fu_by: resolvedNip,
-          fu_visit_id: visitId
-        })
-        .eq("log_date", todayDate)
-        .eq("entity_type", "DEALER")
-        .eq("entity_name", data.dealer_name);
+      try {
+        await supabaseClient.rpc("mark_priority_fu", {
+          p_entity_type: "DEALER",
+          p_entity_name_or_id: data.dealer_name,
+          p_nip: resolvedNip,
+          p_visit_id: visitId,
+          p_log_date: todayDate
+        });
+      } catch(e) {
+        await supabaseClient.from("log_priority_daily")
+          .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId })
+          .eq("log_date", todayDate)
+          .eq("entity_type", "DEALER")
+          .eq("entity_name", data.dealer_name);
+      }
     }
   } catch (asgErr) {
     console.warn("Auto-resolve assignment warning:", asgErr);
