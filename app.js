@@ -4721,6 +4721,33 @@ function setVisitStatusFilter(st) {
   renderPriorityList();
 }
 
+let PRIORITY_SEARCH_QUERY = "";
+
+function onPrioritySearchInput(val) {
+  PRIORITY_SEARCH_QUERY = String(val || "").trim().toLowerCase();
+  const clearBtn = document.getElementById("priority-search-clear-btn");
+  if (clearBtn) {
+    if (PRIORITY_SEARCH_QUERY) {
+      clearBtn.classList.remove("hidden");
+    } else {
+      clearBtn.classList.add("hidden");
+    }
+  }
+  renderPriorityList();
+}
+
+function clearPrioritySearch() {
+  PRIORITY_SEARCH_QUERY = "";
+  const input = document.getElementById("priority-search-input");
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  const clearBtn = document.getElementById("priority-search-clear-btn");
+  if (clearBtn) clearBtn.classList.add("hidden");
+  renderPriorityList();
+}
+
 function setPriorityFilter(lvl) {
   PRIORITY_ACTIVE_FILTER = lvl;
   document.querySelectorAll('#p-filter-all, #p-filter-sp, #p-filter-p, #p-filter-m').forEach(b => {
@@ -4847,19 +4874,59 @@ function renderPriorityList() {
     computedList = computedList.filter(d => d.level !== "Normal" && d.level !== "NORMAL" && (d.score || 0) > 0);
   }
 
+  // 3. Filter Pencarian Teks (Berdasarkan Nama Mitra atau Nopol Unit Kendaraan)
+  if (PRIORITY_SEARCH_QUERY) {
+    const q = PRIORITY_SEARCH_QUERY.trim().toLowerCase();
+    const qClean = q.replace(/[\s\-_.]/g, "");
+    computedList = computedList.filter(d => {
+      // A. Cek Nama Dealer & Cabang
+      const dName = String(d.dealer_name || "").toLowerCase();
+      const dBranch = String(d.cabang || "").toLowerCase();
+      if (dName.includes(q) || dBranch.includes(q)) return true;
+
+      // B. Cek Nopol Kendaraan atau Nama Unit di seluruh unit mitra ini
+      if (Array.isArray(d.units) && d.units.length > 0) {
+        return d.units.some(u => {
+          const nopolRaw = String(u.nopol || "").toLowerCase();
+          const nopolClean = nopolRaw.replace(/[\s\-_.]/g, "");
+          const unitDesc = String(u.unit || "").toLowerCase();
+          const noFas = String(u.no_fasilitas || "").toLowerCase();
+          return (
+            (qClean && nopolClean.includes(qClean)) ||
+            nopolRaw.includes(q) ||
+            unitDesc.includes(q) ||
+            noFas.includes(q)
+          );
+        });
+      }
+
+      return false;
+    });
+  }
+
   if (computedList.length === 0) {
-    const filterText = PRIORITY_ACTIVE_FILTER === "ALL" ? "Prioritas Kunjungan Aktif" : `Level "${PRIORITY_ACTIVE_FILTER}"`;
+    const isSearching = !!PRIORITY_SEARCH_QUERY;
+    const filterText = isSearching 
+      ? `Pencarian "${PRIORITY_SEARCH_QUERY}"` 
+      : (PRIORITY_ACTIVE_FILTER === "ALL" ? "Prioritas Kunjungan Aktif" : `Level "${PRIORITY_ACTIVE_FILTER}"`);
     container.innerHTML = `
       <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-2">
-        <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mx-auto mb-1">
-          <i class="fa-solid fa-circle-check"></i>
+        <div class="w-12 h-12 rounded-2xl ${isSearching ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'} flex items-center justify-center text-xl mx-auto mb-1">
+          <i class="fa-solid ${isSearching ? 'fa-magnifying-glass' : 'fa-circle-check'}"></i>
         </div>
-        <p class="font-bold text-sm text-slate-800">Tidak ada data untuk ${filterText}</p>
-        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">Semua mitra saat ini dalam kondisi normal dan terjadwal dengan baik.</p>
-        <button type="button" onclick="refreshPriorityData(this)" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
-          <i class="fa-solid fa-arrows-rotate"></i>
-          <span>Muat Ulang Data</span>
-        </button>
+        <p class="font-bold text-sm text-slate-800">Tidak ada hasil untuk ${filterText}</p>
+        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">${isSearching ? 'Coba periksa kembali ejaan nama mitra atau nopol kendaraan.' : 'Semua mitra saat ini dalam kondisi normal dan terjadwal dengan baik.'}</p>
+        ${isSearching ? `
+          <button type="button" onclick="clearPrioritySearch()" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-xmark"></i>
+            <span>Reset Pencarian</span>
+          </button>
+        ` : `
+          <button type="button" onclick="refreshPriorityData(this)" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Muat Ulang Data</span>
+          </button>
+        `}
       </div>
     `;
     return;
@@ -4893,6 +4960,20 @@ function renderPriorityList() {
       ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1 text-[7px]"></i>Concern Unit</span>` 
       : ``;
 
+    // Cek apakah ada unit yang cocok dengan query pencarian nopol
+    let matchedUnitBadge = "";
+    if (PRIORITY_SEARCH_QUERY && Array.isArray(d.units)) {
+      const qClean = PRIORITY_SEARCH_QUERY.replace(/[\s\-_.]/g, "");
+      const matchedUnit = d.units.find(u => {
+        const nopolClean = String(u.nopol || "").toLowerCase().replace(/[\s\-_.]/g, "");
+        const nopolRaw = String(u.nopol || "").toLowerCase();
+        return (qClean && nopolClean.includes(qClean)) || nopolRaw.includes(PRIORITY_SEARCH_QUERY);
+      });
+      if (matchedUnit) {
+        matchedUnitBadge = `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-car mr-1 text-[7px]"></i>${matchedUnit.nopol}</span>`;
+      }
+    }
+
     const visitActionBtn = d.visitedToday
       ? `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Kunjungi Ulang Showroom Ini" class="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition flex items-center space-x-1">
           <i class="fa-solid fa-rotate-right text-[9px]"></i>
@@ -4918,6 +4999,7 @@ function renderPriorityList() {
           ${statusPill}
           ${hasDealerConcernPill}
           ${hasUnitConcernPill}
+          ${matchedUnitBadge}
           ${liveUnitsCount > 0 ? `<span class="text-[9px] text-slate-400 font-medium">• ${liveUnitsCount} Unit</span>` : ''}
         </div>
       </div>

@@ -16,6 +16,28 @@
   </div>
 
 
+  <!-- Search Filter: Nama Mitra & Nopol Kendaraan -->
+  <div class="relative">
+    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+    <input
+      type="text"
+      id="priority-search-input"
+      placeholder="Cari nama mitra atau nopol kendaraan..."
+      autocomplete="off"
+      oninput="onPrioritySearchInput(this.value)"
+      class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none shadow-2xs"
+    />
+    <button
+      type="button"
+      id="priority-search-clear-btn"
+      onclick="clearPrioritySearch()"
+      class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1"
+      title="Bersihkan Pencarian"
+    >
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+
   <!-- Filter Level Urgensi -->
   <div class="flex space-x-1.5 text-xs font-bold">
     <button type="button" onclick="setPriorityFilter('ALL')" id="p-filter-all" class="flex-1 py-1.5 rounded-xl bg-slate-900 text-white shadow-xs">Semua Level</button>
