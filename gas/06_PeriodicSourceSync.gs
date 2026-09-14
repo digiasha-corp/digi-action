@@ -281,3 +281,19 @@ function syncAllSourcesPeriodically() {
     Logger.log("Error sync periodik: " + e.toString());
   }
 }
+
+/**
+ * 🚀 JALANKAN MANUAL / TEST KALKULASI PRIORITAS HARIAN (03:00 Pagi)
+ * Fungsi ini memicu stored procedure PostgreSQL 'recalculate_all_priorities' di Supabase
+ * yang secara otomatis mengevaluasi aging visit, status GPS, JTO, concern aktif,
+ * dan menyimpan snapshot target harian ke 'log_priority_daily'.
+ */
+function runDailyPriorityRecalculationNow() {
+  Logger.log("=== MEMULAI TEST KALKULASI PRIORITAS HARIAN (JAM 03:00) ===");
+  try {
+    callSupabaseRpc("recalculate_all_priorities", {});
+    Logger.log("=== KALKULASI PRIORITAS BERHASIL DIJALANKAN DI SUPABASE ===");
+  } catch (e) {
+    Logger.log("Error saat menjalankan kalkulasi prioritas: " + e.toString());
+  }
+}

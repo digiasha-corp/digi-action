@@ -543,9 +543,10 @@ async function supabaseSubmitVisit(data) {
         catatan_unit: `Indikasi: ${u.indikasi || '-'}; Info: ${(u.info_unit || []).join(', ')}; Plan: ${u.ovd_plan || '-'}; Komitmen: ${u.komitmen || '-'}`
       });
 
-      if (u.no_fasilitas) {
+      const isUnitTerlihat = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
+      if (u.no_fasilitas && isUnitTerlihat) {
         await supabaseClient.from("m_facility_unit")
-          .update({ last_visit_date: new Date().toISOString().slice(0, 10) })
+          .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_unit: 0 })
           .eq("no_fasilitas", u.no_fasilitas);
       }
     }
@@ -555,30 +556,45 @@ async function supabaseSubmitVisit(data) {
     }
   }
 
-  await supabaseClient.from("m_dealer")
-    .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_mitra: 0 })
-    .eq("dealer_name", data.dealer_name);
+  // Syarat Solve Prioritas & Concern Mitra:
+  // Kunjungan ke Showroom dan/atau Bertemu Owner
+  const isDealerSolved = (
+    String(data.lokasi || "").toLowerCase().includes("showroom") ||
+    data.bertemu_owner === "Ya" ||
+    String(data.bertemu_owner || "").toLowerCase() === "ya"
+  );
 
-  // Auto-resolve Open Assignments di t_assignment untuk Showroom ini & Unit yang dicek
+  if (isDealerSolved) {
+    await supabaseClient.from("m_dealer")
+      .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_mitra: 0 })
+      .eq("dealer_name", data.dealer_name);
+  }
+
+  // Auto-resolve Open Assignments di t_assignment
   try {
     const nowIso = new Date().toISOString();
     const resolvedNip = data.currentUser?.nip || "PIC-FIELD";
 
-    // 1. Resolve concern umum showroom
-    await supabaseClient.from("t_assignment")
-      .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
-      .eq("dealer_name", data.dealer_name)
-      .in("unit_fasilitas", ["Umum", "-", ""])
-      .eq("status", "OPEN");
+    // 1. Resolve concern umum showroom HANYA jika kunjungan ke Showroom dan/atau Bertemu Owner
+    if (isDealerSolved) {
+      await supabaseClient.from("t_assignment")
+        .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
+        .eq("dealer_name", data.dealer_name)
+        .in("unit_fasilitas", ["Umum", "-", ""])
+        .eq("status", "OPEN");
+    }
 
-    // 2. Resolve concern unit fasilitas yang diperiksa pada kunjungan ini
+    // 2. Resolve concern unit fasilitas HANYA jika hasil cek unit adalah 'Unit Terlihat'
     if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
-      const visitedNoFas = data.unit_check_list.map(u => u.no_fasilitas).filter(Boolean);
-      if (visitedNoFas.length > 0) {
+      const visibleNoFas = data.unit_check_list
+        .filter(u => u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"))
+        .map(u => u.no_fasilitas)
+        .filter(Boolean);
+      if (visibleNoFas.length > 0) {
         await supabaseClient.from("t_assignment")
           .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
           .eq("dealer_name", data.dealer_name)
-          .in("unit_fasilitas", visitedNoFas)
+          .in("unit_fasilitas", visibleNoFas)
           .eq("status", "OPEN");
       }
     }
@@ -6037,16 +6053,33 @@ async function handleFormSubmit(e) {
   waText += `• Catatan Visit: ${catatanVisit}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)},${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
 
   // Update State Lokal Secara Optimistis (Real-time Closed Loop)
+  const isMitraSolved = (
+    String(lokasi || "").toLowerCase().includes("showroom") ||
+    bertemuOwner === "Ya" ||
+    String(bertemuOwner || "").toLowerCase() === "ya"
+  );
   const targetDealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId || d.dealer_name === dealerName);
   if (targetDealer) {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
-    targetDealer.is_visited_today = true;
-    targetDealer.last_visit_date = todayStr;
-    targetDealer.aging_visit_mitra = 0;
-    targetDealer.dealer_concern = null;
-    if (targetDealer.units) {
-      targetDealer.units.forEach(u => u.unit_concern = null);
+    if (isMitraSolved) {
+      targetDealer.is_visited_today = true;
+      targetDealer.last_visit_date = todayStr;
+      targetDealer.aging_visit_mitra = 0;
+      targetDealer.dealer_concern = null;
+    }
+    if (targetDealer.units && Array.isArray(ACTIVE_UNITS_STATE)) {
+      ACTIVE_UNITS_STATE.forEach(checkedUnit => {
+        const isVisible = (checkedUnit.terlihat === "Ya" || String(checkedUnit.terlihat || "").toLowerCase().includes("terlihat"));
+        if (isVisible) {
+          const uObj = targetDealer.units.find(u => (checkedUnit.no_fasilitas && u.no_fasilitas === checkedUnit.no_fasilitas) || u.nopol === checkedUnit.nopol);
+          if (uObj) {
+            uObj.unit_concern = null;
+            uObj.last_visit_date = todayStr;
+            uObj.aging_visit_unit = 0;
+          }
+        }
+      });
     }
   }
 
