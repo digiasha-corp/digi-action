@@ -5571,7 +5571,7 @@ function filterDealerSearchOptions(query) {
 }
 
 function selectDealerFromSearch(dealerId) {
-  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
+  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId || item.dealer_name === dealerId);
   const input = document.getElementById("dealer-search-input");
   const sel = document.getElementById("input-dealer");
   const clearBtn = document.getElementById("dealer-search-clear-btn");
@@ -5579,12 +5579,48 @@ function selectDealerFromSearch(dealerId) {
 
   if (d && input && sel) {
     input.value = `${d.dealer_name} (${d.cabang || "-"})`;
+
+    // Pastikan option dealer_id tersedia di select
+    let opt = sel.querySelector(`option[value="${d.dealer_id}"]`);
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.value = d.dealer_id;
+      opt.innerText = `${d.dealer_name} (${d.cabang || "-"})`;
+      sel.appendChild(opt);
+    }
     sel.value = d.dealer_id;
+
     if (clearBtn) clearBtn.classList.remove("hidden");
     if (chevron) chevron.classList.add("hidden");
     closeDealerSearchDropdown();
-    onDealerSelected(dealerId);
+    onDealerSelected(d.dealer_id);
   }
+}
+
+function onDealerSearchInputBlur() {
+  setTimeout(() => {
+    const input = document.getElementById("dealer-search-input");
+    const sel = document.getElementById("input-dealer");
+    if (!input || !sel) return;
+    const val = input.value.trim().toLowerCase();
+    if (!val) {
+      sel.value = "";
+      onDealerSelected("");
+      return;
+    }
+    // Jika belum terpilih, auto-match dari teks yang diketik
+    if (!sel.value) {
+      const match = MASTER_DEALER_PRIORITY_DATA.find(d => {
+        const name = String(d.dealer_name || "").toLowerCase();
+        const full = `${name} (${String(d.cabang || '').toLowerCase()})`;
+        return full === val || name === val || full.includes(val) || val.includes(name);
+      });
+      if (match) {
+        selectDealerFromSearch(match.dealer_id);
+      }
+    }
+    closeDealerSearchDropdown();
+  }, 250);
 }
 
 function clearDealerSearchSelection() {
@@ -5979,8 +6015,36 @@ async function handleFormSubmit(e) {
   }
 
   const dealerSelect = document.getElementById("input-dealer");
-  const dealerId = dealerSelect.value;
-  const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text;
+  let dealerId = dealerSelect ? dealerSelect.value : "";
+  const searchInput = document.getElementById("dealer-search-input");
+  const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+  // Auto-resolve jika user mengetik nama mitra tapi select belum terikat
+  if (!dealerId && searchVal) {
+    const matched = MASTER_DEALER_PRIORITY_DATA.find(d => {
+      const dName = String(d.dealer_name || "").toLowerCase();
+      const dFull = `${dName} (${String(d.cabang || '').toLowerCase()})`;
+      return dFull === searchVal || dName === searchVal || dFull.includes(searchVal) || searchVal.includes(dName);
+    });
+    if (matched) {
+      dealerId = matched.dealer_id;
+      selectDealerFromSearch(matched.dealer_id);
+    }
+  }
+
+  if (!dealerId) {
+    alert("Silakan pilih Mitra Partner dari daftar pencarian terlebih dahulu!");
+    if (searchInput) {
+      searchInput.focus();
+      openDealerSearchDropdown();
+    }
+    return;
+  }
+
+  const selectedDealerObj = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId);
+  const dealerName = selectedDealerObj 
+    ? selectedDealerObj.dealer_name 
+    : (dealerSelect?.options[dealerSelect?.selectedIndex]?.text || searchInput?.value || "Unknown Dealer");
   const lokasi = document.querySelector('input[name="lokasi_visit"]:checked').value;
   const lokasiDetail = (lokasi === "Tempat Lainnya") ? document.getElementById("input-lokasi-lain").value : "Showroom";
   const bertemuOwner = document.querySelector('input[name="bertemu_owner"]:checked').value;
