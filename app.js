@@ -5645,14 +5645,13 @@ function onDealerSelected(dealerId) {
   const countBadge = document.getElementById("unit-count-badge");
   const boxConcern = document.getElementById("box-concern-prioritas");
   const textConcern = document.getElementById("text-concern-display");
-  const inputTindakLanjut = document.getElementById("input-tindak-lanjut-concern");
 
   container.innerHTML = "";
   ACTIVE_UNITS_STATE = [];
 
   const dealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId);
 
-  // 1. Evaluasi & Tampilkan Dynamic Concern Prioritas Box
+  // 1. Evaluasi & Tampilkan Dynamic Concern Prioritas Box (Reminder ke PIC)
   if (boxConcern && textConcern) {
     if (dealer) {
       const concernList = [];
@@ -5685,24 +5684,15 @@ function onDealerSelected(dealerId) {
         concernList.push(`⚠️ <strong>Pemicu Sistem Mitra:</strong> ${evalMitra.mitraReason}`);
       }
 
-      // Tampilkan atau sembunyikan kotak concern
+      // Tampilkan atau sembunyikan kotak reminder concern
       if (concernList.length > 0) {
         textConcern.innerHTML = concernList.join("\n\n");
         boxConcern.classList.remove("hidden");
-        if (inputTindakLanjut) inputTindakLanjut.required = true;
       } else {
         boxConcern.classList.add("hidden");
-        if (inputTindakLanjut) {
-          inputTindakLanjut.required = false;
-          inputTindakLanjut.value = "";
-        }
       }
     } else {
       boxConcern.classList.add("hidden");
-      if (inputTindakLanjut) {
-        inputTindakLanjut.required = false;
-        inputTindakLanjut.value = "";
-      }
     }
   }
 
@@ -5996,17 +5986,6 @@ async function handleFormSubmit(e) {
   const bertemuOwner = document.querySelector('input[name="bertemu_owner"]:checked').value;
   const ownerReason = (bertemuOwner === "Tidak") ? document.getElementById("input-owner-reason").value : "-";
 
-  // Tangkap Nilai Tindak Lanjut Concern Prioritas
-  const boxConcern = document.getElementById("box-concern-prioritas");
-  const tindakLanjutConcern = (!boxConcern || boxConcern.classList.contains("hidden")) 
-    ? "-" 
-    : (document.getElementById("input-tindak-lanjut-concern")?.value.trim() || "-");
-
-  if (boxConcern && !boxConcern.classList.contains("hidden") && tindakLanjutConcern === "-") {
-    alert("Wajib mengisi Tindak Lanjut / Hasil Pengecekan atas Concern Prioritas!");
-    return;
-  }
-
   let stock = "-";
   let sales = "-";
   let issueDigi = "-";
@@ -6024,10 +6003,6 @@ async function handleFormSubmit(e) {
   const catatanVisit = document.getElementById("input-catatan-visit").value.trim() || "-";
 
   let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi} (${lokasiDetail})\n*Bertemu Owner:* ${bertemuOwner}${bertemuOwner === 'Tidak' ? '(' + ownerReason + ')' : ''}\n`;
-  
-  if (tindakLanjutConcern !== "-") {
-    waText += `*TINDAK LANJUT CONCERN PRIORITAS:*\n${tindakLanjutConcern}\n\n`;
-  }
 
   if (lokasi === "Showroom") {
     waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
@@ -6095,7 +6070,7 @@ async function handleFormSubmit(e) {
     issue_internal: issueInternal,
     issue_komp: issueKomp,
     catatan_visit: catatanVisit,
-    tindak_lanjut_concern: tindakLanjutConcern,
+    tindak_lanjut_concern: "-",
     lat: CURRENT_USER_GEO.lat,
     long: CURRENT_USER_GEO.long,
     showroom_photo_base64: CURRENT_SHOWROOM_PHOTO_BASE64,
