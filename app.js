@@ -600,7 +600,7 @@ async function supabaseSubmitVisit(data) {
     }
 
     // 3. Update Status Follow Up (is_fu) di log_priority_daily
-    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayDate = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 
     // A. Update Unit yang Terlihat
     if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
@@ -621,25 +621,18 @@ async function supabaseSubmitVisit(data) {
       }
     }
 
-    // B. Update Dealer (Hanya jika dealer solved DAN tidak ada unit darurat yang 'Tidak Terlihat')
+    // B. Update Dealer (Solve jika Kunjungan Showroom dan/atau Bertemu Owner)
     if (isDealerSolved) {
-      const hasUnseenUnit = Array.isArray(data.unit_check_list) && data.unit_check_list.some(u => {
-        const isVis = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
-        return !isVis;
-      });
-
-      if (!hasUnseenUnit) {
-        await supabaseClient.from("log_priority_daily")
-          .update({
-            is_fu: true,
-            fu_at: nowIso,
-            fu_by: resolvedNip,
-            fu_visit_id: visitId
-          })
-          .eq("log_date", todayDate)
-          .eq("entity_type", "DEALER")
-          .eq("entity_name", data.dealer_name);
-      }
+      await supabaseClient.from("log_priority_daily")
+        .update({
+          is_fu: true,
+          fu_at: nowIso,
+          fu_by: resolvedNip,
+          fu_visit_id: visitId
+        })
+        .eq("log_date", todayDate)
+        .eq("entity_type", "DEALER")
+        .eq("entity_name", data.dealer_name);
     }
   } catch (asgErr) {
     console.warn("Auto-resolve assignment warning:", asgErr);
