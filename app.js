@@ -509,8 +509,6 @@ async function supabaseGetMasterData() {
     return s === "TERSEDIA" || s === "IDLE" || s === "READY";
   });
 
-  const assignments = resAssign.data || [];
-
   return {
     success: true,
     dealers,
