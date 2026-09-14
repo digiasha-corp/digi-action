@@ -14,6 +14,8 @@ DECLARE
   v_today DATE := CURRENT_DATE;
   v_units_updated INT := 0;
   v_dealers_updated INT := 0;
+  v_logs_inserted INT := 0;
+  v_log_error TEXT := NULL;
 BEGIN
 
   -- --------------------------------------------------------------------------
@@ -267,8 +269,11 @@ BEGIN
       FROM m_facility_unit u
       LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
       WHERE u.priority_score > 0;
+      -- Hitung jumlah snapshot yang berhasil tersimpan
+      SELECT COUNT(*) INTO v_logs_inserted FROM log_priority_daily WHERE log_date = v_today;
     END IF;
   EXCEPTION WHEN OTHERS THEN
+    v_log_error := SQLERRM;
     RAISE NOTICE 'Snapshot log_priority_daily notice: %', SQLERRM;
   END;
 
@@ -277,6 +282,8 @@ BEGIN
     'message', 'Kalkulasi prioritas Supabase selesai',
     'facility_units_updated', v_units_updated,
     'dealers_updated', v_dealers_updated,
+    'daily_logs_count', v_logs_inserted,
+    'log_error', v_log_error,
     'executed_at', NOW()
   );
 END;
@@ -320,3 +327,13 @@ SELECT cron.schedule(
   '0 20 * * *',
   $$SELECT recalculate_all_priorities()$$
 );
+
+-- 4. PASTIKAN TABEL log_priority_daily DAPAT DIBACA OLEH ROLE ANON/AUTHENTICATED (RLS)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'log_priority_daily') THEN
+    ALTER TABLE log_priority_daily ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Allow select log_priority_daily" ON log_priority_daily;
+    CREATE POLICY "Allow select log_priority_daily" ON log_priority_daily FOR SELECT USING (true);
+  END IF;
+END $$;
