@@ -223,7 +223,7 @@ BEGIN
   dealer_calc AS (
     SELECT 
       d.dealer_id,
-      GREATEST(0, (v_today - COALESCE(d.last_visit_date, d.join_date, v_today))) AS calc_aging_visit,
+      GREATEST(0, (v_today - COALESCE(d.last_visit_date, d.tanggal_kerjasama, d.created_at::DATE, v_today))) AS calc_aging_visit,
       c.concern_urgency,
       c.concern_note
     FROM m_dealer d
