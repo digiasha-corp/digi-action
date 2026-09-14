@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260914_v67";
+const APP_BUILD_VERSION = "20260914_v68";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -558,6 +558,33 @@ async function supabaseSubmitVisit(data) {
   await supabaseClient.from("m_dealer")
     .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_mitra: 0 })
     .eq("dealer_name", data.dealer_name);
+
+  // Auto-resolve Open Assignments di t_assignment untuk Showroom ini & Unit yang dicek
+  try {
+    const nowIso = new Date().toISOString();
+    const resolvedNip = data.currentUser?.nip || "PIC-FIELD";
+
+    // 1. Resolve concern umum showroom
+    await supabaseClient.from("t_assignment")
+      .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
+      .eq("dealer_name", data.dealer_name)
+      .in("unit_fasilitas", ["Umum", "-", ""])
+      .eq("status", "OPEN");
+
+    // 2. Resolve concern unit fasilitas yang diperiksa pada kunjungan ini
+    if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
+      const visitedNoFas = data.unit_check_list.map(u => u.no_fasilitas).filter(Boolean);
+      if (visitedNoFas.length > 0) {
+        await supabaseClient.from("t_assignment")
+          .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
+          .eq("dealer_name", data.dealer_name)
+          .in("unit_fasilitas", visitedNoFas)
+          .eq("status", "OPEN");
+      }
+    }
+  } catch (asgErr) {
+    console.warn("Auto-resolve assignment warning:", asgErr);
+  }
 
   return { success: true, visitId };
 }
@@ -4458,11 +4485,32 @@ function calculateUnitUrgency(u) {
     return { level: "Normal", score: 0, reason: `Status Kontrak Non-Eligible (${contractStatus || "Non-Live"})` };
   }
 
+  // Evaluasi pemicu sistem bawaan (aging / GPS / overdue / JTO)
+  let systemReason = "";
+  if (["Pelepasan", "Offline", "Baterai Lemah"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
+    systemReason = `Status GPS: ${gpsStatus}`;
+  } else if (agingVisit >= 22 && lifetime > 90) {
+    systemReason = `Aging Visit >= 22 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)`;
+  } else if (agingVisit >= 15 && nearJto) {
+    systemReason = `Aging Visit >= 15 hr (${agingVisit} hr) & Kondisi H-3 JTO`;
+  } else if (["Belum Lepas", "Belum Pasang", "Geser"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
+    systemReason = `Status GPS: ${gpsStatus}`;
+  } else if (agingVisit >= 3 && overdue >= 3) {
+    systemReason = `Aging Visit >= 3 hr (${agingVisit} hr) & Overdue >= 3 hr (${overdue} hr)`;
+  } else if (agingVisit >= 5 && nearJto) {
+    systemReason = `Aging Visit >= 5 hr (${agingVisit} hr) & Kondisi H-3 JTO`;
+  } else if (agingVisit >= 22) {
+    systemReason = `Aging Visit Unit >= 22 hr (${agingVisit} hr)`;
+  } else if (agingVisit >= 15) {
+    systemReason = `Aging Visit Unit >= 15 hr (${agingVisit} hr)`;
+  }
+
   // -------------------------------------------------------------
   // LEVEL 1: SANGAT PENTING (Score: 3)
   // -------------------------------------------------------------
   if (concernUrgency === "Sangat Penting") {
-    return { level: "Sangat Penting", score: 3, reason: `Assign Concern '${concernNote || "Sangat Penting"}'` };
+    const combinedReason = `Assign Concern '${concernNote || "Sangat Penting"}'` + (systemReason ? ` • ${systemReason}` : "");
+    return { level: "Sangat Penting", score: 3, reason: combinedReason };
   }
   if (["Pelepasan", "Offline", "Baterai Lemah"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
     return { level: "Sangat Penting", score: 3, reason: `Status GPS: ${gpsStatus}` };
@@ -4478,7 +4526,8 @@ function calculateUnitUrgency(u) {
   // LEVEL 2: PENTING (Score: 2)
   // -------------------------------------------------------------
   if (concernUrgency === "Penting") {
-    return { level: "Penting", score: 2, reason: `Assign Concern '${concernNote || "Penting"}'` };
+    const combinedReason = `Assign Concern '${concernNote || "Penting"}'` + (systemReason ? ` • ${systemReason}` : "");
+    return { level: "Penting", score: 2, reason: combinedReason };
   }
   if (["Belum Lepas", "Belum Pasang", "Geser"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
     return { level: "Penting", score: 2, reason: `Status GPS: ${gpsStatus}` };

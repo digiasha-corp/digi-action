@@ -228,6 +228,50 @@ BEGIN
 
   GET DIAGNOSTICS v_dealers_updated = ROW_COUNT;
 
+  -- --------------------------------------------------------------------------
+  -- C. SNAPSHOT HISTORIS HARIAN KE log_priority_daily (Time-Series Analytics)
+  -- --------------------------------------------------------------------------
+  BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'log_priority_daily') THEN
+      DELETE FROM log_priority_daily WHERE log_date = v_today;
+
+      -- Snapshot Mitra Dealer yang memiliki skor prioritas > 0
+      INSERT INTO log_priority_daily (
+        log_date, entity_type, entity_id, entity_name, cabang, priority_level, priority_score, priority_reason
+      )
+      SELECT 
+        v_today,
+        'DEALER',
+        d.dealer_id,
+        d.dealer_name,
+        d.cabang,
+        d.priority_level,
+        d.priority_score,
+        d.priority_reason
+      FROM m_dealer d
+      WHERE d.priority_score > 0;
+
+      -- Snapshot Unit Fasilitas yang memiliki skor prioritas > 0
+      INSERT INTO log_priority_daily (
+        log_date, entity_type, entity_id, entity_name, cabang, priority_level, priority_score, priority_reason
+      )
+      SELECT 
+        v_today,
+        'UNIT',
+        u.no_fasilitas,
+        u.nopol || ' (' || COALESCE(u.unit, '-') || ')',
+        COALESCE(d.cabang, '-'),
+        u.priority_level,
+        u.priority_score,
+        u.priority_reason
+      FROM m_facility_unit u
+      LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
+      WHERE u.priority_score > 0;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Snapshot log_priority_daily notice: %', SQLERRM;
+  END;
+
   RETURN json_build_object(
     'status', 'success',
     'message', 'Kalkulasi prioritas Supabase selesai',
