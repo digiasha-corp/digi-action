@@ -4880,17 +4880,6 @@ function renderPriorityList() {
       mitraLevel = level;
     }
 
-    return {
-      ...d,
-      ...clientCalc,
-      level: level,
-      score: score,
-      priority_level: level,
-      priority_score: score,
-      priority_reason: reason,
-      mitraLevel: mitraLevel,
-      mitraScore: isMitraUrgent ? (clientCalc.mitraScore || score) : 0,
-      urgentUnitsCount: urgentUnits,
     const visitedToday = isDealerVisitedToday(d);
     // Selesai HANYA jika sudah visit hari ini DAN tidak ada lagi unit mendesak yang belum selesai
     const isFullyDone = visitedToday && (urgentUnits === 0);
