@@ -405,13 +405,46 @@ async function supabaseLogin(identifier, password) {
 async function supabaseGetMasterData() {
   if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
 
-  const [resLoc, resDlr, resFac, resGps, resAssign] = await Promise.all([
+  const [resLoc, resDlr, resFac, resGps] = await Promise.all([
     supabaseClient.from("m_work_location").select("*"),
     supabaseClient.from("m_dealer").select("*").order("dealer_name"),
     supabaseClient.from("m_facility_unit").select("*").order("dealer_name"),
-    supabaseClient.from("m_gps_device").select("*"),
-    supabaseClient.from("t_assignment").select("*").eq("status", "OPEN")
+    supabaseClient.from("m_gps_device").select("*")
   ]);
+
+  // Ambil antrean tugas terpadu (t_priority_action) dengan fallback ke t_assignment
+  let assignments = [];
+  try {
+    const resAct = await supabaseClient
+      .from("t_priority_action")
+      .select("*")
+      .eq("is_fu", false)
+      .order("priority_score", { ascending: false })
+      .order("created_at", { ascending: true });
+
+    if (resAct.data && resAct.data.length > 0) {
+      assignments = resAct.data.map(a => ({
+        assignment_id: a.action_id,
+        dealer_name: a.entity_name,
+        unit_fasilitas: (a.entity_type === "DEALER") ? "Umum" : (a.entity_id || "Umum"),
+        urgency_level: a.priority_level,
+        instruksi: a.action_reason,
+        status: a.is_fu ? "RESOLVED" : "OPEN",
+        source: a.source,
+        created_at: a.created_at,
+        assigned_by: a.assigned_by
+      }));
+    } else {
+      const resAssignOld = await supabaseClient.from("t_assignment").select("*").eq("status", "OPEN");
+      assignments = resAssignOld.data || [];
+    }
+  } catch (errAct) {
+    console.warn("t_priority_action fetch fallback to t_assignment:", errAct);
+    try {
+      const resAssignOld = await supabaseClient.from("t_assignment").select("*").eq("status", "OPEN");
+      assignments = resAssignOld.data || [];
+    } catch (e) {}
+  }
 
   const workLocations = (resLoc.data || []).map(l => ({
     location_id: l.location_id,
@@ -599,7 +632,7 @@ async function supabaseSubmitVisit(data) {
       }
     }
 
-    // 3. Update Status Follow Up (is_fu) di log_priority_daily
+    // 3. Update Status Follow Up (is_fu) di t_priority_action & log_priority_daily
     const todayDate = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 
     // A. Update Unit yang Terlihat
@@ -616,9 +649,13 @@ async function supabaseSubmitVisit(data) {
               p_log_date: todayDate
             });
           } catch(e) {
+            await supabaseClient.from("t_priority_action")
+              .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId, updated_at: nowIso })
+              .eq("is_fu", false)
+              .eq("entity_type", "UNIT")
+              .eq("entity_id", u.no_fasilitas);
             await supabaseClient.from("log_priority_daily")
               .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId })
-              .eq("log_date", todayDate)
               .eq("entity_type", "UNIT")
               .eq("entity_id", u.no_fasilitas);
           }
@@ -637,9 +674,13 @@ async function supabaseSubmitVisit(data) {
           p_log_date: todayDate
         });
       } catch(e) {
+        await supabaseClient.from("t_priority_action")
+          .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId, updated_at: nowIso })
+          .eq("is_fu", false)
+          .eq("entity_type", "DEALER")
+          .eq("entity_name", data.dealer_name);
         await supabaseClient.from("log_priority_daily")
           .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId })
-          .eq("log_date", todayDate)
           .eq("entity_type", "DEALER")
           .eq("entity_name", data.dealer_name);
       }
@@ -1030,15 +1071,37 @@ async function supabaseSaveAssignment(data) {
   if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
 
   const assignId = `ASG-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-  await supabaseClient.from("t_assignment").insert([{
-    assignment_id: assignId,
-    supervisor_nip: data.assignedByUserId,
-    dealer_name: data.dealerName,
-    unit_fasilitas: data.unitFasilitas || "Umum",
-    urgency_level: data.urgencyLevel || "Penting",
-    instruksi: data.instruksi,
-    status: "OPEN"
-  }]);
+  const isDealer = !data.unitFasilitas || data.unitFasilitas === "Umum" || data.unitFasilitas === "-";
+
+  // 1. Simpan ke tabel terpadu t_priority_action
+  try {
+    await supabaseClient.from("t_priority_action").insert([{
+      source: "MANUAL_SUPERVISOR",
+      assigned_by: data.assignedByUserId || "SUPERVISOR",
+      entity_type: isDealer ? "DEALER" : "UNIT",
+      entity_id: isDealer ? null : data.unitFasilitas,
+      entity_name: data.dealerName,
+      priority_level: data.urgencyLevel || "Penting",
+      priority_score: (data.urgencyLevel === "Sangat Penting") ? 3 : ((data.urgencyLevel === "Penting") ? 2 : 1),
+      action_reason: data.instruksi,
+      is_fu: false
+    }]);
+  } catch (errAct) {
+    console.warn("Save to t_priority_action error:", errAct);
+  }
+
+  // 2. Dual-write ke t_assignment (backward compatibility)
+  try {
+    await supabaseClient.from("t_assignment").insert([{
+      assignment_id: assignId,
+      supervisor_nip: data.assignedByUserId,
+      dealer_name: data.dealerName,
+      unit_fasilitas: data.unitFasilitas || "Umum",
+      urgency_level: data.urgencyLevel || "Penting",
+      instruksi: data.instruksi,
+      status: "OPEN"
+    }]);
+  } catch (errAsg) {}
 
   return { success: true, assignId };
 }
@@ -5043,12 +5106,28 @@ function renderPriorityList() {
       return uContract.includes("LIVE");
     }).length;
 
+    // Indikator Usia Tiket / Durasi Menggantung SLA
+    let ticketAgePill = "";
+    const ticketDate = d.dealer_concern?.created_at || d.created_at;
+    if (ticketDate && !d.isFullyDone) {
+      const createdTime = new Date(ticketDate).getTime();
+      if (!isNaN(createdTime)) {
+        const diffDays = Math.floor((Date.now() - createdTime) / (1000 * 60 * 60 * 24));
+        if (diffDays >= 2) {
+          ticketAgePill = `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 shrink-0 inline-flex items-center" title="Tiket menggantung selama ${diffDays + 1} hari"><i class="fa-solid fa-hourglass-half mr-1 text-[7px]"></i>Hari ke-${diffDays + 1}</span>`;
+        } else if (diffDays === 1) {
+          ticketAgePill = `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0 inline-flex items-center" title="Tiket dibuat kemarin"><i class="fa-solid fa-clock mr-1 text-[7px]"></i>Kemarin</span>`;
+        }
+      }
+    }
+
     card.innerHTML = `
       <div class="min-w-0 flex-1">
         <h4 class="font-bold text-xs sm:text-sm text-slate-900 truncate leading-tight">${d.dealer_name}</h4>
         <div class="flex items-center space-x-1.5 flex-wrap gap-y-1 mt-1">
           <span class="text-[10px] text-slate-500 font-medium">${d.cabang || "-"}</span>
           <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
+          ${ticketAgePill}
           ${statusPill}
           ${hasDealerConcernPill}
           ${hasUnitConcernPill}
