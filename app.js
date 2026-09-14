@@ -4909,15 +4909,10 @@ function renderPriorityList() {
     return (Number(b.aging_visit_mitra || 0)) - (Number(a.aging_visit_mitra || 0));
   });
 
-  // 1. Filter Status Kunjungan (Hanya aktif jika TIDAK sedang mencari teks tertentu)
+  // 1. Filter Status Kunjungan: Tampilkan prioritas yang belum tuntas (belum dikunjungi atau masih ada unit belum clear)
+  // Jika sedang mencari teks (nama mitra / nopol), jangan sembunyikan agar hasil pencarian tetap ditemukan
   if (!PRIORITY_SEARCH_QUERY) {
-    if (PRIORITY_VISIT_STATUS_FILTER === "DONE") {
-      computedList = computedList.filter(d => d.isFullyDone);
-    } else if (PRIORITY_VISIT_STATUS_FILTER === "PENDING") {
-      // Pending: Belum dikunjungi hari ini ATAU kunjungan sudah selesai tapi masih ada unit darurat belum selesai
-      computedList = computedList.filter(d => !d.isFullyDone);
-    }
-    // Jika "ALL", tampilkan semua (baik pending maupun selesai)
+    computedList = computedList.filter(d => !d.isFullyDone);
   }
 
   // 2. Filter Level Urgensi (Hanya tampilkan mitra yang memiliki prioritas: Sangat Penting, Penting, Moderat)
