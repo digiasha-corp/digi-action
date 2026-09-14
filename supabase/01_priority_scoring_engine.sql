@@ -51,8 +51,7 @@ BEGIN
       AND (
         c.unit_fasilitas_clean = 'UMUM' 
         OR c.unit_fasilitas_clean = '-'
-        OR REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean 
-        OR REGEXP_REPLACE(UPPER(TRIM(COALESCE(u.nopol, ''))), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
+        OR REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
       )
     ) AND c.rn = 1
   ),

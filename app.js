@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260914_v66";
+const APP_BUILD_VERSION = "20260914_v67";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1050,11 +1050,13 @@ async function syncMasterDataFromApi() {
       }
 
       // Hubungkan unit fasilitas dan assign concern ke masing-masing dealer
+      // Key unik mitra = Nama Dealer (dibersihkan dari suffix cabang)
+      // Key unik fasilitas/unit = No Fasilitas
       const normalizeDlr = (str) => String(str || "").replace(/\s*\([^)]*\)\s*$/, "").trim().toUpperCase();
-      const cleanPlate = (str) => String(str || "").replace(/[\s\-_.]/g, "").toUpperCase();
+      const cleanFas = (str) => String(str || "").replace(/[\s\-_.]/g, "").toUpperCase();
 
       const assignmentsByDealer = {};
-      const assignmentsByPlate = {};
+      const assignmentsByFasilitas = {};
 
       (APP_STATE.assignments || []).forEach(asg => {
         const rawD = String(asg.dealer_name || "").trim().toUpperCase();
@@ -1067,9 +1069,9 @@ async function syncMasterDataFromApi() {
           assignmentsByDealer[rawD].push(asg);
         }
 
-        const asgPlate = cleanPlate(asg.unit_fasilitas);
-        if (asgPlate && asgPlate !== "UMUM" && asgPlate !== "-") {
-          assignmentsByPlate[asgPlate] = asg;
+        const asgUnit = cleanFas(asg.unit_fasilitas);
+        if (asgUnit && asgUnit !== "UMUM" && asgUnit !== "-") {
+          assignmentsByFasilitas[asgUnit] = asg;
         }
       });
 
@@ -1098,17 +1100,16 @@ async function syncMasterDataFromApi() {
         // Ambil raw units untuk dealer ini
         const rawUnits = unitsByDealer[normD] || unitsByDealer[rawD] || [];
 
-        // Hubungkan unit_concern ke masing-masing unit fasilitas
+        // Hubungkan unit_concern ke masing-masing unit fasilitas HANYA berdasarkan No Fasilitas
         const dUnits = rawUnits.map(u => {
-          const uPlate = cleanPlate(u.nopol);
-          const uFas = cleanPlate(u.no_fasilitas);
+          const uFas = cleanFas(u.no_fasilitas);
 
-          const uAsg = assignmentsByPlate[uPlate] || assignmentsByPlate[uFas] || dAsg.find(a => {
-            const aPlate = cleanPlate(a.unit_fasilitas);
-            return aPlate && aPlate !== "UMUM" && aPlate !== "-" && (aPlate === uPlate || aPlate === uFas);
+          const uAsg = assignmentsByFasilitas[uFas] || dAsg.find(a => {
+            const aFas = cleanFas(a.unit_fasilitas);
+            return aFas && aFas !== "UMUM" && aFas !== "-" && aFas === uFas;
           }) || (APP_STATE.assignments || []).find(a => {
-            const aPlate = cleanPlate(a.unit_fasilitas);
-            return aPlate && aPlate !== "UMUM" && aPlate !== "-" && (aPlate === uPlate || aPlate === uFas);
+            const aFas = cleanFas(a.unit_fasilitas);
+            return aFas && aFas !== "UMUM" && aFas !== "-" && aFas === uFas;
           });
 
           return {
@@ -1119,8 +1120,8 @@ async function syncMasterDataFromApi() {
 
         // Dealer concern (Umum / Non-fasilitas)
         const dealerConcern = dAsg.find(a => {
-          const aPlate = cleanPlate(a.unit_fasilitas);
-          return !aPlate || aPlate === "UMUM" || aPlate === "-";
+          const aFas = cleanFas(a.unit_fasilitas);
+          return !aFas || aFas === "UMUM" || aFas === "-";
         });
 
         return {
@@ -4938,8 +4939,11 @@ function openFacilityDetailModal(dealerId) {
       itemCard.innerHTML = `
         <div class="flex justify-between items-start">
           <div class="min-w-0 flex-1">
-            <span class="font-bold text-slate-900 text-xs">${u.nopol}</span>
-            <p class="text-[11px] text-slate-600 truncate">${u.unit}</p>
+            <div class="flex items-center space-x-1.5 flex-wrap">
+              <span class="font-bold text-slate-900 text-xs">${u.nopol}</span>
+              <span class="text-[10px] text-purple-700 font-mono font-semibold px-1 py-0.2 bg-purple-50 rounded border border-purple-200">${u.no_fasilitas || "-"}</span>
+            </div>
+            <p class="text-[11px] text-slate-600 truncate mt-0.5">${u.unit}</p>
           </div>
           <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${urgencyPillStyles[uEval.level]} shrink-0">${uEval.level}</span>
         </div>
@@ -5165,8 +5169,8 @@ function onAssignDealerSelected(dealerId) {
   if (selectUnit) {
     ACTIVE_ASSIGN_ELIGIBLE_UNITS.forEach(u => {
       const opt = document.createElement("option");
-      opt.value = u.nopol;
-      opt.innerText = `${u.nopol} - ${u.unit || u.tipe_unit || "Kendaraan"}`;
+      opt.value = u.no_fasilitas; // Unique Key Fasilitas/Unit = No Fasilitas
+      opt.innerText = `${u.no_fasilitas} - ${u.nopol} (${u.unit || u.tipe_unit || "Kendaraan"})`;
       selectUnit.appendChild(opt);
     });
   }
@@ -5200,14 +5204,15 @@ function renderAssignUnitSearchDropdown(query = "") {
     dropdown.appendChild(defaultItem);
   }
 
-  // 2. Filter Unit Kendaraan Eligible
+  // 2. Filter Unit Kendaraan Eligible berdasarkan No Fasilitas & Info Unit
   const filtered = ACTIVE_ASSIGN_ELIGIBLE_UNITS.filter(u => {
     if (!q) return true;
+    const noFas = String(u.no_fasilitas || "").toLowerCase();
     const nopol = String(u.nopol || "").toLowerCase();
     const unitName = String(u.unit || u.tipe_unit || "").toLowerCase();
     const status = String(u.contract_status || u.status_kontrak || u.status || "").toLowerCase();
     const imei = String(u.imei_gps || u.imei || "").toLowerCase();
-    return nopol.includes(q) || unitName.includes(q) || status.includes(q) || imei.includes(q);
+    return noFas.includes(q) || nopol.includes(q) || unitName.includes(q) || status.includes(q) || imei.includes(q);
   });
 
   if (filtered.length === 0 && !isUmumMatch) {
@@ -5223,7 +5228,7 @@ function renderAssignUnitSearchDropdown(query = "") {
     item.className = "p-2.5 hover:bg-purple-50 cursor-pointer flex items-center justify-between gap-2 text-xs transition";
     item.onmousedown = (e) => {
       e.preventDefault();
-      selectAssignUnitFromSearch(u.nopol);
+      selectAssignUnitFromSearch(u.no_fasilitas); // Unique Key = No Fasilitas
     };
 
     const cStatus = String(u.contract_status || u.status_kontrak || u.status || "LIVE").trim().toUpperCase();
@@ -5237,8 +5242,9 @@ function renderAssignUnitSearchDropdown(query = "") {
 
     item.innerHTML = `
       <div class="min-w-0 flex-1">
-        <div class="font-bold text-slate-900 truncate">${u.nopol} - ${u.unit || u.tipe_unit || "Kendaraan"}</div>
-        <div class="text-[10px] text-slate-500 flex items-center space-x-1 mt-0.5 truncate">
+        <div class="font-bold text-slate-900 truncate"><span class="font-mono text-purple-700 font-semibold">${u.no_fasilitas}</span> • ${u.nopol}</div>
+        <div class="text-[11px] text-slate-600 truncate">${u.unit || u.tipe_unit || "Kendaraan"}</div>
+        <div class="text-[10px] text-slate-400 flex items-center space-x-1 mt-0.5 truncate">
           <span>Aging Visit: ${u.aging_visit_unit || u.aging_visit_days || 0} hr</span>
           <span>${gpsStatus}${ovdStatus}</span>
         </div>
@@ -5278,13 +5284,13 @@ function filterAssignUnitSearchOptions(query) {
   }
 }
 
-function selectAssignUnitFromSearch(nopol) {
+function selectAssignUnitFromSearch(noFasilitas) {
   const input = document.getElementById("assign-unit-search-input");
   const sel = document.getElementById("assign-select-unit");
   const clearBtn = document.getElementById("assign-unit-search-clear-btn");
   const chevron = document.getElementById("assign-unit-search-chevron");
 
-  if (nopol === "Umum" || !nopol) {
+  if (noFasilitas === "Umum" || !noFasilitas) {
     if (input) {
       input.value = "-- Umum (Seluruh Showroom / Non-Fasilitas) --";
     }
@@ -5292,10 +5298,10 @@ function selectAssignUnitFromSearch(nopol) {
     if (clearBtn) clearBtn.classList.add("hidden");
     if (chevron) chevron.classList.remove("hidden");
   } else {
-    const u = ACTIVE_ASSIGN_ELIGIBLE_UNITS.find(item => item.nopol === nopol);
+    const u = ACTIVE_ASSIGN_ELIGIBLE_UNITS.find(item => item.no_fasilitas === noFasilitas);
     if (u && input && sel) {
-      input.value = `${u.nopol} - ${u.unit || u.tipe_unit || "Kendaraan"}`;
-      sel.value = u.nopol;
+      input.value = `${u.no_fasilitas} - ${u.nopol} (${u.unit || u.tipe_unit || "Kendaraan"})`;
+      sel.value = u.no_fasilitas; // Value unik = No Fasilitas
       if (clearBtn) clearBtn.classList.remove("hidden");
       if (chevron) chevron.classList.add("hidden");
     }
@@ -5330,7 +5336,7 @@ async function handleAssignConcernSubmit(e) {
   const dealerId = document.getElementById("assign-select-dealer").value;
   const selectDealer = document.getElementById("assign-select-dealer");
   const rawDealerName = selectDealer?.selectedIndex >= 0 ? selectDealer.options[selectDealer.selectedIndex].text : "";
-  const unitVal = document.getElementById("assign-select-unit").value;
+  const unitVal = document.getElementById("assign-select-unit").value; // Menyimpan No Fasilitas atau "Umum"
   const concernText = document.getElementById("assign-input-concern").value.trim();
   const urgencyRadio = document.querySelector('input[name="assign_urgency"]:checked');
   const urgencyVal = urgencyRadio ? urgencyRadio.value : "Penting";
@@ -5349,7 +5355,7 @@ async function handleAssignConcernSubmit(e) {
       btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>Menyimpan Concern...';
     }
 
-    // 1. Simpan ke database Supabase
+    // 1. Simpan ke database Supabase (unit_fasilitas = No Fasilitas)
     await callApi("saveAssignment", {
       assignedByUserId: CURRENT_USER?.nip || "ADM",
       assignedByUserName: CURRENT_USER?.nama || "Supervisor",
@@ -5359,6 +5365,16 @@ async function handleAssignConcernSubmit(e) {
       urgencyLevel: urgencyVal,
       instruksi: concernText
     });
+
+    // Update in-memory dealer / unit concern berdasarkan No Fasilitas
+    if (d) {
+      if (unitVal === "Umum") {
+        d.dealer_concern = { urgency: urgencyVal, note: concernText };
+      } else {
+        const u = d.units?.find(unit => unit.no_fasilitas === unitVal);
+        if (u) u.unit_concern = { urgency: urgencyVal, note: concernText };
+      }
+    }
 
     // 2. Sinkronkan ulang data master agar concern langsung terhubung & prioritas langsung ter-update
     await syncMasterDataFromApi();
