@@ -288,14 +288,15 @@ BEGIN
       FROM m_dealer d
       WHERE d.priority_score > 0
     LOOP
-      -- Cek apakah sudah ada tiket aktif (is_fu = false) untuk dealer ini
+      -- Cek apakah sudah ada tiket otomatis aktif (is_fu = false) dari sistem untuk dealer ini
       IF EXISTS (
         SELECT 1 FROM t_priority_action 
         WHERE entity_type = 'DEALER' 
           AND (entity_id = rec.dealer_id OR LOWER(TRIM(entity_name)) = LOWER(TRIM(rec.dealer_name)))
           AND is_fu = false
+          AND source = 'AUTO_CALCULATE'
       ) THEN
-        -- JANGAN DUPLIKAT: Update skor & alasan terbaru, pertahankan created_at awal
+        -- JANGAN DUPLIKAT TIKET OTOMATIS: Update skor & alasan terbaru, pertahankan created_at awal
         UPDATE t_priority_action
         SET priority_level = rec.priority_level,
             priority_score = rec.priority_score,
@@ -304,9 +305,10 @@ BEGIN
             updated_at = NOW()
         WHERE entity_type = 'DEALER' 
           AND (entity_id = rec.dealer_id OR LOWER(TRIM(entity_name)) = LOWER(TRIM(rec.dealer_name)))
-          AND is_fu = false;
+          AND is_fu = false
+          AND source = 'AUTO_CALCULATE';
       ELSE
-        -- BUAT TIKET BARU: Karena belum pernah ada, atau tiket lama sudah selesai (is_fu = true)
+        -- BUAT TIKET BARU: Karena belum ada tiket otomatis sistem yang aktif
         INSERT INTO t_priority_action (
           source, assigned_by, entity_type, entity_id, entity_name, cabang,
           priority_level, priority_score, action_reason, is_fu, created_at, updated_at
@@ -331,14 +333,15 @@ BEGIN
       LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
       WHERE u.priority_score > 0
     LOOP
-      -- Cek apakah sudah ada tiket aktif (is_fu = false) untuk unit ini
+      -- Cek apakah sudah ada tiket otomatis aktif (is_fu = false) dari sistem untuk unit ini
       IF EXISTS (
         SELECT 1 FROM t_priority_action 
         WHERE entity_type = 'UNIT' 
           AND entity_id = rec.no_fasilitas
           AND is_fu = false
+          AND source = 'AUTO_CALCULATE'
       ) THEN
-        -- JANGAN DUPLIKAT: Update skor & alasan terbaru, pertahankan created_at awal
+        -- JANGAN DUPLIKAT TIKET OTOMATIS: Update skor & alasan terbaru, pertahankan created_at awal
         UPDATE t_priority_action
         SET priority_level = rec.priority_level,
             priority_score = rec.priority_score,
@@ -347,9 +350,10 @@ BEGIN
             updated_at = NOW()
         WHERE entity_type = 'UNIT' 
           AND entity_id = rec.no_fasilitas
-          AND is_fu = false;
+          AND is_fu = false
+          AND source = 'AUTO_CALCULATE';
       ELSE
-        -- BUAT TIKET BARU
+        -- BUAT TIKET BARU: Karena belum ada tiket otomatis sistem yang aktif untuk unit ini
         INSERT INTO t_priority_action (
           source, assigned_by, entity_type, entity_id, entity_name, cabang,
           priority_level, priority_score, action_reason, is_fu, created_at, updated_at
