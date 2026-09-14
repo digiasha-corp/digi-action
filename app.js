@@ -1050,6 +1050,43 @@ async function supabaseSaveAssignment(data) {
     throw error;
   }
 
+  // Real-time Update Status di Tabel Master (m_dealer & m_facility_unit)
+  try {
+    const score = (data.urgencyLevel === "Sangat Penting") ? 3 : ((data.urgencyLevel === "Penting") ? 2 : 1);
+    const nowIso = new Date().toISOString();
+
+    if (isDealer) {
+      await supabaseClient.from("m_dealer")
+        .update({
+          priority_level: data.urgencyLevel || "Penting",
+          priority_score: score,
+          priority_reason: `Concern Mitra: ${data.instruksi}`,
+          updated_at: nowIso
+        })
+        .eq("dealer_name", data.dealerName);
+    } else {
+      await supabaseClient.from("m_facility_unit")
+        .update({
+          priority_level: data.urgencyLevel || "Penting",
+          priority_score: score,
+          priority_reason: `Concern: ${data.instruksi}`,
+          updated_at: nowIso
+        })
+        .eq("no_fasilitas", data.unitFasilitas);
+
+      await supabaseClient.from("m_dealer")
+        .update({
+          priority_level: data.urgencyLevel || "Penting",
+          priority_score: score,
+          priority_reason: `Pemicu Unit: Concern: ${data.instruksi}`,
+          updated_at: nowIso
+        })
+        .eq("dealer_name", data.dealerName);
+    }
+  } catch (errMaster) {
+    console.warn("Update master priority columns warning:", errMaster);
+  }
+
   return { success: true, assignId };
 }
 
