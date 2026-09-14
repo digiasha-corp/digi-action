@@ -412,12 +412,13 @@ async function supabaseGetMasterData() {
     supabaseClient.from("m_gps_device").select("*")
   ]);
 
-  // Ambil antrean tugas terpadu dari t_priority_action
+  // Ambil antrean concern supervisor dari t_priority_action
   let assignments = [];
   try {
     const resAct = await supabaseClient
       .from("t_priority_action")
       .select("*")
+      .eq("source", "MANUAL_SUPERVISOR")
       .eq("is_fu", false)
       .order("priority_score", { ascending: false })
       .order("created_at", { ascending: true });
