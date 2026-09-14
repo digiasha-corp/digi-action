@@ -5034,15 +5034,10 @@ function renderPriorityList() {
           <i class="fa-solid fa-rotate-right text-[9px]"></i>
           <span>Re-visit</span>
         </button>`
-      : (d.hasUnresolvedUnits
-          ? `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Cek Ulang Unit Fasilitas" class="px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
-              <i class="fa-solid fa-car text-[9px]"></i>
-              <span>Cek Unit</span>
-            </button>`
-          : `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Lakukan Visit Sekarang" class="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
-              <i class="fa-solid fa-location-arrow text-[9px]"></i>
-              <span>Visit</span>
-            </button>`);
+      : `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Lakukan Visit Sekarang" class="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
+          <i class="fa-solid fa-location-arrow text-[9px]"></i>
+          <span>Visit</span>
+        </button>`;
 
     // Hitung jumlah unit berstatus LIVE saja untuk ditampilkan pada kartu score card
     const liveUnitsCount = (d.units || []).filter(u => {
