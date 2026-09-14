@@ -412,7 +412,7 @@ async function supabaseGetMasterData() {
     supabaseClient.from("m_gps_device").select("*")
   ]);
 
-  // Ambil antrean tugas terpadu (t_priority_action) dengan fallback ke t_assignment
+  // Ambil antrean tugas terpadu dari t_priority_action
   let assignments = [];
   try {
     const resAct = await supabaseClient
@@ -422,7 +422,7 @@ async function supabaseGetMasterData() {
       .order("priority_score", { ascending: false })
       .order("created_at", { ascending: true });
 
-    if (resAct.data && resAct.data.length > 0) {
+    if (resAct.data) {
       assignments = resAct.data.map(a => ({
         assignment_id: a.action_id,
         dealer_name: a.entity_name,
@@ -434,16 +434,9 @@ async function supabaseGetMasterData() {
         created_at: a.created_at,
         assigned_by: a.assigned_by
       }));
-    } else {
-      const resAssignOld = await supabaseClient.from("t_assignment").select("*").eq("status", "OPEN");
-      assignments = resAssignOld.data || [];
     }
   } catch (errAct) {
-    console.warn("t_priority_action fetch fallback to t_assignment:", errAct);
-    try {
-      const resAssignOld = await supabaseClient.from("t_assignment").select("*").eq("status", "OPEN");
-      assignments = resAssignOld.data || [];
-    } catch (e) {}
+    console.warn("t_priority_action fetch error:", errAct);
   }
 
   const workLocations = (resLoc.data || []).map(l => ({
@@ -603,39 +596,32 @@ async function supabaseSubmitVisit(data) {
       .eq("dealer_name", data.dealer_name);
   }
 
-  // Auto-resolve Open Assignments di t_assignment
+  // Auto-resolve Tiket di t_priority_action
   try {
     const nowIso = new Date().toISOString();
     const resolvedNip = data.currentUser?.nip || "PIC-FIELD";
+    const todayDate = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 
-    // 1. Resolve concern umum showroom HANYA jika kunjungan ke Showroom dan/atau Bertemu Owner
+    // 1. Resolve Tiket Dealer (Jika Kunjungan Showroom dan/atau Bertemu Owner)
     if (isDealerSolved) {
-      await supabaseClient.from("t_assignment")
-        .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
-        .eq("dealer_name", data.dealer_name)
-        .in("unit_fasilitas", ["Umum", "-", ""])
-        .eq("status", "OPEN");
-    }
-
-    // 2. Resolve concern unit fasilitas HANYA jika hasil cek unit adalah 'Unit Terlihat'
-    if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
-      const visibleNoFas = data.unit_check_list
-        .filter(u => u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"))
-        .map(u => u.no_fasilitas)
-        .filter(Boolean);
-      if (visibleNoFas.length > 0) {
-        await supabaseClient.from("t_assignment")
-          .update({ status: "RESOLVED", resolved_at: nowIso, resolved_by: resolvedNip })
-          .eq("dealer_name", data.dealer_name)
-          .in("unit_fasilitas", visibleNoFas)
-          .eq("status", "OPEN");
+      try {
+        await supabaseClient.rpc("mark_priority_fu", {
+          p_entity_type: "DEALER",
+          p_entity_name_or_id: data.dealer_name,
+          p_nip: resolvedNip,
+          p_visit_id: visitId,
+          p_log_date: todayDate
+        });
+      } catch(e) {
+        await supabaseClient.from("t_priority_action")
+          .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId, updated_at: nowIso })
+          .eq("is_fu", false)
+          .eq("entity_type", "DEALER")
+          .eq("entity_name", data.dealer_name);
       }
     }
 
-    // 3. Update Status Follow Up (is_fu) di t_priority_action & log_priority_daily
-    const todayDate = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-
-    // A. Update Unit yang Terlihat
+    // 2. Resolve Tiket Unit Fasilitas (Jika hasil cek 'Ya, Terlihat')
     if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
       for (const u of data.unit_check_list) {
         const isVisible = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
@@ -654,39 +640,12 @@ async function supabaseSubmitVisit(data) {
               .eq("is_fu", false)
               .eq("entity_type", "UNIT")
               .eq("entity_id", u.no_fasilitas);
-            await supabaseClient.from("log_priority_daily")
-              .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId })
-              .eq("entity_type", "UNIT")
-              .eq("entity_id", u.no_fasilitas);
           }
         }
       }
     }
-
-    // B. Update Dealer (Solve jika Kunjungan Showroom dan/atau Bertemu Owner)
-    if (isDealerSolved) {
-      try {
-        await supabaseClient.rpc("mark_priority_fu", {
-          p_entity_type: "DEALER",
-          p_entity_name_or_id: data.dealer_name,
-          p_nip: resolvedNip,
-          p_visit_id: visitId,
-          p_log_date: todayDate
-        });
-      } catch(e) {
-        await supabaseClient.from("t_priority_action")
-          .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId, updated_at: nowIso })
-          .eq("is_fu", false)
-          .eq("entity_type", "DEALER")
-          .eq("entity_name", data.dealer_name);
-        await supabaseClient.from("log_priority_daily")
-          .update({ is_fu: true, fu_at: nowIso, fu_by: resolvedNip, fu_visit_id: visitId })
-          .eq("entity_type", "DEALER")
-          .eq("entity_name", data.dealer_name);
-      }
-    }
   } catch (asgErr) {
-    console.warn("Auto-resolve assignment warning:", asgErr);
+    console.warn("Auto-resolve t_priority_action warning:", asgErr);
   }
 
   return { success: true, visitId };
@@ -1073,35 +1032,23 @@ async function supabaseSaveAssignment(data) {
   const assignId = `ASG-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const isDealer = !data.unitFasilitas || data.unitFasilitas === "Umum" || data.unitFasilitas === "-";
 
-  // 1. Simpan ke tabel terpadu t_priority_action
-  try {
-    await supabaseClient.from("t_priority_action").insert([{
-      source: "MANUAL_SUPERVISOR",
-      assigned_by: data.assignedByUserId || "SUPERVISOR",
-      entity_type: isDealer ? "DEALER" : "UNIT",
-      entity_id: isDealer ? null : data.unitFasilitas,
-      entity_name: data.dealerName,
-      priority_level: data.urgencyLevel || "Penting",
-      priority_score: (data.urgencyLevel === "Sangat Penting") ? 3 : ((data.urgencyLevel === "Penting") ? 2 : 1),
-      action_reason: data.instruksi,
-      is_fu: false
-    }]);
-  } catch (errAct) {
-    console.warn("Save to t_priority_action error:", errAct);
-  }
+  // Simpan ke tabel terpadu t_priority_action
+  const { error } = await supabaseClient.from("t_priority_action").insert([{
+    source: "MANUAL_SUPERVISOR",
+    assigned_by: data.assignedByUserId || "SUPERVISOR",
+    entity_type: isDealer ? "DEALER" : "UNIT",
+    entity_id: isDealer ? null : data.unitFasilitas,
+    entity_name: data.dealerName,
+    priority_level: data.urgencyLevel || "Penting",
+    priority_score: (data.urgencyLevel === "Sangat Penting") ? 3 : ((data.urgencyLevel === "Penting") ? 2 : 1),
+    action_reason: data.instruksi,
+    is_fu: false
+  }]);
 
-  // 2. Dual-write ke t_assignment (backward compatibility)
-  try {
-    await supabaseClient.from("t_assignment").insert([{
-      assignment_id: assignId,
-      supervisor_nip: data.assignedByUserId,
-      dealer_name: data.dealerName,
-      unit_fasilitas: data.unitFasilitas || "Umum",
-      urgency_level: data.urgencyLevel || "Penting",
-      instruksi: data.instruksi,
-      status: "OPEN"
-    }]);
-  } catch (errAsg) {}
+  if (error) {
+    console.warn("Save t_priority_action error:", error);
+    throw error;
+  }
 
   return { success: true, assignId };
 }

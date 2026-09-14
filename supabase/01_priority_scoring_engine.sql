@@ -63,7 +63,7 @@ DECLARE
   v_today DATE := CURRENT_DATE;
   v_units_updated INT := 0;
   v_dealers_updated INT := 0;
-  v_logs_inserted INT := 0;
+  v_active_tasks INT := 0;
   v_log_error TEXT := NULL;
   rec RECORD;
 BEGIN
@@ -77,7 +77,7 @@ BEGIN
       -- 1. Hitung Aging Visit Unit (Hari ini - Last Visit / Lifetime)
       GREATEST(0, (v_today - COALESCE(u.last_visit_date, (v_today - (COALESCE(u.lifetime_days, 0) || ' days')::INTERVAL)::DATE, v_today))) AS calc_aging_visit,
       
-      -- 2. Ambil Concern Aktif dari t_priority_action (manual supervisor) atau t_assignment
+      -- 2. Ambil Concern Aktif dari t_priority_action (Manual Supervisor)
       c.concern_urgency,
       c.concern_note,
       
@@ -91,34 +91,13 @@ BEGIN
     FROM m_facility_unit u
     LEFT JOIN (
       SELECT 
-        dealer_name_clean,
-        unit_fasilitas_clean,
-        concern_urgency,
-        concern_note,
-        ROW_NUMBER() OVER(PARTITION BY dealer_name_clean, unit_fasilitas_clean ORDER BY created_at DESC) as rn
-      FROM (
-        -- Prioritaskan dari t_priority_action (Manual Supervisor)
-        SELECT 
-          LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
-          REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
-          priority_level AS concern_urgency,
-          action_reason AS concern_note,
-          created_at
-        FROM t_priority_action
-        WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR'
-
-        UNION ALL
-
-        -- Fallback dari t_assignment (jika ada data lama)
-        SELECT 
-          LOWER(REGEXP_REPLACE(TRIM(dealer_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
-          REGEXP_REPLACE(UPPER(TRIM(unit_fasilitas)), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
-          urgency_level AS concern_urgency,
-          instruksi AS concern_note,
-          created_at
-        FROM t_assignment
-        WHERE UPPER(status) IN ('OPEN', 'PENDING')
-      ) combined_concerns
+        LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
+        REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
+        priority_level AS concern_urgency,
+        action_reason AS concern_note,
+        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')), REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') ORDER BY created_at DESC) as rn
+      FROM t_priority_action
+      WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR'
     ) c ON (
       (LOWER(TRIM(u.dealer_name)) = c.dealer_name_clean OR LOWER(REGEXP_REPLACE(TRIM(u.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean)
       AND (
@@ -229,30 +208,12 @@ BEGIN
     FROM m_dealer d
     LEFT JOIN (
       SELECT 
-        dealer_name_clean,
-        concern_urgency,
-        concern_note,
-        ROW_NUMBER() OVER(PARTITION BY dealer_name_clean ORDER BY created_at DESC) as rn
-      FROM (
-        SELECT 
-          LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
-          priority_level AS concern_urgency,
-          action_reason AS concern_note,
-          created_at
-        FROM t_priority_action
-        WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR' AND entity_type = 'DEALER'
-
-        UNION ALL
-
-        SELECT 
-          LOWER(REGEXP_REPLACE(TRIM(dealer_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
-          urgency_level AS concern_urgency,
-          instruksi AS concern_note,
-          created_at
-        FROM t_assignment
-        WHERE UPPER(status) IN ('OPEN', 'PENDING')
-          AND REGEXP_REPLACE(UPPER(TRIM(unit_fasilitas)), '[\s\-_.]', '', 'g') IN ('UMUM', '-', '')
-      ) combined_dealer_concerns
+        LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
+        priority_level AS concern_urgency,
+        action_reason AS concern_note,
+        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) ORDER BY created_at DESC) as rn
+      FROM t_priority_action
+      WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR' AND entity_type = 'DEALER'
     ) c ON (
       LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean 
       OR LOWER(REGEXP_REPLACE(TRIM(d.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean
@@ -315,112 +276,96 @@ BEGIN
   -- C. ANTREAN TUGAS TERPADU (t_priority_action) - ACTIVE TASK LIFECYCLE
   -- --------------------------------------------------------------------------
   BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 't_priority_action') THEN
-      
-      -- A. Evaluasi Dealer Prioritas (Skor > 0)
-      FOR rec IN 
-        SELECT 
-          d.dealer_id,
-          d.dealer_name,
-          d.cabang,
-          d.priority_level,
-          d.priority_score,
-          d.priority_reason
-        FROM m_dealer d
-        WHERE d.priority_score > 0
-      LOOP
-        -- Cek apakah sudah ada tiket aktif (is_fu = false) untuk dealer ini
-        IF EXISTS (
-          SELECT 1 FROM t_priority_action 
-          WHERE entity_type = 'DEALER' 
-            AND (entity_id = rec.dealer_id OR LOWER(TRIM(entity_name)) = LOWER(TRIM(rec.dealer_name)))
-            AND is_fu = false
-        ) THEN
-          -- JANGAN DUPLIKAT: Update skor & alasan terbaru, pertahankan created_at awal
-          UPDATE t_priority_action
-          SET priority_level = rec.priority_level,
-              priority_score = rec.priority_score,
-              action_reason = rec.priority_reason,
-              cabang = COALESCE(rec.cabang, cabang),
-              updated_at = NOW()
-          WHERE entity_type = 'DEALER' 
-            AND (entity_id = rec.dealer_id OR LOWER(TRIM(entity_name)) = LOWER(TRIM(rec.dealer_name)))
-            AND is_fu = false;
-        ELSE
-          -- BUAT TIKET BARU: Karena belum pernah ada, atau tiket lama sudah selesai (is_fu = true)
-          INSERT INTO t_priority_action (
-            source, assigned_by, entity_type, entity_id, entity_name, cabang,
-            priority_level, priority_score, action_reason, is_fu, created_at, updated_at
-          ) VALUES (
-            'AUTO_CALCULATE', 'SYSTEM', 'DEALER', rec.dealer_id, rec.dealer_name, rec.cabang,
-            rec.priority_level, rec.priority_score, rec.priority_reason, false, NOW(), NOW()
-          );
-        END IF;
-      END LOOP;
+    -- A. Evaluasi Dealer Prioritas (Skor > 0)
+    FOR rec IN 
+      SELECT 
+        d.dealer_id,
+        d.dealer_name,
+        d.cabang,
+        d.priority_level,
+        d.priority_score,
+        d.priority_reason
+      FROM m_dealer d
+      WHERE d.priority_score > 0
+    LOOP
+      -- Cek apakah sudah ada tiket aktif (is_fu = false) untuk dealer ini
+      IF EXISTS (
+        SELECT 1 FROM t_priority_action 
+        WHERE entity_type = 'DEALER' 
+          AND (entity_id = rec.dealer_id OR LOWER(TRIM(entity_name)) = LOWER(TRIM(rec.dealer_name)))
+          AND is_fu = false
+      ) THEN
+        -- JANGAN DUPLIKAT: Update skor & alasan terbaru, pertahankan created_at awal
+        UPDATE t_priority_action
+        SET priority_level = rec.priority_level,
+            priority_score = rec.priority_score,
+            action_reason = rec.priority_reason,
+            cabang = COALESCE(rec.cabang, cabang),
+            updated_at = NOW()
+        WHERE entity_type = 'DEALER' 
+          AND (entity_id = rec.dealer_id OR LOWER(TRIM(entity_name)) = LOWER(TRIM(rec.dealer_name)))
+          AND is_fu = false;
+      ELSE
+        -- BUAT TIKET BARU: Karena belum pernah ada, atau tiket lama sudah selesai (is_fu = true)
+        INSERT INTO t_priority_action (
+          source, assigned_by, entity_type, entity_id, entity_name, cabang,
+          priority_level, priority_score, action_reason, is_fu, created_at, updated_at
+        ) VALUES (
+          'AUTO_CALCULATE', 'SYSTEM', 'DEALER', rec.dealer_id, rec.dealer_name, rec.cabang,
+          rec.priority_level, rec.priority_score, rec.priority_reason, false, NOW(), NOW()
+        );
+      END IF;
+    END LOOP;
 
-      -- B. Evaluasi Unit Fasilitas Prioritas (Skor > 0)
-      FOR rec IN 
-        SELECT 
-          u.no_fasilitas,
-          u.nopol,
-          u.unit,
-          COALESCE(d.cabang, '-') AS cabang,
-          u.priority_level,
-          u.priority_score,
-          u.priority_reason
-        FROM m_facility_unit u
-        LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
-        WHERE u.priority_score > 0
-      LOOP
-        -- Cek apakah sudah ada tiket aktif (is_fu = false) untuk unit ini
-        IF EXISTS (
-          SELECT 1 FROM t_priority_action 
-          WHERE entity_type = 'UNIT' 
-            AND entity_id = rec.no_fasilitas
-            AND is_fu = false
-        ) THEN
-          -- JANGAN DUPLIKAT: Update skor & alasan terbaru, pertahankan created_at awal
-          UPDATE t_priority_action
-          SET priority_level = rec.priority_level,
-              priority_score = rec.priority_score,
-              action_reason = rec.priority_reason,
-              cabang = COALESCE(rec.cabang, cabang),
-              updated_at = NOW()
-          WHERE entity_type = 'UNIT' 
-            AND entity_id = rec.no_fasilitas
-            AND is_fu = false;
-        ELSE
-          -- BUAT TIKET BARU
-          INSERT INTO t_priority_action (
-            source, assigned_by, entity_type, entity_id, entity_name, cabang,
-            priority_level, priority_score, action_reason, is_fu, created_at, updated_at
-          ) VALUES (
-            'AUTO_CALCULATE', 'SYSTEM', 'UNIT', rec.no_fasilitas, 
-            rec.nopol || ' (' || COALESCE(rec.unit, '-') || ')', 
-            rec.cabang, rec.priority_level, rec.priority_score, rec.priority_reason, false, NOW(), NOW()
-          );
-        END IF;
-      END LOOP;
+    -- B. Evaluasi Unit Fasilitas Prioritas (Skor > 0)
+    FOR rec IN 
+      SELECT 
+        u.no_fasilitas,
+        u.nopol,
+        u.unit,
+        COALESCE(d.cabang, '-') AS cabang,
+        u.priority_level,
+        u.priority_score,
+        u.priority_reason
+      FROM m_facility_unit u
+      LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
+      WHERE u.priority_score > 0
+    LOOP
+      -- Cek apakah sudah ada tiket aktif (is_fu = false) untuk unit ini
+      IF EXISTS (
+        SELECT 1 FROM t_priority_action 
+        WHERE entity_type = 'UNIT' 
+          AND entity_id = rec.no_fasilitas
+          AND is_fu = false
+      ) THEN
+        -- JANGAN DUPLIKAT: Update skor & alasan terbaru, pertahankan created_at awal
+        UPDATE t_priority_action
+        SET priority_level = rec.priority_level,
+            priority_score = rec.priority_score,
+            action_reason = rec.priority_reason,
+            cabang = COALESCE(rec.cabang, cabang),
+            updated_at = NOW()
+        WHERE entity_type = 'UNIT' 
+          AND entity_id = rec.no_fasilitas
+          AND is_fu = false;
+      ELSE
+        -- BUAT TIKET BARU
+        INSERT INTO t_priority_action (
+          source, assigned_by, entity_type, entity_id, entity_name, cabang,
+          priority_level, priority_score, action_reason, is_fu, created_at, updated_at
+        ) VALUES (
+          'AUTO_CALCULATE', 'SYSTEM', 'UNIT', rec.no_fasilitas, 
+          rec.nopol || ' (' || COALESCE(rec.unit, '-') || ')', 
+          rec.cabang, rec.priority_level, rec.priority_score, rec.priority_reason, false, NOW(), NOW()
+        );
+      END IF;
+    END LOOP;
 
-      -- Hitung total tiket aktif saat ini
-      SELECT COUNT(*) INTO v_logs_inserted FROM t_priority_action WHERE is_fu = false;
-    END IF;
-
-    -- Backup / sync ke log_priority_daily (jika tabel masih ada)
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'log_priority_daily') THEN
-      DELETE FROM log_priority_daily WHERE log_date = v_today;
-      INSERT INTO log_priority_daily (log_date, entity_type, entity_id, entity_name, cabang, priority_level, priority_score, priority_reason)
-      SELECT v_today, 'DEALER', d.dealer_id, d.dealer_name, d.cabang, d.priority_level, d.priority_score, d.priority_reason
-      FROM m_dealer d WHERE d.priority_score > 0;
-
-      INSERT INTO log_priority_daily (log_date, entity_type, entity_id, entity_name, cabang, priority_level, priority_score, priority_reason)
-      SELECT v_today, 'UNIT', u.no_fasilitas, u.nopol || ' (' || COALESCE(u.unit, '-') || ')', COALESCE(d.cabang, '-'), u.priority_level, u.priority_score, u.priority_reason
-      FROM m_facility_unit u LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
-      WHERE u.priority_score > 0;
-    END IF;
+    -- Hitung total tiket aktif saat ini
+    SELECT COUNT(*) INTO v_active_tasks FROM t_priority_action WHERE is_fu = false;
   EXCEPTION WHEN OTHERS THEN
     v_log_error := SQLERRM;
-    RAISE NOTICE 'Snapshot/Upsert notice: %', SQLERRM;
+    RAISE NOTICE 'Antrean t_priority_action notice: %', SQLERRM;
   END;
 
   RETURN json_build_object(
@@ -428,7 +373,7 @@ BEGIN
     'message', 'Kalkulasi prioritas Supabase selesai (Unified Active Task Lifecycle)',
     'facility_units_updated', v_units_updated,
     'dealers_updated', v_dealers_updated,
-    'active_priority_tasks', v_logs_inserted,
+    'active_priority_tasks', v_active_tasks,
     'execution_date', v_today,
     'error_detail', v_log_error
   );
@@ -451,7 +396,6 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  -- A. Update di tabel terpadu t_priority_action
   IF UPPER(p_entity_type) = 'DEALER' THEN
     UPDATE t_priority_action
     SET is_fu = true, fu_at = NOW(), fu_by = p_nip, fu_visit_id = p_visit_id, updated_at = NOW()
@@ -459,26 +403,12 @@ BEGIN
       AND entity_type = 'DEALER'
       AND (entity_name ILIKE '%' || p_entity_name_or_id || '%' OR entity_id = p_entity_name_or_id);
 
-    -- Fallback ke log_priority_daily jika ada
-    UPDATE log_priority_daily
-    SET is_fu = true, fu_at = NOW(), fu_by = p_nip, fu_visit_id = p_visit_id
-    WHERE entity_type = 'DEALER'
-      AND (entity_name ILIKE '%' || p_entity_name_or_id || '%' OR entity_id = p_entity_name_or_id)
-      AND (log_date = p_log_date OR is_fu = false);
-
   ELSIF UPPER(p_entity_type) = 'UNIT' THEN
     UPDATE t_priority_action
     SET is_fu = true, fu_at = NOW(), fu_by = p_nip, fu_visit_id = p_visit_id, updated_at = NOW()
     WHERE is_fu = false
       AND entity_type = 'UNIT'
       AND (entity_id = p_entity_name_or_id OR entity_name ILIKE '%' || p_entity_name_or_id || '%');
-
-    -- Fallback ke log_priority_daily jika ada
-    UPDATE log_priority_daily
-    SET is_fu = true, fu_at = NOW(), fu_by = p_nip, fu_visit_id = p_visit_id
-    WHERE entity_type = 'UNIT'
-      AND (entity_id = p_entity_name_or_id OR entity_name ILIKE '%' || p_entity_name_or_id || '%')
-      AND (log_date = p_log_date OR is_fu = false);
   END IF;
 END;
 $$;
@@ -504,11 +434,11 @@ SELECT cron.schedule(
 
 
 -- ----------------------------------------------------------------------------
--- 4. MIGRASI DATA AWAL (JIKA ADA DATA AKTIF DI t_assignment & log_priority_daily)
+-- 4. MIGRASI DATA TERAKHIR & PEMBERSIHAN TABEL LAMA (t_assignment & log_priority_daily)
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
-  -- Migrasi dari t_assignment (Concern Manual)
+  -- A. Migrasi data penugasan terbuka dari t_assignment (jika tabel masih ada)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 't_assignment') THEN
     INSERT INTO t_priority_action (
       source, assigned_by, entity_type, entity_id, entity_name, priority_level, priority_score, action_reason, is_fu, created_at
@@ -528,8 +458,15 @@ BEGIN
     WHERE NOT EXISTS (
       SELECT 1 FROM t_priority_action a 
       WHERE a.source = 'MANUAL_SUPERVISOR' 
-        AND a.entity_name = t_assignment.dealer_name 
-        AND a.action_reason = COALESCE(t_assignment.instruksi, 'Penugasan Manual')
+        AND a.entity_name = t_assignment.dealer_name
     );
+
+    -- Hapus tabel t_assignment
+    DROP TABLE IF EXISTS t_assignment CASCADE;
+  END IF;
+
+  -- B. Hapus tabel log_priority_daily
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'log_priority_daily') THEN
+    DROP TABLE IF EXISTS log_priority_daily CASCADE;
   END IF;
 END $$;
