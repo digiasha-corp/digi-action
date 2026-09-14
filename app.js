@@ -598,6 +598,49 @@ async function supabaseSubmitVisit(data) {
           .eq("status", "OPEN");
       }
     }
+
+    // 3. Update Status Follow Up (is_fu) di log_priority_daily
+    const todayDate = new Date().toISOString().slice(0, 10);
+
+    // A. Update Unit yang Terlihat
+    if (Array.isArray(data.unit_check_list) && data.unit_check_list.length > 0) {
+      for (const u of data.unit_check_list) {
+        const isVisible = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
+        if (isVisible && u.no_fasilitas) {
+          await supabaseClient.from("log_priority_daily")
+            .update({
+              is_fu: true,
+              fu_at: nowIso,
+              fu_by: resolvedNip,
+              fu_visit_id: visitId
+            })
+            .eq("log_date", todayDate)
+            .eq("entity_type", "UNIT")
+            .eq("entity_id", u.no_fasilitas);
+        }
+      }
+    }
+
+    // B. Update Dealer (Hanya jika dealer solved DAN tidak ada unit darurat yang 'Tidak Terlihat')
+    if (isDealerSolved) {
+      const hasUnseenUnit = Array.isArray(data.unit_check_list) && data.unit_check_list.some(u => {
+        const isVis = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
+        return !isVis;
+      });
+
+      if (!hasUnseenUnit) {
+        await supabaseClient.from("log_priority_daily")
+          .update({
+            is_fu: true,
+            fu_at: nowIso,
+            fu_by: resolvedNip,
+            fu_visit_id: visitId
+          })
+          .eq("log_date", todayDate)
+          .eq("entity_type", "DEALER")
+          .eq("entity_name", data.dealer_name);
+      }
+    }
   } catch (asgErr) {
     console.warn("Auto-resolve assignment warning:", asgErr);
   }
@@ -4848,23 +4891,44 @@ function renderPriorityList() {
       mitraLevel: mitraLevel,
       mitraScore: isMitraUrgent ? (clientCalc.mitraScore || score) : 0,
       urgentUnitsCount: urgentUnits,
-      visitedToday: isDealerVisitedToday(d)
+    const visitedToday = isDealerVisitedToday(d);
+    // Selesai HANYA jika sudah visit hari ini DAN tidak ada lagi unit mendesak yang belum selesai
+    const isFullyDone = visitedToday && (urgentUnits === 0);
+    const hasUnresolvedUnits = visitedToday && (urgentUnits > 0);
+
+    return {
+      ...d,
+      ...clientCalc,
+      level: level,
+      score: score,
+      priority_level: level,
+      priority_score: score,
+      priority_reason: reason,
+      mitraLevel: mitraLevel,
+      mitraScore: isMitraUrgent ? (clientCalc.mitraScore || score) : 0,
+      urgentUnitsCount: urgentUnits,
+      visitedToday: visitedToday,
+      isFullyDone: isFullyDone,
+      hasUnresolvedUnits: hasUnresolvedUnits
     };
   });
 
-  // Sorting: Pending First -> Prioritas tertinggi (Score DESC) -> Aging Visit tertinggi (Aging DESC)
+  // Sorting: Prioritas yang belum selesai diletakkan paling atas -> Score DESC -> Aging Visit DESC
   computedList.sort((a, b) => {
-    if (a.visitedToday !== b.visitedToday) return a.visitedToday ? 1 : -1;
+    if (a.isFullyDone !== b.isFullyDone) return a.isFullyDone ? 1 : -1;
     if (b.score !== a.score) return b.score - a.score;
     return (Number(b.aging_visit_mitra || 0)) - (Number(a.aging_visit_mitra || 0));
   });
 
-  // 1. Filter Status Visit: Sembunyikan mitra yang sudah dikunjungi hari ini dari daftar aksi aktif
-  if (PRIORITY_VISIT_STATUS_FILTER === "DONE") {
-    computedList = computedList.filter(d => d.visitedToday);
-  } else {
-    // Default: Hanya tampilkan mitra yang belum dikunjungi hari ini
-    computedList = computedList.filter(d => !d.visitedToday);
+  // 1. Filter Status Kunjungan (Hanya aktif jika TIDAK sedang mencari teks tertentu)
+  if (!PRIORITY_SEARCH_QUERY) {
+    if (PRIORITY_VISIT_STATUS_FILTER === "DONE") {
+      computedList = computedList.filter(d => d.isFullyDone);
+    } else if (PRIORITY_VISIT_STATUS_FILTER === "PENDING") {
+      // Pending: Belum dikunjungi hari ini ATAU kunjungan sudah selesai tapi masih ada unit darurat belum selesai
+      computedList = computedList.filter(d => !d.isFullyDone);
+    }
+    // Jika "ALL", tampilkan semua (baik pending maupun selesai)
   }
 
   // 2. Filter Level Urgensi (Hanya tampilkan mitra yang memiliki prioritas: Sangat Penting, Penting, Moderat)
@@ -4949,9 +5013,11 @@ function renderPriorityList() {
     const carBtnClass = hasUnitUrgency ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400 border border-slate-200';
     const isPriorityUrgent = (d.score > 0) || (d.level && d.level !== "Normal");
 
-    const statusPill = d.visitedToday
+    const statusPill = d.isFullyDone
       ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-circle-check mr-1 text-[7px]"></i> Selesai Hari Ini</span>`
-      : ``;
+      : (d.hasUnresolvedUnits
+          ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-clock-rotate-left mr-1 text-[7px]"></i>Visit Selesai • ${d.urgentUnitsCount} Unit Belum Clear</span>`
+          : ``);
 
     const hasDealerConcernPill = d.dealer_concern 
       ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-bullhorn mr-1 text-[7px]"></i>Concern Mitra</span>` 
@@ -4974,15 +5040,20 @@ function renderPriorityList() {
       }
     }
 
-    const visitActionBtn = d.visitedToday
+    const visitActionBtn = d.isFullyDone
       ? `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Kunjungi Ulang Showroom Ini" class="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition flex items-center space-x-1">
           <i class="fa-solid fa-rotate-right text-[9px]"></i>
           <span>Re-visit</span>
         </button>`
-      : `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Lakukan Visit Sekarang" class="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
-          <i class="fa-solid fa-location-arrow text-[9px]"></i>
-          <span>Visit</span>
-        </button>`;
+      : (d.hasUnresolvedUnits
+          ? `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Cek Ulang Unit Fasilitas" class="px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
+              <i class="fa-solid fa-car text-[9px]"></i>
+              <span>Cek Unit</span>
+            </button>`
+          : `<button type="button" onclick="startVisitForDealer('${d.dealer_id}')" title="Lakukan Visit Sekarang" class="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition flex items-center space-x-1 active:scale-95">
+              <i class="fa-solid fa-location-arrow text-[9px]"></i>
+              <span>Visit</span>
+            </button>`);
 
     // Hitung jumlah unit berstatus LIVE saja untuk ditampilkan pada kartu score card
     const liveUnitsCount = (d.units || []).filter(u => {

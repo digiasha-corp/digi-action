@@ -38,6 +38,22 @@
     </button>
   </div>
 
+  <!-- Filter Status Kunjungan: Belum Selesai (Pending) vs Selesai Hari Ini (Done) vs Semua -->
+  <div class="flex p-1 bg-slate-100 rounded-xl text-xs font-bold gap-1 border border-slate-200">
+    <button type="button" onclick="setVisitStatusFilter('PENDING')" id="p-status-pending" class="flex-1 py-1.5 rounded-lg bg-slate-900 text-white shadow-xs transition text-center flex items-center justify-center space-x-1">
+      <i class="fa-solid fa-clock text-[10px]"></i>
+      <span>Belum Selesai</span>
+    </button>
+    <button type="button" onclick="setVisitStatusFilter('DONE')" id="p-status-done" class="flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition text-center flex items-center justify-center space-x-1">
+      <i class="fa-solid fa-circle-check text-[10px]"></i>
+      <span>Selesai Hari Ini</span>
+    </button>
+    <button type="button" onclick="setVisitStatusFilter('ALL')" id="p-status-all" class="flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition text-center flex items-center justify-center space-x-1">
+      <i class="fa-solid fa-list-ul text-[10px]"></i>
+      <span>Semua</span>
+    </button>
+  </div>
+
   <!-- Filter Level Urgensi -->
   <div class="flex space-x-1.5 text-xs font-bold">
     <button type="button" onclick="setPriorityFilter('ALL')" id="p-filter-all" class="flex-1 py-1.5 rounded-xl bg-slate-900 text-white shadow-xs">Semua Level</button>
