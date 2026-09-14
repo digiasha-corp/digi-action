@@ -383,7 +383,10 @@
   <!-- MODAL FORCE CHANGE PASSWORD (FIRST LOGIN / PASSWORD MUST CHANGE) -->
   <div id="modal-force-change-pass" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[70] hidden flex items-center justify-center p-3">
     <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4">
-      <div class="text-center">
+      <div class="relative text-center">
+        <button type="button" onclick="handleLogout()" class="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition" title="Keluar & Kembali ke Login">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
         <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-2 border border-amber-200 shadow-xs">
           <i class="fa-solid fa-key"></i>
         </div>
@@ -425,10 +428,16 @@
           Kata sandi tidak boleh menggunakan default (<em>Password123!</em>).
         </div>
 
-        <button type="submit" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm shadow transition flex items-center justify-center space-x-2">
-          <span>Simpan & Masuk ke Aplikasi</span>
-          <i class="fa-solid fa-arrow-right text-xs"></i>
-        </button>
+        <div class="space-y-2 pt-1">
+          <button type="submit" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm shadow transition flex items-center justify-center space-x-2 active:scale-95">
+            <span>Simpan & Masuk ke Aplikasi</span>
+            <i class="fa-solid fa-arrow-right text-xs"></i>
+          </button>
+          <button type="button" onclick="handleLogout()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+            <i class="fa-solid fa-arrow-right-from-bracket text-xs text-slate-400"></i>
+            <span>Keluar ke Halaman Login</span>
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -461,7 +470,7 @@
 
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/config.js?v=20260914_v64"></script>
-  <script src="/app.js?v=20260914_v64"></script>
+  <script src="/config.js?v=20260914_v65"></script>
+  <script src="/app.js?v=20260914_v65"></script>
 </body>
 </html>
