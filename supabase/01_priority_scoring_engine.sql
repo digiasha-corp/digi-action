@@ -131,6 +131,7 @@ BEGIN
         -- Level: MODERAT (Score 1)
         WHEN uc.calc_aging_visit >= 15 THEN 1
         WHEN uc.concern_urgency = 'Moderat' THEN 1
+        WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 1
 
         -- Level: NORMAL (Score 0)
         ELSE 0
@@ -153,6 +154,7 @@ BEGIN
 
         WHEN uc.calc_aging_visit >= 15 THEN 'Moderat'
         WHEN uc.concern_urgency = 'Moderat' THEN 'Moderat'
+        WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 'Moderat'
 
         ELSE 'Normal'
       END AS calc_level,
@@ -166,6 +168,7 @@ BEGIN
         WHEN uc.calc_aging_visit >= 5 AND uc.is_h3_jto THEN 'Aging Visit >= 5 hr (' || uc.calc_aging_visit || ' hr) & H-3 JTO (' || TO_CHAR(u.jto_date, 'YYYY-MM-DD') || ')'
         WHEN uc.calc_aging_visit >= 22 THEN 'Aging Visit Unit >= 22 hr (' || uc.calc_aging_visit || ' hr)'
         WHEN uc.calc_aging_visit >= 15 THEN 'Aging Visit Unit >= 15 hr (' || uc.calc_aging_visit || ' hr)'
+        WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 'Aging Maintenance GPS > 30 hr (' || COALESCE(u.aging_gps_maint, 0) || ' hr)'
         ELSE 'Normal'
       END AS calc_reason
     FROM m_facility_unit u

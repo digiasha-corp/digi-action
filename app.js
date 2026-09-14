@@ -4590,83 +4590,87 @@ function calculateUnitUrgency(u) {
   const isEligibleContract = isLive || isExpiredWithImei;
 
   if (!isEligibleContract && !concernUrgency) {
-    return { level: "Normal", score: 0, reason: `Status Kontrak Non-Eligible (${contractStatus || "Non-Live"})` };
+    return { level: "Normal", score: 0, reason: `Status Kontrak Non-Eligible (${contractStatus || "Non-Live"})`, triggers: [] };
   }
 
-  // Evaluasi pemicu sistem bawaan (aging / GPS / overdue / JTO)
-  let systemReason = "";
+  const triggers = [];
+
+  // 1. Cek Assign Concern Manual Atasan
+  if (concernUrgency) {
+    const cScore = (concernUrgency === "Sangat Penting") ? 3 : (concernUrgency === "Penting" ? 2 : 1);
+    triggers.push({
+      level: concernUrgency,
+      score: cScore,
+      type: "CONCERN_SUPERVISOR",
+      reason: concernNote ? `Concern Atasan: "${concernNote}"` : `Concern Atasan (${concernUrgency})`
+    });
+  }
+
+  // 2. Cek Status GPS
   if (["Pelepasan", "Offline", "Baterai Lemah"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
-    systemReason = `Status GPS: ${gpsStatus}`;
-  } else if (agingVisit >= 22 && lifetime > 90) {
-    systemReason = `Aging Visit >= 22 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)`;
-  } else if (agingVisit >= 15 && nearJto) {
-    systemReason = `Aging Visit >= 15 hr (${agingVisit} hr) & Kondisi H-3 JTO`;
+    triggers.push({ level: "Sangat Penting", score: 3, type: "GPS_CRITICAL", reason: `Status GPS: ${gpsStatus}` });
   } else if (["Belum Lepas", "Belum Pasang", "Geser"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
-    systemReason = `Status GPS: ${gpsStatus}`;
-  } else if (agingVisit >= 3 && overdue >= 3) {
-    systemReason = `Aging Visit >= 3 hr (${agingVisit} hr) & Overdue >= 3 hr (${overdue} hr)`;
-  } else if (agingVisit >= 5 && nearJto) {
-    systemReason = `Aging Visit >= 5 hr (${agingVisit} hr) & Kondisi H-3 JTO`;
-  } else if (agingVisit >= 22) {
-    systemReason = `Aging Visit Unit >= 22 hr (${agingVisit} hr)`;
-  } else if (agingVisit >= 15) {
-    systemReason = `Aging Visit Unit >= 15 hr (${agingVisit} hr)`;
+    triggers.push({ level: "Penting", score: 2, type: "GPS_WARNING", reason: `Status GPS: ${gpsStatus}` });
   }
 
-  // -------------------------------------------------------------
-  // LEVEL 1: SANGAT PENTING (Score: 3)
-  // -------------------------------------------------------------
-  if (concernUrgency === "Sangat Penting") {
-    const combinedReason = `Assign Concern '${concernNote || "Sangat Penting"}'` + (systemReason ? ` • ${systemReason}` : "");
-    return { level: "Sangat Penting", score: 3, reason: combinedReason };
-  }
-  if (["Pelepasan", "Offline", "Baterai Lemah"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
-    return { level: "Sangat Penting", score: 3, reason: `Status GPS: ${gpsStatus}` };
-  }
+  // 3. Cek Aging Visit >= 22 hr & Lifetime > 90 hr
   if (agingVisit >= 22 && lifetime > 90) {
-    return { level: "Sangat Penting", score: 3, reason: `Aging Visit >= 22 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)` };
+    triggers.push({ level: "Sangat Penting", score: 3, type: "AGING_LIFETIME", reason: `Aging Visit >= 22 hr (${agingVisit} hr) & Lifetime > 90 hr (${lifetime} hr)` });
   }
+
+  // 4. Cek Kondisi Jatuh Tempo (H-3 JTO)
   if (agingVisit >= 15 && nearJto) {
-    return { level: "Sangat Penting", score: 3, reason: `Aging Visit >= 15 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
+    triggers.push({ level: "Sangat Penting", score: 3, type: "AGING_JTO", reason: `Aging Visit >= 15 hr (${agingVisit} hr) & Kondisi H-3 JTO` });
+  } else if (agingVisit >= 5 && nearJto) {
+    triggers.push({ level: "Penting", score: 2, type: "AGING_JTO", reason: `Aging Visit >= 5 hr (${agingVisit} hr) & Kondisi H-3 JTO` });
   }
 
-  // -------------------------------------------------------------
-  // LEVEL 2: PENTING (Score: 2)
-  // -------------------------------------------------------------
-  if (concernUrgency === "Penting") {
-    const combinedReason = `Assign Concern '${concernNote || "Penting"}'` + (systemReason ? ` • ${systemReason}` : "");
-    return { level: "Penting", score: 2, reason: combinedReason };
-  }
-  if (["Belum Lepas", "Belum Pasang", "Geser"].some(s => gpsStatus.toLowerCase().includes(s.toLowerCase()))) {
-    return { level: "Penting", score: 2, reason: `Status GPS: ${gpsStatus}` };
-  }
+  // 5. Cek Aging Visit & Overdue
   if (agingVisit >= 3 && overdue >= 3) {
-    return { level: "Penting", score: 2, reason: `Aging Visit >= 3 hr (${agingVisit} hr) & Overdue >= 3 hr (${overdue} hr)` };
+    triggers.push({ level: "Penting", score: 2, type: "AGING_OVERDUE", reason: `Aging Visit >= 3 hr (${agingVisit} hr) & Overdue >= 3 hr (${overdue} hr)` });
   }
-  if (agingVisit >= 5 && nearJto) {
-    return { level: "Penting", score: 2, reason: `Aging Visit >= 5 hr (${agingVisit} hr) & Kondisi H-3 JTO` };
-  }
+
+  // 6. Cek Aging Visit Unit Standalone
   if (agingVisit >= 22) {
-    return { level: "Penting", score: 2, reason: `Aging Visit Unit >= 22 hr (${agingVisit} hr)` };
+    triggers.push({ level: "Penting", score: 2, type: "AGING_VISIT", reason: `Aging Visit Unit >= 22 hr (${agingVisit} hr)` });
+  } else if (agingVisit >= 15) {
+    triggers.push({ level: "Moderat", score: 1, type: "AGING_VISIT", reason: `Aging Visit Unit >= 15 hr (${agingVisit} hr)` });
   }
 
-  // -------------------------------------------------------------
-  // LEVEL 3: MODERAT (Score: 1)
-  // -------------------------------------------------------------
-  if (agingVisit >= 15) {
-    return { level: "Moderat", score: 1, reason: `Aging Visit Unit >= 15 hr (${agingVisit} hr)` };
-  }
-  if (concernUrgency === "Moderat") {
-    return { level: "Moderat", score: 1, reason: `Assign Concern '${concernNote || "Moderat"}'` };
-  }
+  // 7. Cek Aging Maintenance GPS
   if (agingGpsMaint > 30) {
-    return { level: "Moderat", score: 1, reason: `Aging Maintenance GPS > 30 hr (${agingGpsMaint} hr)` };
+    triggers.push({ level: "Moderat", score: 1, type: "GPS_MAINT", reason: `Aging Maintenance GPS > 30 hr (${agingGpsMaint} hr)` });
   }
 
-  // -------------------------------------------------------------
-  // LEVEL 4: NORMAL (Score: 0)
-  // -------------------------------------------------------------
-  return { level: "Normal", score: 0, reason: "Kondisi Normal / Terjadwal Baik" };
+  if (triggers.length === 0) {
+    return { level: "Normal", score: 0, reason: "Kondisi Normal / Terjadwal Baik", triggers: [] };
+  }
+
+  // Urutkan pemicu berdasarkan skor risiko tertinggi (Sangat Penting > Penting > Moderat)
+  triggers.sort((a, b) => b.score - a.score);
+
+  const highestScore = triggers[0].score;
+  const scoreToLevel = { 3: "Sangat Penting", 2: "Penting", 1: "Moderat", 0: "Normal" };
+  const highestLevel = scoreToLevel[highestScore] || triggers[0].level;
+  const combinedReason = triggers.map(t => t.reason).join(" • ");
+
+  return {
+    level: highestLevel,
+    score: highestScore,
+    reason: combinedReason,
+    triggers: triggers
+  };
+}
+
+function isUnitVisitedToday(u) {
+  if (u.is_visited_today === true) return true;
+  if (!u.last_visit_date) return false;
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const parts = todayStr.split("-");
+  const todaySlash = `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const lastV = String(u.last_visit_date).trim();
+  return lastV.startsWith(todayStr) || lastV.startsWith(todaySlash);
 }
 
 /**
@@ -4761,7 +4765,9 @@ function calculateMitraUrgency(dealer) {
       }
 
       const uEval = calculateUnitUrgency(u);
-      if (uEval.score > 0) {
+      const isUVisited = isUnitVisitedToday(u);
+      // Unit dihitung sebagai penugasan aktif jika skor risiko > 0 dan BELUM dikunjungi hari ini
+      if (uEval.score > 0 && !isUVisited) {
         urgentUnitsCount++;
       }
       if (uEval.score > highestUnitScore) {
@@ -5168,8 +5174,9 @@ function openFacilityDetailModal(dealerId) {
     return uEval.score > 0;
   });
 
+  const pendingUnitsCount = eligibleUnits.filter(u => !isUnitVisitedToday(u)).length;
   document.getElementById("modal-facility-title").innerText = `Fasilitas: ${d.dealer_name}`;
-  document.getElementById("modal-facility-sub").innerText = `Total ${eligibleUnits.length} Unit Prioritas/Concern (${d.cabang || "-"})`;
+  document.getElementById("modal-facility-sub").innerText = `Total ${eligibleUnits.length} Unit Prioritas (${pendingUnitsCount} Belum FU • ${d.cabang || "-"})`;
 
   const listContainer = document.getElementById("modal-facility-list");
   listContainer.innerHTML = "";
@@ -5177,8 +5184,11 @@ function openFacilityDetailModal(dealerId) {
   if (eligibleUnits.length === 0) {
     listContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Tidak ada unit dengan status prioritas atau concern aktif pada mitra ini.</div>`;
   } else {
-    // Sorting: Unit urgent (Score tertinggi) di atas
+    // Sorting: Unit yang belum FU diletakkan di atas, lalu urutkan Score tertinggi
     eligibleUnits.sort((a, b) => {
+      const aVisited = isUnitVisitedToday(a);
+      const bVisited = isUnitVisitedToday(b);
+      if (aVisited !== bVisited) return aVisited ? 1 : -1;
       const scoreA = calculateUnitUrgency(a).score;
       const scoreB = calculateUnitUrgency(b).score;
       return scoreB - scoreA;
@@ -5186,11 +5196,16 @@ function openFacilityDetailModal(dealerId) {
 
     eligibleUnits.forEach(u => {
       const uEval = calculateUnitUrgency(u);
+      const isVisited = isUnitVisitedToday(u);
       const itemCard = document.createElement("div");
-      itemCard.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5";
+      itemCard.className = `p-3 bg-slate-50 border ${isVisited ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-200'} rounded-xl space-y-2`;
+
+      const fuBadge = isVisited
+        ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-check mr-1 text-[7px]"></i>Sudah FU Hari Ini</span>`
+        : `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-clock mr-1 text-[7px]"></i>Belum FU</span>`;
 
       itemCard.innerHTML = `
-        <div class="flex justify-between items-start">
+        <div class="flex justify-between items-start gap-2">
           <div class="min-w-0 flex-1">
             <div class="flex items-center space-x-1.5 flex-wrap">
               <span class="font-bold text-slate-900 text-xs">${u.nopol}</span>
@@ -5198,7 +5213,10 @@ function openFacilityDetailModal(dealerId) {
             </div>
             <p class="text-[11px] text-slate-600 truncate mt-0.5">${u.unit}</p>
           </div>
-          <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${urgencyPillStyles[uEval.level]} shrink-0">${uEval.level}</span>
+          <div class="flex flex-col items-end space-y-1 shrink-0">
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${urgencyPillStyles[uEval.level]}">${uEval.level}</span>
+            ${fuBadge}
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-100">
@@ -5206,10 +5224,27 @@ function openFacilityDetailModal(dealerId) {
           <div>Aging Visit: <strong class="text-slate-700">${u.aging_visit_unit || 0} hr</strong></div>
           <div>Lifetime: <strong class="text-slate-700">${u.lifetime_days || 0} hr</strong></div>
           <div>Status OVD: <strong class="text-slate-700">${isUnitNearJTO(u) ? 'H-3 JTO' : (Number(u.overdue_days || 0) > 0 ? 'OVD ' + u.overdue_days + ' hr' : 'Lancar')}</strong></div>
+          ${u.aging_gps_maint ? `<div class="col-span-2">Aging Maint GPS: <strong class="text-slate-700">${u.aging_gps_maint} hr</strong></div>` : ''}
         </div>
 
-        <div class="text-[10px] text-amber-900 bg-amber-50 p-1.5 rounded-lg border border-amber-200 font-medium">
-          Pemicu: <strong>${uEval.reason}</strong>${u.unit_concern ? `<br><span class="text-purple-800">Concern: "${typeof u.unit_concern === 'object' ? u.unit_concern.note : u.unit_concern}"</span>` : ''}
+        <div class="p-2 bg-amber-50/80 rounded-xl border border-amber-200 space-y-1.5">
+          <div class="text-[10px] font-bold text-amber-950 flex items-center justify-between border-b border-amber-200/60 pb-1">
+            <span><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i>Pemicu & Concern Unit (${(uEval.triggers || []).length}):</span>
+            ${isVisited 
+              ? '<span class="text-[9px] text-emerald-700 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>Visit Clear Hari Ini</span>' 
+              : '<span class="text-[9px] text-rose-700 font-bold"><i class="fa-solid fa-circle-exclamation mr-1"></i>Perlu Tindakan Visit</span>'}
+          </div>
+          <div class="space-y-1 pt-0.5">
+            ${(uEval.triggers && uEval.triggers.length > 0)
+              ? uEval.triggers.map(trg => `
+                <div class="text-[10px] flex items-start space-x-1.5 leading-snug">
+                  <span class="px-1.5 py-0.2 rounded text-[8px] font-bold border shrink-0 ${urgencyPillStyles[trg.level] || 'bg-slate-100 text-slate-700'}">${trg.level}</span>
+                  <span class="text-slate-800 font-medium">${trg.reason}</span>
+                </div>
+              `).join('')
+              : `<div class="text-[10px] text-slate-600 font-medium">${uEval.reason}</div>`
+            }
+          </div>
         </div>
       `;
       listContainer.appendChild(itemCard);
