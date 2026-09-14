@@ -5051,13 +5051,6 @@ function renderPriorityList() {
           ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-clock-rotate-left mr-1 text-[7px]"></i>Visit Selesai • ${d.urgentUnitsCount} Unit Belum Clear</span>`
           : ``);
 
-    const hasDealerConcernPill = d.dealer_concern 
-      ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-bullhorn mr-1 text-[7px]"></i>Concern Mitra</span>` 
-      : ``;
-    const hasUnitConcernPill = (d.units || []).some(u => u.unit_concern)
-      ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1 text-[7px]"></i>Concern Unit</span>` 
-      : ``;
-
     // Cek apakah ada unit yang cocok dengan query pencarian nopol
     let matchedUnitBadge = "";
     if (PRIORITY_SEARCH_QUERY && Array.isArray(d.units)) {
@@ -5111,8 +5104,6 @@ function renderPriorityList() {
           <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
           ${ticketAgePill}
           ${statusPill}
-          ${hasDealerConcernPill}
-          ${hasUnitConcernPill}
           ${matchedUnitBadge}
           ${liveUnitsCount > 0 ? `<span class="text-[9px] text-slate-400 font-medium">• ${liveUnitsCount} Unit</span>` : ''}
         </div>
