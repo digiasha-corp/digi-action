@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260914_v65";
+const APP_BUILD_VERSION = "20260914_v66";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1050,30 +1050,83 @@ async function syncMasterDataFromApi() {
       }
 
       // Hubungkan unit fasilitas dan assign concern ke masing-masing dealer
+      const normalizeDlr = (str) => String(str || "").replace(/\s*\([^)]*\)\s*$/, "").trim().toUpperCase();
+      const cleanPlate = (str) => String(str || "").replace(/[\s\-_.]/g, "").toUpperCase();
+
       const assignmentsByDealer = {};
+      const assignmentsByPlate = {};
+
       (APP_STATE.assignments || []).forEach(asg => {
-        const dName = String(asg.dealer_name || "").toUpperCase();
-        if (!assignmentsByDealer[dName]) assignmentsByDealer[dName] = [];
-        assignmentsByDealer[dName].push(asg);
+        const rawD = String(asg.dealer_name || "").trim().toUpperCase();
+        const normD = normalizeDlr(asg.dealer_name);
+
+        if (!assignmentsByDealer[normD]) assignmentsByDealer[normD] = [];
+        assignmentsByDealer[normD].push(asg);
+        if (rawD && rawD !== normD) {
+          if (!assignmentsByDealer[rawD]) assignmentsByDealer[rawD] = [];
+          assignmentsByDealer[rawD].push(asg);
+        }
+
+        const asgPlate = cleanPlate(asg.unit_fasilitas);
+        if (asgPlate && asgPlate !== "UMUM" && asgPlate !== "-") {
+          assignmentsByPlate[asgPlate] = asg;
+        }
       });
 
       const unitsByDealer = {};
       (APP_STATE.units || []).forEach(u => {
-        const dName = String(u.dealer_name || "").toUpperCase();
-        if (!unitsByDealer[dName]) unitsByDealer[dName] = [];
-        unitsByDealer[dName].push(u);
+        const rawD = String(u.dealer_name || "").trim().toUpperCase();
+        const normD = normalizeDlr(u.dealer_name);
+        if (!unitsByDealer[normD]) unitsByDealer[normD] = [];
+        unitsByDealer[normD].push(u);
+        if (rawD && rawD !== normD) {
+          if (!unitsByDealer[rawD]) unitsByDealer[rawD] = [];
+          unitsByDealer[rawD].push(u);
+        }
       });
 
       MASTER_DEALER_PRIORITY_DATA = (APP_STATE.dealers || []).map(d => {
-        const dName = String(d.dealer_name || "").toUpperCase();
-        const dUnits = unitsByDealer[dName] || [];
-        const dAsg = assignmentsByDealer[dName] || [];
-        const dealerConcern = dAsg.find(a => !a.unit_fasilitas || a.unit_fasilitas === "Umum" || a.unit_fasilitas === "-");
+        const normD = normalizeDlr(d.dealer_name);
+        const rawD = String(d.dealer_name || "").trim().toUpperCase();
+
+        // Gabungkan assignments untuk dealer ini
+        const dAsg = [
+          ...(assignmentsByDealer[normD] || []),
+          ...(assignmentsByDealer[rawD] || [])
+        ].filter((item, idx, arr) => arr.findIndex(x => (x.assignment_id && x.assignment_id === item.assignment_id) || (x.id && x.id === item.id) || (x.unit_fasilitas === item.unit_fasilitas && x.instruksi === item.instruksi)) === idx);
+
+        // Ambil raw units untuk dealer ini
+        const rawUnits = unitsByDealer[normD] || unitsByDealer[rawD] || [];
+
+        // Hubungkan unit_concern ke masing-masing unit fasilitas
+        const dUnits = rawUnits.map(u => {
+          const uPlate = cleanPlate(u.nopol);
+          const uFas = cleanPlate(u.no_fasilitas);
+
+          const uAsg = assignmentsByPlate[uPlate] || assignmentsByPlate[uFas] || dAsg.find(a => {
+            const aPlate = cleanPlate(a.unit_fasilitas);
+            return aPlate && aPlate !== "UMUM" && aPlate !== "-" && (aPlate === uPlate || aPlate === uFas);
+          }) || (APP_STATE.assignments || []).find(a => {
+            const aPlate = cleanPlate(a.unit_fasilitas);
+            return aPlate && aPlate !== "UMUM" && aPlate !== "-" && (aPlate === uPlate || aPlate === uFas);
+          });
+
+          return {
+            ...u,
+            unit_concern: uAsg ? { urgency: uAsg.urgency_level, note: uAsg.instruksi, assignment_id: uAsg.assignment_id } : null
+          };
+        });
+
+        // Dealer concern (Umum / Non-fasilitas)
+        const dealerConcern = dAsg.find(a => {
+          const aPlate = cleanPlate(a.unit_fasilitas);
+          return !aPlate || aPlate === "UMUM" || aPlate === "-";
+        });
 
         return {
           ...d,
           units: dUnits,
-          dealer_concern: dealerConcern ? { urgency: dealerConcern.urgency_level, note: dealerConcern.instruksi } : null
+          dealer_concern: dealerConcern ? { urgency: dealerConcern.urgency_level, note: dealerConcern.instruksi, assignment_id: dealerConcern.assignment_id } : null
         };
       });
 
@@ -1212,11 +1265,9 @@ async function loadScreen(screenName, updateHistory = true) {
     // Inisialisasi controller tiap modul
     if (screenName === "dashboard") initDashboard();
     if (screenName === "priority") {
-      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
-        syncMasterDataFromApi().then(() => renderPriorityList());
-      } else {
-        renderPriorityList();
-      }
+      renderPriorityList();
+      // Silently sync di background untuk memastikan assign concern atau status visit terbaru selalu termuat
+      syncMasterDataFromApi().then(() => renderPriorityList());
     }
     if (screenName === "assignment") populateAssignDealerOptions();
     if (screenName === "visit") populateVisitDealerOptions();
@@ -4659,25 +4710,38 @@ function renderPriorityList() {
 
   // Kalkulasi evaluasi urgensi untuk semua dealer
   let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => {
-    const hasDbLevel = d.priority_level && d.priority_level.trim() !== "" && d.priority_level !== "undefined";
     const clientCalc = calculateMitraUrgency(d);
 
-    const level = hasDbLevel ? d.priority_level : clientCalc.level;
-    const score = (d.priority_score !== undefined && d.priority_score !== null && !isNaN(Number(d.priority_score))) ? Number(d.priority_score) : clientCalc.score;
-    const reason = (d.priority_reason && d.priority_reason.trim() !== "" && d.priority_reason !== "-") ? d.priority_reason : clientCalc.mitraReason;
-    const urgentUnits = (d.urgent_units_count !== undefined && d.urgent_units_count !== null && !isNaN(Number(d.urgent_units_count))) ? Number(d.urgent_units_count) : clientCalc.urgentUnitsCount;
+    const scoreMap = { "Sangat Penting": 3, "Penting": 2, "Moderat": 1, "Normal": 0, "NORMAL": 0 };
+    const rawDbLevel = (d.priority_level && d.priority_level.trim() !== "" && d.priority_level !== "undefined") ? d.priority_level : "Normal";
+    const dbScore = (d.priority_score !== undefined && d.priority_score !== null && !isNaN(Number(d.priority_score))) 
+      ? Number(d.priority_score) 
+      : (scoreMap[rawDbLevel] || 0);
+
+    const scoreToLevel = { 3: "Sangat Penting", 2: "Penting", 1: "Moderat", 0: "Normal" };
+    const effectiveScore = Math.max(dbScore, clientCalc.score);
+
+    // Utamakan kalkulasi client jika ada concern atau skor client lebih tinggi
+    const level = (clientCalc.score >= dbScore && clientCalc.score > 0) 
+      ? clientCalc.level 
+      : (effectiveScore > 0 ? (scoreToLevel[effectiveScore] || rawDbLevel) : "Normal");
+      
+    const score = effectiveScore;
+    const reason = (clientCalc.score >= dbScore && clientCalc.score > 0)
+      ? (clientCalc.mitraReason || d.priority_reason)
+      : (d.priority_reason || clientCalc.mitraReason);
+
+    const urgentUnits = Math.max(clientCalc.urgentUnitsCount || 0, Number(d.urgent_units_count || 0));
 
     // Evaluasi apakah urgensi berasal dari internal mitra (aging/concern) atau pemicu unit
     let isMitraUrgent = false;
     let mitraLevel = "Normal";
-    if (score > 0) {
-      if (reason && reason.startsWith("Pemicu Unit")) {
-        isMitraUrgent = false;
-        mitraLevel = "Normal";
-      } else {
-        isMitraUrgent = true;
-        mitraLevel = level;
-      }
+    if (clientCalc.mitraScore > 0 || d.dealer_concern) {
+      isMitraUrgent = true;
+      mitraLevel = clientCalc.mitraLevel || level;
+    } else if (score > 0 && urgentUnits === 0) {
+      isMitraUrgent = true;
+      mitraLevel = level;
     }
 
     return {
@@ -4689,7 +4753,7 @@ function renderPriorityList() {
       priority_score: score,
       priority_reason: reason,
       mitraLevel: mitraLevel,
-      mitraScore: isMitraUrgent ? score : 0,
+      mitraScore: isMitraUrgent ? (clientCalc.mitraScore || score) : 0,
       urgentUnitsCount: urgentUnits,
       visitedToday: isDealerVisitedToday(d)
     };
@@ -4752,9 +4816,15 @@ function renderPriorityList() {
     const carBtnClass = hasUnitUrgency ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-400 border border-slate-200';
     const isPriorityUrgent = (d.score > 0) || (d.level && d.level !== "Normal");
 
-    // Status pill hanya ditampilkan jika sudah selesai hari ini (perlu dikunjungi cukup difilter di tab atas)
     const statusPill = d.visitedToday
       ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 inline-flex items-center"><i class="fa-solid fa-circle-check mr-1 text-[7px]"></i> Selesai Hari Ini</span>`
+      : ``;
+
+    const hasDealerConcernPill = d.dealer_concern 
+      ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-bullhorn mr-1 text-[7px]"></i>Concern Mitra</span>` 
+      : ``;
+    const hasUnitConcernPill = (d.units || []).some(u => u.unit_concern)
+      ? `<span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 shrink-0 inline-flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1 text-[7px]"></i>Concern Unit</span>` 
       : ``;
 
     const visitActionBtn = d.visitedToday
@@ -4780,6 +4850,8 @@ function renderPriorityList() {
           <span class="text-[10px] text-slate-500 font-medium">${d.cabang || "-"}</span>
           <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
           ${statusPill}
+          ${hasDealerConcernPill}
+          ${hasUnitConcernPill}
           ${liveUnitsCount > 0 ? `<span class="text-[9px] text-slate-400 font-medium">• ${liveUnitsCount} Unit</span>` : ''}
         </div>
       </div>
@@ -5251,36 +5323,57 @@ function clearAssignUnitSearchSelection() {
 
 async function handleAssignConcernSubmit(e) {
   e.preventDefault();
+  const form = e.target;
+  const btnSubmit = form.querySelector('button[type="submit"]') || document.getElementById("assign-btn-submit");
+  const origBtnHtml = btnSubmit ? btnSubmit.innerHTML : "";
+
   const dealerId = document.getElementById("assign-select-dealer").value;
   const selectDealer = document.getElementById("assign-select-dealer");
-  const dealerName = selectDealer.options[selectDealer.selectedIndex].text;
+  const rawDealerName = selectDealer?.selectedIndex >= 0 ? selectDealer.options[selectDealer.selectedIndex].text : "";
   const unitVal = document.getElementById("assign-select-unit").value;
   const concernText = document.getElementById("assign-input-concern").value.trim();
-  const urgencyVal = document.querySelector('input[name="assign_urgency"]:checked').value;
+  const urgencyRadio = document.querySelector('input[name="assign_urgency"]:checked');
+  const urgencyVal = urgencyRadio ? urgencyRadio.value : "Penting";
 
-  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
-  if (d) {
-    if (unitVal === "Umum") {
-      d.dealer_concern = { urgency: urgencyVal, note: concernText };
-    } else {
-      const u = d.units?.find(unit => unit.nopol === unitVal);
-      if (u) u.unit_concern = { urgency: urgencyVal, note: concernText };
-    }
+  if (!dealerId) {
+    alert("Silakan pilih Partner Dealer terlebih dahulu.");
+    return;
   }
 
-  // Kirim ke backend Spreadsheet jika online
-  callApi("saveAssignment", {
-    assignedByUserId: CURRENT_USER?.nip || "ADM",
-    assignedByUserName: CURRENT_USER?.nama || "Supervisor",
-    dealerName: dealerName,
-    unitFasilitas: unitVal,
-    concernType: "Assign Concern",
-    urgencyLevel: urgencyVal,
-    instruksi: concernText
-  });
+  const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
+  const cleanDealerName = d ? d.dealer_name : rawDealerName.replace(/\s*\([^)]*\)\s*$/, "").trim();
 
-  alert(`Concern ${urgencyVal} berhasil disimpan ke Priority Visit!`);
-  loadScreen('priority');
+  try {
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>Menyimpan Concern...';
+    }
+
+    // 1. Simpan ke database Supabase
+    await callApi("saveAssignment", {
+      assignedByUserId: CURRENT_USER?.nip || "ADM",
+      assignedByUserName: CURRENT_USER?.nama || "Supervisor",
+      dealerName: cleanDealerName,
+      unitFasilitas: unitVal,
+      concernType: "Assign Concern",
+      urgencyLevel: urgencyVal,
+      instruksi: concernText
+    });
+
+    // 2. Sinkronkan ulang data master agar concern langsung terhubung & prioritas langsung ter-update
+    await syncMasterDataFromApi();
+
+    alert(`Concern "${urgencyVal}" berhasil disimpan dan langsung aktif di Prioritas Kunjungan!`);
+    loadScreen('priority');
+  } catch (err) {
+    console.error("Gagal menyimpan assign concern:", err);
+    alert("Terjadi kendala saat menyimpan concern: " + (err.message || err));
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = origBtnHtml;
+    }
+  }
 }
 
 // =========================================================================
