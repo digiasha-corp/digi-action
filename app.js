@@ -5597,6 +5597,30 @@ function selectDealerFromSearch(dealerId) {
   }
 }
 
+function onDealerSearchKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const input = document.getElementById("dealer-search-input");
+    const q = input ? input.value.trim().toLowerCase() : "";
+    if (q) {
+      const match = MASTER_DEALER_PRIORITY_DATA.find(d => {
+        const name = String(d.dealer_name || "").toLowerCase();
+        const branch = String(d.cabang || "").toLowerCase();
+        const full = `${name} (${branch})`;
+        return name.includes(q) || branch.includes(q) || full.includes(q);
+      });
+      if (match) {
+        selectDealerFromSearch(match.dealer_id);
+      }
+    }
+    closeDealerSearchDropdown();
+    if (input) input.blur();
+    return false;
+  }
+}
+
 function onDealerSearchInputBlur() {
   setTimeout(() => {
     const input = document.getElementById("dealer-search-input");
