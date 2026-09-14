@@ -39,19 +39,20 @@ BEGIN
     FROM m_facility_unit u
     LEFT JOIN (
       SELECT 
-        LOWER(TRIM(dealer_name)) AS dealer_name_clean,
-        LOWER(TRIM(unit_fasilitas)) AS unit_fasilitas_clean,
+        LOWER(REGEXP_REPLACE(TRIM(dealer_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
+        REGEXP_REPLACE(UPPER(TRIM(unit_fasilitas)), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
         urgency_level AS concern_urgency,
         instruksi AS concern_note,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(TRIM(dealer_name)), LOWER(TRIM(unit_fasilitas)) ORDER BY created_at DESC) as rn
+        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(dealer_name), '\s*\([^)]*\)\s*$', '')), REGEXP_REPLACE(UPPER(TRIM(unit_fasilitas)), '[\s\-_.]', '', 'g') ORDER BY created_at DESC) as rn
       FROM t_assignment
       WHERE UPPER(status) IN ('OPEN', 'PENDING')
     ) c ON (
-      LOWER(TRIM(u.dealer_name)) = c.dealer_name_clean 
+      (LOWER(TRIM(u.dealer_name)) = c.dealer_name_clean OR LOWER(REGEXP_REPLACE(TRIM(u.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean)
       AND (
-        c.unit_fasilitas_clean = 'umum' 
-        OR LOWER(TRIM(u.no_fasilitas)) = c.unit_fasilitas_clean 
-        OR LOWER(TRIM(COALESCE(u.nopol, ''))) = c.unit_fasilitas_clean
+        c.unit_fasilitas_clean = 'UMUM' 
+        OR c.unit_fasilitas_clean = '-'
+        OR REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean 
+        OR REGEXP_REPLACE(UPPER(TRIM(COALESCE(u.nopol, ''))), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
       )
     ) AND c.rn = 1
   ),
@@ -151,13 +152,13 @@ BEGIN
     FROM m_dealer d
     LEFT JOIN (
       SELECT 
-        LOWER(TRIM(dealer_name)) AS dealer_name_clean,
+        LOWER(REGEXP_REPLACE(TRIM(dealer_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
         urgency_level AS concern_urgency,
         instruksi AS concern_note,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(TRIM(dealer_name)) ORDER BY created_at DESC) as rn
+        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(dealer_name), '\s*\([^)]*\)\s*$', '')) ORDER BY created_at DESC) as rn
       FROM t_assignment
       WHERE UPPER(status) IN ('OPEN', 'PENDING')
-    ) c ON LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean AND c.rn = 1
+    ) c ON (LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean OR LOWER(REGEXP_REPLACE(TRIM(d.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean) AND c.rn = 1
   ),
   mitra_internal_scored AS (
     SELECT 
