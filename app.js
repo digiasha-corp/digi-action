@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260913_v63";
+const APP_BUILD_VERSION = "20260914_v64";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1086,9 +1086,43 @@ async function syncMasterDataFromApi() {
 }
 
 // =========================================================================
-// UI HELPERS & SESSIONS
+// UI HELPERS, CLIENT-SIDE ROUTER & SESSIONS
 // =========================================================================
-async function loadScreen(screenName) {
+const VALID_APP_SCREENS = [
+  "dashboard", "priority", "assignment", "visit", "onboarding", "pipeline",
+  "gps", "fac", "history", "laporan_activity", "absensi", "izin",
+  "persetujuan", "attendance_summary", "rekap_absen", "rekap_tim",
+  "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+  "settings", "login"
+];
+
+function getScreenFromUrl() {
+  let rawPath = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  if (!rawPath && window.location.hash) {
+    rawPath = window.location.hash.replace(/^#\/?/, "");
+  }
+
+  if (!rawPath) return "dashboard";
+
+  const firstSegment = rawPath.split("/")[0].toLowerCase();
+  if (firstSegment === "rekap_absen") return "attendance_summary";
+  if (firstSegment === "home" || firstSegment === "index" || firstSegment === "index.html") return "dashboard";
+
+  if (VALID_APP_SCREENS.includes(firstSegment)) {
+    return firstSegment;
+  }
+  return "dashboard";
+}
+
+function handleBackNavigation() {
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    loadScreen("dashboard", true);
+  }
+}
+
+async function loadScreen(screenName, updateHistory = true) {
   const container = document.getElementById("main-view-container");
   const topbar = document.getElementById("topbar");
   const btnBack = document.getElementById("btn-back-home");
@@ -1097,6 +1131,9 @@ async function loadScreen(screenName) {
 
   // Auth Guard: Jika belum login dan mencoba buka selain login, redirect ke login
   if (!CURRENT_USER && screenName !== "login") {
+    try {
+      sessionStorage.setItem("DIGIASHA_REDIRECT_SCREEN", screenName);
+    } catch (e) {}
     screenName = "login";
   }
 
@@ -1105,6 +1142,44 @@ async function loadScreen(screenName) {
     if (typeof openForceChangePassModal === "function") openForceChangePassModal();
     return;
   }
+
+  // Update URL di address bar browser (HTML5 History API)
+  if (updateHistory && window.history && window.history.pushState) {
+    const targetPath = (screenName === "dashboard") ? "/" : `/${screenName}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ screen: screenName }, "", targetPath);
+    }
+  }
+
+  const titles = {
+    dashboard: "Digiasha Monitoring",
+    visit: "Laporan Visit Mitra",
+    onboarding: "Visit Calon Mitra",
+    pipeline: "Pipeline Onboarding",
+    gps: "GPS Maintenance",
+    priority: "Priority Visit",
+    assignment: "Assign Concern Visit",
+    fac: "Report GPS",
+    absensi: "Presensi Kehadiran",
+    izin: "Pengajuan Izin",
+    persetujuan: "Pusat Persetujuan",
+    settings: "In-App Management",
+    history: "Riwayat Aktivitas PIC",
+    rekap_absen: "Rekap Presensi & Kalender",
+    attendance_summary: "Rekap Presensi & Kalender",
+    rekap_tim: "Presensi Tim & Monitoring PIC",
+    laporan_activity: "Laporan Activity & Monitoring Kunjungan",
+    expense_claim: "Klaim Biaya Operasional",
+    internal_memo: "Memo Pengajuan Internal",
+    employee_loan: "Pinjaman Karyawan (Kasbon)",
+    helpdesk_support: "IT & Helpdesk Support",
+    login: "Masuk Akun"
+  };
+
+  const pageTitle = titles[screenName] || "Monitoring";
+  document.title = (screenName === "dashboard" || screenName === "login")
+    ? "Digiasha Monitoring"
+    : `Digiasha - ${pageTitle}`;
 
   if (screenName === "login") {
     topbar.classList.add("hidden");
@@ -1119,25 +1194,7 @@ async function loadScreen(screenName) {
       title.innerText = "Digiasha Monitoring";
     } else {
       btnBack.classList.remove("hidden");
-      const titles = {
-        visit: "Laporan Visit Mitra",
-        onboarding: "Visit Calon Mitra",
-        pipeline: "Pipeline Onboarding",
-        gps: "GPS Maintenance",
-        priority: "Priority Visit",
-        assignment: "Assign Concern Visit",
-        fac: "Report GPS",
-        absensi: "Presensi Kehadiran",
-        izin: "Pengajuan Izin",
-        persetujuan: "Pusat Persetujuan",
-        settings: "In-App Management",
-        history: "Riwayat Aktivitas PIC",
-        rekap_absen: "Rekap Presensi & Kalender",
-        attendance_summary: "Rekap Presensi & Kalender",
-        rekap_tim: "Presensi Tim & Monitoring PIC",
-        laporan_activity: "Laporan Activity & Monitoring Kunjungan"
-      };
-      title.innerText = titles[screenName] || "Monitoring";
+      title.innerText = pageTitle;
     }
   }
 
@@ -1146,7 +1203,7 @@ async function loadScreen(screenName) {
   try {
     if (!screenCache[screenName]) {
       const vParam = typeof APP_BUILD_VERSION !== "undefined" ? `?v=${APP_BUILD_VERSION}` : `?v=${Date.now()}`;
-      const res = await fetch(`screens/${screenName}.html${vParam}`, { cache: "no-store" });
+      const res = await fetch(`/screens/${screenName}.html${vParam}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Gagal mengambil file screen");
       screenCache[screenName] = await res.text();
     }
@@ -1327,7 +1384,16 @@ async function handleLoginSubmit(e) {
       return;
     }
 
-    loadScreen("dashboard");
+    let targetScreen = "dashboard";
+    try {
+      const redirectScreen = sessionStorage.getItem("DIGIASHA_REDIRECT_SCREEN");
+      if (redirectScreen && redirectScreen !== "login" && VALID_APP_SCREENS.includes(redirectScreen)) {
+        targetScreen = redirectScreen;
+        sessionStorage.removeItem("DIGIASHA_REDIRECT_SCREEN");
+      }
+    } catch (e) {}
+
+    await loadScreen(targetScreen, true);
     syncMasterDataFromApi();
   } catch (err) {
     submitBtn.innerHTML = originalText;
@@ -1338,9 +1404,10 @@ async function handleLoginSubmit(e) {
 
 function handleLogout() {
   localStorage.removeItem("DIGIASHA_AUTH_USER");
+  try { sessionStorage.removeItem("DIGIASHA_REDIRECT_SCREEN"); } catch (e) {}
   CURRENT_USER = null;
   closeForceChangePassModal();
-  loadScreen("login");
+  loadScreen("login", true);
 }
 
 // =========================================================================
@@ -11687,25 +11754,46 @@ async function initAppBootstrap() {
   }
 
   try {
+    const requestedScreen = getScreenFromUrl();
+
     if (CURRENT_USER) {
       if (CURRENT_USER.status_ganti_pass === true || String(CURRENT_USER.status_ganti_pass).toLowerCase() === "true") {
-        await loadScreen("login");
+        await loadScreen("login", false);
         if (typeof openForceChangePassModal === "function") openForceChangePassModal();
       } else {
-        await loadScreen("dashboard");
+        const target = (requestedScreen === "login") ? "dashboard" : requestedScreen;
+        await loadScreen(target, false);
+
+        // Pastikan URL sinkron di browser tanpa menambah tumpukan riwayat
+        const targetPath = (target === "dashboard") ? "/" : `/${target}`;
+        if (window.location.pathname !== targetPath && window.history && window.history.replaceState) {
+          window.history.replaceState({ screen: target }, "", targetPath);
+        }
         syncMasterDataFromApi();
       }
     } else {
-      await loadScreen("login");
+      if (requestedScreen && requestedScreen !== "login") {
+        try { sessionStorage.setItem("DIGIASHA_REDIRECT_SCREEN", requestedScreen); } catch (e) {}
+      }
+      await loadScreen("login", false);
+      if (window.location.pathname !== "/login" && window.location.pathname !== "/" && window.history && window.history.replaceState) {
+        window.history.replaceState({ screen: "login" }, "", "/login");
+      }
     }
   } catch (err) {
     console.error("Critical error in initAppBootstrap:", err);
     const container = document.getElementById("main-view-container");
     if (container && (!container.innerHTML || container.innerHTML.trim() === "")) {
-      loadScreen("login");
+      loadScreen("login", false);
     }
   }
 }
+
+// Listener Tombol Back & Forward Browser HP / Desktop
+window.addEventListener("popstate", function(event) {
+  const target = getScreenFromUrl();
+  loadScreen(target, false);
+});
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initAppBootstrap);
