@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v103";
+const APP_BUILD_VERSION = "20260916_v104";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -530,6 +530,9 @@ async function supabaseGetMasterData() {
   }));
 
   const now = new Date();
+  const obsoleteDealersToClean = [];
+  const obsoleteUnitsToClean = [];
+
   const dealers = (resDlr.data || []).map(d => {
     let agingMitra = d.aging_visit_mitra || 0;
     if (d.last_visit_date) {
@@ -538,6 +541,26 @@ async function supabaseGetMasterData() {
     } else if (d.tanggal_kerjasama) {
       const diffMs = now.getTime() - new Date(d.tanggal_kerjasama).getTime();
       agingMitra = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    const isVisitedToday = isDealerVisitedToday(d);
+    const reasonLower = String(d.priority_reason || "").toLowerCase();
+    const isOldAgingReason = reasonLower.includes("aging visit");
+
+    let pLevel = d.priority_level || "NORMAL";
+    let pScore = d.priority_score || 0;
+    let pReason = d.priority_reason || "";
+    let urgentUnits = d.urgent_units_count || 0;
+
+    // Jika sudah dikunjungi hari ini dan prioritas di DB hanyalah sisa aging visit lama, normalkan
+    if (isVisitedToday && (isOldAgingReason || Number(urgentUnits) > 0)) {
+      if (isOldAgingReason) {
+        pLevel = "Normal";
+        pScore = 0;
+        pReason = "Selesai Dikunjungi Hari Ini";
+      }
+      urgentUnits = 0;
+      obsoleteDealersToClean.push(d.dealer_id || d.dealer_name);
     }
 
     return {
@@ -551,10 +574,10 @@ async function supabaseGetMasterData() {
       tanggal_kerjasama: d.tanggal_kerjasama,
       last_visit_date: d.last_visit_date,
       aging_visit_mitra: agingMitra,
-      urgent_units_count: d.urgent_units_count || 0,
-      priority_level: d.priority_level || "NORMAL",
-      priority_score: d.priority_score || 0,
-      priority_reason: d.priority_reason || ""
+      urgent_units_count: urgentUnits,
+      priority_level: pLevel,
+      priority_score: pScore,
+      priority_reason: pReason
     };
   });
 
@@ -563,6 +586,21 @@ async function supabaseGetMasterData() {
     if (u.last_visit_date) {
       const diffMs = now.getTime() - new Date(u.last_visit_date).getTime();
       agingUnit = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    const isVisitedToday = isUnitVisitedToday(u);
+    const reasonLower = String(u.priority_reason || "").toLowerCase();
+    const isOldAgingReason = reasonLower.includes("aging visit");
+
+    let pLevel = u.priority_level || "NORMAL";
+    let pScore = u.priority_score || 0;
+    let pReason = u.priority_reason || "";
+
+    if (isVisitedToday && isOldAgingReason) {
+      pLevel = "Normal";
+      pScore = 0;
+      pReason = "Kondisi Normal / Terjadwal Baik";
+      obsoleteUnitsToClean.push(u.no_fasilitas);
     }
 
     return {
@@ -579,11 +617,44 @@ async function supabaseGetMasterData() {
       last_visit_date: u.last_visit_date,
       aging_visit_unit: agingUnit,
       aging_gps_maint: u.aging_gps_maint || 0,
-      priority_level: u.priority_level || "NORMAL",
-      priority_score: u.priority_score || 0,
-      priority_reason: u.priority_reason || ""
+      priority_level: pLevel,
+      priority_score: pScore,
+      priority_reason: pReason
     };
   });
+
+  // Background reconcile ke database Supabase jika ada record yang sudah dikunjungi hari ini tapi belum ter-reset di tabel
+  if (supabaseClient) {
+    setTimeout(async () => {
+      try {
+        if (obsoleteUnitsToClean.length > 0) {
+          await supabaseClient.from("m_facility_unit")
+            .update({
+              priority_level: "Normal",
+              priority_score: 0,
+              priority_reason: "Kondisi Normal / Terjadwal Baik",
+              updated_at: new Date().toISOString()
+            })
+            .in("no_fasilitas", obsoleteUnitsToClean);
+        }
+        if (obsoleteDealersToClean.length > 0) {
+          for (const dId of obsoleteDealersToClean) {
+            await supabaseClient.from("m_dealer")
+              .update({
+                urgent_units_count: 0,
+                priority_level: "Normal",
+                priority_score: 0,
+                priority_reason: "Selesai Dikunjungi Hari Ini",
+                updated_at: new Date().toISOString()
+              })
+              .or(`dealer_id.eq.${dId},dealer_name.eq.${dId}`);
+          }
+        }
+      } catch (errClean) {
+        console.warn("[reconcileSupabaseVisitStatus warning]:", errClean);
+      }
+    }, 1200);
+  }
 
   const idleGps = (resGps.data || []).filter(g => {
     const s = String(g.status_device || "").toUpperCase();
@@ -651,7 +722,13 @@ async function supabaseSubmitVisit(data) {
       const isUnitTerlihat = (u.terlihat === "Ya" || String(u.terlihat || "").toLowerCase().includes("terlihat"));
       if (u.no_fasilitas && isUnitTerlihat) {
         await supabaseClient.from("m_facility_unit")
-          .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_unit: 0 })
+          .update({
+            last_visit_date: new Date().toISOString().slice(0, 10),
+            aging_visit_unit: 0,
+            priority_level: "Normal",
+            priority_score: 0,
+            priority_reason: "Kondisi Normal / Terjadwal Baik"
+          })
           .eq("no_fasilitas", u.no_fasilitas);
       }
     }
@@ -670,9 +747,52 @@ async function supabaseSubmitVisit(data) {
   );
 
   if (isDealerSolved) {
-    await supabaseClient.from("m_dealer")
-      .update({ last_visit_date: new Date().toISOString().slice(0, 10), aging_visit_mitra: 0 })
-      .eq("dealer_name", data.dealer_name);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let remainingUrgentCount = 0;
+    try {
+      let remQuery = supabaseClient.from("m_facility_unit")
+        .select("no_fasilitas, priority_level, last_visit_date");
+      if (data.dealer_id) {
+        remQuery = remQuery.or(`dealer_name.eq.${data.dealer_name},dealer_id.eq.${data.dealer_id}`);
+      } else {
+        remQuery = remQuery.eq("dealer_name", data.dealer_name);
+      }
+      const { data: remUnits } = await remQuery;
+
+      if (Array.isArray(remUnits)) {
+        remainingUrgentCount = remUnits.filter(ru => 
+          ru.last_visit_date !== todayStr && 
+          (ru.priority_level === "Kritis" || ru.priority_level === "Penting" || (ru.priority_score && ru.priority_score > 0))
+        ).length;
+      }
+    } catch (cntErr) {
+      console.warn("Count remaining urgent units error:", cntErr);
+    }
+
+    const dealerPriorityLevel = remainingUrgentCount > 0 ? "Penting" : "Normal";
+    const dealerPriorityScore = remainingUrgentCount > 0 ? 1 : 0;
+    const dealerPriorityReason = remainingUrgentCount > 0 
+      ? `Selesai Visit Mitra, ${remainingUrgentCount} unit belum clear`
+      : "Selesai Dikunjungi Hari Ini";
+
+    const dealerUpdate = {
+      last_visit_date: todayStr,
+      aging_visit_mitra: 0,
+      urgent_units_count: remainingUrgentCount,
+      priority_level: dealerPriorityLevel,
+      priority_score: dealerPriorityScore,
+      priority_reason: dealerPriorityReason
+    };
+
+    if (data.dealer_id) {
+      await supabaseClient.from("m_dealer")
+        .update(dealerUpdate)
+        .or(`dealer_id.eq.${data.dealer_id},dealer_name.eq.${data.dealer_name}`);
+    } else {
+      await supabaseClient.from("m_dealer")
+        .update(dealerUpdate)
+        .eq("dealer_name", data.dealer_name);
+    }
   }
 
   // Auto-resolve Tiket di t_priority_action
@@ -5503,6 +5623,13 @@ function renderPriorityList() {
   // Kalkulasi evaluasi urgensi untuk semua dealer
   let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => {
     const clientCalc = calculateMitraUrgency(d);
+    const visitedToday = isDealerVisitedToday(d);
+
+    // 1. urgentUnits adalah murni unit yang BELUM divisit hari ini (clientCalc.urgentUnitsCount)
+    // Jika dealer sudah divisit hari ini, jangan biarkan d.urgent_units_count lama dari DB membatalkan hasil visit
+    const urgentUnits = visitedToday 
+      ? (clientCalc.urgentUnitsCount || 0) 
+      : Math.max(clientCalc.urgentUnitsCount || 0, Number(d.urgent_units_count || 0));
 
     const scoreMap = { "Sangat Penting": 3, "Penting": 2, "Moderat": 1, "Normal": 0, "NORMAL": 0 };
     const rawDbLevel = (d.priority_level && d.priority_level.trim() !== "" && d.priority_level !== "undefined") ? d.priority_level : "Normal";
@@ -5511,19 +5638,31 @@ function renderPriorityList() {
       : (scoreMap[rawDbLevel] || 0);
 
     const scoreToLevel = { 3: "Sangat Penting", 2: "Penting", 1: "Moderat", 0: "Normal" };
-    const effectiveScore = Math.max(dbScore, clientCalc.score);
 
-    // Utamakan kalkulasi client jika ada concern atau skor client lebih tinggi
-    const level = (clientCalc.score >= dbScore && clientCalc.score > 0) 
-      ? clientCalc.level 
-      : (effectiveScore > 0 ? (scoreToLevel[effectiveScore] || rawDbLevel) : "Normal");
-      
-    const score = effectiveScore;
-    const reason = (clientCalc.score >= dbScore && clientCalc.score > 0)
-      ? (clientCalc.mitraReason || d.priority_reason)
-      : (d.priority_reason || clientCalc.mitraReason);
+    // 2. Evaluasi level dan score:
+    // Jika sudah dikunjungi hari ini dan semua unit clear serta tidak ada concern dealer terbuka,
+    // maka dealer berstatus NORMAL (selesai hari ini)
+    let level = "Normal";
+    let score = 0;
+    let reason = "Kondisi Normal / Terjadwal Baik";
 
-    const urgentUnits = Math.max(clientCalc.urgentUnitsCount || 0, Number(d.urgent_units_count || 0));
+    if (visitedToday && urgentUnits === 0 && !d.dealer_concern && clientCalc.mitraScore === 0) {
+      level = "Normal";
+      score = 0;
+      reason = "Selesai Dikunjungi Hari Ini";
+    } else {
+      const effectiveScore = visitedToday ? clientCalc.score : Math.max(dbScore, clientCalc.score);
+      level = (clientCalc.score >= dbScore && clientCalc.score > 0) 
+        ? clientCalc.level 
+        : (effectiveScore > 0 ? (scoreToLevel[effectiveScore] || rawDbLevel) : "Normal");
+      score = effectiveScore;
+      reason = (clientCalc.score >= dbScore && clientCalc.score > 0)
+        ? (clientCalc.mitraReason || d.priority_reason)
+        : (d.priority_reason || clientCalc.mitraReason);
+    }
+
+    const isFullyDone = visitedToday && (urgentUnits === 0);
+    const hasUnresolvedUnits = visitedToday && (urgentUnits > 0);
 
     // Evaluasi apakah urgensi berasal dari internal mitra (aging/concern) atau pemicu unit
     let isMitraUrgent = false;
@@ -5535,11 +5674,6 @@ function renderPriorityList() {
       isMitraUrgent = true;
       mitraLevel = level;
     }
-
-    const visitedToday = isDealerVisitedToday(d);
-    // Selesai HANYA jika sudah visit hari ini DAN tidak ada lagi unit mendesak yang belum selesai
-    const isFullyDone = visitedToday && (urgentUnits === 0);
-    const hasUnresolvedUnits = visitedToday && (urgentUnits > 0);
 
     return {
       ...d,
@@ -6984,14 +7118,37 @@ async function handleFormSubmit(e) {
             uObj.unit_concern = null;
             uObj.last_visit_date = todayStr;
             uObj.aging_visit_unit = 0;
+            uObj.priority_level = "Normal";
+            uObj.priority_score = 0;
+            uObj.priority_reason = "Kondisi Normal / Terjadwal Baik";
           }
         }
       });
+    }
+    if (isMitraSolved) {
+      const remUrgent = (targetDealer.units || []).filter(u => 
+        u.last_visit_date !== todayStr && 
+        (u.priority_level === "Kritis" || u.priority_level === "Penting" || (u.priority_score && u.priority_score > 0) || u.unit_concern)
+      );
+      targetDealer.urgent_units_count = remUrgent.length;
+      if (remUrgent.length === 0) {
+        targetDealer.priority_level = "Normal";
+        targetDealer.priority_score = 0;
+        targetDealer.priority_reason = "Selesai Dikunjungi Hari Ini";
+      } else {
+        targetDealer.priority_level = "Penting";
+        targetDealer.priority_score = 1;
+        targetDealer.priority_reason = `Selesai Visit Mitra, ${remUrgent.length} unit belum clear`;
+      }
+    }
+    if (typeof renderPriorityList === "function") {
+      try { renderPriorityList(); } catch(e) {}
     }
   }
 
   // Kirim ke Google Apps Script secara asynchronous
   callApi("submitVisit", {
+    dealer_id: dealerId,
     dealer_name: dealerName,
     lokasi: lokasi,
     bertemu_owner: bertemuOwner,
