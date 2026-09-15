@@ -1,0 +1,80 @@
+<!-- SCREEN: E-SLIP GAJI KARYAWAN (DIGIASHA HR & PERSONALIA) -->
+<div class="space-y-4 pb-12">
+
+  <!-- HERO BANNER INFORMASI SLIP GAJI -->
+  <div class="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-5 shadow-lg border border-emerald-500/20 relative overflow-hidden">
+    <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+    <div class="flex items-start space-x-3.5 relative z-10">
+      <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+        <i class="fa-solid fa-file-invoice-dollar"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 uppercase tracking-wider">
+            Personalia • Payroll
+          </span>
+          <span class="text-[10px] text-slate-400">Digiasha System</span>
+        </div>
+        <h3 class="text-base sm:text-lg font-black tracking-tight text-white mt-1">E-Slip Gaji Karyawan</h3>
+        <p class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+          Pusat rincian penggajian, tunjangan operasional, dan bukti pembayaran resmi karyawan Digiasha.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECURITY & ANTI-SHARING LOGIN NOTICE BANNER -->
+  <div class="p-4 bg-amber-50 border border-amber-200 rounded-3xl space-y-2">
+    <div class="flex items-center space-x-2.5 text-amber-900">
+      <div class="w-7 h-7 rounded-xl bg-amber-200/70 text-amber-800 flex items-center justify-center text-xs shrink-0 font-bold">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <h4 class="font-bold text-xs uppercase tracking-wide">Peringatan Keamanan & Anti-Sharing Akun</h4>
+    </div>
+    <p class="text-[11px] text-amber-800 leading-relaxed pl-9">
+      Slip gaji bersifat <strong>sangat rahasia dan berstatus dokumen pribadi karyawan</strong>. Demi melindungi privasi penghasilan Anda, <strong>dilarang keras membagikan username dan password login akun Digiasha</strong> kepada rekan kerja maupun pihak manapun.
+    </p>
+  </div>
+
+  <!-- KARTU STATUS PERSIAPAN INTEGRASI -->
+  <div class="bg-white rounded-3xl p-5 shadow-xs border border-slate-200/80 text-center space-y-4">
+    <div class="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner border border-emerald-100">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+    </div>
+
+    <div class="max-w-md mx-auto space-y-1">
+      <span class="px-3 py-1 bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-bold rounded-full inline-block">
+        MENU TELAH DIAKTIFKAN
+      </span>
+      <h4 class="font-bold text-sm text-slate-900 pt-1">Integrasi Data Slip Gaji Sedang Disiapkan</h4>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Menu Slip Gaji telah berhasil terpasang di bawah kategori <strong>Personalia</strong>. Rincian dokumen slip gaji berkala akan otomatis diterbitkan dan tampil di halaman ini sesuai jadwal cut-off penggajian internal.
+      </p>
+    </div>
+
+    <!-- Info Identitas Akun Pemilik -->
+    <div class="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 text-left text-xs space-y-2 max-w-md mx-auto">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-200">
+        <span class="text-slate-500 text-[11px]">Nama Karyawan:</span>
+        <span id="slip-user-name" class="font-bold text-slate-800">-</span>
+      </div>
+      <div class="flex justify-between items-center pb-2 border-b border-slate-200">
+        <span class="text-slate-500 text-[11px]">NIP / Akun:</span>
+        <span id="slip-user-nip" class="font-bold text-slate-800">-</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-slate-500 text-[11px]">Role & Cabang:</span>
+        <span id="slip-user-role" class="font-semibold text-slate-700">-</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="pt-2 flex flex-col sm:flex-row gap-2 justify-center max-w-xs mx-auto">
+      <button type="button" onclick="loadScreen('dashboard')" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-sm">
+        <i class="fa-solid fa-arrow-left mr-1.5"></i>Kembali ke Dashboard
+      </button>
+    </div>
+  </div>
+
+</div>

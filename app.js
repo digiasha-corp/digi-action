@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v99";
+const APP_BUILD_VERSION = "20260915_v100";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -11,11 +11,16 @@ let CURRENT_USER = (() => {
     if (saved) {
       const u = JSON.parse(saved);
       const uRole = String(u.role || u.role_id || u.jabatan || "").toLowerCase();
+      // Ensure slip_gaji is present in permissions
+      if (Array.isArray(u.permissions) && !u.permissions.includes("slip_gaji")) {
+        u.permissions.push("slip_gaji");
+        try { localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(u)); } catch (e) {}
+      }
       // Self-heal: jika role adalah Admin / Super Admin dan permissions terpotong (< 16)
       if ((uRole.includes("admin") || u.role_id === "R-01") && (!Array.isArray(u.permissions) || u.permissions.length < 16)) {
         u.permissions = [
           "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
-          "izin", "persetujuan", "attendance_summary", "rekap_tim",
+          "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
           "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
           "sop_management", "settings"
         ];
@@ -39,7 +44,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, ketentuan, SOP management, dan pengaturan sistem.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
-      "izin", "persetujuan", "attendance_summary", "rekap_tim",
+      "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
       "sop_management", "settings"
     ]
@@ -52,7 +57,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, ketentuan, dan layanan support karyawan.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "laporan_activity",
-      "izin", "persetujuan", "attendance_summary", "rekap_tim",
+      "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan"
     ]
   },
@@ -64,7 +69,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     desc: "Monitoring dan operasional GPS armada dealer, laporan berkala FAC, ketentuan, dan support karyawan.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
-      "izin", "attendance_summary",
+      "izin", "attendance_summary", "slip_gaji",
       "expense_claim", "internal_memo", "helpdesk_support", "ketentuan"
     ]
   },
@@ -76,7 +81,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, presensi, ketentuan, dan klaim biaya.",
     permissions: [
       "priority", "visit", "onboarding", "pipeline", "gps", "history",
-      "izin", "attendance_summary",
+      "izin", "attendance_summary", "slip_gaji",
       "expense_claim", "internal_memo", "helpdesk_support", "ketentuan"
     ]
   }
@@ -94,11 +99,12 @@ const ALL_APP_MODULES = [
   { key: "history", title: "Riwayat", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
   { key: "laporan_activity", title: "Laporan Activity", desc: "Monitoring kunjungan PIC & cabang", icon: "fa-chart-line", category: "Operasional Lapangan" },
 
-  // 2. Presensi & Persetujuan
-  { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit, Terlambat", icon: "fa-file-signature", category: "Presensi & Persetujuan" },
-  { key: "persetujuan", title: "Persetujuan (Approval Hub)", desc: "Pusat persetujuan permohonan staf", icon: "fa-stamp", category: "Presensi & Persetujuan" },
-  { key: "attendance_summary", title: "Rekap Absen", desc: "Kalender presensi saya sendiri", icon: "fa-calendar-check", category: "Presensi & Persetujuan" },
-  { key: "rekap_tim", title: "Presensi Tim", desc: "Monitoring presensi staf / PIC lain", icon: "fa-users-viewfinder", category: "Presensi & Persetujuan" },
+  // 2. Personalia
+  { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit, Terlambat", icon: "fa-file-signature", category: "Personalia" },
+  { key: "persetujuan", title: "Persetujuan (Approval Hub)", desc: "Pusat persetujuan permohonan staf", icon: "fa-stamp", category: "Personalia" },
+  { key: "attendance_summary", title: "Rekap Absen", desc: "Kalender presensi saya sendiri", icon: "fa-calendar-check", category: "Personalia" },
+  { key: "rekap_tim", title: "Presensi Tim", desc: "Monitoring presensi staf / PIC lain", icon: "fa-users-viewfinder", category: "Personalia" },
+  { key: "slip_gaji", title: "Slip Gaji", desc: "E-Slip gaji & kompensasi resmi karyawan", icon: "fa-file-invoice-dollar", category: "Personalia" },
 
   // 3. Layanan & Support Karyawan
   { key: "expense_claim", title: "Klaim Biaya (Reimbursement)", desc: "Pengajuan biaya BBM/Tol/Ops", icon: "fa-money-bill-wave", category: "Layanan & Support" },
@@ -1377,6 +1383,7 @@ async function loadScreen(screenName, updateHistory = true) {
     rekap_absen: "Rekap Presensi & Kalender",
     attendance_summary: "Rekap Presensi & Kalender",
     rekap_tim: "Presensi Tim & Monitoring PIC",
+    slip_gaji: "E-Slip Gaji Karyawan",
     laporan_activity: "Laporan Activity & Monitoring Kunjungan",
     expense_claim: "Klaim Biaya Operasional",
     internal_memo: "Memo Pengajuan Internal",
@@ -1442,6 +1449,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "persetujuan") initPersetujuanScreen();
     if (screenName === "rekap_absen" || screenName === "attendance_summary") initRekapAbsenScreen();
     if (screenName === "rekap_tim") initRekapTimScreen();
+    if (screenName === "slip_gaji" && typeof initSlipGajiScreen === "function") initSlipGajiScreen();
     if (screenName === "laporan_activity") initLaporanActivityScreen();
     if (screenName === "ketentuan" && typeof initKetentuanScreen === "function") initKetentuanScreen();
     if (screenName === "sop_management" && typeof initSopManagementScreen === "function") initSopManagementScreen();
@@ -1798,10 +1806,10 @@ async function initDashboard() {
     String(CURRENT_USER.role || "").toLowerCase().includes("supervisor")
   );
 
-  // Render & filter seluruh modul aplikasi sesuai hak akses role (20 modul)
+  // Render & filter seluruh modul aplikasi sesuai hak akses role (21 modul)
   const allModulesList = [
     "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
-    "izin", "persetujuan", "attendance_summary", "rekap_tim",
+    "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
     "sop_management", "settings"
   ];
@@ -12732,6 +12740,26 @@ function renderActivityDrilldownList() {
   }
 
   container.innerHTML = html;
+}
+
+// =========================================================================
+// E-SLIP GAJI KARYAWAN (DIGIASHA PERSONALIA & PAYROLL)
+// =========================================================================
+function initSlipGajiScreen() {
+  if (!CURRENT_USER) return;
+  const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || CURRENT_USER?.email || "Karyawan";
+  const uNip = CURRENT_USER?.nip || CURRENT_USER?.nik || "-";
+  const uRole = CURRENT_USER?.role || CURRENT_USER?.role_id || "Karyawan";
+  const uCabang = CURRENT_USER?.cabang || "Kantor Pusat";
+
+  const nameEl = document.getElementById("slip-user-name");
+  if (nameEl) nameEl.innerText = uName;
+
+  const nipEl = document.getElementById("slip-user-nip");
+  if (nipEl) nipEl.innerText = uNip;
+
+  const roleEl = document.getElementById("slip-user-role");
+  if (roleEl) roleEl.innerText = `${uRole} • Cabang: ${uCabang}`;
 }
 
 // =========================================================================
