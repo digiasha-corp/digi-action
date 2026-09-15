@@ -36,6 +36,28 @@
         <i class="fa-solid fa-location-crosshairs"></i>
         <span>Perbarui Titik GPS</span>
       </button>
+
+      <!-- Peringatan GPS Diblokir / Masalah Sinyal -->
+      <div id="absen-gps-alert-box" class="hidden p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2 text-xs">
+        <div class="flex items-start space-x-2 text-rose-800">
+          <i class="fa-solid fa-triangle-exclamation text-base text-rose-600 mt-0.5 shrink-0"></i>
+          <div>
+            <strong id="absen-gps-alert-title" class="font-bold block">Akses Lokasi (GPS) Wajib Diizinkan!</strong>
+            <p id="absen-gps-alert-desc" class="text-[11px] text-rose-700 leading-snug mt-0.5">
+              Presensi Absen Datang hanya dapat dilakukan jika izin lokasi browser aktif dan Anda berada di area kantor resmi.
+            </p>
+          </div>
+        </div>
+        <div class="p-2.5 bg-white/80 rounded-lg border border-rose-100 text-[10px] text-slate-600 space-y-1">
+          <p class="font-bold text-slate-700"><i class="fa-solid fa-circle-info mr-1 text-teal-600"></i>Cara Mengaktifkan Izin Lokasi:</p>
+          <ol class="list-decimal pl-4 space-y-0.5">
+            <li>Klik ikon <strong>Gembok / Setelan Situs</strong> di sebelah kiri alamat URL browser (atas layar).</li>
+            <li>Pilih <strong>Izin Situs (Permissions)</strong> &rarr; cari <strong>Lokasi (Location)</strong> &rarr; pilih <strong>Izinkan (Allow)</strong>.</li>
+            <li>Pastikan GPS / Lokasi di HP Android / iPhone Anda sudah aktif (ON).</li>
+            <li>Tekan tombol <strong>"Perbarui Titik GPS"</strong> di atas.</li>
+          </ol>
+        </div>
+      </div>
     </div>
 
     <!-- Kamera Selfie & Auto-Submit -->
@@ -45,12 +67,12 @@
         <p class="text-[10px] text-amber-700 font-semibold mt-0.5"><i class="fa-solid fa-camera mr-1"></i>Ambil foto selfie jelas kelihatan badan / wajah. Presensi langsung tersimpan otomatis.</p>
       </div>
 
-      <div id="btn-trigger-absen-selfie" onclick="triggerCameraInput('file-absen-selfie')" class="border-2 border-dashed border-teal-400 bg-teal-50/40 hover:bg-teal-50 rounded-2xl p-7 text-center cursor-pointer transition">
-        <div class="w-12 h-12 bg-white rounded-2xl shadow-sm text-teal-600 flex items-center justify-center text-2xl mx-auto mb-2">
+      <div id="btn-trigger-absen-selfie" onclick="handleTriggerAbsenCamera()" class="border-2 border-dashed border-teal-400 bg-teal-50/40 hover:bg-teal-50 rounded-2xl p-7 text-center cursor-pointer transition">
+        <div id="btn-trigger-selfie-icon" class="w-12 h-12 bg-white rounded-2xl shadow-sm text-teal-600 flex items-center justify-center text-2xl mx-auto mb-2">
           <i class="fa-solid fa-camera"></i>
         </div>
-        <p class="text-xs text-slate-800 font-bold">Buka Kamera Selfie</p>
-        <span class="text-[10px] text-slate-500 mt-0.5 block">Klik untuk ambil foto & kirim otomatis</span>
+        <p id="btn-trigger-selfie-title" class="text-xs text-slate-800 font-bold">Buka Kamera Selfie</p>
+        <span id="btn-trigger-selfie-desc" class="text-[10px] text-slate-500 mt-0.5 block">Klik untuk ambil foto & kirim otomatis</span>
         <input type="file" id="file-absen-selfie" accept="image/*" capture="user" class="hidden" onchange="handleAbsenSelfieSelected(this)" />
       </div>
 

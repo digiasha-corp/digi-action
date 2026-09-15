@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v93";
+const APP_BUILD_VERSION = "20260915_v94";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -231,7 +231,7 @@ let APP_STATE = {
 let MASTER_DEALER_PRIORITY_DATA = [];
 let FAC_GPS_MONITORING_DATA = [];
 
-let CURRENT_USER_GEO = { lat: -6.295218, long: 106.638482, accuracy: 25, nearestOffice: null, distanceToOffice: 0, isInsideRadius: false };
+let CURRENT_USER_GEO = { lat: null, long: null, accuracy: null, nearestOffice: null, distanceToOffice: null, isInsideRadius: false };
 let ACTIVE_ABSEN_TYPE = "Absen Datang";
 let TODAY_ABSEN_STATUS = "BELUM_ABSEN"; // BELUM_ABSEN, SUDAH_DATANG, SUDAH_PULANG
 let CURRENT_ABSEN_SELFIE_BASE64 = null;
@@ -2359,6 +2359,18 @@ function initAbsensiScreen() {
     if (boxDist) boxDist.classList.remove("hidden");
   }
 
+  // Reset state koordinat presensi
+  CURRENT_USER_GEO.lat = null;
+  CURRENT_USER_GEO.long = null;
+  CURRENT_USER_GEO.accuracy = null;
+  CURRENT_USER_GEO.nearestOffice = null;
+  CURRENT_USER_GEO.distanceToOffice = null;
+  CURRENT_USER_GEO.isInsideRadius = false;
+
+  const alertBox = document.getElementById("absen-gps-alert-box");
+  if (alertBox) alertBox.classList.add("hidden");
+
+  updateAbsenCameraState();
   acquireAbsenLocation();
 }
 
@@ -2372,62 +2384,262 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
+function updateAbsenCameraState() {
+  const triggerBtn = document.getElementById("btn-trigger-absen-selfie");
+  const triggerIcon = document.getElementById("btn-trigger-selfie-icon");
+  const triggerTitle = document.getElementById("btn-trigger-selfie-title");
+  const triggerDesc = document.getElementById("btn-trigger-selfie-desc");
+  if (!triggerBtn) return;
+
+  const isDatang = (ACTIVE_ABSEN_TYPE === "Absen Datang" || ACTIVE_ABSEN_TYPE === "Masuk Kantor");
+
+  if (isDatang) {
+    if (CURRENT_USER_GEO.isInsideRadius && CURRENT_USER_GEO.lat) {
+      // Valid di dalam radius kantor
+      triggerBtn.className = "border-2 border-dashed border-teal-500 bg-teal-50/60 hover:bg-teal-50 rounded-2xl p-7 text-center cursor-pointer transition shadow-sm";
+      if (triggerIcon) {
+        triggerIcon.className = "w-12 h-12 bg-white rounded-2xl shadow-sm text-teal-600 flex items-center justify-center text-2xl mx-auto mb-2";
+        triggerIcon.innerHTML = '<i class="fa-solid fa-camera"></i>';
+      }
+      if (triggerTitle) {
+        triggerTitle.innerText = "Buka Kamera Selfie";
+        triggerTitle.className = "text-xs text-slate-800 font-bold";
+      }
+      if (triggerDesc) triggerDesc.innerText = "Klik untuk ambil foto & kirim otomatis";
+    } else if (CURRENT_USER_GEO.lat === null) {
+      // GPS Belum Aktif / Diblokir
+      triggerBtn.className = "border-2 border-dashed border-rose-300 bg-rose-50/40 rounded-2xl p-7 text-center cursor-pointer transition";
+      if (triggerIcon) {
+        triggerIcon.className = "w-12 h-12 bg-white rounded-2xl shadow-sm text-rose-500 flex items-center justify-center text-2xl mx-auto mb-2";
+        triggerIcon.innerHTML = '<i class="fa-solid fa-lock"></i>';
+      }
+      if (triggerTitle) {
+        triggerTitle.innerText = "Kamera Terkunci (Wajib Izinkan GPS)";
+        triggerTitle.className = "text-xs text-rose-700 font-bold";
+      }
+      if (triggerDesc) triggerDesc.innerText = "Klik di sini untuk panduan aktifkan GPS & lokasi";
+    } else {
+      // Di luar radius kantor
+      triggerBtn.className = "border-2 border-dashed border-amber-300 bg-amber-50/40 rounded-2xl p-7 text-center cursor-pointer transition";
+      if (triggerIcon) {
+        triggerIcon.className = "w-12 h-12 bg-white rounded-2xl shadow-sm text-amber-600 flex items-center justify-center text-2xl mx-auto mb-2";
+        triggerIcon.innerHTML = '<i class="fa-solid fa-ban"></i>';
+      }
+      if (triggerTitle) {
+        triggerTitle.innerText = `Kamera Terkunci (Di Luar Radius: ${CURRENT_USER_GEO.distanceToOffice}m)`;
+        triggerTitle.className = "text-xs text-amber-800 font-bold";
+      }
+      if (triggerDesc) triggerDesc.innerText = "Wajib berada di dalam batas radius kantor resmi";
+    }
+  } else {
+    // Absen Pulang
+    if (CURRENT_USER_GEO.lat) {
+      triggerBtn.className = "border-2 border-dashed border-amber-500 bg-amber-50/60 hover:bg-amber-50 rounded-2xl p-7 text-center cursor-pointer transition shadow-sm";
+      if (triggerIcon) {
+        triggerIcon.className = "w-12 h-12 bg-white rounded-2xl shadow-sm text-amber-600 flex items-center justify-center text-2xl mx-auto mb-2";
+        triggerIcon.innerHTML = '<i class="fa-solid fa-camera"></i>';
+      }
+      if (triggerTitle) {
+        triggerTitle.innerText = "Buka Kamera Selfie (Absen Pulang)";
+        triggerTitle.className = "text-xs text-slate-800 font-bold";
+      }
+      if (triggerDesc) triggerDesc.innerText = "Klik untuk ambil foto & kirim kepulangan";
+    } else {
+      triggerBtn.className = "border-2 border-dashed border-rose-300 bg-rose-50/40 rounded-2xl p-7 text-center cursor-pointer transition";
+      if (triggerIcon) {
+        triggerIcon.className = "w-12 h-12 bg-white rounded-2xl shadow-sm text-rose-500 flex items-center justify-center text-2xl mx-auto mb-2";
+        triggerIcon.innerHTML = '<i class="fa-solid fa-lock"></i>';
+      }
+      if (triggerTitle) {
+        triggerTitle.innerText = "Kamera Terkunci (Menunggu GPS Pulang)";
+        triggerTitle.className = "text-xs text-rose-700 font-bold";
+      }
+      if (triggerDesc) triggerDesc.innerText = "Wajib aktifkan GPS untuk mencatat lokasi pulang";
+    }
+  }
+}
+
+function handleTriggerAbsenCamera() {
+  const isDatang = (ACTIVE_ABSEN_TYPE === "Absen Datang" || ACTIVE_ABSEN_TYPE === "Masuk Kantor");
+
+  if (isDatang) {
+    if (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long) {
+      showCenterAlertModal({
+        title: "Izin GPS Diperlukan",
+        message: "Sistem mendeteksi akses lokasi (GPS) ditolak, diblokir, atau belum aktif. Presensi Absen Datang WAJIB mendapatkan titik koordinat fisik kantor. Silakan izinkan akses lokasi di browser/HP Anda lalu tekan 'Perbarui Titik GPS'.",
+        type: "error"
+      });
+      const alertBox = document.getElementById("absen-gps-alert-box");
+      if (alertBox) alertBox.classList.remove("hidden");
+      return;
+    }
+    if (!CURRENT_USER_GEO.isInsideRadius) {
+      showCenterAlertModal({
+        title: "Di Luar Radius Kantor",
+        message: `Lokasi Anda berada sejauh ${CURRENT_USER_GEO.distanceToOffice} Meter dari ${CURRENT_USER_GEO.nearestOffice?.name || 'kantor'} (Batas maksimum radius: ${CURRENT_USER_GEO.nearestOffice?.maxRadiusMeter || 100}m). Anda tidak diperkenankan absen datang di luar area kantor.`,
+        type: "error"
+      });
+      return;
+    }
+  } else {
+    if (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long) {
+      showCenterAlertModal({
+        title: "Akses GPS Diperlukan",
+        message: "Presensi kepulangan memerlukan geotag lokasi Anda. Mohon izinkan akses lokasi browser sebelum mengambil foto selfie.",
+        type: "error"
+      });
+      const alertBox = document.getElementById("absen-gps-alert-box");
+      if (alertBox) alertBox.classList.remove("hidden");
+      return;
+    }
+  }
+
+  // Jika valid, buka input file / kamera
+  const fileInput = document.getElementById("file-absen-selfie");
+  if (fileInput) {
+    fileInput.value = "";
+    fileInput.click();
+  }
+}
+
 function acquireAbsenLocation() {
   const coordsDisplay = document.getElementById("absen-coords-display");
   const distDisplay = document.getElementById("absen-distance-display");
   const officeNameDisplay = document.getElementById("absen-office-name");
   const badge = document.getElementById("absen-geofence-badge");
+  const alertBox = document.getElementById("absen-gps-alert-box");
+  const alertTitle = document.getElementById("absen-gps-alert-title");
+  const alertDesc = document.getElementById("absen-gps-alert-desc");
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const crd = pos.coords;
-        CURRENT_USER_GEO.lat = crd.latitude;
-        CURRENT_USER_GEO.long = crd.longitude;
-        CURRENT_USER_GEO.accuracy = crd.accuracy;
-
-        let nearest = null;
-        let minD = Infinity;
-        OFFICE_LOCATIONS.forEach(o => {
-          const d = calculateDistanceMeters(crd.latitude, crd.longitude, o.lat, o.long);
-          if (d < minD) { minD = d; nearest = { ...o, distance: d }; }
-        });
-        CURRENT_USER_GEO.nearestOffice = nearest;
-        CURRENT_USER_GEO.distanceToOffice = nearest.distance;
-
-        if (coordsDisplay) coordsDisplay.innerText = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
-        if (officeNameDisplay) officeNameDisplay.innerText = nearest.name;
-
-        if (ACTIVE_ABSEN_TYPE === "Absen Datang") {
-          if (distDisplay) distDisplay.innerText = `${nearest.distance} Meter (Maks ${nearest.maxRadiusMeter}m)`;
-          if (nearest.distance <= nearest.maxRadiusMeter) {
-            CURRENT_USER_GEO.isInsideRadius = true;
-            if (badge) { badge.innerText = `Radius Valid (${nearest.name})`; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800"; }
-          } else {
-            CURRENT_USER_GEO.isInsideRadius = false;
-            if (badge) { badge.innerText = `Di Luar Radius (${nearest.distance}m)`; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-red-100 text-red-800"; }
-          }
-        } else {
-          // Absen Pulang: Bebas geolokasi kantor
-          CURRENT_USER_GEO.isInsideRadius = true;
-          if (badge) { badge.innerText = "Geotag Terkunci (Bebas Radius)"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800"; }
-        }
-      },
-      () => {
-        const defaultOffice = OFFICE_LOCATIONS[0] || { name: "Kantor Pusat", lat: -6.295217, long: 106.638591, maxRadiusMeter: 100 };
-        CURRENT_USER_GEO.lat = defaultOffice.lat;
-        CURRENT_USER_GEO.long = defaultOffice.long;
-        CURRENT_USER_GEO.distanceToOffice = 10;
-        CURRENT_USER_GEO.isInsideRadius = true;
-        CURRENT_USER_GEO.nearestOffice = defaultOffice;
-        if (coordsDisplay) coordsDisplay.innerText = `${defaultOffice.lat.toFixed(6)}, ${defaultOffice.long.toFixed(6)} (Default GPS)`;
-        if (officeNameDisplay) officeNameDisplay.innerText = defaultOffice.name;
-        if (distDisplay) distDisplay.innerText = "10 Meter (Valid Radius)";
-        if (badge) { badge.innerText = `Radius Valid (${defaultOffice.name})`; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800"; }
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
+  // Reset state tampilan saat proses pengecekan
+  if (coordsDisplay) coordsDisplay.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1 text-slate-400"></i>Mencari sinyal GPS...';
+  if (officeNameDisplay) officeNameDisplay.innerText = "Mendeteksi kantor terdekat...";
+  if (distDisplay) distDisplay.innerText = "Menghitung jarak...";
+  if (badge) {
+    badge.innerText = "Mengecek Lokasi...";
+    badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-600";
   }
+  if (alertBox) alertBox.classList.add("hidden");
+
+  // Reset koordinat
+  CURRENT_USER_GEO.lat = null;
+  CURRENT_USER_GEO.long = null;
+  CURRENT_USER_GEO.accuracy = null;
+  CURRENT_USER_GEO.isInsideRadius = false;
+  CURRENT_USER_GEO.nearestOffice = null;
+  CURRENT_USER_GEO.distanceToOffice = null;
+  updateAbsenCameraState();
+
+  if (!navigator.geolocation) {
+    if (coordsDisplay) coordsDisplay.innerText = "Browser Tidak Mendukung GPS";
+    if (officeNameDisplay) officeNameDisplay.innerText = "Verifikasi Gagal";
+    if (distDisplay) distDisplay.innerText = "Perangkat Tidak Mendukung Geolocation";
+    if (badge) {
+      badge.innerText = "GPS Not Supported";
+      badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-800";
+    }
+    if (alertBox) {
+      alertBox.classList.remove("hidden");
+      if (alertTitle) alertTitle.innerText = "Browser Tidak Mendukung GPS";
+      if (alertDesc) alertDesc.innerText = "Browser Anda tidak mendukung fitur Geolocation. Silakan gunakan Google Chrome di HP Anda.";
+    }
+    updateAbsenCameraState();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const crd = pos.coords;
+      CURRENT_USER_GEO.lat = crd.latitude;
+      CURRENT_USER_GEO.long = crd.longitude;
+      CURRENT_USER_GEO.accuracy = crd.accuracy;
+
+      let nearest = null;
+      let minD = Infinity;
+      OFFICE_LOCATIONS.forEach(o => {
+        const d = calculateDistanceMeters(crd.latitude, crd.longitude, o.lat, o.long);
+        if (d < minD) { minD = d; nearest = { ...o, distance: d }; }
+      });
+      CURRENT_USER_GEO.nearestOffice = nearest;
+      CURRENT_USER_GEO.distanceToOffice = nearest ? nearest.distance : 0;
+
+      if (coordsDisplay) coordsDisplay.innerText = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
+      if (officeNameDisplay) officeNameDisplay.innerText = nearest ? nearest.name : "Kantor Pusat";
+
+      if (ACTIVE_ABSEN_TYPE === "Absen Datang" || ACTIVE_ABSEN_TYPE === "Masuk Kantor") {
+        if (distDisplay) distDisplay.innerText = `${nearest.distance} Meter (Maks ${nearest.maxRadiusMeter}m)`;
+        if (nearest.distance <= nearest.maxRadiusMeter) {
+          CURRENT_USER_GEO.isInsideRadius = true;
+          if (badge) {
+            badge.innerText = `Radius Valid (${nearest.name})`;
+            badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300";
+          }
+          if (alertBox) alertBox.classList.add("hidden");
+        } else {
+          CURRENT_USER_GEO.isInsideRadius = false;
+          if (badge) {
+            badge.innerText = `Di Luar Radius (${nearest.distance}m)`;
+            badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-800 border border-rose-300";
+          }
+          if (alertBox) {
+            alertBox.classList.remove("hidden");
+            if (alertTitle) alertTitle.innerText = `Anda Berada di Luar Radius Kantor (${nearest.distance}m)`;
+            if (alertDesc) alertDesc.innerText = `Jarak Anda ke ${nearest.name} adalah ${nearest.distance} meter. Batas toleransi presensi masuk adalah ${nearest.maxRadiusMeter} meter. Silakan merapat ke kantor sebelum absen.`;
+          }
+        }
+      } else {
+        // Absen Pulang: Bebas geolokasi kantor, asalkan GPS aktif tercatat
+        CURRENT_USER_GEO.isInsideRadius = true;
+        if (badge) {
+          badge.innerText = "Geotag Terkunci (Bebas Radius)";
+          badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800 border border-teal-300";
+        }
+        if (alertBox) alertBox.classList.add("hidden");
+      }
+
+      updateAbsenCameraState();
+    },
+    err => {
+      // Strict Error Handling: DILARANG menginjeksi Default GPS / fake radius!
+      CURRENT_USER_GEO.lat = null;
+      CURRENT_USER_GEO.long = null;
+      CURRENT_USER_GEO.accuracy = null;
+      CURRENT_USER_GEO.nearestOffice = null;
+      CURRENT_USER_GEO.distanceToOffice = null;
+      CURRENT_USER_GEO.isInsideRadius = false;
+
+      let errReason = "Akses GPS Ditolak / Tidak Aktif";
+      let detailDesc = "Presensi kedatangan WAJIB mengizinkan GPS dan berada di kantor resmi. Geotag palsu atau pemblokiran GPS tidak diperbolehkan.";
+
+      if (err && err.code === 1) { // PERMISSION_DENIED
+        errReason = "Izin GPS Ditolak / Diblokir";
+        detailDesc = "Anda menekan tombol 'Blokir' atau browser menonaktifkan izin lokasi. Silakan buka setelan browser (ikon gembok di URL) dan pilih 'Izinkan' untuk lokasi.";
+      } else if (err && err.code === 2) { // POSITION_UNAVAILABLE
+        errReason = "Sinyal GPS Tidak Ditemukan";
+        detailDesc = "Perangkat Anda tidak dapat menentukan lokasi. Pastikan fitur GPS / Lokasi pada pengaturan HP Anda aktif (ON) dan sinyal stabil.";
+      } else if (err && err.code === 3) { // TIMEOUT
+        errReason = "Waktu Pencarian GPS Habis";
+        detailDesc = "Gagal mengunci posisi satelit GPS dalam waktu yang ditentukan. Coba berada di area terbuka dan klik 'Perbarui Titik GPS'.";
+      }
+
+      if (coordsDisplay) coordsDisplay.innerText = errReason;
+      if (officeNameDisplay) officeNameDisplay.innerText = "Akses Ditolak";
+      if (distDisplay) distDisplay.innerText = "Wajib Aktifkan & Izinkan GPS";
+      if (badge) {
+        badge.innerText = errReason;
+        badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-800 border border-rose-300";
+      }
+
+      if (alertBox) {
+        alertBox.classList.remove("hidden");
+        if (alertTitle) alertTitle.innerText = errReason;
+        if (alertDesc) alertDesc.innerText = detailDesc;
+      }
+
+      updateAbsenCameraState();
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
 }
 
 // Helper Kompresi Gambar Otomatis (Mencegah Payload Limit & Upload Kilat)
@@ -2468,6 +2680,29 @@ function compressImage(file, maxDimension = 1024, quality = 0.75) {
 // Handler Foto Selfie Presensi -> Auto Submit
 async function handleAbsenSelfieSelected(input) {
   if (input.files && input.files[0]) {
+    const isDatang = (ACTIVE_ABSEN_TYPE === "Absen Datang" || ACTIVE_ABSEN_TYPE === "Masuk Kantor");
+
+    // Guard ketat: cegah submit jika GPS belum valid
+    if (isDatang && (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long || !CURRENT_USER_GEO.isInsideRadius)) {
+      input.value = "";
+      CURRENT_ABSEN_SELFIE_BASE64 = null;
+      showCenterAlertModal({
+        title: "Presensi Ditolak",
+        message: "Presensi Absen Datang WAJIB berada di dalam radius kantor dan GPS harus diizinkan. Silakan aktifkan GPS dan coba kembali.",
+        type: "error"
+      });
+      return;
+    } else if (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long) {
+      input.value = "";
+      CURRENT_ABSEN_SELFIE_BASE64 = null;
+      showCenterAlertModal({
+        title: "Presensi Ditolak",
+        message: "Presensi memerlukan geotag lokasi GPS yang valid. Silakan izinkan akses lokasi browser.",
+        type: "error"
+      });
+      return;
+    }
+
     const compressed = await compressImage(input.files[0], 1024, 0.75);
     CURRENT_ABSEN_SELFIE_BASE64 = compressed;
 
@@ -2506,15 +2741,28 @@ function removeAbsenSelfie() {
 async function handleAbsenSubmit() {
   const isDatang = (ACTIVE_ABSEN_TYPE === "Absen Datang" || ACTIVE_ABSEN_TYPE === "Masuk Kantor");
 
-  // Validasi geofence radius hanya untuk Absen Datang
-  if (isDatang && !CURRENT_USER_GEO.isInsideRadius) {
-    removeAbsenSelfie();
-    showCenterAlertModal({
-      title: "Absensi Gagal",
-      message: `Lokasi Anda berada di luar radius kantor (${CURRENT_USER_GEO.distanceToOffice} Meter / Maks 100m). Silakan dekati kantor dan perbarui titik GPS.`,
-      type: "error"
-    });
-    return;
+  // Validasi geofence radius ketat untuk Absen Datang
+  if (isDatang) {
+    if (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long || !CURRENT_USER_GEO.isInsideRadius) {
+      removeAbsenSelfie();
+      showCenterAlertModal({
+        title: "Absensi Gagal",
+        message: `Lokasi Anda tidak valid atau di luar radius kantor (${CURRENT_USER_GEO.distanceToOffice || 0} Meter / Maks ${CURRENT_USER_GEO.nearestOffice?.maxRadiusMeter || 100}m). Silakan masuk ke dalam area kantor dan perbarui titik GPS.`,
+        type: "error"
+      });
+      return;
+    }
+  } else {
+    // Absen Pulang wajib ada koordinat real
+    if (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long) {
+      removeAbsenSelfie();
+      showCenterAlertModal({
+        title: "Absensi Gagal",
+        message: "Presensi pulang memerlukan koordinat lokasi geotag. Mohon izinkan akses GPS Anda.",
+        type: "error"
+      });
+      return;
+    }
   }
 
   if (!CURRENT_ABSEN_SELFIE_BASE64) {
@@ -2624,6 +2872,9 @@ function acquireIzinLocation() {
   const coordsDisplay = document.getElementById("izin-coords-display");
   const badge = document.getElementById("izin-geo-badge");
 
+  CURRENT_IZIN_GEO.lat = null;
+  CURRENT_IZIN_GEO.long = null;
+
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -2635,8 +2886,10 @@ function acquireIzinLocation() {
         if (badge) { badge.innerText = "GPS Terkunci"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800"; }
       },
       () => {
-        if (coordsDisplay) coordsDisplay.innerText = "-6.295217, 106.638591 (Default)";
-        if (badge) { badge.innerText = "GPS Default"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700"; }
+        CURRENT_IZIN_GEO.lat = null;
+        CURRENT_IZIN_GEO.long = null;
+        if (coordsDisplay) coordsDisplay.innerText = "Akses GPS Tidak Aktif / Ditolak";
+        if (badge) { badge.innerText = "GPS Mati/Ditolak"; badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-700"; }
       },
       { enableHighAccuracy: true, timeout: 6000 }
     );
@@ -6450,6 +6703,9 @@ function getPreciseLocation() {
   const geoDisplay = document.getElementById("geo-location-display");
   const onbGeoDisplay = document.getElementById("onb-geo-display");
 
+  CURRENT_USER_GEO.lat = null;
+  CURRENT_USER_GEO.long = null;
+
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -6462,7 +6718,9 @@ function getPreciseLocation() {
         if (onbGeoDisplay) onbGeoDisplay.innerText = locStr;
       },
       () => {
-        const fallback = "-6.295218, 106.638482 (Default GPS)";
+        CURRENT_USER_GEO.lat = null;
+        CURRENT_USER_GEO.long = null;
+        const fallback = "Lokasi Tidak Terdeteksi (GPS Tidak Aktif)";
         if (geoDisplay) geoDisplay.innerText = fallback;
         if (onbGeoDisplay) onbGeoDisplay.innerText = fallback;
       },
