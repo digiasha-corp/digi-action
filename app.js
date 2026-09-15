@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v102";
+const APP_BUILD_VERSION = "20260915_v103";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -236,6 +236,76 @@ let APP_STATE = {
 
 let MASTER_DEALER_PRIORITY_DATA = [];
 let FAC_GPS_MONITORING_DATA = [];
+
+// Helper verifikasi cakupan wilayah (cover area) mitra vs PIC pengguna (berlaku untuk seluruh role)
+function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
+  if (!dealer) return false;
+  if (!user) return true;
+
+  const rawArea = String(user.area_cover || "").trim();
+  const rawBranch = String(user.cabang || "").trim();
+
+  // Jika user tidak memiliki batasan area_cover maupun cabang, atau diset '*' / 'ALL', tampilkan semua
+  if (!rawArea && !rawBranch) return true;
+  if (rawArea === "*" || rawArea.toUpperCase() === "ALL") return true;
+
+  const clean = (s) => String(s || "").toLowerCase().replace(/[\s\-_.]/g, "");
+
+  // Parsing daftar area cover user (contoh: 'TGR A, TGR B, TGR C' -> ['tgr a', 'tgr b', 'tgr c'])
+  const userAreas = rawArea.split(/[,;/|\n\r]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+  const userAreasClean = userAreas.map(clean).filter(Boolean);
+
+  const dArea = String(dealer.area_cover || "").trim().toLowerCase();
+  const dAreaClean = clean(dealer.area_cover);
+
+  const dCabang = String(dealer.cabang || "").trim().toLowerCase();
+  const dCabangClean = clean(dealer.cabang);
+
+  const uBranch = rawBranch.toLowerCase();
+  const uBranchClean = clean(rawBranch);
+
+  // 1. Cek kecocokan antara area_cover dealer dengan daftar cover area user
+  if (dArea && userAreas.length > 0) {
+    const matchArea = userAreas.some((a, idx) => {
+      const aClean = userAreasClean[idx];
+      return (
+        dArea === a ||
+        dArea.includes(a) ||
+        a.includes(dArea) ||
+        (dAreaClean && aClean && (dAreaClean === aClean || dAreaClean.includes(aClean) || aClean.includes(dAreaClean)))
+      );
+    });
+    if (matchArea) return true;
+  }
+
+  // 2. Cek apakah cabang dealer cocok dengan salah satu area cover user
+  if (dCabang && userAreas.length > 0) {
+    const matchCabangToArea = userAreas.some((a, idx) => {
+      const aClean = userAreasClean[idx];
+      return (
+        dCabang === a ||
+        dCabang.includes(a) ||
+        a.includes(dCabang) ||
+        (dCabangClean && aClean && (dCabangClean === aClean || dCabangClean.includes(aClean) || aClean.includes(dCabangClean)))
+      );
+    });
+    if (matchCabangToArea) return true;
+  }
+
+  // 3. Jika area_cover dealer belum diatur (kosong), bandingkan cabang dealer vs cabang user
+  if (!dArea && uBranch && uBranch !== "head office" && uBranch !== "kantor pusat") {
+    if (dCabangClean && uBranchClean && (dCabangClean === uBranchClean || dCabang.includes(uBranch) || uBranch.includes(dCabang))) {
+      return true;
+    }
+  }
+
+  // 4. Jika user memiliki cabang yang sama persis dengan cabang dealer
+  if (uBranch && uBranch !== "head office" && uBranch !== "kantor pusat" && dCabangClean && uBranchClean && dCabangClean === uBranchClean) {
+    return true;
+  }
+
+  return false;
+}
 
 let CURRENT_USER_GEO = { lat: null, long: null, accuracy: null, nearestOffice: null, distanceToOffice: null, isInsideRadius: false };
 let ACTIVE_ABSEN_TYPE = "Absen Datang";
@@ -5418,6 +5488,18 @@ function renderPriorityList() {
   if (!container) return;
   container.innerHTML = "";
 
+  // Tampilkan label area cover aktif di header
+  const subTitleEl = document.getElementById("priority-header-subtitle");
+  if (subTitleEl) {
+    if (CURRENT_USER?.area_cover) {
+      subTitleEl.innerHTML = `<i class="fa-solid fa-map-location-dot mr-1 text-amber-800"></i>Cover Area: <strong class="text-amber-900 font-bold">${CURRENT_USER.area_cover}</strong>`;
+    } else if (CURRENT_USER?.cabang) {
+      subTitleEl.innerHTML = `<i class="fa-solid fa-building mr-1 text-amber-800"></i>Cabang: <strong class="text-amber-900 font-bold">${CURRENT_USER.cabang}</strong>`;
+    } else {
+      subTitleEl.innerText = "Real-time Closed-Loop Priority Action Monitoring";
+    }
+  }
+
   // Kalkulasi evaluasi urgensi untuk semua dealer
   let computedList = MASTER_DEALER_PRIORITY_DATA.map(d => {
     const clientCalc = calculateMitraUrgency(d);
@@ -5476,6 +5558,10 @@ function renderPriorityList() {
     };
   });
 
+  // 0. Filter Cakupan Wilayah (Cover Area PIC):
+  // Wajib difilter strictly sesuai cover area pengguna yang aktif, berlaku untuk seluruh role (termasuk Admin/Super Admin).
+  computedList = computedList.filter(d => isDealerInUserCoverArea(d));
+
   // Sorting: Prioritas yang belum selesai diletakkan paling atas -> Score DESC -> Aging Visit DESC
   computedList.sort((a, b) => {
     if (a.isFullyDone !== b.isFullyDone) return a.isFullyDone ? 1 : -1;
@@ -5528,16 +5614,17 @@ function renderPriorityList() {
 
   if (computedList.length === 0) {
     const isSearching = !!PRIORITY_SEARCH_QUERY;
+    const userAreaLabel = CURRENT_USER?.area_cover ? `Area ${CURRENT_USER.area_cover}` : (CURRENT_USER?.cabang ? `Cabang ${CURRENT_USER.cabang}` : "Area Anda");
     const filterText = isSearching 
       ? `Pencarian "${PRIORITY_SEARCH_QUERY}"` 
-      : (PRIORITY_ACTIVE_FILTER === "ALL" ? "Prioritas Kunjungan Aktif" : `Level "${PRIORITY_ACTIVE_FILTER}"`);
+      : (PRIORITY_ACTIVE_FILTER === "ALL" ? `Prioritas Aktif (${userAreaLabel})` : `Level "${PRIORITY_ACTIVE_FILTER}" (${userAreaLabel})`);
     container.innerHTML = `
       <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 space-y-2">
         <div class="w-12 h-12 rounded-2xl ${isSearching ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'} flex items-center justify-center text-xl mx-auto mb-1">
-          <i class="fa-solid ${isSearching ? 'fa-magnifying-glass' : 'fa-circle-check'}"></i>
+          <i class="fa-solid ${isSearching ? 'fa-magnifying-glass' : 'fa-map-location-dot'}"></i>
         </div>
-        <p class="font-bold text-sm text-slate-800">Tidak ada hasil untuk ${filterText}</p>
-        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">${isSearching ? 'Coba periksa kembali ejaan nama mitra atau nopol kendaraan.' : 'Semua mitra saat ini dalam kondisi normal dan terjadwal dengan baik.'}</p>
+        <p class="font-bold text-sm text-slate-800">Tidak ada mitra prioritas untuk ${filterText}</p>
+        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">${isSearching ? 'Coba periksa kembali ejaan nama mitra atau nopol kendaraan.' : `Semua mitra di cover area Anda (${userAreaLabel}) saat ini dalam kondisi normal dan terpantau dengan baik.`}</p>
         ${isSearching ? `
           <button type="button" onclick="clearPrioritySearch()" class="mt-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow inline-flex items-center space-x-1.5 transition">
             <i class="fa-solid fa-xmark"></i>
@@ -5627,6 +5714,7 @@ function renderPriorityList() {
         <h4 class="font-bold text-xs sm:text-sm text-slate-900 truncate leading-tight">${d.dealer_name}</h4>
         <div class="flex items-center space-x-1.5 flex-wrap gap-y-1 mt-1">
           <span class="text-[10px] text-slate-500 font-medium">${d.cabang || "-"}</span>
+          ${d.area_cover ? `<span class="text-[9px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Area: ${d.area_cover}</span>` : ''}
           <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md ${urgencyPillStyles[d.level]} uppercase shrink-0">${d.level}</span>
           ${ticketAgePill}
           ${statusPill}
@@ -5786,7 +5874,8 @@ function populateAssignDealerOptions() {
   const selectDealer = document.getElementById("assign-select-dealer");
   if (!selectDealer) return;
   selectDealer.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
-  MASTER_DEALER_PRIORITY_DATA.forEach(d => {
+  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  coveredDealers.forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.dealer_id;
     opt.innerText = `${d.dealer_name} (${d.cabang || "-"})`;
@@ -5826,11 +5915,13 @@ function renderAssignDealerSearchDropdown(query = "") {
   if (!dropdown) return;
   
   const q = String(query || "").trim().toLowerCase();
-  const filtered = MASTER_DEALER_PRIORITY_DATA.filter(d => {
+  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const filtered = coveredDealers.filter(d => {
     if (!q) return true;
     const name = String(d.dealer_name || "").toLowerCase();
     const branch = String(d.cabang || "").toLowerCase();
-    return name.includes(q) || branch.includes(q);
+    const area = String(d.area_cover || "").toLowerCase();
+    return name.includes(q) || branch.includes(q) || area.includes(q);
   });
 
   dropdown.innerHTML = "";
@@ -5838,7 +5929,7 @@ function renderAssignDealerSearchDropdown(query = "") {
   if (filtered.length === 0) {
     const emptyDiv = document.createElement("div");
     emptyDiv.className = "p-3 text-center text-xs text-slate-400";
-    emptyDiv.innerHTML = '<i class="fa-solid fa-store-slash mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok';
+    emptyDiv.innerHTML = '<i class="fa-solid fa-store-slash mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok di cover area Anda';
     dropdown.appendChild(emptyDiv);
     return;
   }
@@ -6206,7 +6297,8 @@ function populateVisitDealerOptions() {
   const sel = document.getElementById("input-dealer");
   if (!sel) return;
   sel.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
-  MASTER_DEALER_PRIORITY_DATA.forEach(d => {
+  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  coveredDealers.forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.dealer_id;
     opt.innerText = `${d.dealer_name} (${d.cabang || "-"})`;
@@ -6233,11 +6325,13 @@ function renderDealerSearchDropdown(query = "") {
   if (!dropdown) return;
   
   const q = String(query || "").trim().toLowerCase();
-  const filtered = MASTER_DEALER_PRIORITY_DATA.filter(d => {
+  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const filtered = coveredDealers.filter(d => {
     if (!q) return true;
     const name = String(d.dealer_name || "").toLowerCase();
     const branch = String(d.cabang || "").toLowerCase();
-    return name.includes(q) || branch.includes(q);
+    const area = String(d.area_cover || "").toLowerCase();
+    return name.includes(q) || branch.includes(q) || area.includes(q);
   });
 
   dropdown.innerHTML = "";
@@ -6245,7 +6339,7 @@ function renderDealerSearchDropdown(query = "") {
   if (filtered.length === 0) {
     const emptyDiv = document.createElement("div");
     emptyDiv.className = "p-3 text-center text-xs text-slate-400";
-    emptyDiv.innerHTML = '<i class="fa-solid fa-store-slash mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok';
+    emptyDiv.innerHTML = '<i class="fa-solid fa-store-slash mb-1 block text-slate-300"></i>Tidak ada dealer yang cocok di cover area Anda';
     dropdown.appendChild(emptyDiv);
     return;
   }
@@ -6271,8 +6365,9 @@ function renderDealerSearchDropdown(query = "") {
     item.innerHTML = `
       <div class="min-w-0 flex-1">
         <div class="font-bold text-slate-900 truncate">${d.dealer_name}</div>
-        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+        <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5 flex-wrap">
           <span>${d.cabang || "-"}</span>
+          ${d.area_cover ? `<span>• Area: <strong class="text-amber-700">${d.area_cover}</strong></span>` : ''}
           <span>•</span>
           <span>Aging Visit: ${d.aging_visit_mitra || 0} hr</span>
         </div>
@@ -6347,11 +6442,13 @@ function onDealerSearchKeyDown(e) {
     const input = document.getElementById("dealer-search-input");
     const q = input ? input.value.trim().toLowerCase() : "";
     if (q) {
-      const match = MASTER_DEALER_PRIORITY_DATA.find(d => {
+      const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+      const match = coveredDealers.find(d => {
         const name = String(d.dealer_name || "").toLowerCase();
         const branch = String(d.cabang || "").toLowerCase();
+        const area = String(d.area_cover || "").toLowerCase();
         const full = `${name} (${branch})`;
-        return name.includes(q) || branch.includes(q) || full.includes(q);
+        return name.includes(q) || branch.includes(q) || area.includes(q) || full.includes(q);
       });
       if (match) {
         selectDealerFromSearch(match.dealer_id);
@@ -6934,7 +7031,7 @@ async function initOnboardingScreen() {
   try {
     if (!supabaseClient) throw new Error("Supabase Client belum terhubung");
 
-    const isSuper = CURRENT_USER?.role === "Super Admin" || CURRENT_USER?.role_id === "R-01" || !CURRENT_USER?.area_cover || CURRENT_USER?.area_cover === "*" || CURRENT_USER?.area_cover?.toUpperCase() === "ALL";
+    const isSuper = (!CURRENT_USER?.area_cover || CURRENT_USER.area_cover.trim() === "" || CURRENT_USER.area_cover === "*" || CURRENT_USER.area_cover.toUpperCase() === "ALL") && (!CURRENT_USER?.cabang || CURRENT_USER.cabang === "Head Office");
     const userAreas = (CURRENT_USER?.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
     const userBranch = String(CURRENT_USER?.cabang || "").trim().toLowerCase();
     const userNip = CURRENT_USER?.nip || null;
@@ -7773,7 +7870,8 @@ function isUnitGpsInstalled(v) {
 }
 
 function getEligibleGpsDealers(actType) {
-  return MASTER_DEALER_PRIORITY_DATA.filter(d => {
+  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  return coveredDealers.filter(d => {
     const vehicles = APP_STATE.masterVehiclesGps[d.dealer_id] || d.units || [];
     if (!vehicles || vehicles.length === 0) return false;
 
@@ -8499,30 +8597,8 @@ function isUnitEligibleForFacMonitoring(u) {
 }
 
 function initFacMonitoringData() {
-  const isSuper = !CURRENT_USER || 
-    CURRENT_USER.role === "Super Admin" || 
-    CURRENT_USER.role_id === "R-01" || 
-    CURRENT_USER.role === "SUPERADMIN" || 
-    CURRENT_USER.role === "DIREKSI" || 
-    !CURRENT_USER.area_cover || 
-    CURRENT_USER.area_cover.trim() === "" || 
-    CURRENT_USER.area_cover.trim() === "*" || 
-    CURRENT_USER.area_cover.trim().toUpperCase() === "ALL";
-
-  const userAreas = (CURRENT_USER?.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
-  const userBranch = String(CURRENT_USER?.cabang || "").trim().toLowerCase();
-
-  // 1. Filter dealers by cover area
-  let coveredDealers = APP_STATE.dealers || [];
-  if (!isSuper) {
-    coveredDealers = coveredDealers.filter(d => {
-      const dArea = String(d.area_cover || "").trim().toLowerCase();
-      const dBranch = String(d.cabang || "").trim().toLowerCase();
-      const matchArea = userAreas.length > 0 && userAreas.some(a => dArea.includes(a) || a.includes(dArea));
-      const matchBranch = userBranch && userBranch !== "head office" && dBranch === userBranch;
-      return matchArea || matchBranch;
-    });
-  }
+  // 1. Filter dealers strictly by cover area PIC (berlaku untuk semua role: Admin, Super Admin, PIC)
+  const coveredDealers = (APP_STATE.dealers || []).filter(d => isDealerInUserCoverArea(d));
   const allowedDealerNames = new Set(coveredDealers.map(d => String(d.dealer_name).trim().toLowerCase()));
 
   // 2. Filter units: must belong to allowed dealers AND be eligible (LIVE or EXPIRED with GPS)
