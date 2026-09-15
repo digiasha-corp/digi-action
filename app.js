@@ -1341,7 +1341,7 @@ async function loadScreen(screenName, updateHistory = true) {
   }
 
   const titles = {
-    dashboard: "Digiasha Monitoring",
+    dashboard: "Digi Action",
     visit: "Form Visit FAC",
     onboarding: "Visit Calon Mitra",
     pipeline: "Pipeline Onboarding",
@@ -1365,10 +1365,10 @@ async function loadScreen(screenName, updateHistory = true) {
     login: "Masuk Akun"
   };
 
-  const pageTitle = titles[screenName] || "Monitoring";
+  const pageTitle = titles[screenName] || "Digi Action";
   document.title = (screenName === "dashboard" || screenName === "login")
-    ? "Digiasha Monitoring"
-    : `Digiasha - ${pageTitle}`;
+    ? "Digi Action"
+    : `Digi Action - ${pageTitle}`;
 
   if (screenName === "login") {
     topbar.classList.add("hidden");
@@ -1380,7 +1380,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (sub) sub.innerText = `${uName} • ${uRole}${areaSuffix}`;
     if (screenName === "dashboard") {
       btnBack.classList.add("hidden");
-      title.innerText = "Digiasha Monitoring";
+      title.innerText = "Digi Action";
     } else {
       btnBack.classList.remove("hidden");
       title.innerText = pageTitle;
@@ -1607,10 +1607,10 @@ let BANNER_AUTOSLIDE_TIMER = null;
 const DEFAULT_BANNER_SLIDES = [
   {
     banner_id: "BNR-01",
-    title: "Selamat Datang di Digiasha Monitoring System",
-    description: "Aplikasi monitoring terpadu, presensi cerdas, dan support operasional karyawan.",
+    title: "Selamat Datang di Digi Action",
+    description: "Aplikasi aktivitas harian terpadu, presensi cerdas, dan operasional karyawan.",
     image_url: "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80",
-    tag: "DIGIASHA UPDATE",
+    tag: "DIGI ACTION",
     tag_bg: "bg-teal-500 text-slate-950"
   },
   {
@@ -11560,7 +11560,7 @@ async function handleForceChangePasswordSubmit(e) {
     } catch (err) {}
 
     closeForceChangePassModal();
-    alert("Kata sandi berhasil diperbarui! Selamat datang di Digiasha Monitoring.");
+    alert("Kata sandi berhasil diperbarui! Selamat datang di Digi Action.");
     loadScreen("dashboard");
     syncMasterDataFromApi();
   } catch (err) {
