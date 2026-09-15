@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v98";
+const APP_BUILD_VERSION = "20260915_v99";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -13206,7 +13206,7 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
   if (metaEl) metaEl.innerText = meta || "-";
 
   // Watermark anti-screenshot identitas user (Tepat di Depan & Ditengah Halaman Dokumen)
-  const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || CURRENT_USER?.email || "DIGI ACTION USER";
+  const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || CURRENT_USER?.email || "DIGIASHA USER";
   const uNip = CURRENT_USER?.nip || CURRENT_USER?.nik || "-";
   const now = new Date();
   const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -13217,7 +13217,7 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
     el.innerText = `${uName} • NIP: ${uNip}`;
   });
   document.querySelectorAll(".pdf-wm-meta").forEach(el => {
-    el.innerText = "DIGI ACTION • STRICTLY CONFIDENTIAL";
+    el.innerText = "DIGIASHA • STRICTLY CONFIDENTIAL";
   });
   document.querySelectorAll(".pdf-wm-time").forEach(el => {
     el.innerText = `Waktu Akses: ${fullStamp}`;
@@ -13225,7 +13225,7 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
 
   const oldWatermarkEl = document.getElementById("pdf-watermark-text");
   if (oldWatermarkEl) {
-    oldWatermarkEl.innerText = `${uName} • NIP: ${uNip}\nDIGI ACTION • STRICTLY CONFIDENTIAL • ${fullStamp}`;
+    oldWatermarkEl.innerText = `${uName} • NIP: ${uNip}\nDIGIASHA • STRICTLY CONFIDENTIAL • ${fullStamp}`;
   }
 
   // Tampilkan modal viewer
