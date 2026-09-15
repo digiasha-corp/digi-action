@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v97";
+const APP_BUILD_VERSION = "20260915_v98";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -13205,12 +13205,27 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
   const metaEl = document.getElementById("pdf-viewer-meta");
   if (metaEl) metaEl.innerText = meta || "-";
 
-  // Watermark anti-screenshot identitas user
-  const watermarkEl = document.getElementById("pdf-watermark-text");
-  if (watermarkEl) {
-    const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || "DIGI ACTION USER";
-    const uNip = CURRENT_USER?.nip ? ` • NIP: ${CURRENT_USER.nip}` : "";
-    watermarkEl.innerText = `${uName}${uNip}\nDIGI ACTION • STRICTLY CONFIDENTIAL • ANTI-DOWNLOAD`;
+  // Watermark anti-screenshot identitas user (Tepat di Depan & Ditengah Halaman Dokumen)
+  const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || CURRENT_USER?.email || "DIGI ACTION USER";
+  const uNip = CURRENT_USER?.nip || CURRENT_USER?.nik || "-";
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const fullStamp = `${dateStr}, ${timeStr} WIB`;
+
+  document.querySelectorAll(".pdf-wm-user").forEach(el => {
+    el.innerText = `${uName} • NIP: ${uNip}`;
+  });
+  document.querySelectorAll(".pdf-wm-meta").forEach(el => {
+    el.innerText = "DIGI ACTION • STRICTLY CONFIDENTIAL";
+  });
+  document.querySelectorAll(".pdf-wm-time").forEach(el => {
+    el.innerText = `Waktu Akses: ${fullStamp}`;
+  });
+
+  const oldWatermarkEl = document.getElementById("pdf-watermark-text");
+  if (oldWatermarkEl) {
+    oldWatermarkEl.innerText = `${uName} • NIP: ${uNip}\nDIGI ACTION • STRICTLY CONFIDENTIAL • ${fullStamp}`;
   }
 
   // Tampilkan modal viewer

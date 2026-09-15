@@ -93,17 +93,40 @@
         <span class="text-xs font-medium">Memuat halaman PDF...</span>
       </div>
 
-      <!-- Watermark Anti-Screenshot Overlay (Transparan Halus) -->
-      <div class="pointer-events-none fixed inset-0 z-10 opacity-5 flex items-center justify-center rotate-[-30deg]">
-        <span id="pdf-watermark-text" class="text-white text-3xl sm:text-5xl font-black uppercase tracking-widest text-center select-none">
-          DIGI ACTION • INTERNAL ONLY
-        </span>
-      </div>
-
       <!-- Canvas Tempat Merender Halaman PDF (Full scrollable & centered without clipping) -->
       <div class="min-w-fit min-h-full flex items-center justify-center py-2 px-1">
-        <div id="pdf-canvas-wrapper" class="shadow-2xl rounded-lg overflow-hidden bg-white shrink-0 border border-slate-700/50">
+        <div id="pdf-canvas-wrapper" class="relative shadow-2xl rounded-lg overflow-hidden bg-white shrink-0 border border-slate-700/50 select-none">
           <canvas id="pdf-render-canvas" class="block"></canvas>
+
+          <!-- Watermark Anti-Screenshot Overlay (Tepat di Depan & Ditengah Halaman Dokumen) -->
+          <div class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-around items-center overflow-hidden select-none p-4 py-8">
+            <!-- Top Watermark -->
+            <div class="rotate-[-25deg] text-center select-none pointer-events-none opacity-[0.14]">
+              <p class="pdf-wm-user text-slate-900 text-xs sm:text-sm font-black uppercase tracking-wider">DIGI ACTION USER • NIP: -</p>
+              <p class="pdf-wm-meta text-slate-800 text-[10px] sm:text-xs font-bold uppercase tracking-wider">DIGI ACTION • STRICTLY CONFIDENTIAL</p>
+            </div>
+
+            <!-- Center Main Watermark Badge -->
+            <div class="rotate-[-25deg] text-center select-none pointer-events-none opacity-[0.18] max-w-[85%]">
+              <div class="border-2 border-dashed border-slate-800/40 rounded-2xl px-5 py-3 sm:px-8 sm:py-5 backdrop-blur-[0.5px]">
+                <p class="pdf-wm-user text-slate-900 text-sm sm:text-xl md:text-2xl font-black uppercase tracking-wider leading-tight">
+                  DIGI ACTION USER • NIP: -
+                </p>
+                <p class="pdf-wm-meta text-slate-800 text-[11px] sm:text-xs md:text-sm font-black uppercase tracking-widest mt-1">
+                  DIGI ACTION • STRICTLY CONFIDENTIAL
+                </p>
+                <p class="pdf-wm-time text-slate-700 text-[9px] sm:text-[11px] font-semibold mt-1">
+                  Akses Dokumen Internal Terproteksi
+                </p>
+              </div>
+            </div>
+
+            <!-- Bottom Watermark -->
+            <div class="rotate-[-25deg] text-center select-none pointer-events-none opacity-[0.14]">
+              <p class="pdf-wm-user text-slate-900 text-xs sm:text-sm font-black uppercase tracking-wider">DIGI ACTION USER • NIP: -</p>
+              <p class="pdf-wm-meta text-slate-800 text-[10px] sm:text-xs font-bold uppercase tracking-wider">DO NOT COPY / DISTRIBUTE</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
