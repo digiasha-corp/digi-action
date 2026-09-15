@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v92";
+const APP_BUILD_VERSION = "20260915_v93";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -17,7 +17,7 @@ let CURRENT_USER = (() => {
           "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
           "izin", "persetujuan", "attendance_summary", "rekap_tim",
           "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
-          "settings"
+          "sop_management", "settings"
         ];
         try { localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(u)); } catch (e) {}
       }
@@ -29,19 +29,19 @@ let CURRENT_USER = (() => {
   }
 })();
 
-// Definisi Matriks Role & Hak Akses Standar (19 Modul Sesuai Menu Aplikasi)
+// Definisi Matriks Role & Hak Akses Standar (20 Modul Sesuai Menu Aplikasi)
 const DEFAULT_ROLE_PERMISSIONS = {
   "R-01": {
     name: "Super Admin",
     icon: "fa-crown",
     color: "purple",
     badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
-    desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, ketentuan, dan pengaturan sistem.",
+    desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, ketentuan, SOP management, dan pengaturan sistem.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
       "izin", "persetujuan", "attendance_summary", "rekap_tim",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
-      "settings"
+      "sop_management", "settings"
     ]
   },
   "R-02": {
@@ -105,9 +105,10 @@ const ALL_APP_MODULES = [
   { key: "internal_memo", title: "Memo Pengajuan Internal", desc: "Pembuatan surat memo resmi", icon: "fa-file-lines", category: "Layanan & Support" },
   { key: "employee_loan", title: "Pinjaman Karyawan (Kasbon)", desc: "Fasilitas pinjaman darurat karyawan", icon: "fa-hand-holding-dollar", category: "Layanan & Support" },
   { key: "helpdesk_support", title: "IT & Helpdesk Support", desc: "Bantuan kendala sistem & SOP", icon: "fa-headset", category: "Layanan & Support" },
-  { key: "ketentuan", title: "Ketentuan & SOP", desc: "Portal ketentuan, SOP & regulasi perusahaan", icon: "fa-book-bookmark", category: "Layanan & Support" },
+  { key: "ketentuan", title: "Ketentuan & SOP", desc: "Pustaka pedoman & kebijakan karyawan", icon: "fa-book-bookmark", category: "Layanan & Support" },
 
   // 4. Administrasi & Sistem
+  { key: "sop_management", title: "SOP Management", desc: "Kelola upload PDF, tanggal berlaku & hak akses role", icon: "fa-folder-gear", category: "Administrasi & Sistem" },
   { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS, Banner & Role", icon: "fa-sliders", category: "Administrasi & Sistem" }
 ];
 
@@ -198,9 +199,9 @@ function getPermissionsForRole(roleKey, userObj = null) {
 
 // Hak Akses Modul per Role (Legacy Fallback)
 const ROLE_PERMISSIONS = {
-  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "settings"],
-  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "settings"],
-  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "settings"],
+  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "settings"],
+  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "settings"],
+  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "settings"],
   "Supervisor": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan"],
   "Branch Manager": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
   "R-02": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
@@ -1376,7 +1377,8 @@ async function loadScreen(screenName, updateHistory = true) {
     internal_memo: "Memo Pengajuan Internal",
     employee_loan: "Pinjaman Karyawan (Kasbon)",
     helpdesk_support: "IT & Helpdesk Support",
-    ketentuan: "Portal Ketentuan & SOP",
+    ketentuan: "Pustaka Ketentuan & SOP",
+    sop_management: "SOP & Policy Management",
     login: "Masuk Akun"
   };
 
@@ -1437,6 +1439,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "rekap_tim") initRekapTimScreen();
     if (screenName === "laporan_activity") initLaporanActivityScreen();
     if (screenName === "ketentuan" && typeof initKetentuanScreen === "function") initKetentuanScreen();
+    if (screenName === "sop_management" && typeof initSopManagementScreen === "function") initSopManagementScreen();
     if (screenName === "settings" && typeof initSettingsScreen === "function") initSettingsScreen();
     if (screenName === "history" && typeof initHistory === "function") initHistory();
 
@@ -1781,12 +1784,12 @@ async function initDashboard() {
     String(CURRENT_USER.role || "").toLowerCase().includes("supervisor")
   );
 
-  // Render & filter seluruh modul aplikasi sesuai hak akses role (19 modul)
+  // Render & filter seluruh modul aplikasi sesuai hak akses role (20 modul)
   const allModulesList = [
     "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
     "izin", "persetujuan", "attendance_summary", "rekap_tim",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
-    "settings"
+    "sop_management", "settings"
   ];
 
   allModulesList.forEach(key => {
@@ -1813,7 +1816,7 @@ async function initDashboard() {
   // Tampilkan/sembunyikan grup admin
   const adminBox = document.getElementById("box-group-admin");
   if (adminBox) {
-    adminBox.style.display = perms.includes("settings") ? "block" : "none";
+    adminBox.style.display = (perms.includes("settings") || perms.includes("sop_management")) ? "block" : "none";
   }
 
   // Inisialisasi Banner Slideshow Berita
@@ -12755,7 +12758,7 @@ function renderKetentuanList() {
 
     html += `
       <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-slate-300 transition space-y-3">
-        <!-- Header Dokumen: Badge Kategori & Actions -->
+        <!-- Header Dokumen: Badge Kategori -->
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center space-x-2">
             <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${catStyle.bg} flex items-center space-x-1">
@@ -12768,17 +12771,6 @@ function renderKetentuanList() {
               </span>
             ` : ''}
           </div>
-
-          ${isAdmin ? `
-            <div class="flex items-center space-x-1 shrink-0">
-              <button type="button" onclick="openUploadKetentuanModal('${item.id}')" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition" title="Edit Ketentuan">
-                <i class="fa-solid fa-pen-to-square text-xs"></i>
-              </button>
-              <button type="button" onclick="deleteKetentuan('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition" title="Hapus Ketentuan">
-                <i class="fa-solid fa-trash-can text-xs"></i>
-              </button>
-            </div>
-          ` : ''}
         </div>
 
         <!-- Judul Ketentuan -->
@@ -13333,7 +13325,8 @@ async function handleSaveKetentuan(event) {
     } catch (e) {}
 
     closeUploadKetentuanModal();
-    renderKetentuanList();
+    if (typeof renderKetentuanList === "function") renderKetentuanList();
+    if (typeof renderSopManagementList === "function") renderSopManagementList();
 
     alert(editId ? "Ketentuan berhasil diperbarui!" : "Ketentuan baru berhasil diunggah dan dipublikasikan!");
   } catch (error) {
@@ -13368,8 +13361,220 @@ async function deleteKetentuan(id) {
     localStorage.setItem("DIGIASHA_KETENTUAN_DATA", JSON.stringify(KETENTUAN_DATA_CACHE));
   } catch (e) {}
 
-  renderKetentuanList();
+  if (typeof renderKetentuanList === "function") renderKetentuanList();
+  if (typeof renderSopManagementList === "function") renderSopManagementList();
   alert("Ketentuan berhasil dihapus.");
+}
+
+// =========================================================================
+// SOP & POLICY MANAGEMENT CONTROLLER (ADMIN CONTROL & UPLOAD HUB)
+// =========================================================================
+let ACTIVE_SOP_MGMT_CATEGORY = "ALL";
+let SEARCH_SOP_MGMT_QUERY = "";
+
+async function initSopManagementScreen() {
+  // Guard: Hanya role Admin / Super Admin atau role yang diberi wewenang sop_management
+  const perms = getPermissionsForRole(CURRENT_USER?.role_id || CURRENT_USER?.role, CURRENT_USER);
+  if (!isUserAdminOrSuperAdmin() && !perms.includes("sop_management")) {
+    alert("Akses ditolak: Menu SOP Management hanya dapat diakses oleh Administrator.");
+    loadScreen("dashboard");
+    return;
+  }
+
+  const lastUpdatedEl = document.getElementById("sop-mgmt-last-updated");
+  if (lastUpdatedEl) {
+    const now = new Date();
+    lastUpdatedEl.innerText = `Update: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  }
+
+  ACTIVE_SOP_MGMT_CATEGORY = "ALL";
+  SEARCH_SOP_MGMT_QUERY = "";
+  const searchInput = document.getElementById("sop-mgmt-search-input");
+  if (searchInput) searchInput.value = "";
+  const clearBtn = document.getElementById("btn-clear-search-sop-mgmt");
+  if (clearBtn) clearBtn.classList.add("hidden");
+
+  await fetchKetentuanList();
+  renderSopManagementList();
+}
+
+function filterSopMgmtCategory(category) {
+  ACTIVE_SOP_MGMT_CATEGORY = category;
+  
+  const filterBtns = document.querySelectorAll("#sop-mgmt-category-filters .cat-filter-btn");
+  filterBtns.forEach(btn => {
+    btn.className = "cat-filter-btn px-3 py-1.5 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0 transition";
+  });
+
+  const catMap = {
+    "ALL": "sop-mgmt-btn-cat-ALL",
+    "SOP Operasional": "sop-mgmt-btn-cat-sop",
+    "Kebijakan HR": "sop-mgmt-btn-cat-hr",
+    "Surat Keputusan": "sop-mgmt-btn-cat-sk",
+    "Regulasi Bisnis": "sop-mgmt-btn-cat-bisnis",
+    "Panduan Sistem": "sop-mgmt-btn-cat-sistem"
+  };
+
+  const activeBtnId = catMap[category] || "sop-mgmt-btn-cat-ALL";
+  const activeBtn = document.getElementById(activeBtnId);
+  if (activeBtn) {
+    activeBtn.className = "cat-filter-btn px-3 py-1.5 rounded-xl font-bold bg-slate-900 text-white shadow-xs shrink-0 transition";
+  }
+
+  renderSopManagementList();
+}
+
+function handleSearchSopMgmt(query) {
+  SEARCH_SOP_MGMT_QUERY = (query || "").trim().toLowerCase();
+  const clearBtn = document.getElementById("btn-clear-search-sop-mgmt");
+  if (clearBtn) {
+    clearBtn.classList.toggle("hidden", !SEARCH_SOP_MGMT_QUERY);
+  }
+  renderSopManagementList();
+}
+
+function clearSearchSopMgmt() {
+  const searchInput = document.getElementById("sop-mgmt-search-input");
+  if (searchInput) searchInput.value = "";
+  handleSearchSopMgmt("");
+}
+
+function renderSopManagementList() {
+  const container = document.getElementById("sop-mgmt-list-container");
+  if (!container) return;
+
+  // Di SOP Management (Admin), Admin melihat SEMUA dokumen tanpa tersembunyi
+  let docs = KETENTUAN_DATA_CACHE;
+
+  const countAllEl = document.getElementById("sop-mgmt-count-cat-all");
+  if (countAllEl) countAllEl.innerText = docs.length;
+
+  if (ACTIVE_SOP_MGMT_CATEGORY !== "ALL") {
+    docs = docs.filter(d => (d.kategori || "").toLowerCase() === ACTIVE_SOP_MGMT_CATEGORY.toLowerCase());
+  }
+
+  if (SEARCH_SOP_MGMT_QUERY) {
+    docs = docs.filter(d => {
+      const matchJudul = String(d.judul || "").toLowerCase().includes(SEARCH_SOP_MGMT_QUERY);
+      const matchNomor = String(d.nomor_dokumen || "").toLowerCase().includes(SEARCH_SOP_MGMT_QUERY);
+      const matchKategori = String(d.kategori || "").toLowerCase().includes(SEARCH_SOP_MGMT_QUERY);
+      return matchJudul || matchNomor || matchKategori;
+    });
+  }
+
+  if (docs.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-700 text-xs sm:text-sm">Belum Ada Dokumen di Kategori Ini</h4>
+          <p class="text-[11px] text-slate-400 mt-0.5">
+            ${SEARCH_SOP_MGMT_QUERY ? `Tidak ada hasil untuk kata kunci "${SEARCH_SOP_MGMT_QUERY}".` : 'Klik tombol "Upload Ketentuan Baru" di atas untuk menambahkan dokumen PDF baru.'}
+          </p>
+        </div>
+        <button type="button" onclick="openUploadKetentuanModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs">
+          <i class="fa-solid fa-plus mr-1"></i> Upload Dokumen Baru
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const categoryColorMap = {
+    "SOP Operasional": { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "fa-clipboard-check" },
+    "Kebijakan HR": { bg: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: "fa-users-gear" },
+    "Surat Keputusan": { bg: "bg-rose-50 text-rose-700 border-rose-200", icon: "fa-stamp" },
+    "Regulasi Bisnis": { bg: "bg-amber-50 text-amber-800 border-amber-200", icon: "fa-scale-balanced" },
+    "Panduan Sistem": { bg: "bg-cyan-50 text-cyan-700 border-cyan-200", icon: "fa-laptop-code" },
+    "Lainnya": { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: "fa-file-lines" }
+  };
+
+  let html = "";
+  docs.forEach(item => {
+    const catStyle = categoryColorMap[item.kategori] || categoryColorMap["Lainnya"];
+    const tglBerlakuFmt = item.tgl_berlaku ? formatDisplayDate(item.tgl_berlaku) : "-";
+    const fileSizeStr = item.file_size ? `${Math.round(item.file_size / 1024)} KB` : "";
+
+    let roles = item.allowed_roles;
+    if (typeof roles === "string") {
+      try { roles = JSON.parse(roles); } catch (e) { roles = [roles]; }
+    }
+    const isAllRoles = !roles || roles.length === 0 || roles.includes("ALL") || roles.includes("Semua Role");
+
+    let roleBadgesHtml = "";
+    if (isAllRoles) {
+      roleBadgesHtml = `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">Semua Role</span>`;
+    } else {
+      roleBadgesHtml = roles.map(r => `<span class="px-1.5 py-0.5 rounded text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-100 font-semibold">${r}</span>`).join(" ");
+    }
+
+    const safeJudul = (item.judul || "").replace(/"/g, '&quot;');
+    const safeMeta = `${item.nomor_dokumen || item.kategori} • Berlaku sejak ${tglBerlakuFmt}`;
+
+    html += `
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-slate-300 transition space-y-3">
+        <!-- Header Dokumen: Badge Kategori, No Dokumen & Actions Admin -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${catStyle.bg} flex items-center space-x-1">
+              <i class="fa-solid ${catStyle.icon} text-[9px]"></i>
+              <span>${item.kategori || "Ketentuan"}</span>
+            </span>
+            ${item.nomor_dokumen ? `
+              <span class="text-[10px] text-slate-400 font-mono truncate max-w-[150px] sm:max-w-[240px]">
+                ${item.nomor_dokumen}
+              </span>
+            ` : ''}
+          </div>
+
+          <div class="flex items-center space-x-1.5 shrink-0">
+            <button type="button" onclick="openUploadKetentuanModal('${item.id}')" class="px-2.5 py-1 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 border border-slate-200 rounded-lg transition text-xs font-bold flex items-center space-x-1" title="Edit Metadata & Hak Akses Role">
+              <i class="fa-solid fa-pen-to-square text-[11px]"></i>
+              <span>Edit</span>
+            </button>
+            <button type="button" onclick="deleteKetentuan('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 border border-slate-200 rounded-lg transition text-xs" title="Hapus Dokumen">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Judul Ketentuan -->
+        <div class="flex items-start space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg shrink-0 shadow-inner">
+            <i class="fa-solid fa-file-pdf"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="font-bold text-slate-900 text-xs sm:text-sm leading-snug line-clamp-2">${item.judul || "Dokumen Ketentuan"}</h4>
+            <div class="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-slate-400">
+              <span class="flex items-center space-x-1">
+                <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                <span>Berlaku: <strong class="text-slate-600">${tglBerlakuFmt}</strong></span>
+              </span>
+              ${fileSizeStr ? `<span>•</span><span>${fileSizeStr}</span>` : ''}
+              ${item.file_name ? `<span class="hidden sm:inline font-mono truncate max-w-[180px] text-slate-400">(${item.file_name})</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Card: Hak Akses Role & Tombol Preview Viewer -->
+        <div class="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div class="flex items-center space-x-1.5 flex-wrap">
+            <span class="text-[10px] text-slate-500 font-bold">Hak Akses Role:</span>
+            ${roleBadgesHtml}
+          </div>
+
+          <button type="button" onclick="openSecurePdfViewer('${item.pdf_url}', '${safeJudul}', '${safeMeta}')" class="w-full sm:w-auto px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+            <i class="fa-solid fa-eye text-xs text-emerald-400"></i>
+            <span>Preview PDF</span>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
 }
 
 // =========================================================================
