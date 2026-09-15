@@ -1131,9 +1131,10 @@ async function callApi(action, data = {}) {
           if (!error && rows) return { success: true, approvals: rows };
         }
         if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-          const queryUrl = (!isAdmin && cleanNip)
-            ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${encodeURIComponent(cleanNip)}&select=*&order=timestamp.desc`
-            : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?select=*&order=timestamp.desc`;
+          const cleanNip = encodeURIComponent(CURRENT_USER?.nip || data?.nip || "");
+          const queryUrl = cleanNip
+            ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&select=*&order=timestamp.desc`
+            : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?order=timestamp.desc`;
           const res = await fetch(queryUrl, {
             headers: {
               "apikey": CONFIG.SUPABASE_ANON_KEY,
@@ -2865,12 +2866,11 @@ async function fetchApprovalList() {
     // 1. Coba ambil langsung dari Supabase REST API
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
       try {
-        const isAdmin = String(CURRENT_USER.role || "").toLowerCase().includes("admin");
         const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
-        // Admin bisa melihat seluruh pengajuan, sedangkan non-admin melihat pengajuan yang ditujukan ke dia dan pengajuan miliknya sendiri
-        const queryUrl = isAdmin 
-          ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?select=*&order=timestamp.desc`
-          : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&order=timestamp.desc`;
+        // Pengguna HANYA memuat pengajuan di mana dia ditunjuk sebagai atasan/approver dan pengajuan miliknya sendiri
+        const queryUrl = cleanNip
+          ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&order=timestamp.desc`
+          : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?order=timestamp.desc`;
 
         const sbRes = await fetch(queryUrl, {
           headers: {
@@ -2911,12 +2911,9 @@ async function fetchPendingApprovalCount() {
   try {
     let pendingCount = 0;
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      const isAdmin = String(CURRENT_USER.role || "").toLowerCase().includes("admin");
       const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
-      // PENTING: Pengajuan milik sendiri (nip == cleanNip) tidak boleh dihitung sebagai tugas approval yang harus direspon!
-      const queryUrl = isAdmin
-        ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`
-        : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`;
+      // HANYA hitung pengajuan bawahan yang secara spesifik menunjuk user ini sebagai atasan (pic_approval_nip == cleanNip)
+      const queryUrl = `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`;
 
       const sbRes = await fetch(queryUrl, {
         headers: {
@@ -2936,6 +2933,7 @@ async function fetchPendingApprovalCount() {
       if (res && res.success && Array.isArray(res.approvals)) {
         pendingCount = res.approvals.filter(a => 
           String(a.status_approval || "").toUpperCase() === "PENDING" &&
+          String(a.pic_approval_nip || "").trim() === String(CURRENT_USER.nip || "").trim() &&
           String(a.nip || "").trim() !== String(CURRENT_USER.nip || "").trim()
         ).length;
       }
@@ -2953,11 +2951,12 @@ async function fetchPendingApprovalCount() {
 function updateApprovalBadgeCounts() {
   const cleanNip = String(CURRENT_USER?.nip || "").trim();
 
-  // 1. Pengajuan tim/bawahan yang menunggu keputusan persetujuan user ini
+  // 1. Pengajuan tim/bawahan yang menunjuk user ini sebagai atasan dan berstatus PENDING
   const inboxPendingCount = APPROVALS_CACHE.filter(a => {
+    const isForMe = String(a.pic_approval_nip || "").trim() === cleanNip;
     const isNotMe = String(a.nip || "").trim() !== cleanNip;
     const isPending = String(a.status_approval || "").toUpperCase() === "PENDING";
-    return isNotMe && isPending;
+    return isForMe && isNotMe && isPending;
   }).length;
 
   // 2. Pengajuan milik user ini sendiri yang masih pending menunggu atasan
@@ -3039,10 +3038,14 @@ function renderApprovalList() {
   // 1. Filter berdasarkan scope tab (INBOX vs MY)
   let list = APPROVALS_CACHE;
   if (ACTIVE_APPROVAL_SCOPE === "MY") {
+    // Pengajuan yang diajukan oleh user ini sendiri
     list = list.filter(a => String(a.nip || "").trim() === cleanNip);
   } else {
-    // INBOX: Hanya tampilkan pengajuan dari orang lain/bawahan (Bukan pengajuan sendiri)
-    list = list.filter(a => String(a.nip || "").trim() !== cleanNip);
+    // INBOX (Perlu Persetujuan Tim): HANYA tampilkan pengajuan dari bawahan yang MENUNJUK user ini sebagai atasan!
+    list = list.filter(a => 
+      String(a.pic_approval_nip || "").trim() === cleanNip && 
+      String(a.nip || "").trim() !== cleanNip
+    );
   }
 
   // 2. Filter status
