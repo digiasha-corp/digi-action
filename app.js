@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v101";
+const APP_BUILD_VERSION = "20260915_v102";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -10107,6 +10107,176 @@ async function handleApplyBulkRoleAssign(e) {
   populateEmployeeRoleOptions();
 
   showToast(`Berhasil menambahkan ${selectedModuleKeys.length} menu ke ${selectedRoleIds.length} role terpilih (${totalNewAdded} hak akses baru berhasil diberikan)!`, "success", 3000);
+}
+
+// ================= BULK HAPUS MENU DARI BANYAK ROLE =================
+function openBulkRemoveRoleModal() {
+  const roleContainer = document.getElementById("bulk-remove-roles-list-container");
+  const moduleContainer = document.getElementById("bulk-remove-modules-list-container");
+  if (!roleContainer || !moduleContainer) return;
+
+  // 1. Render Roles Checkbox List
+  const roleKeys = Object.keys(ROLE_PERMISSIONS_STATE);
+  roleContainer.innerHTML = roleKeys.map(roleId => {
+    const role = ROLE_PERMISSIONS_STATE[roleId];
+    const permCount = (role.permissions || []).length;
+    return `
+      <label class="flex items-center space-x-2.5 p-2 bg-white rounded-xl border border-rose-200 hover:border-rose-400 hover:bg-rose-50/30 cursor-pointer transition select-none">
+        <input type="checkbox" name="bulk_remove_target_role" value="${roleId}" class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer" />
+        <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-xs shrink-0">
+          <i class="fa-solid ${role.icon || 'fa-user-gear'}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-1.5 flex-wrap">
+            <span class="text-xs font-bold text-slate-900 truncate">${role.name}</span>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold ${role.badgeBg || 'bg-slate-100 text-slate-700'}">${roleId}</span>
+          </div>
+          <span class="text-[10px] text-slate-400">${permCount} modul aktif saat ini</span>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  // 2. Render Modules Checkbox List per Kategori
+  const preferredOrder = ["Operasional Lapangan", "Personalia", "Layanan & Support", "Administrasi & Sistem"];
+  const allCats = Array.from(new Set(ALL_APP_MODULES.map(m => m.category || "Operasional Lapangan")));
+  const categories = [
+    ...preferredOrder.filter(c => allCats.includes(c)),
+    ...allCats.filter(c => !preferredOrder.includes(c))
+  ];
+
+  moduleContainer.innerHTML = categories.map(cat => {
+    const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
+    if (catMods.length === 0) return "";
+
+    const itemsHtml = catMods.map(mod => {
+      return `
+        <label class="flex items-start space-x-2.5 p-2 bg-white hover:bg-rose-50/50 rounded-xl border border-slate-200 hover:border-rose-300 cursor-pointer transition select-none">
+          <input type="checkbox" name="bulk_remove_target_module" value="${mod.key}" class="mt-0.5 w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer" />
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid ${mod.icon} text-[11px] text-slate-600"></i>
+              <span class="text-xs font-bold text-slate-800">${mod.title}</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-tight mt-0.5">${mod.desc}</p>
+          </div>
+        </label>
+      `;
+    }).join('');
+
+    return `
+      <div class="space-y-1.5">
+        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">${cat}</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const modal = document.getElementById("modal-bulk-remove-role");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeBulkRemoveRoleModal() {
+  const modal = document.getElementById("modal-bulk-remove-role");
+  if (modal) modal.classList.add("hidden");
+}
+
+function selectAllBulkRemoveRoles(checked) {
+  const cbs = document.querySelectorAll('input[name="bulk_remove_target_role"]');
+  cbs.forEach(cb => cb.checked = !!checked);
+}
+
+function selectAllBulkRemoveModules(checked) {
+  const cbs = document.querySelectorAll('input[name="bulk_remove_target_module"]');
+  cbs.forEach(cb => cb.checked = !!checked);
+}
+
+async function handleApplyBulkRoleRemove(e) {
+  e.preventDefault();
+
+  const selectedRoleCbs = document.querySelectorAll('input[name="bulk_remove_target_role"]:checked');
+  const selectedModuleCbs = document.querySelectorAll('input[name="bulk_remove_target_module"]:checked');
+
+  const selectedRoleIds = Array.from(selectedRoleCbs).map(cb => cb.value);
+  const selectedModuleKeys = Array.from(selectedModuleCbs).map(cb => cb.value);
+
+  if (selectedRoleIds.length === 0) {
+    alert("Silakan pilih minimal 1 role tujuan yang ingin dikurangi!");
+    return;
+  }
+
+  if (selectedModuleKeys.length === 0) {
+    alert("Silakan pilih minimal 1 menu/modul yang ingin dicabut/dihapus!");
+    return;
+  }
+
+  if (!confirm(`Yakin ingin mencabut ${selectedModuleKeys.length} menu terpilih dari ${selectedRoleIds.length} role?`)) {
+    return;
+  }
+
+  let totalRemoved = 0;
+  const updatedRoles = [];
+
+  selectedRoleIds.forEach(roleId => {
+    if (!ROLE_PERMISSIONS_STATE[roleId]) return;
+    let currentPerms = Array.from(ROLE_PERMISSIONS_STATE[roleId].permissions || []);
+
+    selectedModuleKeys.forEach(modKey => {
+      // Proteksi khusus Super Admin: Jangan cabut settings agar tidak terkunci keluar
+      if (roleId === "R-01" && modKey === "settings") {
+        return;
+      }
+      const idx = currentPerms.indexOf(modKey);
+      if (idx !== -1) {
+        currentPerms.splice(idx, 1);
+        totalRemoved++;
+      }
+    });
+
+    ROLE_PERMISSIONS_STATE[roleId].permissions = currentPerms;
+    updatedRoles.push({
+      role_id: roleId,
+      role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
+      permissions: JSON.stringify(currentPerms),
+      description: ROLE_PERMISSIONS_STATE[roleId].desc || "",
+      updated_at: new Date().toISOString()
+    });
+  });
+
+  // Simpan ke localStorage
+  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+  // Simpan ke Supabase jika tersedia
+  if (supabaseClient && updatedRoles.length > 0) {
+    try {
+      await supabaseClient.from("m_role_permission").upsert(updatedRoles, { onConflict: "role_id" });
+    } catch (err) {
+      console.warn("Supabase upsert error on bulk role remove:", err);
+    }
+  }
+
+  // Jika role user yang sedang login terpengaruh, sync permissions dan update dashboard
+  if (CURRENT_USER) {
+    const uRole = CURRENT_USER.role || CURRENT_USER.role_id;
+    if (selectedRoleIds.includes(uRole) || selectedRoleIds.includes(CURRENT_USER.role_id)) {
+      const activeRoleId = CURRENT_USER.role_id || uRole;
+      if (ROLE_PERMISSIONS_STATE[activeRoleId]) {
+        CURRENT_USER.permissions = ROLE_PERMISSIONS_STATE[activeRoleId].permissions;
+        try {
+          localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+        } catch (err) {}
+        if (typeof initDashboard === "function") initDashboard();
+      }
+    }
+  }
+
+  closeBulkRemoveRoleModal();
+  loadRolePermissionsSettings();
+  populateEmployeeRoleOptions();
+
+  showToast(`Berhasil mencabut ${selectedModuleKeys.length} menu dari ${selectedRoleIds.length} role terpilih (${totalRemoved} hak akses dicabut)!`, "info", 3000);
 }
 
 let ROLE_EDIT_MODE = "add"; // "add" | "edit"
