@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v100";
+const APP_BUILD_VERSION = "20260915_v101";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -9906,7 +9906,12 @@ function renderModalModulesChecklist(selectedKeys = []) {
   const container = document.getElementById("role-modal-modules-container");
   if (!container) return;
 
-  const categories = ["Operasional Lapangan", "Presensi & Persetujuan", "Layanan & Support", "Administrasi & Sistem"];
+  const preferredOrder = ["Operasional Lapangan", "Personalia", "Layanan & Support", "Administrasi & Sistem"];
+  const allCats = Array.from(new Set(ALL_APP_MODULES.map(m => m.category || "Operasional Lapangan")));
+  const categories = [
+    ...preferredOrder.filter(c => allCats.includes(c)),
+    ...allCats.filter(c => !preferredOrder.includes(c))
+  ];
   container.innerHTML = categories.map(cat => {
     const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
     if (catMods.length === 0) return "";
@@ -9972,7 +9977,12 @@ function openBulkAssignRoleModal() {
   }).join('');
 
   // 2. Render Modules Checkbox List per Kategori
-  const categories = ["Operasional Lapangan", "Presensi & Persetujuan", "Layanan & Support", "Administrasi & Sistem"];
+  const preferredOrder = ["Operasional Lapangan", "Personalia", "Layanan & Support", "Administrasi & Sistem"];
+  const allCats = Array.from(new Set(ALL_APP_MODULES.map(m => m.category || "Operasional Lapangan")));
+  const categories = [
+    ...preferredOrder.filter(c => allCats.includes(c)),
+    ...allCats.filter(c => !preferredOrder.includes(c))
+  ];
   moduleContainer.innerHTML = categories.map(cat => {
     const catMods = ALL_APP_MODULES.filter(m => (m.category || "Operasional Lapangan") === cat);
     if (catMods.length === 0) return "";
