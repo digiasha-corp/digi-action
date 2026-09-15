@@ -468,9 +468,17 @@
     </div>
   </div>
 
+  <!-- PDF.js CDN for Protected Anti-Download PDF Viewer Canvas Rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/config.js?v=20260915_v91"></script>
-  <script src="/app.js?v=20260915_v91"></script>
+  <script src="/config.js?v=20260915_v92"></script>
+  <script src="/app.js?v=20260915_v92"></script>
 </body>
 </html>

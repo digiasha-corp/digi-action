@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260914_v68";
+const APP_BUILD_VERSION = "20260915_v92";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -16,7 +16,7 @@ let CURRENT_USER = (() => {
         u.permissions = [
           "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
           "izin", "persetujuan", "attendance_summary", "rekap_tim",
-          "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+          "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
           "settings"
         ];
         try { localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(u)); } catch (e) {}
@@ -29,18 +29,18 @@ let CURRENT_USER = (() => {
   }
 })();
 
-// Definisi Matriks Role & Hak Akses Standar (18 Modul Sesuai Menu Aplikasi)
+// Definisi Matriks Role & Hak Akses Standar (19 Modul Sesuai Menu Aplikasi)
 const DEFAULT_ROLE_PERMISSIONS = {
   "R-01": {
     name: "Super Admin",
     icon: "fa-crown",
     color: "purple",
     badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
-    desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, dan pengaturan sistem.",
+    desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, ketentuan, dan pengaturan sistem.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
       "izin", "persetujuan", "attendance_summary", "rekap_tim",
-      "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+      "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
       "settings"
     ]
   },
@@ -49,11 +49,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     icon: "fa-user-tie",
     color: "blue",
     badgeBg: "bg-blue-100 text-blue-800 border border-blue-200",
-    desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, dan layanan support karyawan.",
+    desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, ketentuan, dan layanan support karyawan.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "laporan_activity",
       "izin", "persetujuan", "attendance_summary", "rekap_tim",
-      "expense_claim", "internal_memo", "employee_loan", "helpdesk_support"
+      "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan"
     ]
   },
   "R-03": {
@@ -61,11 +61,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     icon: "fa-satellite-dish",
     color: "cyan",
     badgeBg: "bg-cyan-100 text-cyan-800 border border-cyan-200",
-    desc: "Monitoring dan operasional GPS armada dealer, laporan berkala FAC, dan support karyawan.",
+    desc: "Monitoring dan operasional GPS armada dealer, laporan berkala FAC, ketentuan, dan support karyawan.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history",
       "izin", "attendance_summary",
-      "expense_claim", "internal_memo", "helpdesk_support"
+      "expense_claim", "internal_memo", "helpdesk_support", "ketentuan"
     ]
   },
   "R-04": {
@@ -73,11 +73,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     icon: "fa-person-walking",
     color: "emerald",
     badgeBg: "bg-emerald-100 text-emerald-800 border border-emerald-200",
-    desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, presensi, dan klaim biaya.",
+    desc: "Eksekusi kunjungan lapangan, visit mitra berkala, onboarding calon mitra, presensi, ketentuan, dan klaim biaya.",
     permissions: [
       "priority", "visit", "onboarding", "pipeline", "gps", "history",
       "izin", "attendance_summary",
-      "expense_claim", "internal_memo", "helpdesk_support"
+      "expense_claim", "internal_memo", "helpdesk_support", "ketentuan"
     ]
   }
 };
@@ -105,6 +105,7 @@ const ALL_APP_MODULES = [
   { key: "internal_memo", title: "Memo Pengajuan Internal", desc: "Pembuatan surat memo resmi", icon: "fa-file-lines", category: "Layanan & Support" },
   { key: "employee_loan", title: "Pinjaman Karyawan (Kasbon)", desc: "Fasilitas pinjaman darurat karyawan", icon: "fa-hand-holding-dollar", category: "Layanan & Support" },
   { key: "helpdesk_support", title: "IT & Helpdesk Support", desc: "Bantuan kendala sistem & SOP", icon: "fa-headset", category: "Layanan & Support" },
+  { key: "ketentuan", title: "Ketentuan & SOP", desc: "Portal ketentuan, SOP & regulasi perusahaan", icon: "fa-book-bookmark", category: "Layanan & Support" },
 
   // 4. Administrasi & Sistem
   { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS, Banner & Role", icon: "fa-sliders", category: "Administrasi & Sistem" }
@@ -197,17 +198,17 @@ function getPermissionsForRole(roleKey, userObj = null) {
 
 // Hak Akses Modul per Role (Legacy Fallback)
 const ROLE_PERMISSIONS = {
-  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"],
-  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"],
-  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "settings"],
-  "Supervisor": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history"],
-  "Branch Manager": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history"],
-  "R-02": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history"],
-  "FAC": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history"],
-  "R-03": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history"],
-  "Other": ["priority"],
-  "R-04": ["priority", "visit", "onboarding", "pipeline", "gps", "history"],
-  "Field PIC": ["priority", "visit", "onboarding", "pipeline", "gps", "history"]
+  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "settings"],
+  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "settings"],
+  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "settings"],
+  "Supervisor": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan"],
+  "Branch Manager": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
+  "R-02": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
+  "FAC": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history", "ketentuan"],
+  "R-03": ["priority", "assignment", "visit", "onboarding", "gps", "fac", "history", "ketentuan"],
+  "Other": ["priority", "ketentuan"],
+  "R-04": ["priority", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
+  "Field PIC": ["priority", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"]
 };
 
 // Data Kantor untuk Geofencing Presensi (Sinkron Dinamis dengan Sheet M_WORK_LOCATION)
@@ -1375,6 +1376,7 @@ async function loadScreen(screenName, updateHistory = true) {
     internal_memo: "Memo Pengajuan Internal",
     employee_loan: "Pinjaman Karyawan (Kasbon)",
     helpdesk_support: "IT & Helpdesk Support",
+    ketentuan: "Portal Ketentuan & SOP",
     login: "Masuk Akun"
   };
 
@@ -1434,6 +1436,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "rekap_absen" || screenName === "attendance_summary") initRekapAbsenScreen();
     if (screenName === "rekap_tim") initRekapTimScreen();
     if (screenName === "laporan_activity") initLaporanActivityScreen();
+    if (screenName === "ketentuan" && typeof initKetentuanScreen === "function") initKetentuanScreen();
     if (screenName === "settings" && typeof initSettingsScreen === "function") initSettingsScreen();
     if (screenName === "history" && typeof initHistory === "function") initHistory();
 
@@ -1778,11 +1781,11 @@ async function initDashboard() {
     String(CURRENT_USER.role || "").toLowerCase().includes("supervisor")
   );
 
-  // Render & filter seluruh modul aplikasi sesuai hak akses role (18 modul)
+  // Render & filter seluruh modul aplikasi sesuai hak akses role (19 modul)
   const allModulesList = [
     "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
     "izin", "persetujuan", "attendance_summary", "rekap_tim",
-    "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+    "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
     "settings"
   ];
 
@@ -12454,6 +12457,919 @@ function renderActivityDrilldownList() {
   }
 
   container.innerHTML = html;
+}
+
+// =========================================================================
+// PORTAL KETENTUAN & SOP PERUSAHAAN (ANTI-DOWNLOAD PDF & ROLE ACCESS)
+// =========================================================================
+let KETENTUAN_DATA_CACHE = [];
+let ACTIVE_KETENTUAN_CATEGORY = "ALL";
+let SEARCH_KETENTUAN_QUERY = "";
+let PDF_DOC_OBJECT = null;
+let CURRENT_PDF_PAGE = 1;
+let TOTAL_PDF_PAGES = 1;
+let PDF_PAGE_ZOOM = 1.0;
+let IS_RENDERING_PDF = false;
+let SELECTED_KETENTUAN_FILE_BLOB = null;
+
+function isUserAdminOrSuperAdmin() {
+  if (!CURRENT_USER) return false;
+  const roleId = String(CURRENT_USER.role_id || "").toUpperCase();
+  const roleName = String(CURRENT_USER.role || CURRENT_USER.jabatan || "").toLowerCase();
+  if (roleId === "R-01" || roleId === "R-02") return true;
+  if (roleName.includes("admin") || roleName.includes("manager") || roleName.includes("supervisor")) return true;
+  const perms = getPermissionsForRole(CURRENT_USER.role_id || roleName, CURRENT_USER);
+  return perms.includes("settings");
+}
+
+async function initKetentuanScreen() {
+  // 1. Tampilkan tombol upload jika user adalah Admin / Super Admin / Manager
+  const btnUpload = document.getElementById("btn-open-upload-ketentuan");
+  if (btnUpload) {
+    if (isUserAdminOrSuperAdmin()) {
+      btnUpload.classList.remove("hidden");
+    } else {
+      btnUpload.classList.add("hidden");
+    }
+  }
+
+  // 2. Set label update terakhir
+  const lastUpdatedEl = document.getElementById("ketentuan-last-updated");
+  if (lastUpdatedEl) {
+    const now = new Date();
+    lastUpdatedEl.innerText = `Update: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  }
+
+  // 3. Reset filter & pencarian
+  ACTIVE_KETENTUAN_CATEGORY = "ALL";
+  SEARCH_KETENTUAN_QUERY = "";
+  const searchInput = document.getElementById("input-search-ketentuan");
+  if (searchInput) searchInput.value = "";
+  const clearBtn = document.getElementById("btn-clear-search-ketentuan");
+  if (clearBtn) clearBtn.classList.add("hidden");
+
+  // 4. Fetch list ketentuan dari Supabase (dengan localStorage fallback)
+  await fetchKetentuanList();
+  renderKetentuanList();
+}
+
+async function fetchKetentuanList() {
+  const container = document.getElementById("ketentuan-list-container");
+  if (container) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-700"></i>
+        <span>Memuat portal ketentuan...</span>
+      </div>
+    `;
+  }
+
+  let fetched = false;
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from("m_ketentuan")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        KETENTUAN_DATA_CACHE = data;
+        try { localStorage.setItem("DIGIASHA_KETENTUAN_DATA", JSON.stringify(data)); } catch (e) {}
+        fetched = true;
+      } else if (error) {
+        console.warn("Supabase m_ketentuan not found or error, using fallback cache:", error.message);
+      }
+    } catch (err) {
+      console.warn("Error querying m_ketentuan:", err);
+    }
+  }
+
+  if (!fetched) {
+    try {
+      const local = localStorage.getItem("DIGIASHA_KETENTUAN_DATA");
+      if (local) {
+        KETENTUAN_DATA_CACHE = JSON.parse(local);
+        fetched = true;
+      }
+    } catch (e) {}
+  }
+
+  // Jika masih kosong (belum ada data sama sekali), inisialisasi default ketentuan SOP awal
+  if (!fetched || !Array.isArray(KETENTUAN_DATA_CACHE) || KETENTUAN_DATA_CACHE.length === 0) {
+    KETENTUAN_DATA_CACHE = [
+      {
+        id: "KET-SOP-001",
+        judul: "SOP Pelaksanaan Visit Lapangan & Handling Unit OVD FAC",
+        nomor_dokumen: "SOP/OPS/FAC/2026/001",
+        kategori: "SOP Operasional",
+        tgl_berlaku: "2026-01-01",
+        pdf_url: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf",
+        file_name: "SOP_Visit_FAC_2026.pdf",
+        file_size: 245760,
+        allowed_roles: ["ALL"],
+        is_active: true,
+        uploaded_by: "Super Admin",
+        created_at: new Date().toISOString()
+      },
+      {
+        id: "KET-HR-002",
+        judul: "Kebijakan Tata Tertib Presensi, Jam Kerja & Lembur Karyawan",
+        nomor_dokumen: "HRD/POL/2026/004",
+        kategori: "Kebijakan HR",
+        tgl_berlaku: "2026-02-01",
+        pdf_url: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf",
+        file_name: "Kebijakan_Presensi_HR_2026.pdf",
+        file_size: 512000,
+        allowed_roles: ["ALL"],
+        is_active: true,
+        uploaded_by: "Super Admin",
+        created_at: new Date().toISOString()
+      },
+      {
+        id: "KET-SK-003",
+        judul: "Surat Keputusan Direksi Tentang Standar Operasional GPS Armada",
+        nomor_dokumen: "SK/DIR/2026/012",
+        kategori: "Surat Keputusan",
+        tgl_berlaku: "2026-03-01",
+        pdf_url: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf",
+        file_name: "SK_Direksi_GPS_Armada_2026.pdf",
+        file_size: 786432,
+        allowed_roles: ["R-01", "R-02", "R-03"],
+        is_active: true,
+        uploaded_by: "Super Admin",
+        created_at: new Date().toISOString()
+      }
+    ];
+    try { localStorage.setItem("DIGIASHA_KETENTUAN_DATA", JSON.stringify(KETENTUAN_DATA_CACHE)); } catch (e) {}
+  }
+
+  return KETENTUAN_DATA_CACHE;
+}
+
+function filterKetentuanCategory(category) {
+  ACTIVE_KETENTUAN_CATEGORY = category;
+  
+  // Update class tombol category tabs
+  const filterBtns = document.querySelectorAll("#ketentuan-category-filters .cat-filter-btn");
+  filterBtns.forEach(btn => {
+    btn.className = "cat-filter-btn px-3 py-1.5 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0 transition";
+  });
+
+  const catMap = {
+    "ALL": "btn-cat-ALL",
+    "SOP Operasional": "btn-cat-sop",
+    "Kebijakan HR": "btn-cat-hr",
+    "Surat Keputusan": "btn-cat-sk",
+    "Regulasi Bisnis": "btn-cat-bisnis",
+    "Panduan Sistem": "btn-cat-sistem"
+  };
+
+  const activeBtnId = catMap[category] || "btn-cat-ALL";
+  const activeBtn = document.getElementById(activeBtnId);
+  if (activeBtn) {
+    activeBtn.className = "cat-filter-btn px-3 py-1.5 rounded-xl font-bold bg-slate-900 text-white shadow-xs shrink-0 transition";
+  }
+
+  renderKetentuanList();
+}
+
+function handleSearchKetentuan(query) {
+  SEARCH_KETENTUAN_QUERY = (query || "").trim().toLowerCase();
+  const clearBtn = document.getElementById("btn-clear-search-ketentuan");
+  if (clearBtn) {
+    clearBtn.classList.toggle("hidden", !SEARCH_KETENTUAN_QUERY);
+  }
+  renderKetentuanList();
+}
+
+function clearSearchKetentuan() {
+  const searchInput = document.getElementById("input-search-ketentuan");
+  if (searchInput) searchInput.value = "";
+  handleSearchKetentuan("");
+}
+
+function renderKetentuanList() {
+  const container = document.getElementById("ketentuan-list-container");
+  if (!container) return;
+
+  const isAdmin = isUserAdminOrSuperAdmin();
+  const myRoleId = String(CURRENT_USER?.role_id || "").toUpperCase();
+  const myRoleName = String(CURRENT_USER?.role || CURRENT_USER?.jabatan || "").toLowerCase();
+
+  // 1. Filter hak akses role (Role-based filtering)
+  const accessibleDocs = KETENTUAN_DATA_CACHE.filter(item => {
+    if (isAdmin) return true; // Super Admin & Admin / Manager can see all
+
+    let roles = item.allowed_roles;
+    if (typeof roles === "string") {
+      try { roles = JSON.parse(roles); } catch (e) { roles = [roles]; }
+    }
+    if (!Array.isArray(roles) || roles.length === 0) return true;
+
+    // Cek jika allow "ALL"
+    if (roles.includes("ALL") || roles.includes("Semua Role")) return true;
+
+    // Cek kecocokan role_id atau nama role
+    if (myRoleId && roles.includes(myRoleId)) return true;
+    if (roles.some(r => String(r).toLowerCase() === myRoleName || myRoleName.includes(String(r).toLowerCase()))) return true;
+
+    return false;
+  });
+
+  // Update counter tab 'Semua'
+  const countAllEl = document.getElementById("count-cat-all");
+  if (countAllEl) countAllEl.innerText = accessibleDocs.length;
+
+  // 2. Filter kategori
+  let filteredDocs = accessibleDocs;
+  if (ACTIVE_KETENTUAN_CATEGORY !== "ALL") {
+    filteredDocs = filteredDocs.filter(d => (d.kategori || "").toLowerCase() === ACTIVE_KETENTUAN_CATEGORY.toLowerCase());
+  }
+
+  // 3. Filter query pencarian
+  if (SEARCH_KETENTUAN_QUERY) {
+    filteredDocs = filteredDocs.filter(d => {
+      const matchJudul = String(d.judul || "").toLowerCase().includes(SEARCH_KETENTUAN_QUERY);
+      const matchNomor = String(d.nomor_dokumen || "").toLowerCase().includes(SEARCH_KETENTUAN_QUERY);
+      const matchKategori = String(d.kategori || "").toLowerCase().includes(SEARCH_KETENTUAN_QUERY);
+      return matchJudul || matchNomor || matchKategori;
+    });
+  }
+
+  // 4. Render HTML daftar dokumen
+  if (filteredDocs.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">
+          <i class="fa-solid fa-file-circle-question"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-700 text-xs sm:text-sm">Tidak Ada Dokumen Ditemukan</h4>
+          <p class="text-[11px] text-slate-400 mt-0.5">
+            ${SEARCH_KETENTUAN_QUERY ? `Tidak ada hasil untuk kata kunci "${SEARCH_KETENTUAN_QUERY}".` : `Belum ada ketentuan pada kategori "${ACTIVE_KETENTUAN_CATEGORY}" yang dapat Anda akses.`}
+          </p>
+        </div>
+        ${SEARCH_KETENTUAN_QUERY ? `
+          <button type="button" onclick="clearSearchKetentuan()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">
+            Reset Pencarian
+          </button>
+        ` : ''}
+      </div>
+    `;
+    return;
+  }
+
+  const categoryColorMap = {
+    "SOP Operasional": { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "fa-clipboard-check", iconColor: "text-emerald-500" },
+    "Kebijakan HR": { bg: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: "fa-users-gear", iconColor: "text-indigo-500" },
+    "Surat Keputusan": { bg: "bg-rose-50 text-rose-700 border-rose-200", icon: "fa-stamp", iconColor: "text-rose-500" },
+    "Regulasi Bisnis": { bg: "bg-amber-50 text-amber-800 border-amber-200", icon: "fa-scale-balanced", iconColor: "text-amber-500" },
+    "Panduan Sistem": { bg: "bg-cyan-50 text-cyan-700 border-cyan-200", icon: "fa-laptop-code", iconColor: "text-cyan-500" },
+    "Lainnya": { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: "fa-file-lines", iconColor: "text-slate-500" }
+  };
+
+  let html = "";
+  filteredDocs.forEach(item => {
+    const catStyle = categoryColorMap[item.kategori] || categoryColorMap["Lainnya"];
+    const tglBerlakuFmt = item.tgl_berlaku ? formatDisplayDate(item.tgl_berlaku) : "-";
+    const fileSizeStr = item.file_size ? `${Math.round(item.file_size / 1024)} KB` : "";
+
+    // Parse role tags
+    let roles = item.allowed_roles;
+    if (typeof roles === "string") {
+      try { roles = JSON.parse(roles); } catch (e) { roles = [roles]; }
+    }
+    const isAllRoles = !roles || roles.length === 0 || roles.includes("ALL") || roles.includes("Semua Role");
+
+    let roleBadgesHtml = "";
+    if (isAllRoles) {
+      roleBadgesHtml = `<span class="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-600 font-semibold">Semua Role</span>`;
+    } else {
+      roleBadgesHtml = roles.map(r => `<span class="px-1.5 py-0.5 rounded text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-100 font-semibold">${r}</span>`).join(" ");
+    }
+
+    const safeJudul = (item.judul || "").replace(/"/g, '&quot;');
+    const safeMeta = `${item.nomor_dokumen || item.kategori} • Berlaku sejak ${tglBerlakuFmt}`;
+
+    html += `
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-slate-300 transition space-y-3">
+        <!-- Header Dokumen: Badge Kategori & Actions -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${catStyle.bg} flex items-center space-x-1">
+              <i class="fa-solid ${catStyle.icon} text-[9px]"></i>
+              <span>${item.kategori || "Ketentuan"}</span>
+            </span>
+            ${item.nomor_dokumen ? `
+              <span class="text-[10px] text-slate-400 font-mono truncate max-w-[150px] sm:max-w-[220px]">
+                ${item.nomor_dokumen}
+              </span>
+            ` : ''}
+          </div>
+
+          ${isAdmin ? `
+            <div class="flex items-center space-x-1 shrink-0">
+              <button type="button" onclick="openUploadKetentuanModal('${item.id}')" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition" title="Edit Ketentuan">
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+              </button>
+              <button type="button" onclick="deleteKetentuan('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition" title="Hapus Ketentuan">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Judul Ketentuan -->
+        <div class="flex items-start space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg shrink-0 shadow-inner">
+            <i class="fa-solid fa-file-pdf"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="font-bold text-slate-900 text-xs sm:text-sm leading-snug line-clamp-2">${item.judul || "Dokumen Ketentuan"}</h4>
+            <div class="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-slate-400">
+              <span class="flex items-center space-x-1">
+                <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                <span>Berlaku: <strong class="text-slate-600">${tglBerlakuFmt}</strong></span>
+              </span>
+              ${fileSizeStr ? `<span>•</span><span>${fileSizeStr}</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Card: Hak Akses Role & Tombol Buka Viewer -->
+        <div class="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div class="flex items-center space-x-1.5 flex-wrap">
+            <span class="text-[10px] text-slate-400 font-medium">Akses:</span>
+            ${roleBadgesHtml}
+          </div>
+
+          <button type="button" onclick="openSecurePdfViewer('${item.pdf_url}', '${safeJudul}', '${safeMeta}')" class="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+            <i class="fa-solid fa-book-open-reader text-xs text-emerald-400"></i>
+            <span>Buka Dokumen</span>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// =========================================================================
+// ANTI-DOWNLOAD PDF VIEWER CONTROLLER (MOZILLA PDF.JS CANVAS RENDERING)
+// =========================================================================
+function handlePdfViewerKeydown(e) {
+  // Blokir Shortcut Download & Cetak: Ctrl+S, Ctrl+P, Cmd+S, Cmd+P
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p' || e.key === 'S' || e.key === 'P')) {
+    e.preventDefault();
+    e.stopPropagation();
+    alert("Perhatian: Mengunduh atau mencetak dokumen ini dilarang sesuai regulasi perlindungan data internal perusahaan.");
+    return false;
+  }
+  // Tombol Esc menutup viewer
+  if (e.key === 'Escape') {
+    closeSecurePdfViewer();
+  }
+}
+
+async function openSecurePdfViewer(pdfUrl, title, meta) {
+  if (!pdfUrl) {
+    alert("URL Dokumen PDF tidak valid atau belum diunggah.");
+    return;
+  }
+
+  const modal = document.getElementById("modal-secure-pdf-viewer");
+  if (!modal) return;
+
+  // Set judul dan metadata
+  const titleEl = document.getElementById("pdf-viewer-title");
+  if (titleEl) titleEl.innerText = title || "Dokumen Ketentuan";
+  const metaEl = document.getElementById("pdf-viewer-meta");
+  if (metaEl) metaEl.innerText = meta || "-";
+
+  // Watermark anti-screenshot identitas user
+  const watermarkEl = document.getElementById("pdf-watermark-text");
+  if (watermarkEl) {
+    const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || "DIGI ACTION USER";
+    const uNip = CURRENT_USER?.nip ? ` • NIP: ${CURRENT_USER.nip}` : "";
+    watermarkEl.innerText = `${uName}${uNip}\nDIGI ACTION • STRICTLY CONFIDENTIAL • ANTI-DOWNLOAD`;
+  }
+
+  // Tampilkan modal viewer
+  modal.classList.remove("hidden");
+  document.body.style.overflow = "hidden"; // Kunci scrolling latar belakang
+
+  // Pasang listener proteksi keyboard
+  window.addEventListener("keydown", handlePdfViewerKeydown);
+
+  // Tampilkan spinner loading
+  const spinner = document.getElementById("pdf-loading-spinner");
+  if (spinner) spinner.classList.remove("hidden");
+
+  // Inisialisasi state viewer
+  PDF_DOC_OBJECT = null;
+  CURRENT_PDF_PAGE = 1;
+  TOTAL_PDF_PAGES = 1;
+  PDF_PAGE_ZOOM = 1.0;
+  const zoomLevelEl = document.getElementById("pdf-zoom-level");
+  if (zoomLevelEl) zoomLevelEl.innerText = "100%";
+
+  try {
+    if (typeof pdfjsLib === "undefined") {
+      throw new Error("Pustaka PDF.js belum dimuat. Periksa koneksi internet Anda.");
+    }
+
+    const loadingTask = pdfjsLib.getDocument({
+      url: pdfUrl,
+      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+      cMapPacked: true
+    });
+
+    PDF_DOC_OBJECT = await loadingTask.promise;
+    TOTAL_PDF_PAGES = PDF_DOC_OBJECT.numPages || 1;
+
+    const totalEl = document.getElementById("pdf-page-count");
+    if (totalEl) totalEl.innerText = TOTAL_PDF_PAGES;
+
+    await renderPdfPage(1);
+  } catch (err) {
+    console.error("Gagal membuka dokumen PDF via PDF.js:", err);
+    if (spinner) spinner.classList.add("hidden");
+    
+    const viewportContainer = document.getElementById("pdf-viewport-container");
+    if (viewportContainer) {
+      viewportContainer.innerHTML = `
+        <div class="m-auto text-center p-6 bg-slate-800 text-white rounded-2xl max-w-sm space-y-3">
+          <i class="fa-solid fa-triangle-exclamation text-rose-400 text-3xl"></i>
+          <h4 class="font-bold text-sm">Gagal Menampilkan PDF</h4>
+          <p class="text-xs text-slate-300">${err.message || "File dokumen tidak dapat diakses atau diblokir oleh CORS."}</p>
+          <button type="button" onclick="closeSecurePdfViewer()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold transition">
+            Tutup Viewer
+          </button>
+        </div>
+      `;
+    }
+  }
+}
+
+async function renderPdfPage(pageNum) {
+  if (!PDF_DOC_OBJECT || IS_RENDERING_PDF) return;
+  IS_RENDERING_PDF = true;
+
+  const spinner = document.getElementById("pdf-loading-spinner");
+  if (spinner) spinner.classList.remove("hidden");
+
+  try {
+    const page = await PDF_DOC_OBJECT.getPage(pageNum);
+    const canvas = document.getElementById("pdf-render-canvas");
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+
+    // Hitung auto-fit skala terhadap viewport lebar layar
+    const viewportContainer = document.getElementById("pdf-viewport-container");
+    const containerWidth = viewportContainer ? (viewportContainer.clientWidth - 32) : 800;
+    const initialViewport = page.getViewport({ scale: 1.0 });
+    
+    // Base scale menyesuaikan lebar layar (responsif HP & Desktop)
+    const baseScale = Math.min(containerWidth / initialViewport.width, 1.6);
+    const effectiveScale = Math.max(baseScale * PDF_PAGE_ZOOM, 0.5);
+
+    const viewport = page.getViewport({ scale: effectiveScale });
+
+    // Dukungan High-DPI Retina Screen
+    const outputScale = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(viewport.width * outputScale);
+    canvas.height = Math.floor(viewport.height * outputScale);
+    canvas.style.width = `${Math.floor(viewport.width)}px`;
+    canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+    const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
+    const renderContext = {
+      canvasContext: ctx,
+      transform: transform,
+      viewport: viewport
+    };
+
+    await page.render(renderContext).promise;
+
+    // Update UI Toolbar Indikator Halaman
+    CURRENT_PDF_PAGE = pageNum;
+    const pageNumEl = document.getElementById("pdf-page-num");
+    if (pageNumEl) pageNumEl.innerText = CURRENT_PDF_PAGE;
+
+    const prevBtn = document.getElementById("btn-pdf-prev");
+    if (prevBtn) prevBtn.disabled = (CURRENT_PDF_PAGE <= 1);
+
+    const nextBtn = document.getElementById("btn-pdf-next");
+    if (nextBtn) nextBtn.disabled = (CURRENT_PDF_PAGE >= TOTAL_PDF_PAGES);
+
+  } catch (renderErr) {
+    console.error("Render page error:", renderErr);
+  } finally {
+    IS_RENDERING_PDF = false;
+    if (spinner) spinner.classList.add("hidden");
+  }
+}
+
+function prevPdfPage() {
+  if (CURRENT_PDF_PAGE > 1) {
+    renderPdfPage(CURRENT_PDF_PAGE - 1);
+  }
+}
+
+function nextPdfPage() {
+  if (CURRENT_PDF_PAGE < TOTAL_PDF_PAGES) {
+    renderPdfPage(CURRENT_PDF_PAGE + 1);
+  }
+}
+
+function zoomPdfIn() {
+  if (PDF_PAGE_ZOOM < 2.5) {
+    PDF_PAGE_ZOOM = +(PDF_PAGE_ZOOM + 0.2).toFixed(1);
+    const zoomEl = document.getElementById("pdf-zoom-level");
+    if (zoomEl) zoomEl.innerText = `${Math.round(PDF_PAGE_ZOOM * 100)}%`;
+    renderPdfPage(CURRENT_PDF_PAGE);
+  }
+}
+
+function zoomPdfOut() {
+  if (PDF_PAGE_ZOOM > 0.6) {
+    PDF_PAGE_ZOOM = +(PDF_PAGE_ZOOM - 0.2).toFixed(1);
+    const zoomEl = document.getElementById("pdf-zoom-level");
+    if (zoomEl) zoomEl.innerText = `${Math.round(PDF_PAGE_ZOOM * 100)}%`;
+    renderPdfPage(CURRENT_PDF_PAGE);
+  }
+}
+
+function closeSecurePdfViewer() {
+  const modal = document.getElementById("modal-secure-pdf-viewer");
+  if (modal) modal.classList.add("hidden");
+  document.body.style.overflow = "";
+
+  window.removeEventListener("keydown", handlePdfViewerKeydown);
+
+  // Bersihkan canvas
+  const canvas = document.getElementById("pdf-render-canvas");
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  PDF_DOC_OBJECT = null;
+}
+
+// =========================================================================
+// UPLOAD & ROLE ACCESS MANAGEMENT MODAL CONTROLLER
+// =========================================================================
+function openUploadKetentuanModal(editId = null) {
+  const modal = document.getElementById("modal-upload-ketentuan");
+  if (!modal) return;
+
+  const form = document.getElementById("form-upload-ketentuan");
+  if (form) form.reset();
+
+  const editIdInput = document.getElementById("ketentuan-edit-id");
+  if (editIdInput) editIdInput.value = editId || "";
+
+  const titleEl = document.getElementById("modal-ketentuan-title");
+  const submitTextEl = document.getElementById("btn-submit-ketentuan-text");
+  const starEl = document.getElementById("ketentuan-pdf-req-star");
+
+  clearKetentuanFileSelection();
+
+  // Populate Role Checkboxes
+  populateKetentuanRoleCheckboxes();
+
+  if (editId) {
+    const existing = KETENTUAN_DATA_CACHE.find(d => String(d.id) === String(editId));
+    if (existing) {
+      if (titleEl) titleEl.innerText = "Edit Ketentuan & SOP";
+      if (submitTextEl) submitTextEl.innerText = "Simpan Perubahan";
+      if (starEl) starEl.innerText = ""; // Tidak wajib upload ulang jika sudah ada PDF
+
+      document.getElementById("ketentuan-input-judul").value = existing.judul || "";
+      document.getElementById("ketentuan-input-nomor").value = existing.nomor_dokumen || "";
+      document.getElementById("ketentuan-input-kategori").value = existing.kategori || "SOP Operasional";
+      document.getElementById("ketentuan-input-tgl-berlaku").value = existing.tgl_berlaku ? existing.tgl_berlaku.split("T")[0] : "";
+
+      // Preview nama file existing
+      if (existing.file_name) {
+        document.getElementById("ketentuan-selected-name").innerText = existing.file_name;
+        document.getElementById("ketentuan-selected-size").innerText = existing.file_size ? `${Math.round(existing.file_size / 1024)} KB (File Tersimpan)` : "File Tersimpan";
+        document.getElementById("ketentuan-dropzone-content").classList.add("hidden");
+        document.getElementById("ketentuan-file-selected-box").classList.remove("hidden");
+      }
+
+      // Check role permissions yang sesuai
+      let roles = existing.allowed_roles;
+      if (typeof roles === "string") {
+        try { roles = JSON.parse(roles); } catch (e) { roles = [roles]; }
+      }
+      const isAll = !roles || roles.includes("ALL") || roles.includes("Semua Role");
+      if (isAll) {
+        toggleAllRoleKetentuan(true);
+        const checkAllEl = document.getElementById("check-all-roles");
+        if (checkAllEl) checkAllEl.checked = true;
+      } else {
+        const checkAllEl = document.getElementById("check-all-roles");
+        if (checkAllEl) checkAllEl.checked = false;
+        const checkboxes = document.querySelectorAll(".ketentuan-role-checkbox");
+        checkboxes.forEach(cb => {
+          cb.checked = roles.includes(cb.value);
+        });
+      }
+    }
+  } else {
+    if (titleEl) titleEl.innerText = "Upload Ketentuan & SOP Baru";
+    if (submitTextEl) submitTextEl.innerText = "Simpan & Publikasikan";
+    if (starEl) starEl.innerText = "*";
+
+    // Set tanggal berlaku default hari ini
+    const today = new Date().toISOString().split("T")[0];
+    const tglInput = document.getElementById("ketentuan-input-tgl-berlaku");
+    if (tglInput) tglInput.value = today;
+
+    // Check all roles by default
+    toggleAllRoleKetentuan(true);
+    const checkAllEl = document.getElementById("check-all-roles");
+    if (checkAllEl) checkAllEl.checked = true;
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeUploadKetentuanModal() {
+  const modal = document.getElementById("modal-upload-ketentuan");
+  if (modal) modal.classList.add("hidden");
+  clearKetentuanFileSelection();
+}
+
+function populateKetentuanRoleCheckboxes() {
+  const container = document.getElementById("ketentuan-roles-checkbox-container");
+  if (!container) return;
+
+  const rolesObj = (typeof ROLE_PERMISSIONS_STATE !== "undefined" && Object.keys(ROLE_PERMISSIONS_STATE).length > 0)
+    ? ROLE_PERMISSIONS_STATE
+    : DEFAULT_ROLE_PERMISSIONS;
+
+  let html = "";
+  Object.keys(rolesObj).forEach(roleId => {
+    const r = rolesObj[roleId];
+    html += `
+      <label class="flex items-center space-x-2 p-2 bg-white rounded-xl border border-indigo-100 hover:border-indigo-300 cursor-pointer transition select-none">
+        <input type="checkbox" value="${roleId}" class="ketentuan-role-checkbox rounded text-indigo-600 focus:ring-indigo-500" />
+        <div class="min-w-0">
+          <span class="font-bold text-xs text-slate-800 block truncate">${r.name || roleId}</span>
+          <span class="text-[9px] text-slate-400 font-mono">${roleId}</span>
+        </div>
+      </label>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleAllRoleKetentuan(isChecked) {
+  const checkboxes = document.querySelectorAll(".ketentuan-role-checkbox");
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+  });
+}
+
+function handleKetentuanFileSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // Validasi tipe file PDF
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    alert("Format dokumen harus PDF (.pdf). File lain tidak didukung.");
+    clearKetentuanFileSelection();
+    return;
+  }
+
+  // Validasi ukuran file (maksimal 15 MB)
+  const maxSizeBytes = 15 * 1024 * 1024;
+  if (file.size > maxSizeBytes) {
+    alert("Ukuran file terlalu besar. Maksimal 15 MB.");
+    clearKetentuanFileSelection();
+    return;
+  }
+
+  SELECTED_KETENTUAN_FILE_BLOB = file;
+
+  // Tampilkan preview nama & ukuran file
+  const dropzoneContent = document.getElementById("ketentuan-dropzone-content");
+  if (dropzoneContent) dropzoneContent.classList.add("hidden");
+
+  const previewBox = document.getElementById("ketentuan-file-selected-box");
+  if (previewBox) previewBox.classList.remove("hidden");
+
+  const nameEl = document.getElementById("ketentuan-selected-name");
+  if (nameEl) nameEl.innerText = file.name;
+
+  const sizeEl = document.getElementById("ketentuan-selected-size");
+  if (sizeEl) sizeEl.innerText = `${Math.round(file.size / 1024)} KB`;
+}
+
+function clearKetentuanFileSelection() {
+  SELECTED_KETENTUAN_FILE_BLOB = null;
+  const fileInput = document.getElementById("ketentuan-file-input");
+  if (fileInput) fileInput.value = "";
+
+  const dropzoneContent = document.getElementById("ketentuan-dropzone-content");
+  if (dropzoneContent) dropzoneContent.classList.remove("hidden");
+
+  const previewBox = document.getElementById("ketentuan-file-selected-box");
+  if (previewBox) previewBox.classList.add("hidden");
+}
+
+async function handleSaveKetentuan(event) {
+  event.preventDefault();
+
+  const editId = document.getElementById("ketentuan-edit-id").value;
+  const judul = (document.getElementById("ketentuan-input-judul").value || "").trim();
+  const nomorDokumen = (document.getElementById("ketentuan-input-nomor").value || "").trim();
+  const kategori = document.getElementById("ketentuan-input-kategori").value;
+  const tglBerlaku = document.getElementById("ketentuan-input-tgl-berlaku").value;
+
+  if (!judul) {
+    alert("Judul dokumen ketentuan wajib diisi.");
+    return;
+  }
+  if (!tglBerlaku) {
+    alert("Tanggal berlaku dokumen wajib diisi.");
+    return;
+  }
+
+  // Ambil pilihan role
+  const checkAllEl = document.getElementById("check-all-roles");
+  const isCheckAll = checkAllEl ? checkAllEl.checked : false;
+  
+  let selectedRoles = [];
+  if (isCheckAll) {
+    selectedRoles = ["ALL"];
+  } else {
+    const checkboxes = document.querySelectorAll(".ketentuan-role-checkbox:checked");
+    checkboxes.forEach(cb => selectedRoles.push(cb.value));
+  }
+
+  if (selectedRoles.length === 0) {
+    alert("Pilih minimal 1 role yang berhak membuka ketentuan ini, atau centang 'Semua Role'.");
+    return;
+  }
+
+  const existingDoc = editId ? KETENTUAN_DATA_CACHE.find(d => String(d.id) === String(editId)) : null;
+  if (!editId && !SELECTED_KETENTUAN_FILE_BLOB) {
+    alert("Silakan pilih file PDF yang akan diunggah.");
+    return;
+  }
+
+  // Tampilkan indikator proses pada tombol submit
+  const submitBtn = document.getElementById("btn-submit-ketentuan");
+  const submitBtnText = document.getElementById("btn-submit-ketentuan-text");
+  const originalText = submitBtnText ? submitBtnText.innerText : "Simpan";
+  if (submitBtn) submitBtn.disabled = true;
+  if (submitBtnText) submitBtnText.innerText = "Mengunggah & Menyimpan...";
+
+  try {
+    let pdfUrl = existingDoc ? existingDoc.pdf_url : "";
+    let fileName = existingDoc ? existingDoc.file_name : "";
+    let fileSize = existingDoc ? existingDoc.file_size : 0;
+
+    const client = getSupabaseClient();
+
+    // 1. Upload File PDF ke Supabase Storage (jika ada file baru dipilih)
+    if (SELECTED_KETENTUAN_FILE_BLOB) {
+      fileName = SELECTED_KETENTUAN_FILE_BLOB.name;
+      fileSize = SELECTED_KETENTUAN_FILE_BLOB.size;
+
+      if (client) {
+        const bucketName = CONFIG.MEDIA_BUCKET || "digiasha-media";
+        const cleanName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filePath = `ketentuan/${Date.now()}_${cleanName}`;
+
+        const { data: uploadData, error: uploadErr } = await client.storage
+          .from(bucketName)
+          .upload(filePath, SELECTED_KETENTUAN_FILE_BLOB, {
+            contentType: "application/pdf",
+            upsert: true
+          });
+
+        if (uploadErr) {
+          console.warn("Storage upload error:", uploadErr);
+          // Fallback Object URL sementara jika storage error
+          pdfUrl = URL.createObjectURL(SELECTED_KETENTUAN_FILE_BLOB);
+        } else {
+          const { data: urlData } = client.storage.from(bucketName).getPublicUrl(filePath);
+          pdfUrl = urlData.publicUrl;
+        }
+      } else {
+        pdfUrl = URL.createObjectURL(SELECTED_KETENTUAN_FILE_BLOB);
+      }
+    }
+
+    // 2. Siapkan Objek Data Dokumen
+    const uName = CURRENT_USER?.nama || CURRENT_USER?.nama_lengkap || "Admin";
+    const docPayload = {
+      judul: judul,
+      nomor_dokumen: nomorDokumen,
+      kategori: kategori,
+      tgl_berlaku: tglBerlaku,
+      pdf_url: pdfUrl,
+      file_name: fileName,
+      file_size: fileSize,
+      allowed_roles: selectedRoles,
+      is_active: true,
+      uploaded_by: uName,
+      updated_at: new Date().toISOString()
+    };
+
+    // 3. Simpan ke Supabase DB m_ketentuan
+    let savedToDb = false;
+    if (client) {
+      try {
+        if (editId) {
+          const { error: updateErr } = await client
+            .from("m_ketentuan")
+            .update(docPayload)
+            .eq("id", editId);
+          if (!updateErr) savedToDb = true;
+          else console.warn("Supabase update error:", updateErr.message);
+        } else {
+          const { data: inserted, error: insertErr } = await client
+            .from("m_ketentuan")
+            .insert([docPayload])
+            .select();
+          if (!insertErr && inserted && inserted[0]) {
+            docPayload.id = inserted[0].id;
+            savedToDb = true;
+          } else if (insertErr) {
+            console.warn("Supabase insert error:", insertErr.message);
+          }
+        }
+      } catch (dbErr) {
+        console.warn("Supabase DB execution error:", dbErr);
+      }
+    }
+
+    // 4. Update Cache Lokal (LocalStorage fallback)
+    if (editId) {
+      const idx = KETENTUAN_DATA_CACHE.findIndex(d => String(d.id) === String(editId));
+      if (idx !== -1) {
+        KETENTUAN_DATA_CACHE[idx] = { ...KETENTUAN_DATA_CACHE[idx], ...docPayload };
+      }
+    } else {
+      if (!docPayload.id) docPayload.id = `LOCAL-KET-${Date.now()}`;
+      docPayload.created_at = new Date().toISOString();
+      KETENTUAN_DATA_CACHE.unshift(docPayload);
+    }
+
+    try {
+      localStorage.setItem("DIGIASHA_KETENTUAN_DATA", JSON.stringify(KETENTUAN_DATA_CACHE));
+    } catch (e) {}
+
+    closeUploadKetentuanModal();
+    renderKetentuanList();
+
+    alert(editId ? "Ketentuan berhasil diperbarui!" : "Ketentuan baru berhasil diunggah dan dipublikasikan!");
+  } catch (error) {
+    console.error("Gagal menyimpan ketentuan:", error);
+    alert(`Terjadi kesalahan: ${error.message}`);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtnText) submitBtnText.innerText = originalText;
+  }
+}
+
+async function deleteKetentuan(id) {
+  if (!id) return;
+  const doc = KETENTUAN_DATA_CACHE.find(d => String(d.id) === String(id));
+  const docTitle = doc?.judul || "dokumen ini";
+
+  if (!confirm(`Apakah Anda yakin ingin menghapus ketentuan "${docTitle}"? Dokumen tidak akan dapat diakses lagi oleh karyawan.`)) {
+    return;
+  }
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      await client.from("m_ketentuan").delete().eq("id", id);
+    } catch (e) {
+      console.warn("Error deleting from Supabase:", e);
+    }
+  }
+
+  KETENTUAN_DATA_CACHE = KETENTUAN_DATA_CACHE.filter(d => String(d.id) !== String(id));
+  try {
+    localStorage.setItem("DIGIASHA_KETENTUAN_DATA", JSON.stringify(KETENTUAN_DATA_CACHE));
+  } catch (e) {}
+
+  renderKetentuanList();
+  alert("Ketentuan berhasil dihapus.");
 }
 
 // =========================================================================
