@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v96";
+const APP_BUILD_VERSION = "20260915_v97";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -12745,6 +12745,8 @@ let CURRENT_PDF_PAGE = 1;
 let TOTAL_PDF_PAGES = 1;
 let PDF_PAGE_ZOOM = 1.0;
 let IS_RENDERING_PDF = false;
+let PDF_FIT_MODE = "FIT_PAGE"; // "FIT_PAGE" (Pas Halaman Penuh) atau "FIT_WIDTH" (Pas Lebar)
+let PDF_RESIZE_DEBOUNCE = null;
 let SELECTED_KETENTUAN_FILE_BLOB = null;
 
 function isUserAdminOrSuperAdmin() {
@@ -13187,14 +13189,6 @@ function handlePdfViewerKeydown(e) {
     closeSecurePdfViewer();
   }
 }
-
-let PDF_DOC_OBJECT = null;
-let CURRENT_PDF_PAGE = 1;
-let TOTAL_PDF_PAGES = 1;
-let PDF_PAGE_ZOOM = 1.0;
-let IS_RENDERING_PDF = false;
-let PDF_FIT_MODE = "FIT_PAGE"; // "FIT_PAGE" (Pas Halaman Penuh) atau "FIT_WIDTH" (Pas Lebar)
-let PDF_RESIZE_DEBOUNCE = null;
 
 async function openSecurePdfViewer(pdfUrl, title, meta) {
   if (!pdfUrl) {
