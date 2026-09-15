@@ -85,13 +85,13 @@ const DEFAULT_ROLE_PERMISSIONS = {
 const ALL_APP_MODULES = [
   // 1. Operasional Lapangan
   { key: "priority", title: "Priority FAC", desc: "Monitoring prioritas unit & mitra FAC", icon: "fa-triangle-exclamation", category: "Operasional Lapangan" },
-  { key: "assignment", title: "Assign Concern", desc: "Tandai concern visit mitra", icon: "fa-bullhorn", category: "Operasional Lapangan" },
   { key: "visit", title: "Form Visit FAC", desc: "Input kunjungan regular & unit OVD", icon: "fa-clipboard-check", category: "Operasional Lapangan" },
-  { key: "onboarding", title: "Visit Calon Mitra", desc: "Input onboarding baru", icon: "fa-user-plus", category: "Operasional Lapangan" },
-  { key: "pipeline", title: "Pipeline Onboarding", desc: "Progres & folder dokumen", icon: "fa-bars-progress", category: "Operasional Lapangan" },
-  { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish", category: "Operasional Lapangan" },
+  { key: "onboarding", title: "Calon Mitra", desc: "Input onboarding calon mitra baru", icon: "fa-user-plus", category: "Operasional Lapangan" },
+  { key: "pipeline", title: "Pipeline", desc: "Progres pipeline & folder dokumen", icon: "fa-bars-progress", category: "Operasional Lapangan" },
+  { key: "gps", title: "GPS Maintain", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish", category: "Operasional Lapangan" },
   { key: "fac", title: "Report GPS", desc: "Monitoring sinyal GPS harian", icon: "fa-tower-broadcast", category: "Operasional Lapangan" },
-  { key: "history", title: "Riwayat Aktivitas", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
+  { key: "assignment", title: "Assign", desc: "Tandai concern visit mitra", icon: "fa-bullhorn", category: "Operasional Lapangan" },
+  { key: "history", title: "Riwayat", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
   { key: "laporan_activity", title: "Laporan Activity", desc: "Monitoring kunjungan PIC & cabang", icon: "fa-chart-line", category: "Operasional Lapangan" },
 
   // 2. Presensi & Persetujuan

@@ -104,7 +104,7 @@
 
       <div class="grid grid-cols-4 gap-2 text-center" id="group-field-ops">
         
-        <!-- Priority FAC -->
+        <!-- 1. Priority FAC -->
         <button id="menu-btn-priority" onclick="loadScreen('priority')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-amber-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-triangle-exclamation"></i>
@@ -113,16 +113,7 @@
           <span class="text-[9px] text-slate-400">Monitoring</span>
         </button>
 
-        <!-- Assign Concern -->
-        <button id="menu-btn-assignment" onclick="loadScreen('assignment')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-purple-50/60 transition active:scale-95">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
-            <i class="fa-solid fa-bullhorn"></i>
-          </div>
-          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-purple-700">Assign</span>
-          <span class="text-[9px] text-slate-400">Concern</span>
-        </button>
-
-        <!-- Form Visit FAC -->
+        <!-- 2. Form Visit FAC -->
         <button id="menu-btn-visit" onclick="loadScreen('visit')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-blue-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-clipboard-check"></i>
@@ -131,7 +122,7 @@
           <span class="text-[9px] text-slate-400">Input Form</span>
         </button>
 
-        <!-- Visit Calon Mitra -->
+        <!-- 3. Calon Mitra -->
         <button id="menu-btn-onboarding" onclick="loadScreen('onboarding')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-teal-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-user-plus"></i>
@@ -140,7 +131,7 @@
           <span class="text-[9px] text-slate-400">Onboarding</span>
         </button>
 
-        <!-- Pipeline Onboarding -->
+        <!-- 4. Pipeline -->
         <button id="menu-btn-pipeline" onclick="loadScreen('pipeline')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-cyan-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-bars-progress"></i>
@@ -149,16 +140,16 @@
           <span class="text-[9px] text-slate-400">Dokumen</span>
         </button>
 
-        <!-- GPS Maintenance -->
+        <!-- 5. GPS Maintain -->
         <button id="menu-btn-gps" onclick="loadScreen('gps')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-emerald-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-satellite-dish"></i>
           </div>
-          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-emerald-700">GPS Maint</span>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-emerald-700">GPS Maintain</span>
           <span class="text-[9px] text-slate-400">Pasang/Cabut</span>
         </button>
 
-        <!-- Report GPS (Monitoring Sinyal GPS) -->
+        <!-- 6. Report GPS -->
         <button id="menu-btn-fac" onclick="loadScreen('fac')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-sky-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-tower-broadcast"></i>
@@ -167,7 +158,16 @@
           <span class="text-[9px] text-slate-400">Monitoring</span>
         </button>
 
-        <!-- Riwayat Log -->
+        <!-- 7. Assign -->
+        <button id="menu-btn-assignment" onclick="loadScreen('assignment')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-purple-50/60 transition active:scale-95">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
+            <i class="fa-solid fa-bullhorn"></i>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700 mt-1.5 leading-tight group-hover:text-purple-700">Assign</span>
+          <span class="text-[9px] text-slate-400">Concern</span>
+        </button>
+
+        <!-- 8. Riwayat -->
         <button id="menu-btn-history" onclick="loadScreen('history')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-orange-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-clock-rotate-left"></i>
@@ -176,7 +176,7 @@
           <span class="text-[9px] text-slate-400">Log Aktivitas</span>
         </button>
 
-        <!-- Laporan Activity (Monitoring Kunjungan Lapangan Atasan) -->
+        <!-- 9. Laporan Activity -->
         <button id="menu-btn-laporan_activity" onclick="loadScreen('laporan_activity')" class="group flex flex-col items-center p-2 rounded-2xl hover:bg-teal-50/60 transition active:scale-95">
           <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 text-white flex items-center justify-center text-lg shadow-sm group-hover:shadow transition">
             <i class="fa-solid fa-chart-line"></i>
