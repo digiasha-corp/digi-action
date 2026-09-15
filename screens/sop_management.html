@@ -242,7 +242,7 @@
     </div>
 
     <!-- Viewer Canvas Viewport Area -->
-    <div id="pdf-viewport-container" class="flex-1 overflow-auto bg-slate-900/60 p-2 sm:p-4 flex flex-col items-center justify-start relative">
+    <div id="pdf-viewport-container" class="flex-1 overflow-auto bg-slate-900/90 p-2 sm:p-4 relative" style="-webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;">
       <div id="pdf-loading-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 z-20 text-white space-y-2">
         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-emerald-400"></i>
         <span class="text-xs font-medium">Memuat halaman PDF...</span>
@@ -254,8 +254,11 @@
         </span>
       </div>
 
-      <div id="pdf-canvas-wrapper" class="shadow-2xl rounded-lg overflow-hidden bg-white max-w-full my-auto">
-        <canvas id="pdf-render-canvas" class="max-w-full block"></canvas>
+      <!-- Canvas Tempat Merender Halaman PDF (Full scrollable & centered without clipping) -->
+      <div class="min-w-fit min-h-full flex items-center justify-center py-2 px-1">
+        <div id="pdf-canvas-wrapper" class="shadow-2xl rounded-lg overflow-hidden bg-white shrink-0 border border-slate-700/50">
+          <canvas id="pdf-render-canvas" class="block"></canvas>
+        </div>
       </div>
     </div>
 
@@ -273,9 +276,17 @@
         </button>
       </div>
 
-      <span class="hidden md:inline text-[10px] text-slate-400 italic">
-        <i class="fa-solid fa-lock mr-1 text-emerald-400"></i>Mode Baca Terproteksi (Download Dinonaktifkan)
-      </span>
+      <!-- Fit Mode Selector & Security Notice -->
+      <div class="flex items-center space-x-2">
+        <button type="button" id="btn-pdf-fit-mode" onclick="togglePdfFitMode()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-[11px] font-medium flex items-center space-x-1.5 transition" title="Ganti Mode Pas Halaman / Lebar">
+          <i id="btn-pdf-fit-icon" class="fa-solid fa-compress text-xs text-emerald-400"></i>
+          <span id="btn-pdf-fit-label">Pas Halaman</span>
+        </button>
+
+        <span class="hidden lg:inline text-[10px] text-slate-400 italic">
+          <i class="fa-solid fa-lock mr-1 text-emerald-400"></i>Mode Terproteksi
+        </span>
+      </div>
 
       <div class="flex items-center space-x-1">
         <button type="button" onclick="zoomPdfOut()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition" title="Perkecil">

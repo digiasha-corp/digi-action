@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v95";
+const APP_BUILD_VERSION = "20260915_v96";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -13188,6 +13188,14 @@ function handlePdfViewerKeydown(e) {
   }
 }
 
+let PDF_DOC_OBJECT = null;
+let CURRENT_PDF_PAGE = 1;
+let TOTAL_PDF_PAGES = 1;
+let PDF_PAGE_ZOOM = 1.0;
+let IS_RENDERING_PDF = false;
+let PDF_FIT_MODE = "FIT_PAGE"; // "FIT_PAGE" (Pas Halaman Penuh) atau "FIT_WIDTH" (Pas Lebar)
+let PDF_RESIZE_DEBOUNCE = null;
+
 async function openSecurePdfViewer(pdfUrl, title, meta) {
   if (!pdfUrl) {
     alert("URL Dokumen PDF tidak valid atau belum diunggah.");
@@ -13215,8 +13223,11 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
   modal.classList.remove("hidden");
   document.body.style.overflow = "hidden"; // Kunci scrolling latar belakang
 
-  // Pasang listener proteksi keyboard
+  // Pasang listener proteksi keyboard & responsif resize
+  window.removeEventListener("keydown", handlePdfViewerKeydown);
   window.addEventListener("keydown", handlePdfViewerKeydown);
+  window.removeEventListener("resize", handlePdfViewerResize);
+  window.addEventListener("resize", handlePdfViewerResize);
 
   // Tampilkan spinner loading
   const spinner = document.getElementById("pdf-loading-spinner");
@@ -13229,6 +13240,17 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
   PDF_PAGE_ZOOM = 1.0;
   const zoomLevelEl = document.getElementById("pdf-zoom-level");
   if (zoomLevelEl) zoomLevelEl.innerText = "100%";
+
+  // Deteksi mode awal: Tablet / Landscape / Foldable mendatar default ke PAS HALAMAN agar tidak kepotong ke bawah
+  const winW = window.innerWidth;
+  const winH = window.innerHeight;
+  if (winW >= winH * 1.05) {
+    PDF_FIT_MODE = "FIT_PAGE";
+  } else {
+    // Mode portrait HP biasa default pas lebar
+    PDF_FIT_MODE = "FIT_WIDTH";
+  }
+  updatePdfFitModeUI();
 
   try {
     if (typeof pdfjsLib === "undefined") {
@@ -13268,7 +13290,44 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
   }
 }
 
-async function renderPdfPage(pageNum) {
+function handlePdfViewerResize() {
+  const modal = document.getElementById("modal-secure-pdf-viewer");
+  if (!modal || modal.classList.contains("hidden")) return;
+  clearTimeout(PDF_RESIZE_DEBOUNCE);
+  PDF_RESIZE_DEBOUNCE = setTimeout(() => {
+    if (PDF_DOC_OBJECT && CURRENT_PDF_PAGE) {
+      renderPdfPage(CURRENT_PDF_PAGE, true);
+    }
+  }, 250);
+}
+
+function togglePdfFitMode() {
+  if (PDF_FIT_MODE === "FIT_PAGE") {
+    PDF_FIT_MODE = "FIT_WIDTH";
+  } else {
+    PDF_FIT_MODE = "FIT_PAGE";
+  }
+  PDF_PAGE_ZOOM = 1.0;
+  const zoomLevelEl = document.getElementById("pdf-zoom-level");
+  if (zoomLevelEl) zoomLevelEl.innerText = "100%";
+  updatePdfFitModeUI();
+  renderPdfPage(CURRENT_PDF_PAGE, false);
+}
+
+function updatePdfFitModeUI() {
+  const label = document.getElementById("btn-pdf-fit-label");
+  const icon = document.getElementById("btn-pdf-fit-icon");
+  if (!label || !icon) return;
+  if (PDF_FIT_MODE === "FIT_PAGE") {
+    label.innerText = "Pas Halaman";
+    icon.className = "fa-solid fa-compress text-xs text-emerald-400";
+  } else {
+    label.innerText = "Pas Lebar";
+    icon.className = "fa-solid fa-arrows-left-right text-xs text-blue-400";
+  }
+}
+
+async function renderPdfPage(pageNum, keepScroll = false) {
   if (!PDF_DOC_OBJECT || IS_RENDERING_PDF) return;
   IS_RENDERING_PDF = true;
 
@@ -13282,14 +13341,31 @@ async function renderPdfPage(pageNum) {
 
     const ctx = canvas.getContext("2d");
 
-    // Hitung auto-fit skala terhadap viewport lebar layar
+    // Hitung dimensi container untuk auto-fit
     const viewportContainer = document.getElementById("pdf-viewport-container");
-    const containerWidth = viewportContainer ? (viewportContainer.clientWidth - 32) : 800;
+    const containerWidth = viewportContainer ? viewportContainer.clientWidth : window.innerWidth;
+    const containerHeight = viewportContainer ? viewportContainer.clientHeight : window.innerHeight;
+    
+    // Margin padding aman
+    const availableWidth = Math.max(containerWidth - 24, 260);
+    const availableHeight = Math.max(containerHeight - 24, 260);
+
     const initialViewport = page.getViewport({ scale: 1.0 });
     
-    // Base scale menyesuaikan lebar layar (responsif HP & Desktop)
-    const baseScale = Math.min(containerWidth / initialViewport.width, 1.6);
-    const effectiveScale = Math.max(baseScale * PDF_PAGE_ZOOM, 0.5);
+    let baseScale = 1.0;
+    if (PDF_FIT_MODE === "FIT_PAGE") {
+      // Mode Pas Halaman: seluruh halaman muat tanpa terpotong ke bawah maupun ke samping
+      const scaleW = availableWidth / initialViewport.width;
+      const scaleH = availableHeight / initialViewport.height;
+      baseScale = Math.min(scaleW, scaleH);
+    } else {
+      // Mode Pas Lebar: lebar dokumen mengisi lebar layar, dapat discroll ke bawah dengan leluasa
+      baseScale = availableWidth / initialViewport.width;
+    }
+
+    // Batasi baseScale ke batas aman
+    baseScale = Math.min(Math.max(baseScale, 0.2), 3.0);
+    const effectiveScale = Math.max(baseScale * PDF_PAGE_ZOOM, 0.25);
 
     const viewport = page.getViewport({ scale: effectiveScale });
 
@@ -13309,6 +13385,12 @@ async function renderPdfPage(pageNum) {
     };
 
     await page.render(renderContext).promise;
+
+    // Reset posisi scroll bila bukan sekadar resize
+    if (!keepScroll && viewportContainer) {
+      viewportContainer.scrollTop = 0;
+      viewportContainer.scrollLeft = 0;
+    }
 
     // Update UI Toolbar Indikator Halaman
     CURRENT_PDF_PAGE = pageNum;
@@ -13342,20 +13424,20 @@ function nextPdfPage() {
 }
 
 function zoomPdfIn() {
-  if (PDF_PAGE_ZOOM < 2.5) {
+  if (PDF_PAGE_ZOOM < 3.0) {
     PDF_PAGE_ZOOM = +(PDF_PAGE_ZOOM + 0.2).toFixed(1);
     const zoomEl = document.getElementById("pdf-zoom-level");
     if (zoomEl) zoomEl.innerText = `${Math.round(PDF_PAGE_ZOOM * 100)}%`;
-    renderPdfPage(CURRENT_PDF_PAGE);
+    renderPdfPage(CURRENT_PDF_PAGE, true);
   }
 }
 
 function zoomPdfOut() {
-  if (PDF_PAGE_ZOOM > 0.6) {
+  if (PDF_PAGE_ZOOM > 0.4) {
     PDF_PAGE_ZOOM = +(PDF_PAGE_ZOOM - 0.2).toFixed(1);
     const zoomEl = document.getElementById("pdf-zoom-level");
     if (zoomEl) zoomEl.innerText = `${Math.round(PDF_PAGE_ZOOM * 100)}%`;
-    renderPdfPage(CURRENT_PDF_PAGE);
+    renderPdfPage(CURRENT_PDF_PAGE, true);
   }
 }
 
@@ -13365,6 +13447,7 @@ function closeSecurePdfViewer() {
   document.body.style.overflow = "";
 
   window.removeEventListener("keydown", handlePdfViewerKeydown);
+  window.removeEventListener("resize", handlePdfViewerResize);
 
   // Bersihkan canvas
   const canvas = document.getElementById("pdf-render-canvas");
