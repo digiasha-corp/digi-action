@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260915_v94";
+const APP_BUILD_VERSION = "20260915_v95";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1311,6 +1311,7 @@ function getScreenFromUrl() {
   const firstSegment = rawPath.split("/")[0].toLowerCase();
   if (firstSegment === "rekap_absen") return "attendance_summary";
   if (firstSegment === "home" || firstSegment === "index" || firstSegment === "index.html") return "dashboard";
+  if (firstSegment === "sop") return "ketentuan";
 
   if (VALID_APP_SCREENS.includes(firstSegment)) {
     return firstSegment;
@@ -1336,7 +1337,9 @@ async function loadScreen(screenName, updateHistory = true) {
   // Auth Guard: Jika belum login dan mencoba buka selain login, redirect ke login
   if (!CURRENT_USER && screenName !== "login") {
     try {
+      const fullPath = window.location.pathname + window.location.search;
       sessionStorage.setItem("DIGIASHA_REDIRECT_SCREEN", screenName);
+      sessionStorage.setItem("DIGIASHA_REDIRECT_URL", fullPath);
     } catch (e) {}
     screenName = "login";
   }
@@ -1350,8 +1353,10 @@ async function loadScreen(screenName, updateHistory = true) {
   // Update URL di address bar browser (HTML5 History API)
   if (updateHistory && window.history && window.history.pushState) {
     const targetPath = (screenName === "dashboard") ? "/" : `/${screenName}`;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({ screen: screenName }, "", targetPath);
+    const query = (screenName === "ketentuan") ? window.location.search : "";
+    const fullTarget = `${targetPath}${query}`;
+    if (window.location.pathname + window.location.search !== fullTarget) {
+      window.history.pushState({ screen: screenName }, "", fullTarget);
     }
   }
 
@@ -1592,10 +1597,19 @@ async function handleLoginSubmit(e) {
 
     let targetScreen = "dashboard";
     try {
+      const redirectUrl = sessionStorage.getItem("DIGIASHA_REDIRECT_URL");
       const redirectScreen = sessionStorage.getItem("DIGIASHA_REDIRECT_SCREEN");
-      if (redirectScreen && redirectScreen !== "login" && VALID_APP_SCREENS.includes(redirectScreen)) {
+      sessionStorage.removeItem("DIGIASHA_REDIRECT_URL");
+      sessionStorage.removeItem("DIGIASHA_REDIRECT_SCREEN");
+
+      if (redirectUrl) {
+        window.history.replaceState(null, "", redirectUrl);
+        const resolved = getScreenFromUrl();
+        await loadScreen(resolved, false);
+        syncMasterDataFromApi();
+        return;
+      } else if (redirectScreen && redirectScreen !== "login" && VALID_APP_SCREENS.includes(redirectScreen)) {
         targetScreen = redirectScreen;
-        sessionStorage.removeItem("DIGIASHA_REDIRECT_SCREEN");
       }
     } catch (e) {}
 
@@ -12772,6 +12786,9 @@ async function initKetentuanScreen() {
   // 4. Fetch list ketentuan dari Supabase (dengan localStorage fallback)
   await fetchKetentuanList();
   renderKetentuanList();
+
+  // 5. Cek deep-link langsung (misal ?id=... atau ?sop=...)
+  checkAndOpenDeepLinkSop();
 }
 
 async function fetchKetentuanList() {
@@ -13055,16 +13072,103 @@ function renderKetentuanList() {
             ${roleBadgesHtml}
           </div>
 
-          <button type="button" onclick="openSecurePdfViewer('${item.pdf_url}', '${safeJudul}', '${safeMeta}')" class="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
-            <i class="fa-solid fa-book-open-reader text-xs text-emerald-400"></i>
-            <span>Buka Dokumen</span>
-          </button>
+          <div class="flex items-center space-x-2 w-full sm:w-auto">
+            <button type="button" onclick="copySopShareLink('${item.id}', '${safeJudul}')" title="Salin tautan langsung ke dokumen ini" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 active:scale-95 shrink-0">
+              <i class="fa-solid fa-link text-slate-500 text-xs"></i>
+              <span>Salin Link</span>
+            </button>
+            <button type="button" onclick="openSecurePdfViewer('${item.pdf_url}', '${safeJudul}', '${safeMeta}')" class="flex-1 sm:flex-initial px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+              <i class="fa-solid fa-book-open-reader text-xs text-emerald-400"></i>
+              <span>Buka Dokumen</span>
+            </button>
+          </div>
         </div>
       </div>
     `;
   });
 
   container.innerHTML = html;
+}
+
+// =========================================================================
+// FITUR BERBAGI LINK LANGSUNG (DEEP-LINKING SOP)
+// =========================================================================
+function copySopShareLink(id, judul = "") {
+  if (!id) return;
+  const baseUrl = window.location.origin;
+  const shareUrl = `${baseUrl}/ketentuan?id=${encodeURIComponent(id)}`;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      showToast("Link SOP berhasil disalin! Bagikan ke rekan kerja Anda.", "success", 2500);
+    }).catch(() => {
+      fallbackCopyTextToClipboard(shareUrl);
+    });
+  } else {
+    fallbackCopyTextToClipboard(shareUrl);
+  }
+}
+
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  textArea.style.top = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    showToast("Link SOP berhasil disalin! Bagikan ke rekan kerja Anda.", "success", 2500);
+  } catch (err) {
+    prompt("Salin tautan dokumen SOP berikut:", text);
+  }
+  document.body.removeChild(textArea);
+}
+
+function checkAndOpenDeepLinkSop() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetId = urlParams.get("id") || urlParams.get("sop") || urlParams.get("doc");
+  if (!targetId) return;
+
+  const doc = KETENTUAN_DATA_CACHE.find(d => String(d.id).toLowerCase() === String(targetId).toLowerCase());
+  if (!doc) {
+    showToast("Dokumen SOP yang dituju tidak ditemukan atau sudah tidak aktif.", "warning", 3000);
+    return;
+  }
+
+  // Otorisasi role untuk membaca dokumen
+  const isAdmin = isUserAdminOrSuperAdmin();
+  const myRoleId = String(CURRENT_USER?.role_id || "").toUpperCase();
+  const myRoleName = String(CURRENT_USER?.role || CURRENT_USER?.jabatan || "").toLowerCase();
+
+  let roles = doc.allowed_roles;
+  if (typeof roles === "string") {
+    try { roles = JSON.parse(roles); } catch (e) { roles = [roles]; }
+  }
+  const isAllowed = isAdmin || !roles || roles.length === 0 || roles.includes("ALL") || roles.includes("Semua Role") ||
+    (myRoleId && roles.includes(myRoleId)) ||
+    roles.some(r => String(r).toLowerCase() === myRoleName || myRoleName.includes(String(r).toLowerCase()));
+
+  if (!isAllowed) {
+    showCenterAlertModal({
+      title: "Akses Dokumen Terbatas",
+      message: `Mohon maaf, dokumen "${doc.judul}" hanya dapat dibaca oleh role tertentu. Akun Anda saat ini (${CURRENT_USER?.role || 'Karyawan'}) tidak memiliki izin untuk membuka dokumen ini.`,
+      type: "warning"
+    });
+    return;
+  }
+
+  // Langsung buka dokumen secara otomatis
+  const safeJudul = (doc.judul || "").replace(/"/g, '&quot;');
+  const tglBerlakuFmt = doc.tgl_berlaku ? formatDisplayDate(doc.tgl_berlaku) : "-";
+  const safeMeta = `${doc.nomor_dokumen || doc.kategori} • Berlaku sejak ${tglBerlakuFmt}`;
+
+  setTimeout(() => {
+    openSecurePdfViewer(doc.pdf_url, safeJudul, safeMeta);
+    showToast(`Membuka: ${doc.judul}`, "info", 2000);
+  }, 250);
 }
 
 // =========================================================================
@@ -13275,6 +13379,28 @@ function closeSecurePdfViewer() {
 // =========================================================================
 // UPLOAD & ROLE ACCESS MANAGEMENT MODAL CONTROLLER
 // =========================================================================
+function switchKetentuanSourceMode(mode) {
+  const modeInput = document.getElementById("ketentuan-source-mode");
+  if (modeInput) modeInput.value = mode;
+
+  const uploadWrapper = document.getElementById("ketentuan-upload-file-wrapper");
+  const linkWrapper = document.getElementById("ketentuan-link-url-wrapper");
+  const tabUpload = document.getElementById("tab-src-upload");
+  const tabLink = document.getElementById("tab-src-link");
+
+  if (mode === "link") {
+    if (uploadWrapper) uploadWrapper.classList.add("hidden");
+    if (linkWrapper) linkWrapper.classList.remove("hidden");
+    if (tabUpload) tabUpload.className = "px-2.5 py-1 rounded-lg font-bold text-slate-500 hover:text-slate-800 transition";
+    if (tabLink) tabLink.className = "px-2.5 py-1 rounded-lg font-bold bg-white text-slate-900 shadow-xs transition";
+  } else {
+    if (uploadWrapper) uploadWrapper.classList.remove("hidden");
+    if (linkWrapper) linkWrapper.classList.add("hidden");
+    if (tabUpload) tabUpload.className = "px-2.5 py-1 rounded-lg font-bold bg-white text-slate-900 shadow-xs transition";
+    if (tabLink) tabLink.className = "px-2.5 py-1 rounded-lg font-bold text-slate-500 hover:text-slate-800 transition";
+  }
+}
+
 function openUploadKetentuanModal(editId = null) {
   const modal = document.getElementById("modal-upload-ketentuan");
   if (!modal) return;
@@ -13290,6 +13416,9 @@ function openUploadKetentuanModal(editId = null) {
   const starEl = document.getElementById("ketentuan-pdf-req-star");
 
   clearKetentuanFileSelection();
+  const linkInput = document.getElementById("ketentuan-input-link-url");
+  if (linkInput) linkInput.value = "";
+  switchKetentuanSourceMode("upload");
 
   // Populate Role Checkboxes
   populateKetentuanRoleCheckboxes();
@@ -13299,15 +13428,18 @@ function openUploadKetentuanModal(editId = null) {
     if (existing) {
       if (titleEl) titleEl.innerText = "Edit Ketentuan & SOP";
       if (submitTextEl) submitTextEl.innerText = "Simpan Perubahan";
-      if (starEl) starEl.innerText = ""; // Tidak wajib upload ulang jika sudah ada PDF
+      if (starEl) starEl.innerText = ""; // Tidak wajib upload ulang jika sudah ada PDF/Link
 
       document.getElementById("ketentuan-input-judul").value = existing.judul || "";
       document.getElementById("ketentuan-input-nomor").value = existing.nomor_dokumen || "";
       document.getElementById("ketentuan-input-kategori").value = existing.kategori || "SOP Operasional";
       document.getElementById("ketentuan-input-tgl-berlaku").value = existing.tgl_berlaku ? existing.tgl_berlaku.split("T")[0] : "";
 
-      // Preview nama file existing
-      if (existing.file_name) {
+      // Cek apakah berupa Tautan / Link URL
+      if (existing.pdf_url && (existing.file_name === "Tautan / Link Dokumen" || existing.pdf_url.startsWith("http") && !existing.pdf_url.includes("supabase.co/storage"))) {
+        if (linkInput) linkInput.value = existing.pdf_url;
+        switchKetentuanSourceMode("link");
+      } else if (existing.file_name) {
         document.getElementById("ketentuan-selected-name").innerText = existing.file_name;
         document.getElementById("ketentuan-selected-size").innerText = existing.file_size ? `${Math.round(existing.file_size / 1024)} KB (File Tersimpan)` : "File Tersimpan";
         document.getElementById("ketentuan-dropzone-content").classList.add("hidden");
@@ -13473,9 +13605,18 @@ async function handleSaveKetentuan(event) {
   }
 
   const existingDoc = editId ? KETENTUAN_DATA_CACHE.find(d => String(d.id) === String(editId)) : null;
-  if (!editId && !SELECTED_KETENTUAN_FILE_BLOB) {
-    alert("Silakan pilih file PDF yang akan diunggah.");
-    return;
+  const sourceMode = document.getElementById("ketentuan-source-mode")?.value || "upload";
+  const linkUrl = (document.getElementById("ketentuan-input-link-url")?.value || "").trim();
+
+  if (!editId) {
+    if (sourceMode === "upload" && !SELECTED_KETENTUAN_FILE_BLOB) {
+      alert("Silakan pilih file PDF yang akan diunggah.");
+      return;
+    }
+    if (sourceMode === "link" && !linkUrl) {
+      alert("Silakan masukkan tautan / URL link dokumen.");
+      return;
+    }
   }
 
   // Tampilkan indikator proses pada tombol submit
@@ -13492,8 +13633,11 @@ async function handleSaveKetentuan(event) {
 
     const client = getSupabaseClient();
 
-    // 1. Upload File PDF ke Supabase Storage (jika ada file baru dipilih)
-    if (SELECTED_KETENTUAN_FILE_BLOB) {
+    if (sourceMode === "link" && linkUrl) {
+      pdfUrl = linkUrl;
+      fileName = "Tautan / Link Dokumen";
+      fileSize = 0;
+    } else if (SELECTED_KETENTUAN_FILE_BLOB) {
       fileName = SELECTED_KETENTUAN_FILE_BLOB.name;
       fileSize = SELECTED_KETENTUAN_FILE_BLOB.size;
 
@@ -13823,10 +13967,16 @@ function renderSopManagementList() {
             ${roleBadgesHtml}
           </div>
 
-          <button type="button" onclick="openSecurePdfViewer('${item.pdf_url}', '${safeJudul}', '${safeMeta}')" class="w-full sm:w-auto px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
-            <i class="fa-solid fa-eye text-xs text-emerald-400"></i>
-            <span>Preview PDF</span>
-          </button>
+          <div class="flex items-center space-x-2 w-full sm:w-auto">
+            <button type="button" onclick="copySopShareLink('${item.id}', '${safeJudul}')" title="Salin link langsung ke SOP ini" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 active:scale-95 shrink-0">
+              <i class="fa-solid fa-link text-slate-500 text-xs"></i>
+              <span>Salin Link</span>
+            </button>
+            <button type="button" onclick="openSecurePdfViewer('${item.pdf_url}', '${safeJudul}', '${safeMeta}')" class="flex-1 sm:flex-initial px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+              <i class="fa-solid fa-eye text-xs text-emerald-400"></i>
+              <span>Preview PDF</span>
+            </button>
+          </div>
         </div>
       </div>
     `;

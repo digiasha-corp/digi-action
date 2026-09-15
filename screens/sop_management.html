@@ -122,34 +122,61 @@
           <span class="text-[10px] text-slate-400 mt-0.5 block">Dokumen akan berstatus aktif terhitung mulai tanggal ini.</span>
         </div>
 
-        <!-- File Upload PDF -->
-        <div id="ketentuan-upload-file-wrapper">
-          <label class="block font-bold text-slate-700 mb-1">Dokumen PDF <span class="text-rose-500" id="ketentuan-pdf-req-star">*</span></label>
-          
-          <div class="border-2 border-dashed border-slate-300 hover:border-slate-800 rounded-2xl p-4 text-center bg-slate-50 hover:bg-slate-100/60 transition cursor-pointer relative" onclick="document.getElementById('ketentuan-file-input').click()">
-            <input type="file" id="ketentuan-file-input" accept="application/pdf" class="hidden" onchange="handleKetentuanFileSelected(event)" />
-            
-            <div id="ketentuan-dropzone-content" class="space-y-1.5">
-              <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto text-lg">
-                <i class="fa-solid fa-file-pdf"></i>
-              </div>
-              <p class="font-bold text-xs text-slate-700">Pilih atau Seret File PDF ke Sini</p>
-              <span class="text-[10px] text-slate-400 block">Format dokumen wajib .PDF (Maksimal 15 MB)</span>
-            </div>
-
-            <!-- Preview File Name yang Terpilih -->
-            <div id="ketentuan-file-selected-box" class="hidden flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-left">
-              <div class="flex items-center space-x-2 min-w-0">
-                <i class="fa-solid fa-circle-check text-emerald-600 text-sm shrink-0"></i>
-                <div class="min-w-0">
-                  <span id="ketentuan-selected-name" class="font-bold text-xs text-emerald-950 block truncate">dokumen.pdf</span>
-                  <span id="ketentuan-selected-size" class="text-[10px] text-emerald-700 font-medium">0 KB</span>
-                </div>
-              </div>
-              <button type="button" onclick="event.stopPropagation(); clearKetentuanFileSelection();" class="p-1 text-slate-400 hover:text-rose-600">
-                <i class="fa-solid fa-trash-can"></i>
+        <!-- Sumber Dokumen: Switcher Upload File vs Tautan / Link URL -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block font-bold text-slate-700 text-xs">Sumber Dokumen PDF <span class="text-rose-500" id="ketentuan-pdf-req-star">*</span></label>
+            <!-- Tab Switcher -->
+            <div class="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-[11px]">
+              <button type="button" id="tab-src-upload" onclick="switchKetentuanSourceMode('upload')" class="px-2.5 py-1 rounded-lg font-bold bg-white text-slate-900 shadow-xs transition">
+                <i class="fa-solid fa-cloud-arrow-up mr-1 text-slate-600"></i>Upload File
+              </button>
+              <button type="button" id="tab-src-link" onclick="switchKetentuanSourceMode('link')" class="px-2.5 py-1 rounded-lg font-bold text-slate-500 hover:text-slate-800 transition">
+                <i class="fa-solid fa-link mr-1 text-teal-600"></i>Tautan / Link URL
               </button>
             </div>
+          </div>
+          <input type="hidden" id="ketentuan-source-mode" value="upload" />
+
+          <!-- Pilihan 1: Dropzone File Upload PDF -->
+          <div id="ketentuan-upload-file-wrapper" class="space-y-1">
+            <div class="border-2 border-dashed border-slate-300 hover:border-slate-800 rounded-2xl p-4 text-center bg-slate-50 hover:bg-slate-100/60 transition cursor-pointer relative" onclick="document.getElementById('ketentuan-file-input').click()">
+              <input type="file" id="ketentuan-file-input" accept="application/pdf" class="hidden" onchange="handleKetentuanFileSelected(event)" />
+              
+              <div id="ketentuan-dropzone-content" class="space-y-1.5">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto text-lg">
+                  <i class="fa-solid fa-file-pdf"></i>
+                </div>
+                <p class="font-bold text-xs text-slate-700">Pilih atau Seret File PDF ke Sini</p>
+                <span class="text-[10px] text-slate-400 block">Format dokumen wajib .PDF (Maksimal 15 MB)</span>
+              </div>
+
+              <!-- Preview File Name yang Terpilih -->
+              <div id="ketentuan-file-selected-box" class="hidden flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-left">
+                <div class="flex items-center space-x-2 min-w-0">
+                  <i class="fa-solid fa-circle-check text-emerald-600 text-sm shrink-0"></i>
+                  <div class="min-w-0">
+                    <span id="ketentuan-selected-name" class="font-bold text-xs text-emerald-950 block truncate">dokumen.pdf</span>
+                    <span id="ketentuan-selected-size" class="text-[10px] text-emerald-700 font-medium">0 KB</span>
+                  </div>
+                </div>
+                <button type="button" onclick="event.stopPropagation(); clearKetentuanFileSelection();" class="p-1 text-slate-400 hover:text-rose-600">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pilihan 2: Input Tautan / Link URL PDF -->
+          <div id="ketentuan-link-url-wrapper" class="hidden space-y-1.5">
+            <div class="relative">
+              <i class="fa-solid fa-link absolute left-3 top-1/2 -translate-y-1/2 text-teal-600 text-xs"></i>
+              <input type="url" id="ketentuan-input-link-url" placeholder="https://.../dokumen.pdf atau link Google Drive" class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 outline-none transition font-mono" />
+            </div>
+            <p class="text-[10px] text-slate-500 flex items-center space-x-1">
+              <i class="fa-solid fa-circle-info text-teal-600"></i>
+              <span>Dapat berupa URL file PDF publik, link Supabase, atau link Google Drive (pastikan disetel "Siapa saja yang memiliki link").</span>
+            </p>
           </div>
         </div>
 
