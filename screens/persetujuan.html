@@ -11,12 +11,17 @@
     </div>
   </div>
 
-  <!-- Tab Navigation -->
-  <div class="flex border-b border-slate-200 bg-white rounded-2xl p-1 shadow-sm gap-1">
-    <button type="button" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-xs flex items-center justify-center space-x-1.5 transition">
-      <i class="fa-solid fa-user-clock text-xs"></i>
-      <span>Personalia (Izin & Cuti)</span>
-      <span id="tab-personalia-count" class="ml-1 text-[9px] px-1.5 py-0.2 rounded-full bg-white/20 text-white">0</span>
+  <!-- Tab Scope Navigation (Perlu Persetujuan Tim vs Pengajuan Saya) -->
+  <div class="flex bg-slate-200/80 rounded-2xl p-1 gap-1 text-xs font-bold">
+    <button type="button" id="tab-scope-inbox" onclick="switchApprovalScope('INBOX')" class="flex-1 py-2.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 bg-slate-900 text-white shadow-sm">
+      <i class="fa-solid fa-stamp text-xs"></i>
+      <span>Perlu Persetujuan Tim</span>
+      <span id="tab-inbox-count" class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-white/20 text-white font-extrabold">0</span>
+    </button>
+    <button type="button" id="tab-scope-my" onclick="switchApprovalScope('MY')" class="flex-1 py-2.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900">
+      <i class="fa-solid fa-user text-xs"></i>
+      <span>Pengajuan Saya</span>
+      <span id="tab-my-count" class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-slate-300 text-slate-700 font-extrabold">0</span>
     </button>
   </div>
 
@@ -34,6 +39,9 @@
     <button type="button" onclick="filterApprovals('REJECTED')" id="btn-filter-REJECTED" class="approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0 transition">
       Ditolak
     </button>
+    <button type="button" onclick="filterApprovals('CANCELLED')" id="btn-filter-CANCELLED" class="approval-filter-btn px-3 py-1.5 rounded-xl font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0 transition">
+      Dibatalkan
+    </button>
   </div>
 
   <!-- Container Daftar Pengajuan -->
@@ -44,7 +52,7 @@
     </div>
   </div>
 
-  <!-- MODAL AKSI PERSETUJUAN (APPROVE / REJECT) -->
+  <!-- MODAL AKSI PERSETUJUAN (APPROVE / REJECT) - KHUSUS APPROVER / ATASAN -->
   <div id="modal-process-approval" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
       <div class="text-center">
@@ -56,6 +64,10 @@
       </div>
 
       <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Pemohon:</span>
+          <span id="modal-appr-pemohon" class="font-bold text-slate-800">-</span>
+        </div>
         <div class="flex justify-between">
           <span class="text-slate-400">Jenis Izin:</span>
           <span id="modal-appr-jenis" class="font-bold text-slate-800">-</span>
@@ -79,6 +91,46 @@
         <button type="button" onclick="closeProcessApprovalModal()" class="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition">Batal</button>
         <button type="button" id="btn-confirm-approval-action" onclick="executeApprovalAction()" class="w-2/3 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95">
           Konfirmasi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BATALKAN PENGAJUAN (KHUSUS PEMOHON SENDIRI) -->
+  <div id="modal-cancel-izin" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      <div class="text-center">
+        <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl mx-auto mb-2">
+          <i class="fa-solid fa-ban"></i>
+        </div>
+        <h4 class="font-bold text-sm text-slate-900">Batalkan Pengajuan Izin?</h4>
+        <p class="text-[11px] text-slate-500 mt-0.5">Pengajuan yang dibatalkan tidak akan diproses lagi oleh atasan.</p>
+      </div>
+
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Jenis Izin:</span>
+          <span id="modal-cancel-jenis" class="font-bold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Periode:</span>
+          <span id="modal-cancel-periode" class="font-semibold text-slate-700">-</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block">Alasan Pengajuan:</span>
+          <div id="modal-cancel-catatan" class="font-medium text-slate-800 mt-0.5 p-2 bg-white rounded-lg border border-slate-200 text-[11px] max-h-20 overflow-y-auto">-</div>
+        </div>
+        <div class="pt-1 text-[10px] text-indigo-700 font-semibold flex items-center space-x-1">
+          <i class="fa-solid fa-user-tie"></i>
+          <span>Atasan yang dituju: <strong id="modal-cancel-atasan">-</strong></span>
+        </div>
+      </div>
+
+      <div class="flex space-x-2 pt-1">
+        <button type="button" onclick="closeCancelIzinModal()" class="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition">Kembali</button>
+        <button type="button" id="btn-confirm-cancel-action" onclick="executeCancelIzinAction()" class="w-2/3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95 flex items-center justify-center space-x-1">
+          <i class="fa-solid fa-ban text-xs"></i>
+          <span>Ya, Batalkan</span>
         </button>
       </div>
     </div>

@@ -239,7 +239,9 @@ let SELECTED_IZIN_CATEGORY = "WFA";
 let CURRENT_IZIN_GEO = { lat: -6.295218, long: 106.638482, accuracy: 25 };
 let APPROVALS_CACHE = [];
 let ACTIVE_APPROVAL_FILTER = "PENDING";
+let ACTIVE_APPROVAL_SCOPE = "INBOX"; // "INBOX" (Persetujuan Tim) atau "MY" (Pengajuan Saya)
 let PENDING_APPROVAL_ACTION_PAYLOAD = null;
+let PENDING_CANCEL_IZIN_ID = null;
 let CENTER_ALERT_CALLBACK = null;
 
 let PRIORITY_ACTIVE_FILTER = "ALL";
@@ -904,9 +906,15 @@ async function supabaseProcessApproval(data) {
   }
 
   const rawDecision = String(data.decision || data.status || data.actionType || "APPROVED").toUpperCase();
-  const finalStatus = (rawDecision.includes("APPROV") || rawDecision.includes("SETUJU")) ? "APPROVED" : "REJECTED";
+  let finalStatus = "REJECTED";
+  if (rawDecision.includes("APPROV") || rawDecision.includes("SETUJU")) {
+    finalStatus = "APPROVED";
+  } else if (rawDecision.includes("CANCEL") || rawDecision.includes("BATAL")) {
+    finalStatus = "CANCELLED";
+  }
+
   const approverName = data.approver_name || data.approverNama || data.approved_by || CURRENT_USER?.nama || "Atasan";
-  const approverNotes = data.catatan_approval || data.note || "-";
+  const approverNotes = data.catatan_approval || data.note || (finalStatus === "CANCELLED" ? "Dibatalkan oleh pemohon" : "-");
 
   const updateData = {
     status_approval: finalStatus,
@@ -914,6 +922,10 @@ async function supabaseProcessApproval(data) {
     approved_by: approverName,
     catatan_approval: approverNotes
   };
+
+  const successMsg = finalStatus === "CANCELLED"
+    ? "Permohonan izin berhasil dibatalkan."
+    : `Permohonan berhasil di-${finalStatus === 'APPROVED' ? 'Setujui' : 'Tolak'}.`;
 
   if (supabaseClient) {
     try {
@@ -925,7 +937,7 @@ async function supabaseProcessApproval(data) {
         return { 
           success: true, 
           status: finalStatus,
-          message: `Permohonan berhasil di-${finalStatus === 'APPROVED' ? 'Setujui' : 'Tolak'}.` 
+          message: successMsg
         };
       }
     } catch (e) {
@@ -948,7 +960,7 @@ async function supabaseProcessApproval(data) {
       return { 
         success: true, 
         status: finalStatus,
-        message: `Permohonan berhasil di-${finalStatus === 'APPROVED' ? 'Setujui' : 'Tolak'}.` 
+        message: successMsg
       };
     }
   }
@@ -2835,8 +2847,9 @@ async function handleIzinManualSubmit(e) {
 function initPersetujuanScreen() {
   if (!CURRENT_USER) return;
   const picInfo = document.getElementById("approval-pic-info");
-  if (picInfo) picInfo.innerText = `PIC Approver: ${CURRENT_USER.nama} (${CURRENT_USER.nip}) • ${CURRENT_USER.role}`;
+  if (picInfo) picInfo.innerText = `${CURRENT_USER.nama} (${CURRENT_USER.nip}) • ${CURRENT_USER.role}`;
 
+  switchApprovalScope(ACTIVE_APPROVAL_SCOPE || "INBOX");
   fetchApprovalList();
 }
 
@@ -2854,9 +2867,10 @@ async function fetchApprovalList() {
       try {
         const isAdmin = String(CURRENT_USER.role || "").toLowerCase().includes("admin");
         const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
+        // Admin bisa melihat seluruh pengajuan, sedangkan non-admin melihat pengajuan yang ditujukan ke dia dan pengajuan miliknya sendiri
         const queryUrl = isAdmin 
           ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?select=*&order=timestamp.desc`
-          : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&order=timestamp.desc`;
+          : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&order=timestamp.desc`;
 
         const sbRes = await fetch(queryUrl, {
           headers: {
@@ -2884,8 +2898,8 @@ async function fetchApprovalList() {
     }
 
     APPROVALS_CACHE = approvals || [];
-    renderApprovalList();
     updateApprovalBadgeCounts();
+    renderApprovalList();
 
   } catch (err) {
     container.innerHTML = `<div class="p-5 text-center text-xs text-rose-600 bg-rose-50 rounded-2xl border border-rose-200">Error memuat data: ${err.message}</div>`;
@@ -2899,9 +2913,10 @@ async function fetchPendingApprovalCount() {
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
       const isAdmin = String(CURRENT_USER.role || "").toLowerCase().includes("admin");
       const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
+      // PENTING: Pengajuan milik sendiri (nip == cleanNip) tidak boleh dihitung sebagai tugas approval yang harus direspon!
       const queryUrl = isAdmin
-        ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?status_approval=eq.PENDING&select=izin_id`
-        : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&select=izin_id`;
+        ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`
+        : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`;
 
       const sbRes = await fetch(queryUrl, {
         headers: {
@@ -2919,7 +2934,10 @@ async function fetchPendingApprovalCount() {
         role: CURRENT_USER.role
       });
       if (res && res.success && Array.isArray(res.approvals)) {
-        pendingCount = res.approvals.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING").length;
+        pendingCount = res.approvals.filter(a => 
+          String(a.status_approval || "").toUpperCase() === "PENDING" &&
+          String(a.nip || "").trim() !== String(CURRENT_USER.nip || "").trim()
+        ).length;
       }
     }
 
@@ -2933,25 +2951,72 @@ async function fetchPendingApprovalCount() {
 }
 
 function updateApprovalBadgeCounts() {
-  const pendingCount = APPROVALS_CACHE.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING").length;
+  const cleanNip = String(CURRENT_USER?.nip || "").trim();
+
+  // 1. Pengajuan tim/bawahan yang menunggu keputusan persetujuan user ini
+  const inboxPendingCount = APPROVALS_CACHE.filter(a => {
+    const isNotMe = String(a.nip || "").trim() !== cleanNip;
+    const isPending = String(a.status_approval || "").toUpperCase() === "PENDING";
+    return isNotMe && isPending;
+  }).length;
+
+  // 2. Pengajuan milik user ini sendiri yang masih pending menunggu atasan
+  const myPendingCount = APPROVALS_CACHE.filter(a => {
+    const isMe = String(a.nip || "").trim() === cleanNip;
+    const isPending = String(a.status_approval || "").toUpperCase() === "PENDING";
+    return isMe && isPending;
+  }).length;
+
   const countFilterPending = document.getElementById("count-filter-pending");
-  const tabCount = document.getElementById("tab-personalia-count");
+  const tabInboxCount = document.getElementById("tab-inbox-count");
+  const tabMyCount = document.getElementById("tab-my-count");
   const dashBadge = document.getElementById("badge-pending-approval-count");
 
-  if (countFilterPending) countFilterPending.innerText = pendingCount;
-  if (tabCount) tabCount.innerText = pendingCount;
+  if (tabInboxCount) tabInboxCount.innerText = inboxPendingCount;
+  if (tabMyCount) tabMyCount.innerText = myPendingCount;
+
+  if (countFilterPending) {
+    countFilterPending.innerText = (ACTIVE_APPROVAL_SCOPE === "MY") ? myPendingCount : inboxPendingCount;
+  }
+
+  // Badge di dashboard hanya menyala jika ada permohonan staf/bawahan yang butuh direspon oleh user ini
   if (dashBadge) {
-    dashBadge.innerText = pendingCount;
-    if (pendingCount > 0) dashBadge.classList.remove("hidden");
+    dashBadge.innerText = inboxPendingCount;
+    if (inboxPendingCount > 0) dashBadge.classList.remove("hidden");
     else dashBadge.classList.add("hidden");
   }
+}
+
+function switchApprovalScope(scope) {
+  ACTIVE_APPROVAL_SCOPE = scope || "INBOX";
+  const btnInbox = document.getElementById("tab-scope-inbox");
+  const btnMy = document.getElementById("tab-scope-my");
+
+  if (scope === "MY") {
+    if (btnMy) {
+      btnMy.className = "flex-1 py-2.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 bg-slate-900 text-white shadow-sm";
+    }
+    if (btnInbox) {
+      btnInbox.className = "flex-1 py-2.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900";
+    }
+  } else {
+    if (btnInbox) {
+      btnInbox.className = "flex-1 py-2.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 bg-slate-900 text-white shadow-sm";
+    }
+    if (btnMy) {
+      btnMy.className = "flex-1 py-2.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900";
+    }
+  }
+
+  updateApprovalBadgeCounts();
+  renderApprovalList();
 }
 
 function filterApprovals(filterType) {
   ACTIVE_APPROVAL_FILTER = filterType;
 
   // Update button active styles
-  ["PENDING", "ALL", "APPROVED", "REJECTED"].forEach(f => {
+  ["PENDING", "ALL", "APPROVED", "REJECTED", "CANCELLED"].forEach(f => {
     const btn = document.getElementById(`btn-filter-${f}`);
     if (btn) {
       if (f === filterType) {
@@ -2969,21 +3034,40 @@ function renderApprovalList() {
   const container = document.getElementById("approval-list-container");
   if (!container) return;
 
-  let filtered = APPROVALS_CACHE;
-  if (ACTIVE_APPROVAL_FILTER === "PENDING") {
-    filtered = filtered.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING");
-  } else if (ACTIVE_APPROVAL_FILTER === "APPROVED") {
-    filtered = filtered.filter(a => String(a.status_approval || "").toUpperCase() === "APPROVED");
-  } else if (ACTIVE_APPROVAL_FILTER === "REJECTED") {
-    filtered = filtered.filter(a => String(a.status_approval || "").toUpperCase() === "REJECTED");
+  const cleanNip = String(CURRENT_USER?.nip || "").trim();
+
+  // 1. Filter berdasarkan scope tab (INBOX vs MY)
+  let list = APPROVALS_CACHE;
+  if (ACTIVE_APPROVAL_SCOPE === "MY") {
+    list = list.filter(a => String(a.nip || "").trim() === cleanNip);
+  } else {
+    // INBOX: Hanya tampilkan pengajuan dari orang lain/bawahan (Bukan pengajuan sendiri)
+    list = list.filter(a => String(a.nip || "").trim() !== cleanNip);
   }
 
-  if (filtered.length === 0) {
+  // 2. Filter status
+  if (ACTIVE_APPROVAL_FILTER === "PENDING") {
+    list = list.filter(a => String(a.status_approval || "").toUpperCase() === "PENDING");
+  } else if (ACTIVE_APPROVAL_FILTER === "APPROVED") {
+    list = list.filter(a => String(a.status_approval || "").toUpperCase() === "APPROVED");
+  } else if (ACTIVE_APPROVAL_FILTER === "REJECTED") {
+    list = list.filter(a => String(a.status_approval || "").toUpperCase() === "REJECTED");
+  } else if (ACTIVE_APPROVAL_FILTER === "CANCELLED") {
+    list = list.filter(a => {
+      const s = String(a.status_approval || "").toUpperCase();
+      return s === "CANCELLED" || s === "BATAL";
+    });
+  }
+
+  if (list.length === 0) {
+    const emptyMsg = ACTIVE_APPROVAL_SCOPE === "MY"
+      ? "Anda belum memiliki riwayat pengajuan izin pada filter ini"
+      : "Tidak ada permohonan persetujuan tim pada filter ini";
     container.innerHTML = `
       <div class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400 space-y-1.5">
         <i class="fa-solid fa-inbox text-3xl text-slate-300 mb-1"></i>
-        <p class="text-xs font-bold text-slate-600">Tidak ada pengajuan permohonan</p>
-        <span class="text-[10px]">Daftar pengajuan izin karyawan akan tampil di sini</span>
+        <p class="text-xs font-bold text-slate-600">${emptyMsg}</p>
+        <span class="text-[10px]">Data akan otomatis tampil di sini saat tersedia</span>
       </div>
     `;
     return;
@@ -2996,16 +3080,31 @@ function renderApprovalList() {
     "Sakit": { bg: "bg-rose-50 text-rose-700 border-rose-200", icon: "fa-hospital-user" }
   };
 
-  container.innerHTML = filtered.map(a => {
-    const isPending = String(a.status_approval || "").toUpperCase() === "PENDING";
-    const isApproved = String(a.status_approval || "").toUpperCase() === "APPROVED";
-    const isRejected = String(a.status_approval || "").toUpperCase() === "REJECTED";
+  container.innerHTML = list.map(a => {
+    const st = String(a.status_approval || "").toUpperCase();
+    const isPending = st === "PENDING";
+    const isApproved = st === "APPROVED";
+    const isRejected = st === "REJECTED";
+    const isCancelled = st === "CANCELLED" || st === "BATAL";
 
-    const badgeStyle = isPending
-      ? "bg-amber-100 text-amber-800 border-amber-200"
-      : (isApproved ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-rose-100 text-rose-800 border-rose-200");
+    const isOwnSubmission = String(a.nip || "").trim() === cleanNip;
 
-    const statusLabel = isPending ? "Menunggu Respon" : (isApproved ? "Disetujui" : "Ditolak");
+    let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
+    let statusLabel = "Menunggu Respon";
+    if (isPending) {
+      badgeStyle = "bg-amber-100 text-amber-800 border-amber-200";
+      statusLabel = "Menunggu Respon";
+    } else if (isApproved) {
+      badgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-200";
+      statusLabel = "Disetujui";
+    } else if (isRejected) {
+      badgeStyle = "bg-rose-100 text-rose-800 border-rose-200";
+      statusLabel = "Ditolak";
+    } else if (isCancelled) {
+      badgeStyle = "bg-slate-100 text-slate-600 border-slate-200";
+      statusLabel = "Dibatalkan";
+    }
+
     const catConfig = categoryBadges[a.jenis_izin] || { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: "fa-file" };
 
     const periodeText = (a.tgl_mulai && a.tgl_selesai && a.tgl_mulai !== a.tgl_selesai)
@@ -3022,34 +3121,88 @@ function renderApprovalList() {
       </div>
     ` : '';
 
-    const actionButtons = isPending ? `
-      <div class="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 mt-2.5">
-        <button type="button" onclick="openProcessApprovalModal('${a.izin_id}', 'REJECTED')" class="py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center space-x-1 transition active:scale-95">
-          <i class="fa-solid fa-xmark"></i>
-          <span>Tolak</span>
-        </button>
-        <button type="button" onclick="openProcessApprovalModal('${a.izin_id}', 'APPROVED')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center justify-center space-x-1 transition active:scale-95">
-          <i class="fa-solid fa-check"></i>
-          <span>Setujui</span>
-        </button>
-      </div>
-    ` : `
-      <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-slate-400 flex items-center justify-between">
-        <span>Direspon oleh: <strong class="text-slate-600">${a.approved_by || 'Atasan'}</strong></span>
-        <span>${a.approved_at ? a.approved_at.slice(0, 16) : ''}</span>
-      </div>
-      ${a.catatan_approval && a.catatan_approval !== '-' ? `
-        <div class="mt-1 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-600 italic">
-          Catatan: "${a.catatan_approval}"
-        </div>
-      ` : ''}
-    `;
+    let actionSection = '';
+    if (isOwnSubmission) {
+      // PENGAJUAN SAYA: Hanya bisa melihat status dan tombol BATALKAN jika masih PENDING!
+      // MUTLAK TIDAK BISA APPROVE / REJECT DIRI SENDIRI
+      if (isPending) {
+        actionSection = `
+          <div class="mt-2.5 pt-2.5 border-t border-slate-100 space-y-2">
+            <div class="p-2 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[10px] text-indigo-950 flex items-center space-x-2">
+              <i class="fa-solid fa-user-tie text-indigo-600 text-xs shrink-0"></i>
+              <div class="min-w-0 flex-1">
+                <span class="text-[9px] text-indigo-500 font-bold block uppercase">Menunggu Persetujuan Atasan:</span>
+                <strong class="text-indigo-900">${a.pic_approval_nama || 'Atasan Langsung'} (${a.pic_approval_nip || '-'})</strong>
+              </div>
+            </div>
+            <button type="button" onclick="openCancelIzinModal('${a.izin_id}')" class="w-full py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition active:scale-95">
+              <i class="fa-solid fa-ban"></i>
+              <span>Batalkan Pengajuan</span>
+            </button>
+          </div>
+        `;
+      } else if (isApproved) {
+        actionSection = `
+          <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-emerald-700 flex items-center justify-between font-medium">
+            <span><i class="fa-solid fa-circle-check mr-1"></i>Telah disetujui oleh: <strong>${a.approved_by || 'Atasan'}</strong></span>
+            <span>${a.approved_at ? a.approved_at.slice(0, 16) : ''}</span>
+          </div>
+          ${a.catatan_approval && a.catatan_approval !== '-' ? `<div class="mt-1 p-2 bg-emerald-50/60 rounded-lg text-[10px] text-emerald-800 italic">Catatan Atasan: "${a.catatan_approval}"</div>` : ''}
+        `;
+      } else if (isRejected) {
+        actionSection = `
+          <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-rose-700 flex items-center justify-between font-medium">
+            <span><i class="fa-solid fa-circle-xmark mr-1"></i>Ditolak oleh: <strong>${a.approved_by || 'Atasan'}</strong></span>
+            <span>${a.approved_at ? a.approved_at.slice(0, 16) : ''}</span>
+          </div>
+          ${a.catatan_approval && a.catatan_approval !== '-' ? `<div class="mt-1 p-2 bg-rose-50/60 rounded-lg text-[10px] text-rose-800 italic">Alasan Tolak: "${a.catatan_approval}"</div>` : ''}
+        `;
+      } else {
+        actionSection = `
+          <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-slate-500 flex items-center justify-between">
+            <span><i class="fa-solid fa-ban mr-1"></i>Pengajuan ini telah Anda batalkan</span>
+            <span>${a.approved_at ? a.approved_at.slice(0, 16) : ''}</span>
+          </div>
+        `;
+      }
+    } else {
+      // PENGAJUAN TIM / BAWAHAN: Approver berhak Setujui / Tolak
+      if (isPending) {
+        actionSection = `
+          <div class="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 mt-2.5">
+            <button type="button" onclick="openProcessApprovalModal('${a.izin_id}', 'REJECTED')" class="py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center space-x-1 transition active:scale-95">
+              <i class="fa-solid fa-xmark"></i>
+              <span>Tolak</span>
+            </button>
+            <button type="button" onclick="openProcessApprovalModal('${a.izin_id}', 'APPROVED')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center justify-center space-x-1 transition active:scale-95">
+              <i class="fa-solid fa-check"></i>
+              <span>Setujui</span>
+            </button>
+          </div>
+        `;
+      } else {
+        actionSection = `
+          <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+            <span>Direspon oleh: <strong class="text-slate-600">${a.approved_by || 'Atasan'}</strong></span>
+            <span>${a.approved_at ? a.approved_at.slice(0, 16) : ''}</span>
+          </div>
+          ${a.catatan_approval && a.catatan_approval !== '-' ? `
+            <div class="mt-1 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-600 italic">
+              Catatan: "${a.catatan_approval}"
+            </div>
+          ` : ''}
+        `;
+      }
+    }
 
     return `
       <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <h4 class="font-bold text-slate-900 text-sm leading-tight truncate">${a.nama}</h4>
+            <div class="flex items-center space-x-1.5">
+              <h4 class="font-bold text-slate-900 text-sm leading-tight truncate">${a.nama}</h4>
+              ${isOwnSubmission ? '<span class="px-2 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md font-bold text-[9px] shrink-0">Pengajuan Saya</span>' : ''}
+            </div>
             <p class="text-[10px] text-slate-400 mt-0.5">NIP: ${a.nip} • ${a.cabang}</p>
           </div>
           <span class="text-[9px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${badgeStyle}">${statusLabel}</span>
@@ -3069,7 +3222,7 @@ function renderApprovalList() {
         </div>
 
         ${selfieThumbnail}
-        ${actionButtons}
+        ${actionSection}
       </div>
     `;
   }).join("");
@@ -3091,6 +3244,7 @@ function openProcessApprovalModal(izinId, actionType) {
   const icon = document.getElementById("modal-appr-icon");
   const title = document.getElementById("modal-appr-title");
   const sub = document.getElementById("modal-appr-sub");
+  const pemohon = document.getElementById("modal-appr-pemohon");
   const jenis = document.getElementById("modal-appr-jenis");
   const periode = document.getElementById("modal-appr-periode");
   const catatan = document.getElementById("modal-appr-catatan");
@@ -3098,8 +3252,9 @@ function openProcessApprovalModal(izinId, actionType) {
   const inputNotes = document.getElementById("modal-appr-input-notes");
 
   if (inputNotes) inputNotes.value = "";
-  if (jenis) jenis.innerText = `${item.jenis_izin} (${item.nama})`;
-  if (periode) periode.innerText = item.tgl_mulai ? `${item.tgl_mulai} s/d ${item.tgl_selesai || item.tgl_mulai}` : item.timestamp;
+  if (pemohon) pemohon.innerText = `${item.nama} (${item.nip}) • ${item.cabang}`;
+  if (jenis) jenis.innerText = `${item.jenis_izin}`;
+  if (periode) periode.innerText = item.tgl_mulai ? `${item.tgl_mulai} s/d ${item.tgl_selesai || item.tgl_mulai}` : (item.timestamp ? item.timestamp.slice(0, 10) : "-");
   if (catatan) catatan.innerText = item.catatan || "-";
 
   if (actionType === "APPROVED") {
@@ -3129,6 +3284,86 @@ function closeProcessApprovalModal() {
   const modal = document.getElementById("modal-process-approval");
   if (modal) modal.classList.add("hidden");
   PENDING_APPROVAL_ACTION_PAYLOAD = null;
+}
+
+function openCancelIzinModal(izinId) {
+  const item = APPROVALS_CACHE.find(a => a.izin_id === izinId);
+  if (!item) return;
+
+  PENDING_CANCEL_IZIN_ID = izinId;
+
+  const modal = document.getElementById("modal-cancel-izin");
+  const jenis = document.getElementById("modal-cancel-jenis");
+  const periode = document.getElementById("modal-cancel-periode");
+  const catatan = document.getElementById("modal-cancel-catatan");
+  const atasan = document.getElementById("modal-cancel-atasan");
+
+  if (jenis) jenis.innerText = item.jenis_izin || "-";
+  if (periode) periode.innerText = item.tgl_mulai ? `${item.tgl_mulai} s/d ${item.tgl_selesai || item.tgl_mulai}` : (item.timestamp ? item.timestamp.slice(0, 10) : "-");
+  if (catatan) catatan.innerText = item.catatan || "-";
+  if (atasan) atasan.innerText = `${item.pic_approval_nama || 'Atasan Langsung'} (${item.pic_approval_nip || '-'})`;
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeCancelIzinModal() {
+  const modal = document.getElementById("modal-cancel-izin");
+  if (modal) modal.classList.add("hidden");
+  PENDING_CANCEL_IZIN_ID = null;
+}
+
+async function executeCancelIzinAction() {
+  if (!PENDING_CANCEL_IZIN_ID) return;
+  const izinId = PENDING_CANCEL_IZIN_ID;
+  const btnConfirm = document.getElementById("btn-confirm-cancel-action");
+  const origText = btnConfirm ? btnConfirm.innerHTML : "Ya, Batalkan";
+
+  if (btnConfirm) {
+    btnConfirm.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Membatalkan...';
+    btnConfirm.disabled = true;
+  }
+
+  try {
+    const res = await callApi("processApproval", {
+      izin_id: izinId,
+      status: "CANCELLED",
+      decision: "CANCELLED",
+      approver_name: CURRENT_USER?.nama || "Pemohon",
+      approver_nip: CURRENT_USER?.nip || "-",
+      catatan_approval: "Dibatalkan oleh pemohon"
+    });
+
+    if (btnConfirm) {
+      btnConfirm.innerHTML = origText;
+      btnConfirm.disabled = false;
+    }
+
+    closeCancelIzinModal();
+
+    // Update local cache
+    const target = APPROVALS_CACHE.find(a => a.izin_id === izinId);
+    if (target) {
+      target.status_approval = "CANCELLED";
+      target.approved_by = CURRENT_USER?.nama || "Pemohon";
+      target.approved_at = new Date().toISOString();
+      target.catatan_approval = "Dibatalkan oleh pemohon";
+    }
+
+    showToast("Pengajuan izin berhasil dibatalkan.", "success", 2000);
+    updateApprovalBadgeCounts();
+    renderApprovalList();
+  } catch (err) {
+    if (btnConfirm) {
+      btnConfirm.innerHTML = origText;
+      btnConfirm.disabled = false;
+    }
+    closeCancelIzinModal();
+    showCenterAlertModal({
+      title: "Gagal Membatalkan",
+      message: err.message,
+      type: "error"
+    });
+  }
 }
 
 async function executeApprovalAction() {
