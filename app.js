@@ -84,9 +84,9 @@ const DEFAULT_ROLE_PERMISSIONS = {
 
 const ALL_APP_MODULES = [
   // 1. Operasional Lapangan
-  { key: "priority", title: "Priority Visit", desc: "Scorecard & prioritas mitra", icon: "fa-triangle-exclamation", category: "Operasional Lapangan" },
+  { key: "priority", title: "Priority FAC", desc: "Monitoring prioritas unit & mitra FAC", icon: "fa-triangle-exclamation", category: "Operasional Lapangan" },
   { key: "assignment", title: "Assign Concern", desc: "Tandai concern visit mitra", icon: "fa-bullhorn", category: "Operasional Lapangan" },
-  { key: "visit", title: "Laporan Visit Mitra", desc: "Input regular & unit OVD", icon: "fa-clipboard-check", category: "Operasional Lapangan" },
+  { key: "visit", title: "Form Visit FAC", desc: "Input kunjungan regular & unit OVD", icon: "fa-clipboard-check", category: "Operasional Lapangan" },
   { key: "onboarding", title: "Visit Calon Mitra", desc: "Input onboarding baru", icon: "fa-user-plus", category: "Operasional Lapangan" },
   { key: "pipeline", title: "Pipeline Onboarding", desc: "Progres & folder dokumen", icon: "fa-bars-progress", category: "Operasional Lapangan" },
   { key: "gps", title: "GPS Maintenance", desc: "Pasang / ganti / cabut GPS", icon: "fa-satellite-dish", category: "Operasional Lapangan" },
@@ -1342,11 +1342,11 @@ async function loadScreen(screenName, updateHistory = true) {
 
   const titles = {
     dashboard: "Digiasha Monitoring",
-    visit: "Laporan Visit Mitra",
+    visit: "Form Visit FAC",
     onboarding: "Visit Calon Mitra",
     pipeline: "Pipeline Onboarding",
     gps: "GPS Maintenance",
-    priority: "Priority Visit",
+    priority: "Priority FAC",
     assignment: "Assign Concern Visit",
     fac: "Report GPS",
     absensi: "Presensi Kehadiran",
