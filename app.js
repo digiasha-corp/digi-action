@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v111";
+const APP_BUILD_VERSION = "20260916_v112";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -5667,11 +5667,19 @@ function isDealerVisitedToday(d) {
   return lastV.startsWith(todayStr) || lastV.startsWith(todaySlash);
 }
 
-function startVisitForDealer(dealerId) {
-  loadScreen('visit');
-  setTimeout(() => {
-    selectDealerFromSearch(dealerId);
-  }, 120);
+async function startVisitForDealer(dealerId) {
+  await loadScreen('visit');
+  let retries = 0;
+  const trySelect = () => {
+    const input = document.getElementById("dealer-search-input");
+    if (input) {
+      selectDealerFromSearch(dealerId);
+    } else if (retries < 10) {
+      retries++;
+      setTimeout(trySelect, 50);
+    }
+  };
+  setTimeout(trySelect, 50);
 }
 
 async function refreshPriorityData(btn) {
