@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v108";
+const APP_BUILD_VERSION = "20260916_v109";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -242,26 +242,24 @@ function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
   if (!dealer) return false;
   if (!user) return true;
 
-  const uRole = String(user.role || user.role_id || user.jabatan || "").toUpperCase();
   const rawArea = String(user.area_cover || "").trim();
-  const rawBranch = String(user.cabang || "").trim().toLowerCase();
 
-  // Super Admin (R-01) atau user Head Office / Kantor Pusat melihat seluruh dealer kecuali jika area_cover dispesifikasikan khusus
-  if (uRole.includes("SUPER ADMIN") || user.role_id === "R-01" || rawBranch === "head office" || rawBranch === "kantor pusat") {
-    if (!rawArea || rawArea === "*" || rawArea.toUpperCase() === "ALL") {
-      return true;
-    }
+  // ATURAN UTAMA:
+  // Semua user (termasuk Admin/Super Admin/user cabang) diatur oleh field area_cover.
+  // Jika area_cover kosong, "*", atau "ALL", artinya user memiliki akses ke SEMUA AREA (seluruh dealer).
+  if (!rawArea || rawArea === "*" || rawArea.toUpperCase() === "ALL") {
+    return true;
   }
 
-  // Jika user tidak memiliki batasan area_cover maupun cabang, atau diset '*' / 'ALL', tampilkan semua
-  if (!rawArea && !rawBranch) return true;
-  if (rawArea === "*" || rawArea.toUpperCase() === "ALL") return true;
-
+  // Jika area_cover diisi secara spesifik (misal: "Tangerang 1, Tangerang 2, Jakarta Barat"),
+  // maka user (siapapun rolenya) hanya dapat melihat dealer yang berada di area cover tersebut.
   const clean = (s) => String(s || "").toLowerCase().replace(/[\s\-_.]/g, "");
 
-  // Parsing daftar area cover user (contoh: 'TGR A, TGR B, TGR C' -> ['tgr a', 'tgr b', 'tgr c'])
+  // Parsing daftar area cover user (contoh: 'TGR 1, TGR 2, Jakarta' -> ['tgr 1', 'tgr 2', 'jakarta'])
   const userAreas = rawArea.split(/[,;/|\n\r]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
   const userAreasClean = userAreas.map(clean).filter(Boolean);
+
+  if (userAreas.length === 0) return true;
 
   const dArea = String(dealer.area_cover || "").trim().toLowerCase();
   const dAreaClean = clean(dealer.area_cover);
@@ -269,11 +267,8 @@ function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
   const dCabang = String(dealer.cabang || "").trim().toLowerCase();
   const dCabangClean = clean(dealer.cabang);
 
-  const uBranch = rawBranch.toLowerCase();
-  const uBranchClean = clean(rawBranch);
-
   // 1. Cek kecocokan antara area_cover dealer dengan daftar cover area user
-  if (dArea && userAreas.length > 0) {
+  if (dArea) {
     const matchArea = userAreas.some((a, idx) => {
       const aClean = userAreasClean[idx];
       return (
@@ -287,8 +282,8 @@ function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
   }
 
   // 2. Cek apakah cabang dealer cocok dengan salah satu area cover user
-  if (dCabang && userAreas.length > 0) {
-    const matchCabangToArea = userAreas.some((a, idx) => {
+  if (dCabang) {
+    const matchCabang = userAreas.some((a, idx) => {
       const aClean = userAreasClean[idx];
       return (
         dCabang === a ||
@@ -297,19 +292,7 @@ function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
         (dCabangClean && aClean && (dCabangClean === aClean || dCabangClean.includes(aClean) || aClean.includes(dCabangClean)))
       );
     });
-    if (matchCabangToArea) return true;
-  }
-
-  // 3. Jika area_cover dealer belum diatur (kosong), bandingkan cabang dealer vs cabang user
-  if (!dArea && uBranch && uBranch !== "head office" && uBranch !== "kantor pusat") {
-    if (dCabangClean && uBranchClean && (dCabangClean === uBranchClean || dCabang.includes(uBranch) || uBranch.includes(dCabang))) {
-      return true;
-    }
-  }
-
-  // 4. Jika user memiliki cabang yang sama persis dengan cabang dealer
-  if (uBranch && uBranch !== "head office" && uBranch !== "kantor pusat" && dCabangClean && uBranchClean && dCabangClean === uBranchClean) {
-    return true;
+    if (matchCabang) return true;
   }
 
   return false;
@@ -5813,7 +5796,7 @@ function renderPriorityList() {
 
   if (computedList.length === 0) {
     const isSearching = !!PRIORITY_SEARCH_QUERY;
-    const userAreaLabel = CURRENT_USER?.area_cover ? `Area ${CURRENT_USER.area_cover}` : (CURRENT_USER?.cabang ? `Cabang ${CURRENT_USER.cabang}` : "Area Anda");
+    const userAreaLabel = (CURRENT_USER?.area_cover && CURRENT_USER.area_cover !== "*" && CURRENT_USER.area_cover.toUpperCase() !== "ALL") ? `Area ${CURRENT_USER.area_cover}` : "Semua Area";
     const filterText = isSearching 
       ? `Pencarian "${PRIORITY_SEARCH_QUERY}"` 
       : (PRIORITY_ACTIVE_FILTER === "ALL" ? `Prioritas Aktif (${userAreaLabel})` : `Level "${PRIORITY_ACTIVE_FILTER}" (${userAreaLabel})`);
@@ -7258,7 +7241,7 @@ async function initOnboardingScreen() {
   try {
     if (!supabaseClient) throw new Error("Supabase Client belum terhubung");
 
-    const isSuper = (!CURRENT_USER?.area_cover || CURRENT_USER.area_cover.trim() === "" || CURRENT_USER.area_cover === "*" || CURRENT_USER.area_cover.toUpperCase() === "ALL") && (!CURRENT_USER?.cabang || CURRENT_USER.cabang === "Head Office");
+    const isSuper = (!CURRENT_USER?.area_cover || CURRENT_USER.area_cover.trim() === "" || CURRENT_USER.area_cover === "*" || CURRENT_USER.area_cover.toUpperCase() === "ALL");
     const userAreas = (CURRENT_USER?.area_cover || "").split(/[,;/|]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
     const userBranch = String(CURRENT_USER?.cabang || "").trim().toLowerCase();
     const userNip = CURRENT_USER?.nip || null;
@@ -9691,6 +9674,9 @@ async function handleSaveEmployee(e) {
     if (CURRENT_USER && String(CURRENT_USER.nip).trim() === String(nip).trim()) {
       CURRENT_USER.atasan_nip = atasanNip || "";
       CURRENT_USER.atasan_nama = atasanNama || "";
+      CURRENT_USER.area_cover = areaCover || "";
+      CURRENT_USER.cabang = cabang || "";
+      CURRENT_USER.role_id = roleId || CURRENT_USER.role_id;
       try {
         localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
       } catch (e) {}
