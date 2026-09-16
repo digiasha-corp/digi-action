@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v105";
+const APP_BUILD_VERSION = "20260916_v106";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -10286,63 +10286,98 @@ async function handleApplyBulkRoleAssign(e) {
     return;
   }
 
-  let totalNewAdded = 0;
-  const updatedRoles = [];
-
-  // Terapkan penambahan (additive: tidak menimpa, hanya menambahkan jika belum ada)
-  selectedRoleIds.forEach(roleId => {
-    if (!ROLE_PERMISSIONS_STATE[roleId]) return;
-    const currentPerms = Array.from(ROLE_PERMISSIONS_STATE[roleId].permissions || []);
-
-    selectedModuleKeys.forEach(modKey => {
-      if (!currentPerms.includes(modKey)) {
-        currentPerms.push(modKey);
-        totalNewAdded++;
-      }
-    });
-
-    ROLE_PERMISSIONS_STATE[roleId].permissions = currentPerms;
-    updatedRoles.push({
-      role_id: roleId,
-      role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
-      permissions: JSON.stringify(currentPerms),
-      description: ROLE_PERMISSIONS_STATE[roleId].desc || "",
-      updated_at: new Date().toISOString()
-    });
-  });
-
-  // Simpan ke localStorage
-  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
-
-  // Simpan ke Supabase jika tersedia
-  if (supabaseClient && updatedRoles.length > 0) {
-    try {
-      await supabaseClient.from("m_role_permission").upsert(updatedRoles, { onConflict: "role_id" });
-    } catch (err) {
-      console.warn("Supabase upsert error on bulk role assign:", err);
-    }
+  const submitBtn = document.getElementById("btn-apply-bulk-assign");
+  const origBtnHtml = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Menyimpan ke Supabase...</span>';
   }
 
-  // Jika role user yang sedang login terpengaruh, sync permissions dan update dashboard
-  if (CURRENT_USER) {
-    const uRole = CURRENT_USER.role || CURRENT_USER.role_id;
-    if (selectedRoleIds.includes(uRole) || selectedRoleIds.includes(CURRENT_USER.role_id)) {
-      const activeRoleId = CURRENT_USER.role_id || uRole;
-      if (ROLE_PERMISSIONS_STATE[activeRoleId]) {
-        CURRENT_USER.permissions = ROLE_PERMISSIONS_STATE[activeRoleId].permissions;
-        try {
-          localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
-        } catch (err) {}
-        if (typeof initDashboard === "function") initDashboard();
+  try {
+    let totalNewAdded = 0;
+    const updatedRoles = [];
+
+    // Terapkan penambahan (additive: tidak menimpa, hanya menambahkan jika belum ada)
+    selectedRoleIds.forEach(roleId => {
+      if (!ROLE_PERMISSIONS_STATE[roleId]) return;
+      const currentPerms = Array.from(ROLE_PERMISSIONS_STATE[roleId].permissions || []);
+
+      selectedModuleKeys.forEach(modKey => {
+        if (!currentPerms.includes(modKey)) {
+          currentPerms.push(modKey);
+          totalNewAdded++;
+        }
+      });
+
+      ROLE_PERMISSIONS_STATE[roleId].permissions = currentPerms;
+      updatedRoles.push({
+        role_id: roleId,
+        role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
+        permissions: JSON.stringify(currentPerms),
+        description: ROLE_PERMISSIONS_STATE[roleId].desc || "",
+        updated_at: new Date().toISOString()
+      });
+    });
+
+    // Simpan ke localStorage
+    localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+    // Simpan ke Supabase jika tersedia (individual upsert via Promise.all agar 100% konsisten & persisten)
+    if (!supabaseClient && typeof getSupabaseClient === "function") {
+      supabaseClient = getSupabaseClient();
+    }
+    const client = supabaseClient;
+
+    if (client && updatedRoles.length > 0) {
+      try {
+        const results = await Promise.all(
+          updatedRoles.map(roleItem =>
+            client.from("m_role_permission").upsert({
+              role_id: roleItem.role_id,
+              role_name: roleItem.role_name,
+              permissions: roleItem.permissions,
+              description: roleItem.description || "",
+              updated_at: roleItem.updated_at
+            }, { onConflict: "role_id" })
+          )
+        );
+        const failed = results.filter(r => r && r.error);
+        if (failed.length > 0) {
+          console.warn("Sebagian role gagal disimpan ke Supabase:", failed);
+        } else {
+          console.log(`Berhasil menyimpan ${updatedRoles.length} role ke Supabase m_role_permission!`);
+        }
+      } catch (err) {
+        console.warn("Supabase upsert error on bulk role assign:", err);
       }
     }
+
+    // Jika role user yang sedang login terpengaruh, sync permissions dan update dashboard
+    if (CURRENT_USER) {
+      const uRole = CURRENT_USER.role || CURRENT_USER.role_id;
+      if (selectedRoleIds.includes(uRole) || selectedRoleIds.includes(CURRENT_USER.role_id)) {
+        const activeRoleId = CURRENT_USER.role_id || uRole;
+        if (ROLE_PERMISSIONS_STATE[activeRoleId]) {
+          CURRENT_USER.permissions = ROLE_PERMISSIONS_STATE[activeRoleId].permissions;
+          try {
+            localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+          } catch (err) {}
+          if (typeof initDashboard === "function") initDashboard();
+        }
+      }
+    }
+
+    closeBulkAssignRoleModal();
+    loadRolePermissionsSettings();
+    populateEmployeeRoleOptions();
+
+    showToast(`Berhasil menambahkan ${selectedModuleKeys.length} menu ke ${selectedRoleIds.length} role terpilih (${totalNewAdded} hak akses baru berhasil disimpan ke Supabase)!`, "success", 3000);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
   }
-
-  closeBulkAssignRoleModal();
-  loadRolePermissionsSettings();
-  populateEmployeeRoleOptions();
-
-  showToast(`Berhasil menambahkan ${selectedModuleKeys.length} menu ke ${selectedRoleIds.length} role terpilih (${totalNewAdded} hak akses baru berhasil diberikan)!`, "success", 3000);
 }
 
 // ================= BULK HAPUS MENU DARI BANYAK ROLE =================
@@ -10452,67 +10487,102 @@ async function handleApplyBulkRoleRemove(e) {
     return;
   }
 
-  let totalRemoved = 0;
-  const updatedRoles = [];
-
-  selectedRoleIds.forEach(roleId => {
-    if (!ROLE_PERMISSIONS_STATE[roleId]) return;
-    let currentPerms = Array.from(ROLE_PERMISSIONS_STATE[roleId].permissions || []);
-
-    selectedModuleKeys.forEach(modKey => {
-      // Proteksi khusus Super Admin: Jangan cabut settings agar tidak terkunci keluar
-      if (roleId === "R-01" && modKey === "settings") {
-        return;
-      }
-      const idx = currentPerms.indexOf(modKey);
-      if (idx !== -1) {
-        currentPerms.splice(idx, 1);
-        totalRemoved++;
-      }
-    });
-
-    ROLE_PERMISSIONS_STATE[roleId].permissions = currentPerms;
-    updatedRoles.push({
-      role_id: roleId,
-      role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
-      permissions: JSON.stringify(currentPerms),
-      description: ROLE_PERMISSIONS_STATE[roleId].desc || "",
-      updated_at: new Date().toISOString()
-    });
-  });
-
-  // Simpan ke localStorage
-  localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
-
-  // Simpan ke Supabase jika tersedia
-  if (supabaseClient && updatedRoles.length > 0) {
-    try {
-      await supabaseClient.from("m_role_permission").upsert(updatedRoles, { onConflict: "role_id" });
-    } catch (err) {
-      console.warn("Supabase upsert error on bulk role remove:", err);
-    }
+  const submitBtn = document.getElementById("btn-apply-bulk-remove");
+  const origBtnHtml = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Mencabut & Menyimpan ke Supabase...</span>';
   }
 
-  // Jika role user yang sedang login terpengaruh, sync permissions dan update dashboard
-  if (CURRENT_USER) {
-    const uRole = CURRENT_USER.role || CURRENT_USER.role_id;
-    if (selectedRoleIds.includes(uRole) || selectedRoleIds.includes(CURRENT_USER.role_id)) {
-      const activeRoleId = CURRENT_USER.role_id || uRole;
-      if (ROLE_PERMISSIONS_STATE[activeRoleId]) {
-        CURRENT_USER.permissions = ROLE_PERMISSIONS_STATE[activeRoleId].permissions;
-        try {
-          localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
-        } catch (err) {}
-        if (typeof initDashboard === "function") initDashboard();
+  try {
+    let totalRemoved = 0;
+    const updatedRoles = [];
+
+    selectedRoleIds.forEach(roleId => {
+      if (!ROLE_PERMISSIONS_STATE[roleId]) return;
+      let currentPerms = Array.from(ROLE_PERMISSIONS_STATE[roleId].permissions || []);
+
+      selectedModuleKeys.forEach(modKey => {
+        // Proteksi khusus Super Admin: Jangan cabut settings agar tidak terkunci keluar
+        if (roleId === "R-01" && modKey === "settings") {
+          return;
+        }
+        const idx = currentPerms.indexOf(modKey);
+        if (idx !== -1) {
+          currentPerms.splice(idx, 1);
+          totalRemoved++;
+        }
+      });
+
+      ROLE_PERMISSIONS_STATE[roleId].permissions = currentPerms;
+      updatedRoles.push({
+        role_id: roleId,
+        role_name: ROLE_PERMISSIONS_STATE[roleId].name || roleId,
+        permissions: JSON.stringify(currentPerms),
+        description: ROLE_PERMISSIONS_STATE[roleId].desc || "",
+        updated_at: new Date().toISOString()
+      });
+    });
+
+    // Simpan ke localStorage
+    localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
+
+    // Simpan ke Supabase jika tersedia (individual upsert via Promise.all agar 100% konsisten & persisten)
+    if (!supabaseClient && typeof getSupabaseClient === "function") {
+      supabaseClient = getSupabaseClient();
+    }
+    const client = supabaseClient;
+
+    if (client && updatedRoles.length > 0) {
+      try {
+        const results = await Promise.all(
+          updatedRoles.map(roleItem =>
+            client.from("m_role_permission").upsert({
+              role_id: roleItem.role_id,
+              role_name: roleItem.role_name,
+              permissions: roleItem.permissions,
+              description: roleItem.description || "",
+              updated_at: roleItem.updated_at
+            }, { onConflict: "role_id" })
+          )
+        );
+        const failed = results.filter(r => r && r.error);
+        if (failed.length > 0) {
+          console.warn("Sebagian role gagal disimpan ke Supabase saat pencabutan menu:", failed);
+        } else {
+          console.log(`Berhasil mencabut menu & menyimpan ${updatedRoles.length} role ke Supabase m_role_permission!`);
+        }
+      } catch (err) {
+        console.warn("Supabase upsert error on bulk role remove:", err);
       }
     }
+
+    // Jika role user yang sedang login terpengaruh, sync permissions dan update dashboard
+    if (CURRENT_USER) {
+      const uRole = CURRENT_USER.role || CURRENT_USER.role_id;
+      if (selectedRoleIds.includes(uRole) || selectedRoleIds.includes(CURRENT_USER.role_id)) {
+        const activeRoleId = CURRENT_USER.role_id || uRole;
+        if (ROLE_PERMISSIONS_STATE[activeRoleId]) {
+          CURRENT_USER.permissions = ROLE_PERMISSIONS_STATE[activeRoleId].permissions;
+          try {
+            localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+          } catch (err) {}
+          if (typeof initDashboard === "function") initDashboard();
+        }
+      }
+    }
+
+    closeBulkRemoveRoleModal();
+    loadRolePermissionsSettings();
+    populateEmployeeRoleOptions();
+
+    showToast(`Berhasil mencabut ${selectedModuleKeys.length} menu dari ${selectedRoleIds.length} role terpilih (${totalRemoved} hak akses dicabut & tersimpan di Supabase)!`, "info", 3000);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
   }
-
-  closeBulkRemoveRoleModal();
-  loadRolePermissionsSettings();
-  populateEmployeeRoleOptions();
-
-  showToast(`Berhasil mencabut ${selectedModuleKeys.length} menu dari ${selectedRoleIds.length} role terpilih (${totalRemoved} hak akses dicabut)!`, "info", 3000);
 }
 
 let ROLE_EDIT_MODE = "add"; // "add" | "edit"
@@ -10626,6 +10696,9 @@ function handleSaveRoleInfo(e) {
 
   localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
   
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
   if (supabaseClient) {
     const roleObj = ROLE_PERMISSIONS_STATE[id];
     supabaseClient.from("m_role_permission").upsert({
@@ -10663,6 +10736,9 @@ async function resetRolePermissionsToDefault() {
   ROLE_PERMISSIONS_STATE = JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
   localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
 
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
   if (supabaseClient) {
     try {
       const rows = Object.keys(ROLE_PERMISSIONS_STATE).map(k => ({
@@ -10672,7 +10748,7 @@ async function resetRolePermissionsToDefault() {
         description: ROLE_PERMISSIONS_STATE[k].desc || "",
         updated_at: new Date().toISOString()
       }));
-      await supabaseClient.from("m_role_permission").upsert(rows, { onConflict: "role_id" });
+      await Promise.all(rows.map(r => supabaseClient.from("m_role_permission").upsert(r, { onConflict: "role_id" })));
     } catch (e) {
       console.warn("Error reset role to supabase:", e);
     }
@@ -10699,6 +10775,9 @@ async function deleteCustomRole(roleId) {
   delete ROLE_PERMISSIONS_STATE[roleId];
   localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
 
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
   if (supabaseClient) {
     try {
       await supabaseClient.from("m_role_permission").delete().eq("role_id", roleId);
@@ -10720,6 +10799,9 @@ async function saveRolePermissions(roleId) {
   try {
     localStorage.setItem("DIGIASHA_ROLE_PERMS", JSON.stringify(ROLE_PERMISSIONS_STATE));
 
+    if (!supabaseClient && typeof getSupabaseClient === "function") {
+      supabaseClient = getSupabaseClient();
+    }
     if (supabaseClient) {
       const roleObj = ROLE_PERMISSIONS_STATE[roleId];
       const { error } = await supabaseClient
@@ -10751,32 +10833,34 @@ async function saveRolePermissions(roleId) {
 }
 
 async function seedDefaultRolesToSupabase() {
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
   if (!supabaseClient) return;
   try {
     const rows = Object.keys(DEFAULT_ROLE_PERMISSIONS).map(roleId => {
       const def = DEFAULT_ROLE_PERMISSIONS[roleId];
       const existing = ROLE_PERMISSIONS_STATE[roleId]?.permissions;
-      const perms = (existing && existing.length >= def.permissions.length) ? existing : def.permissions;
+      const perms = (Array.isArray(existing) && existing.length > 0) ? existing : def.permissions;
       return {
         role_id: roleId,
-        role_name: def.name,
+        role_name: ROLE_PERMISSIONS_STATE[roleId]?.name || def.name,
         permissions: JSON.stringify(perms),
-        description: def.desc || "",
+        description: ROLE_PERMISSIONS_STATE[roleId]?.desc || def.desc || "",
         updated_at: new Date().toISOString()
       };
     });
-    const { error } = await supabaseClient.from("m_role_permission").upsert(rows, { onConflict: "role_id" });
-    if (!error) {
-      console.log("Sukses seed seluruh default roles ke Supabase m_role_permission!");
-    } else {
-      console.warn("Error seedDefaultRolesToSupabase:", error);
-    }
+    await Promise.all(rows.map(r => supabaseClient.from("m_role_permission").upsert(r, { onConflict: "role_id" })));
+    console.log("Sukses seed seluruh default roles ke Supabase m_role_permission!");
   } catch (e) {
     console.warn("Exception seedDefaultRolesToSupabase:", e);
   }
 }
 
 async function syncRolePermissionsFromSupabase() {
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
   if (!supabaseClient) return;
   try {
     const { data: permsData, error } = await supabaseClient.from("m_role_permission").select("*");
@@ -10788,8 +10872,6 @@ async function syncRolePermissionsFromSupabase() {
         return;
       }
 
-      let needsUpdateToSupabase = false;
-
       permsData.forEach(r => {
         const rId = String(r.role_id || "").trim();
         if (!rId) return;
@@ -10797,24 +10879,9 @@ async function syncRolePermissionsFromSupabase() {
         let perms = parseRolePermissions(r.permissions || r.permission_keys);
         perms = perms.filter(p => p !== "work_calendar");
 
-        // Jika R-01 di database hanya punya menu lama / tidak lengkap (< 16), lengkapi ke 18 modul
-        if (rId === "R-01") {
-          DEFAULT_ROLE_PERMISSIONS["R-01"].permissions.forEach(p => {
-            if (!perms.includes(p)) {
-              perms.push(p);
-              needsUpdateToSupabase = true;
-            }
-          });
-        }
-
-        // Jika R-02 di database belum ada modul esensial baru
-        if (rId === "R-02") {
-          ["rekap_tim", "attendance_summary", "persetujuan", "laporan_activity"].forEach(p => {
-            if (!perms.includes(p)) {
-              perms.push(p);
-              needsUpdateToSupabase = true;
-            }
-          });
+        // Proteksi Super Admin R-01 agar tidak pernah kehilangan menu settings (pengaturan)
+        if (rId === "R-01" && !perms.includes("settings")) {
+          perms.push("settings");
         }
 
         if (ROLE_PERMISSIONS_STATE[rId]) {
@@ -10838,9 +10905,19 @@ async function syncRolePermissionsFromSupabase() {
         !permsData.some(r => String(r.role_id || "").trim() === k)
       );
 
-      if (missingDefaultRoles.length > 0 || needsUpdateToSupabase) {
+      if (missingDefaultRoles.length > 0) {
         console.log("Melengkapi role default ke database Supabase:", missingDefaultRoles);
-        await seedDefaultRolesToSupabase();
+        const rowsToInsert = missingDefaultRoles.map(roleId => {
+          const def = DEFAULT_ROLE_PERMISSIONS[roleId];
+          return {
+            role_id: roleId,
+            role_name: def.name,
+            permissions: JSON.stringify(def.permissions),
+            description: def.desc || "",
+            updated_at: new Date().toISOString()
+          };
+        });
+        await Promise.all(rowsToInsert.map(r => supabaseClient.from("m_role_permission").upsert(r, { onConflict: "role_id" })));
       }
 
       try {
