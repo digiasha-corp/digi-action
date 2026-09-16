@@ -55,24 +55,25 @@
             <input
               type="text"
               id="lokasi-search-input"
-              value="Showroom"
+              value=""
               placeholder="Pilih atau ketik lokasi (Showroom, Rumah Owner, dll)..."
               autocomplete="off"
               onfocus="openLokasiSearchDropdown()"
+              onclick="openLokasiSearchDropdown()"
               oninput="filterLokasiSearchOptions(this.value)"
               onkeydown="onLokasiSearchKeyDown(event)"
               onblur="onLokasiSearchInputBlur()"
-              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none cursor-pointer"
             />
             <button
               type="button"
               id="lokasi-search-clear-btn"
               onclick="clearLokasiSearchSelection()"
-              class="absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
             >
               <i class="fa-solid fa-xmark"></i>
             </button>
-            <i id="lokasi-search-chevron" class="hidden fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+            <i id="lokasi-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
           </div>
 
           <div
@@ -93,24 +94,25 @@
             <input
               type="text"
               id="bertemu-search-input"
-              value="Owner"
+              value=""
               placeholder="Pilih atau ketik siapa yang ditemui (Owner, Pekerja, dll)..."
               autocomplete="off"
               onfocus="openBertemuSearchDropdown()"
+              onclick="openBertemuSearchDropdown()"
               oninput="filterBertemuSearchOptions(this.value)"
               onkeydown="onBertemuSearchKeyDown(event)"
               onblur="onBertemuSearchInputBlur()"
-              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none cursor-pointer"
             />
             <button
               type="button"
               id="bertemu-search-clear-btn"
               onclick="clearBertemuSearchSelection()"
-              class="absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+              class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
             >
               <i class="fa-solid fa-xmark"></i>
             </button>
-            <i id="bertemu-search-chevron" class="hidden fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+            <i id="bertemu-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
           </div>
 
           <div

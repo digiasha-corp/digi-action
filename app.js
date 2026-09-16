@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v113";
+const APP_BUILD_VERSION = "20260916_v114";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6560,18 +6560,26 @@ function populateVisitDealerOptions() {
     initVisitSearchableDropdowns();
   }
 
-  // Set default lokasi dan bertemu jika belum terisi
+  // Set default lokasi dan bertemu blank agar pertama klik langsung menampilkan dropdown
   const lokasiInput = document.getElementById("lokasi-search-input");
-  if (lokasiInput && !lokasiInput.value) {
-    lokasiInput.value = "Showroom";
+  if (lokasiInput) {
+    lokasiInput.value = "";
+    const clearLokasi = document.getElementById("lokasi-search-clear-btn");
+    const chevLokasi = document.getElementById("lokasi-search-chevron");
+    if (clearLokasi) clearLokasi.classList.add("hidden");
+    if (chevLokasi) chevLokasi.classList.remove("hidden");
   }
   if (typeof onLokasiVisitChanged === "function") {
-    onLokasiVisitChanged(lokasiInput ? lokasiInput.value : "Showroom");
+    onLokasiVisitChanged("");
   }
 
   const bertemuInput = document.getElementById("bertemu-search-input");
-  if (bertemuInput && !bertemuInput.value) {
-    bertemuInput.value = "Owner";
+  if (bertemuInput) {
+    bertemuInput.value = "";
+    const clearBertemu = document.getElementById("bertemu-search-clear-btn");
+    const chevBertemu = document.getElementById("bertemu-search-chevron");
+    if (clearBertemu) clearBertemu.classList.add("hidden");
+    if (chevBertemu) chevBertemu.classList.remove("hidden");
   }
 
   // Setup click outside listener to auto-close dropdown
