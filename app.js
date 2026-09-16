@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v110";
+const APP_BUILD_VERSION = "20260916_v111";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -5715,7 +5715,7 @@ function renderPriorityList() {
 
     // 1. urgentUnits adalah murni unit yang BELUM divisit hari ini (clientCalc.urgentUnitsCount)
     // Jika dealer sudah divisit hari ini, jangan biarkan d.urgent_units_count lama dari DB membatalkan hasil visit
-    const urgentUnits = visitedToday 
+    let urgentUnits = visitedToday 
       ? (clientCalc.urgentUnitsCount || 0) 
       : Math.max(clientCalc.urgentUnitsCount || 0, Number(d.urgent_units_count || 0));
 
