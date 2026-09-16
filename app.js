@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v112";
+const APP_BUILD_VERSION = "20260916_v113";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -738,11 +738,17 @@ async function supabaseSubmitVisit(data) {
   }
 
   // Syarat Solve Prioritas & Concern Mitra:
-  // Kunjungan ke Showroom dan/atau Bertemu Owner
+  // Kunjungan ke Showroom dan/atau Bertemu (Owner, Pekerja, Penanggung Jawab, dll)
+  const isBertemuDb = (
+    data.bertemu_owner &&
+    String(data.bertemu_owner).trim() !== "" &&
+    String(data.bertemu_owner).trim() !== "-" &&
+    !String(data.bertemu_owner).toLowerCase().includes("tidak bertemu") &&
+    String(data.bertemu_owner).toLowerCase() !== "tidak"
+  );
   const isDealerSolved = (
     String(data.lokasi || "").toLowerCase().includes("showroom") ||
-    data.bertemu_owner === "Ya" ||
-    String(data.bertemu_owner || "").toLowerCase() === "ya"
+    isBertemuDb
   );
 
   if (isDealerSolved) {
@@ -6550,6 +6556,23 @@ function populateVisitDealerOptions() {
   });
 
   renderDealerSearchDropdown("");
+  if (typeof initVisitSearchableDropdowns === "function") {
+    initVisitSearchableDropdowns();
+  }
+
+  // Set default lokasi dan bertemu jika belum terisi
+  const lokasiInput = document.getElementById("lokasi-search-input");
+  if (lokasiInput && !lokasiInput.value) {
+    lokasiInput.value = "Showroom";
+  }
+  if (typeof onLokasiVisitChanged === "function") {
+    onLokasiVisitChanged(lokasiInput ? lokasiInput.value : "Showroom");
+  }
+
+  const bertemuInput = document.getElementById("bertemu-search-input");
+  if (bertemuInput && !bertemuInput.value) {
+    bertemuInput.value = "Owner";
+  }
 
   // Setup click outside listener to auto-close dropdown
   if (!window._dealerSearchClickAttached) {
@@ -6748,38 +6771,314 @@ function clearDealerSearchSelection() {
   openDealerSearchDropdown();
 }
 
-function onLokasiVisitChanged(val) {
-  const boxLain = document.getElementById("box-lokasi-lain");
-  const inputLain = document.getElementById("input-lokasi-lain");
-  const segmen2 = document.getElementById("segment-2-container");
-  const stockInput = document.getElementById("input-stock-unit");
-  const salesInput = document.getElementById("input-sales-unit");
+// =========================================================================
+// SEARCHABLE DROPDOWN: LOKASI KUNJUNGAN & BERTEMU
+// =========================================================================
+const VISIT_LOKASI_PRESETS = [
+  { value: "Showroom", label: "Showroom", icon: "fa-store", desc: "Lokasi dealer fisik / showroom mitra" },
+  { value: "Rumah Owner", label: "Rumah Owner", icon: "fa-house-user", desc: "Kediaman pemilik / owner mitra" },
+  { value: "Janjian Diluar", label: "Janjian Diluar", icon: "fa-mug-hot", desc: "Kafe, restoran, atau tempat umum" }
+];
 
-  if (val === "Showroom") {
-    boxLain.classList.add("hidden");
-    inputLain.required = false;
-    segmen2.classList.remove("hidden");
-    stockInput.required = true;
-    salesInput.required = true;
-  } else {
-    boxLain.classList.remove("hidden");
-    inputLain.required = true;
-    segmen2.classList.add("hidden");
-    stockInput.required = false;
-    salesInput.required = false;
+const VISIT_BERTEMU_PRESETS = [
+  { value: "Owner", label: "Owner", icon: "fa-user-tie", desc: "Pemilik langsung / owner showroom" },
+  { value: "Pekerja", label: "Pekerja", icon: "fa-user-gear", desc: "Karyawan / staf / mekanik dealer" },
+  { value: "Penanggung Jawab", label: "Penanggung Jawab", icon: "fa-user-shield", desc: "Kepala cabang / PIC / penanggung jawab" },
+  { value: "Tidak Bertemu", label: "Tidak Bertemu", icon: "fa-user-xmark", desc: "Showroom tutup / tidak bertemu siapapun" }
+];
+
+// Helper listener untuk menutup dropdown saat klik di luar
+function initVisitSearchableDropdowns() {
+  if (!window._visitDropdownClickAttached) {
+    window._visitDropdownClickAttached = true;
+    document.addEventListener("click", (e) => {
+      const lokasiWrapper = document.getElementById("lokasi-search-wrapper");
+      const lokasiDropdown = document.getElementById("lokasi-search-dropdown");
+      if (lokasiDropdown && lokasiWrapper && !lokasiWrapper.contains(e.target)) {
+        lokasiDropdown.classList.add("hidden");
+      }
+
+      const bertemuWrapper = document.getElementById("bertemu-search-wrapper");
+      const bertemuDropdown = document.getElementById("bertemu-search-dropdown");
+      if (bertemuDropdown && bertemuWrapper && !bertemuWrapper.contains(e.target)) {
+        bertemuDropdown.classList.add("hidden");
+      }
+    });
   }
 }
 
-function toggleOwnerReason(show) {
-  const box = document.getElementById("box-owner-reason");
-  const input = document.getElementById("input-owner-reason");
-  if (show) {
-    box.classList.remove("hidden");
-    input.required = true;
-  } else {
-    box.classList.add("hidden");
-    input.required = false;
+// 1. LOKASI KUNJUNGAN
+function openLokasiSearchDropdown() {
+  const dropdown = document.getElementById("lokasi-search-dropdown");
+  const input = document.getElementById("lokasi-search-input");
+  if (!dropdown) return;
+  initVisitSearchableDropdowns();
+  renderLokasiSearchDropdown(input ? input.value : "");
+  dropdown.classList.remove("hidden");
+}
+
+function closeLokasiSearchDropdown() {
+  const dropdown = document.getElementById("lokasi-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function renderLokasiSearchDropdown(query = "") {
+  const dropdown = document.getElementById("lokasi-search-dropdown");
+  if (!dropdown) return;
+  const q = String(query || "").trim().toLowerCase();
+
+  dropdown.innerHTML = "";
+
+  const filtered = VISIT_LOKASI_PRESETS.filter(item => {
+    if (!q) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-slate-100 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectLokasiOption(item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc}</div>
+      </div>
+    `;
+    dropdown.appendChild(el);
+  });
+
+  // Jika input teks tidak persis sama dengan salah satu preset, sediakan opsi gunakan teks inputan
+  const rawQ = String(query || "").trim();
+  const exactMatch = VISIT_LOKASI_PRESETS.some(item => item.value.toLowerCase() === rawQ.toLowerCase());
+  if (rawQ && !exactMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-amber-50/60 hover:bg-amber-100/70 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-amber-100";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectLokasiOption(rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid fa-location-arrow"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-amber-900">Gunakan Lokasi: "${rawQ}"</div>
+        <div class="text-[10px] text-amber-700">Gunakan lokasi pertemuan khusus sesuai inputan</div>
+      </div>
+    `;
+    dropdown.prepend(customEl);
   }
+}
+
+function selectLokasiOption(val) {
+  const input = document.getElementById("lokasi-search-input");
+  const clearBtn = document.getElementById("lokasi-search-clear-btn");
+  const chevron = document.getElementById("lokasi-search-chevron");
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeLokasiSearchDropdown();
+  onLokasiVisitChanged(val);
+}
+
+function filterLokasiSearchOptions(val) {
+  const clearBtn = document.getElementById("lokasi-search-clear-btn");
+  const chevron = document.getElementById("lokasi-search-chevron");
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderLokasiSearchDropdown(val);
+  const dropdown = document.getElementById("lokasi-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+  onLokasiVisitChanged(val);
+}
+
+function clearLokasiSearchSelection() {
+  const input = document.getElementById("lokasi-search-input");
+  const clearBtn = document.getElementById("lokasi-search-clear-btn");
+  const chevron = document.getElementById("lokasi-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderLokasiSearchDropdown("");
+  const dropdown = document.getElementById("lokasi-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+  onLokasiVisitChanged("");
+}
+
+function onLokasiSearchKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = document.getElementById("lokasi-search-input");
+    const val = input ? input.value.trim() : "";
+    if (val) selectLokasiOption(val);
+    closeLokasiSearchDropdown();
+    if (input) input.blur();
+  }
+}
+
+function onLokasiSearchInputBlur() {
+  setTimeout(() => {
+    closeLokasiSearchDropdown();
+    const input = document.getElementById("lokasi-search-input");
+    if (input) onLokasiVisitChanged(input.value.trim());
+  }, 200);
+}
+
+function onLokasiVisitChanged(val) {
+  const segmen2 = document.getElementById("segment-2-container");
+  const stockInput = document.getElementById("input-stock-unit");
+  const salesInput = document.getElementById("input-sales-unit");
+  const isShowroom = String(val || "").toLowerCase().includes("showroom");
+
+  if (isShowroom) {
+    if (segmen2) segmen2.classList.remove("hidden");
+    if (stockInput) stockInput.required = true;
+    if (salesInput) salesInput.required = true;
+  } else {
+    if (segmen2) segmen2.classList.add("hidden");
+    if (stockInput) stockInput.required = false;
+    if (salesInput) salesInput.required = false;
+  }
+}
+
+// 2. BERTEMU
+function openBertemuSearchDropdown() {
+  const dropdown = document.getElementById("bertemu-search-dropdown");
+  const input = document.getElementById("bertemu-search-input");
+  if (!dropdown) return;
+  initVisitSearchableDropdowns();
+  renderBertemuSearchDropdown(input ? input.value : "");
+  dropdown.classList.remove("hidden");
+}
+
+function closeBertemuSearchDropdown() {
+  const dropdown = document.getElementById("bertemu-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function renderBertemuSearchDropdown(query = "") {
+  const dropdown = document.getElementById("bertemu-search-dropdown");
+  if (!dropdown) return;
+  const q = String(query || "").trim().toLowerCase();
+
+  dropdown.innerHTML = "";
+
+  const filtered = VISIT_BERTEMU_PRESETS.filter(item => {
+    if (!q) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-slate-100 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectBertemuOption(item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc}</div>
+      </div>
+    `;
+    dropdown.appendChild(el);
+  });
+
+  // Jika input teks tidak persis sama dengan salah satu preset, sediakan opsi gunakan teks inputan
+  const rawQ = String(query || "").trim();
+  const exactMatch = VISIT_BERTEMU_PRESETS.some(item => item.value.toLowerCase() === rawQ.toLowerCase());
+  if (rawQ && !exactMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-teal-50/60 hover:bg-teal-100/70 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-teal-100";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectBertemuOption(rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid fa-user-plus"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-teal-900">Gunakan Pilihan: "${rawQ}"</div>
+        <div class="text-[10px] text-teal-700">Pertemuan dengan pihak khusus sesuai inputan</div>
+      </div>
+    `;
+    dropdown.prepend(customEl);
+  }
+}
+
+function selectBertemuOption(val) {
+  const input = document.getElementById("bertemu-search-input");
+  const clearBtn = document.getElementById("bertemu-search-clear-btn");
+  const chevron = document.getElementById("bertemu-search-chevron");
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeBertemuSearchDropdown();
+}
+
+function filterBertemuSearchOptions(val) {
+  const clearBtn = document.getElementById("bertemu-search-clear-btn");
+  const chevron = document.getElementById("bertemu-search-chevron");
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderBertemuSearchDropdown(val);
+  const dropdown = document.getElementById("bertemu-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function clearBertemuSearchSelection() {
+  const input = document.getElementById("bertemu-search-input");
+  const clearBtn = document.getElementById("bertemu-search-clear-btn");
+  const chevron = document.getElementById("bertemu-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderBertemuSearchDropdown("");
+  const dropdown = document.getElementById("bertemu-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function onBertemuSearchKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = document.getElementById("bertemu-search-input");
+    const val = input ? input.value.trim() : "";
+    if (val) selectBertemuOption(val);
+    closeBertemuSearchDropdown();
+    if (input) input.blur();
+  }
+}
+
+function onBertemuSearchInputBlur() {
+  setTimeout(() => {
+    closeBertemuSearchDropdown();
+  }, 200);
 }
 
 function onDealerSelected(dealerId) {
@@ -7157,10 +7456,36 @@ async function handleFormSubmit(e) {
   const dealerName = selectedDealerObj 
     ? selectedDealerObj.dealer_name 
     : (dealerSelect?.options[dealerSelect?.selectedIndex]?.text || searchInput?.value || "Unknown Dealer");
-  const lokasi = document.querySelector('input[name="lokasi_visit"]:checked').value;
-  const lokasiDetail = (lokasi === "Tempat Lainnya") ? document.getElementById("input-lokasi-lain").value : "Showroom";
-  const bertemuOwner = document.querySelector('input[name="bertemu_owner"]:checked').value;
-  const ownerReason = (bertemuOwner === "Tidak") ? document.getElementById("input-owner-reason").value : "-";
+  const lokasiInput = document.getElementById("lokasi-search-input");
+  const lokasi = lokasiInput ? lokasiInput.value.trim() : "Showroom";
+  if (!lokasi) {
+    alert("Silakan pilih atau ketik Lokasi Kunjungan terlebih dahulu!");
+    if (lokasiInput) {
+      lokasiInput.focus();
+      openLokasiSearchDropdown();
+    }
+    return;
+  }
+
+  const bertemuInput = document.getElementById("bertemu-search-input");
+  const bertemu = bertemuInput ? bertemuInput.value.trim() : "Owner";
+  if (!bertemu) {
+    alert("Silakan pilih atau ketik pihak yang Anda temui saat kunjungan!");
+    if (bertemuInput) {
+      bertemuInput.focus();
+      openBertemuSearchDropdown();
+    }
+    return;
+  }
+
+  const isShowroom = lokasi.toLowerCase().includes("showroom");
+  const isBertemu = (
+    bertemu !== "" &&
+    bertemu !== "-" &&
+    !bertemu.toLowerCase().includes("tidak bertemu") &&
+    bertemu.toLowerCase() !== "tidak"
+  );
+  const ownerReason = isBertemu ? "-" : "Tidak Bertemu";
 
   let stock = "-";
   let sales = "-";
@@ -7168,19 +7493,19 @@ async function handleFormSubmit(e) {
   let issueInternal = "-";
   let issueKomp = "-";
 
-  if (lokasi === "Showroom") {
-    stock = document.getElementById("input-stock-unit").value || "0";
-    sales = document.getElementById("input-sales-unit").value || "0";
-    issueDigi = document.getElementById("input-issue-digiasha").value || "-";
-    issueInternal = document.getElementById("input-issue-internal").value || "-";
-    issueKomp = document.getElementById("input-issue-kompetitor").value || "-";
+  if (isShowroom) {
+    stock = document.getElementById("input-stock-unit")?.value || "0";
+    sales = document.getElementById("input-sales-unit")?.value || "0";
+    issueDigi = document.getElementById("input-issue-digiasha")?.value || "-";
+    issueInternal = document.getElementById("input-issue-internal")?.value || "-";
+    issueKomp = document.getElementById("input-issue-kompetitor")?.value || "-";
   }
 
-  const catatanVisit = document.getElementById("input-catatan-visit").value.trim() || "-";
+  const catatanVisit = document.getElementById("input-catatan-visit")?.value?.trim() || "-";
 
-  let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi} (${lokasiDetail})\n*Bertemu Owner:* ${bertemuOwner}${bertemuOwner === 'Tidak' ? '(' + ownerReason + ')' : ''}\n`;
+  let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi}\n*Bertemu:* ${bertemu}\n`;
 
-  if (lokasi === "Showroom") {
+  if (isShowroom) {
     waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
   } else {
     waText += `\n`;
@@ -7197,7 +7522,7 @@ async function handleFormSubmit(e) {
     waText += `\n`;
   }
 
-  if (lokasi === "Showroom") {
+  if (isShowroom) {
     waText += `*CATATAN & ISSUE:*\n• Digiasha: ${issueDigi}\n• Internal Dealer: ${issueInternal}\n• Kompetitor: ${issueKomp}\n`;
   }
 
@@ -7205,9 +7530,8 @@ async function handleFormSubmit(e) {
 
   // Update State Lokal Secara Optimistis (Real-time Closed Loop)
   const isMitraSolved = (
-    String(lokasi || "").toLowerCase().includes("showroom") ||
-    bertemuOwner === "Ya" ||
-    String(bertemuOwner || "").toLowerCase() === "ya"
+    isShowroom ||
+    isBertemu
   );
   const targetDealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId || d.dealer_name === dealerName);
   if (targetDealer) {
@@ -7261,7 +7585,7 @@ async function handleFormSubmit(e) {
     dealer_id: dealerId,
     dealer_name: dealerName,
     lokasi: lokasi,
-    bertemu_owner: bertemuOwner,
+    bertemu_owner: bertemu,
     owner_reason: ownerReason,
     stock: stock,
     sales: sales,
