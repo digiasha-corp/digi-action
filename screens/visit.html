@@ -137,32 +137,48 @@
     </div>
 
     <!-- Segmen 2 -->
-    <div id="segment-2-container" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
-        <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">2</span>
-        <h3 class="text-xs font-bold text-slate-800 uppercase">Kondisi Showroom & Wawancara</h3>
+    <div id="segment-2-container" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3 transition-all duration-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <div class="flex items-center space-x-2">
+          <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">2</span>
+          <h3 class="text-xs font-bold text-slate-800 uppercase">Kondisi Showroom & Wawancara</h3>
+        </div>
+        <!-- Toggle Tidak Ada Informasi di Pojok Kanan Atas -->
+        <label class="flex items-center space-x-1.5 cursor-pointer select-none bg-slate-100 hover:bg-slate-200 active:scale-95 px-2.5 py-1 rounded-xl transition border border-slate-200">
+          <input type="checkbox" id="toggle-no-showroom-info" onchange="toggleShowroomInfo(this.checked)" class="w-3.5 h-3.5 rounded text-slate-900 border-slate-300 focus:ring-slate-900 cursor-pointer" />
+          <span class="text-[10px] font-bold text-slate-700">Tidak Ada Informasi</span>
+        </label>
       </div>
-      <div class="grid grid-cols-2 gap-2.5">
-        <div>
-          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Jumlah Stock Unit <span class="text-red-500">*</span></label>
-          <input type="number" id="input-stock-unit" min="0" placeholder="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold" />
+
+      <!-- Notice saat toggle Tidak Ada Informasi aktif -->
+      <div id="box-no-showroom-notice" class="hidden p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center text-xs text-slate-500 font-medium">
+        <i class="fa-solid fa-ban mr-1.5 text-slate-400"></i> Data kondisi showroom & wawancara dilewati (tidak ada informasi).
+      </div>
+
+      <!-- Konten isian form Segmen 2 -->
+      <div id="box-showroom-form-fields" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Jumlah Stock Unit <span class="text-red-500">*</span></label>
+            <input type="number" id="input-stock-unit" min="0" placeholder="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Penjualan Bulan Ini <span class="text-red-500">*</span></label>
+            <input type="number" id="input-sales-unit" min="0" placeholder="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold" />
+          </div>
         </div>
         <div>
-          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Penjualan Bulan Ini <span class="text-red-500">*</span></label>
-          <input type="number" id="input-sales-unit" min="0" placeholder="0" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold" />
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Digiasha <span class="text-[10px] font-normal text-slate-400">(Kondisional / Opsional)</span></label>
+          <textarea id="input-issue-digiasha" rows="2" placeholder="Masukan layanan, admin, GPS, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
         </div>
-      </div>
-      <div>
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Digiasha</label>
-        <textarea id="input-issue-digiasha" rows="2" placeholder="Masukan layanan, admin, GPS, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
-      </div>
-      <div>
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Internal Mitra</label>
-        <textarea id="input-issue-internal" rows="2" placeholder="Kendala cashflow, sengketa, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
-      </div>
-      <div>
-        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Kompetitor</label>
-        <textarea id="input-issue-kompetitor" rows="2" placeholder="Program leasing / fintech lain" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Internal Mitra <span class="text-[10px] font-normal text-slate-400">(Kondisional / Opsional)</span></label>
+          <textarea id="input-issue-internal" rows="2" placeholder="Kendala cashflow, sengketa, dll." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Kompetitor <span class="text-[10px] font-normal text-slate-400">(Kondisional / Opsional)</span></label>
+          <textarea id="input-issue-kompetitor" rows="2" placeholder="Program leasing / fintech lain" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"></textarea>
+        </div>
       </div>
     </div>
 

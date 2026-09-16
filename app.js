@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v114";
+const APP_BUILD_VERSION = "20260916_v115";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6947,19 +6947,40 @@ function onLokasiSearchInputBlur() {
 }
 
 function onLokasiVisitChanged(val) {
+  // Segmen 2 selalu ada di form, isian diatur oleh toggle "Tidak Ada Informasi"
   const segmen2 = document.getElementById("segment-2-container");
+  if (segmen2) segmen2.classList.remove("hidden");
+
+  const isShowroom = String(val || "").toLowerCase().includes("showroom");
+  const toggleNoInfo = document.getElementById("toggle-no-showroom-info");
+
+  // Jika user memilih lokasi selain showroom (misal: Rumah Owner / Janjian Diluar), 
+  // secara cerdas bantu centang "Tidak Ada Informasi" jika belum terisi, tapi tetap bisa diubah user.
+  if (val && !isShowroom && toggleNoInfo && !toggleNoInfo.checked) {
+    toggleNoInfo.checked = true;
+    toggleShowroomInfo(true);
+  } else if (isShowroom && toggleNoInfo && toggleNoInfo.checked) {
+    toggleNoInfo.checked = false;
+    toggleShowroomInfo(false);
+  }
+}
+
+function toggleShowroomInfo(isNoInfo) {
+  const boxFields = document.getElementById("box-showroom-form-fields");
+  const noticeBox = document.getElementById("box-no-showroom-notice");
   const stockInput = document.getElementById("input-stock-unit");
   const salesInput = document.getElementById("input-sales-unit");
-  const isShowroom = String(val || "").toLowerCase().includes("showroom");
 
-  if (isShowroom) {
-    if (segmen2) segmen2.classList.remove("hidden");
-    if (stockInput) stockInput.required = true;
-    if (salesInput) salesInput.required = true;
-  } else {
-    if (segmen2) segmen2.classList.add("hidden");
+  if (isNoInfo) {
+    if (boxFields) boxFields.classList.add("hidden");
+    if (noticeBox) noticeBox.classList.remove("hidden");
     if (stockInput) stockInput.required = false;
     if (salesInput) salesInput.required = false;
+  } else {
+    if (boxFields) boxFields.classList.remove("hidden");
+    if (noticeBox) noticeBox.classList.add("hidden");
+    if (stockInput) stockInput.required = true;
+    if (salesInput) salesInput.required = true;
   }
 }
 
@@ -7495,28 +7516,46 @@ async function handleFormSubmit(e) {
   );
   const ownerReason = isBertemu ? "-" : "Tidak Bertemu";
 
+  const isNoShowroomInfo = document.getElementById("toggle-no-showroom-info")?.checked || false;
+
   let stock = "-";
   let sales = "-";
   let issueDigi = "-";
   let issueInternal = "-";
   let issueKomp = "-";
 
-  if (isShowroom) {
-    stock = document.getElementById("input-stock-unit")?.value || "0";
-    sales = document.getElementById("input-sales-unit")?.value || "0";
-    issueDigi = document.getElementById("input-issue-digiasha")?.value || "-";
-    issueInternal = document.getElementById("input-issue-internal")?.value || "-";
-    issueKomp = document.getElementById("input-issue-kompetitor")?.value || "-";
+  if (!isNoShowroomInfo) {
+    const rawStock = document.getElementById("input-stock-unit")?.value?.trim();
+    const rawSales = document.getElementById("input-sales-unit")?.value?.trim();
+
+    if (rawStock === "" || rawStock === undefined) {
+      alert("Mohon isi Jumlah Stock Unit di Segmen 2 (atau aktifkan centang 'Tidak Ada Informasi' jika informasi tidak didapatkan).");
+      const sInput = document.getElementById("input-stock-unit");
+      if (sInput) sInput.focus();
+      return;
+    }
+    if (rawSales === "" || rawSales === undefined) {
+      alert("Mohon isi Penjualan Bulan Ini di Segmen 2 (atau aktifkan centang 'Tidak Ada Informasi' jika informasi tidak didapatkan).");
+      const slInput = document.getElementById("input-sales-unit");
+      if (slInput) slInput.focus();
+      return;
+    }
+
+    stock = rawStock;
+    sales = rawSales;
+    issueDigi = document.getElementById("input-issue-digiasha")?.value?.trim() || "-";
+    issueInternal = document.getElementById("input-issue-internal")?.value?.trim() || "-";
+    issueKomp = document.getElementById("input-issue-kompetitor")?.value?.trim() || "-";
   }
 
   const catatanVisit = document.getElementById("input-catatan-visit")?.value?.trim() || "-";
 
   let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi}\n*Bertemu:* ${bertemu}\n`;
 
-  if (isShowroom) {
+  if (!isNoShowroomInfo) {
     waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
   } else {
-    waText += `\n`;
+    waText += `*Kondisi Showroom:* (Tidak Ada Informasi)\n\n`;
   }
 
   if (ACTIVE_UNITS_STATE.length > 0) {
@@ -7530,7 +7569,7 @@ async function handleFormSubmit(e) {
     waText += `\n`;
   }
 
-  if (isShowroom) {
+  if (!isNoShowroomInfo) {
     waText += `*CATATAN & ISSUE:*\n• Digiasha: ${issueDigi}\n• Internal Dealer: ${issueInternal}\n• Kompetitor: ${issueKomp}\n`;
   }
 
