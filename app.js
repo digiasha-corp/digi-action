@@ -5677,7 +5677,7 @@ function startVisitForDealer(dealerId) {
 async function refreshPriorityData(btn) {
   const container = document.getElementById("priority-list-container");
   if (container) {
-    container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-slate-800"></i>Menyinkronkan data mitra dari Spreadsheet...</div>';
+    container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-amber-600"></i>Menyinkronkan data antrean prioritas...</div>';
   }
   if (btn) {
     btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
