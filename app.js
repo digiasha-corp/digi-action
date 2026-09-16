@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v115";
+const APP_BUILD_VERSION = "20260916_v116";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6947,22 +6947,9 @@ function onLokasiSearchInputBlur() {
 }
 
 function onLokasiVisitChanged(val) {
-  // Segmen 2 selalu ada di form, isian diatur oleh toggle "Tidak Ada Informasi"
+  // Segmen 2 selalu tampil, user yang menentukan via toggle apakah ada informasi atau tidak
   const segmen2 = document.getElementById("segment-2-container");
   if (segmen2) segmen2.classList.remove("hidden");
-
-  const isShowroom = String(val || "").toLowerCase().includes("showroom");
-  const toggleNoInfo = document.getElementById("toggle-no-showroom-info");
-
-  // Jika user memilih lokasi selain showroom (misal: Rumah Owner / Janjian Diluar), 
-  // secara cerdas bantu centang "Tidak Ada Informasi" jika belum terisi, tapi tetap bisa diubah user.
-  if (val && !isShowroom && toggleNoInfo && !toggleNoInfo.checked) {
-    toggleNoInfo.checked = true;
-    toggleShowroomInfo(true);
-  } else if (isShowroom && toggleNoInfo && toggleNoInfo.checked) {
-    toggleNoInfo.checked = false;
-    toggleShowroomInfo(false);
-  }
 }
 
 function toggleShowroomInfo(isNoInfo) {
