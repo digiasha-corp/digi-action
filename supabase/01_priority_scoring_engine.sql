@@ -91,20 +91,15 @@ BEGIN
     FROM m_facility_unit u
     LEFT JOIN (
       SELECT 
-        LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
-        REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
+        REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, ''))), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
         priority_level AS concern_urgency,
         action_reason AS concern_note,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')), REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') ORDER BY created_at DESC) as rn
+        ROW_NUMBER() OVER(PARTITION BY REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, ''))), '[\s\-_.]', '', 'g') ORDER BY created_at DESC) as rn
       FROM t_priority_action
-      WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR'
+      WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR' AND entity_type = 'UNIT'
     ) c ON (
-      (LOWER(TRIM(u.dealer_name)) = c.dealer_name_clean OR LOWER(REGEXP_REPLACE(TRIM(u.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean)
-      AND (
-        c.unit_fasilitas_clean = 'UMUM' 
-        OR c.unit_fasilitas_clean = '-'
-        OR REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
-      )
+      REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
+      AND c.unit_fasilitas_clean <> ''
     ) AND c.rn = 1
   ),
   unit_scored AS (
@@ -211,14 +206,16 @@ BEGIN
     FROM m_dealer d
     LEFT JOIN (
       SELECT 
+        COALESCE(entity_id, '') AS dealer_id_clean,
         LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
         priority_level AS concern_urgency,
         action_reason AS concern_note,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) ORDER BY created_at DESC) as rn
+        ROW_NUMBER() OVER(PARTITION BY COALESCE(NULLIF(entity_id, ''), LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', ''))) ORDER BY created_at DESC) as rn
       FROM t_priority_action
       WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR' AND entity_type = 'DEALER'
     ) c ON (
-      LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean 
+      (c.dealer_id_clean <> '' AND d.dealer_id = c.dealer_id_clean)
+      OR LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean 
       OR LOWER(REGEXP_REPLACE(TRIM(d.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean
     ) AND c.rn = 1
   ),

@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v106";
+const APP_BUILD_VERSION = "20260916_v107";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -504,17 +504,25 @@ async function supabaseGetMasterData() {
       .order("created_at", { ascending: true });
 
     if (resAct.data) {
-      assignments = resAct.data.map(a => ({
-        assignment_id: a.action_id,
-        dealer_name: a.entity_name,
-        unit_fasilitas: (a.entity_type === "DEALER") ? "Umum" : (a.entity_id || "Umum"),
-        urgency_level: a.priority_level,
-        instruksi: a.action_reason,
-        status: a.is_fu ? "RESOLVED" : "OPEN",
-        source: a.source,
-        created_at: a.created_at,
-        assigned_by: a.assigned_by
-      }));
+      assignments = resAct.data.map(a => {
+        let dName = a.entity_name;
+        if (a.entity_type === "UNIT" && a.notes && a.notes.startsWith("Mitra: ")) {
+          dName = a.notes.replace("Mitra: ", "").trim();
+        }
+        return {
+          assignment_id: a.action_id,
+          dealer_name: dName,
+          entity_name: a.entity_name,
+          entity_type: a.entity_type,
+          unit_fasilitas: (a.entity_type === "DEALER") ? "Umum" : (a.entity_id || "Umum"),
+          urgency_level: a.priority_level,
+          instruksi: a.action_reason,
+          status: a.is_fu ? "RESOLVED" : "OPEN",
+          source: a.source,
+          created_at: a.created_at,
+          assigned_by: a.assigned_by
+        };
+      });
     }
   } catch (errAct) {
     console.warn("t_priority_action fetch error:", errAct);
@@ -1236,23 +1244,35 @@ async function supabaseSubmitOnboarding(data) {
 }
 
 async function supabaseSaveAssignment(data) {
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
   if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
 
   const assignId = `ASG-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const isDealer = !data.unitFasilitas || data.unitFasilitas === "Umum" || data.unitFasilitas === "-";
 
+  // Entity name: Jika UNIT, gunakan format "Nopol (Unit)" agar jelas di antrean
+  const entityName = isDealer 
+    ? data.dealerName 
+    : (data.nopol ? `${data.nopol} (${data.unitModel || 'Kendaraan'})` : data.unitFasilitas);
+
   // Simpan ke tabel terpadu t_priority_action
-  const { error } = await supabaseClient.from("t_priority_action").insert([{
+  const insertPayload = {
     source: "MANUAL_SUPERVISOR",
     assigned_by: data.assignedByUserId || "SUPERVISOR",
     entity_type: isDealer ? "DEALER" : "UNIT",
-    entity_id: isDealer ? null : data.unitFasilitas,
-    entity_name: data.dealerName,
+    entity_id: isDealer ? (data.dealerId || null) : data.unitFasilitas,
+    entity_name: entityName,
+    cabang: data.cabang || null,
+    notes: isDealer ? null : `Mitra: ${data.dealerName}`,
     priority_level: data.urgencyLevel || "Penting",
     priority_score: (data.urgencyLevel === "Sangat Penting") ? 3 : ((data.urgencyLevel === "Penting") ? 2 : 1),
     action_reason: data.instruksi,
     is_fu: false
-  }]);
+  };
+
+  const { error } = await supabaseClient.from("t_priority_action").insert([insertPayload]);
 
   if (error) {
     console.warn("Save t_priority_action error:", error);
@@ -1265,15 +1285,20 @@ async function supabaseSaveAssignment(data) {
     const nowIso = new Date().toISOString();
 
     if (isDealer) {
-      await supabaseClient.from("m_dealer")
+      const q = supabaseClient.from("m_dealer")
         .update({
           priority_level: data.urgencyLevel || "Penting",
           priority_score: score,
           priority_reason: `Concern Mitra: ${data.instruksi}`,
           updated_at: nowIso
-        })
-        .eq("dealer_name", data.dealerName);
+        });
+      if (data.dealerId) {
+        await q.eq("dealer_id", data.dealerId);
+      } else {
+        await q.eq("dealer_name", data.dealerName);
+      }
     } else {
+      // Update unit
       await supabaseClient.from("m_facility_unit")
         .update({
           priority_level: data.urgencyLevel || "Penting",
@@ -1283,14 +1308,19 @@ async function supabaseSaveAssignment(data) {
         })
         .eq("no_fasilitas", data.unitFasilitas);
 
-      await supabaseClient.from("m_dealer")
+      // Tingkatkan prioritas dealer karena ada unit yang memiliki concern
+      const qDlr = supabaseClient.from("m_dealer")
         .update({
           priority_level: data.urgencyLevel || "Penting",
           priority_score: score,
           priority_reason: `Pemicu Unit: Concern: ${data.instruksi}`,
           updated_at: nowIso
-        })
-        .eq("dealer_name", data.dealerName);
+        });
+      if (data.dealerId) {
+        await qDlr.eq("dealer_id", data.dealerId);
+      } else {
+        await qDlr.eq("dealer_name", data.dealerName);
+      }
     }
   } catch (errMaster) {
     console.warn("Update master priority columns warning:", errMaster);
@@ -6383,6 +6413,7 @@ async function handleAssignConcernSubmit(e) {
 
   const d = MASTER_DEALER_PRIORITY_DATA.find(item => item.dealer_id === dealerId);
   const cleanDealerName = d ? d.dealer_name : rawDealerName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const targetUnit = d?.units?.find(unit => unit.no_fasilitas === unitVal);
 
   try {
     if (btnSubmit) {
@@ -6394,8 +6425,12 @@ async function handleAssignConcernSubmit(e) {
     await callApi("saveAssignment", {
       assignedByUserId: CURRENT_USER?.nip || "ADM",
       assignedByUserName: CURRENT_USER?.nama || "Supervisor",
+      dealerId: dealerId,
       dealerName: cleanDealerName,
+      cabang: d?.cabang || "-",
       unitFasilitas: unitVal,
+      nopol: targetUnit?.nopol || "",
+      unitModel: targetUnit?.unit || targetUnit?.tipe_unit || "",
       concernType: "Assign Concern",
       urgencyLevel: urgencyVal,
       instruksi: concernText
