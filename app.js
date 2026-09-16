@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v104";
+const APP_BUILD_VERSION = "20260916_v105";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1492,8 +1492,8 @@ const VALID_APP_SCREENS = [
   "dashboard", "priority", "assignment", "visit", "onboarding", "pipeline",
   "gps", "fac", "history", "laporan_activity", "absensi", "izin",
   "persetujuan", "attendance_summary", "rekap_absen", "rekap_tim",
-  "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
-  "settings", "login"
+  "slip_gaji", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+  "ketentuan", "sop_management", "settings", "login"
 ];
 
 function getScreenFromUrl() {
@@ -1504,7 +1504,10 @@ function getScreenFromUrl() {
 
   if (!rawPath) return "dashboard";
 
-  const firstSegment = rawPath.split("/")[0].toLowerCase();
+  // Bersihkan dari parameter query (?) atau hash ekstra agar nama screen tepat
+  const cleanPath = rawPath.split("?")[0].split("#")[0];
+  const firstSegment = cleanPath.split("/")[0].toLowerCase();
+
   if (firstSegment === "rekap_absen") return "attendance_summary";
   if (firstSegment === "home" || firstSegment === "index" || firstSegment === "index.html") return "dashboard";
   if (firstSegment === "sop") return "ketentuan";
@@ -13231,7 +13234,7 @@ async function initKetentuanScreen() {
   renderKetentuanList();
 
   // 5. Cek deep-link langsung (misal ?id=... atau ?sop=...)
-  checkAndOpenDeepLinkSop();
+  await checkAndOpenDeepLinkSop();
 }
 
 async function fetchKetentuanList() {
@@ -13570,12 +13573,45 @@ function fallbackCopyTextToClipboard(text) {
   document.body.removeChild(textArea);
 }
 
-function checkAndOpenDeepLinkSop() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const targetId = urlParams.get("id") || urlParams.get("sop") || urlParams.get("doc");
+async function checkAndOpenDeepLinkSop() {
+  let urlParams = new URLSearchParams(window.location.search);
+  let targetId = urlParams.get("id") || urlParams.get("sop") || urlParams.get("doc");
+
+  // Fallback jika query param menempel di hash (misal #/ketentuan?id=...)
+  if (!targetId && window.location.hash && window.location.hash.includes("?")) {
+    const hashQuery = window.location.hash.split("?")[1];
+    urlParams = new URLSearchParams(hashQuery);
+    targetId = urlParams.get("id") || urlParams.get("sop") || urlParams.get("doc");
+  }
+
   if (!targetId) return;
 
-  const doc = KETENTUAN_DATA_CACHE.find(d => String(d.id).toLowerCase() === String(targetId).toLowerCase());
+  let doc = KETENTUAN_DATA_CACHE.find(d => String(d.id).toLowerCase() === String(targetId).toLowerCase());
+
+  // Jika tidak ditemukan di cache awal, coba fetch langsung dari Supabase m_ketentuan
+  if (!doc) {
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { data: singleDoc, error } = await client
+          .from("m_ketentuan")
+          .select("*")
+          .eq("id", targetId)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (!error && singleDoc) {
+          doc = singleDoc;
+          if (!KETENTUAN_DATA_CACHE.some(x => x.id === singleDoc.id)) {
+            KETENTUAN_DATA_CACHE.unshift(singleDoc);
+            renderKetentuanList();
+          }
+        }
+      } catch (e) {
+        console.warn("Direct fetch doc by id error:", e);
+      }
+    }
+  }
+
   if (!doc) {
     showToast("Dokumen SOP yang dituju tidak ditemukan atau sudah tidak aktif.", "warning", 3000);
     return;
@@ -13611,7 +13647,7 @@ function checkAndOpenDeepLinkSop() {
   setTimeout(() => {
     openSecurePdfViewer(doc.pdf_url, safeJudul, safeMeta);
     showToast(`Membuka: ${doc.judul}`, "info", 2000);
-  }, 250);
+  }, 350);
 }
 
 // =========================================================================
@@ -14541,16 +14577,22 @@ async function initAppBootstrap() {
         const target = (requestedScreen === "login") ? "dashboard" : requestedScreen;
         await loadScreen(target, false);
 
-        // Pastikan URL sinkron di browser tanpa menambah tumpukan riwayat
-        const targetPath = (target === "dashboard") ? "/" : `/${target}`;
-        if (window.location.pathname !== targetPath && window.history && window.history.replaceState) {
+        // Pastikan URL sinkron di browser tanpa menambah tumpukan riwayat, pertahankan query string jika ada
+        const currentSearch = window.location.search || "";
+        const targetPath = (target === "dashboard") ? "/" : `/${target}${currentSearch}`;
+        const currentFull = window.location.pathname + (target === "dashboard" ? "" : currentSearch);
+        if (currentFull !== targetPath && window.history && window.history.replaceState) {
           window.history.replaceState({ screen: target }, "", targetPath);
         }
         syncMasterDataFromApi();
       }
     } else {
       if (requestedScreen && requestedScreen !== "login") {
-        try { sessionStorage.setItem("DIGIASHA_REDIRECT_SCREEN", requestedScreen); } catch (e) {}
+        try {
+          sessionStorage.setItem("DIGIASHA_REDIRECT_SCREEN", requestedScreen);
+          const fullPath = window.location.pathname + window.location.search;
+          sessionStorage.setItem("DIGIASHA_REDIRECT_URL", fullPath);
+        } catch (e) {}
       }
       await loadScreen("login", false);
       if (window.location.pathname !== "/login" && window.location.pathname !== "/" && window.history && window.history.replaceState) {
