@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v117";
+const APP_BUILD_VERSION = "20260916_v118";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6582,6 +6582,11 @@ function populateVisitDealerOptions() {
     if (chevBertemu) chevBertemu.classList.remove("hidden");
   }
 
+  // Otomatis deteksi koordinat GPS saat form visit dibuka
+  if (typeof getPreciseLocation === "function") {
+    getPreciseLocation();
+  }
+
   // Setup click outside listener to auto-close dropdown
   if (!window._dealerSearchClickAttached) {
     window._dealerSearchClickAttached = true;
@@ -6961,13 +6966,11 @@ function toggleShowroomInfo(isNoInfo) {
   if (isNoInfo) {
     if (boxFields) boxFields.classList.add("hidden");
     if (noticeBox) noticeBox.classList.remove("hidden");
-    if (stockInput) stockInput.required = false;
-    if (salesInput) salesInput.required = false;
+    if (stockInput) stockInput.value = "";
+    if (salesInput) salesInput.value = "";
   } else {
     if (boxFields) boxFields.classList.remove("hidden");
     if (noticeBox) noticeBox.classList.add("hidden");
-    if (stockInput) stockInput.required = true;
-    if (salesInput) salesInput.required = true;
   }
 }
 
@@ -7606,214 +7609,231 @@ function removePhoto() {
 async function handleFormSubmit(e) {
   e.preventDefault();
 
-  if (ACTIVE_UNITS_STATE.length > 0) {
-    const unchecked = ACTIVE_UNITS_STATE.filter(u => !u.is_checked);
-    if (unchecked.length > 0) {
-      alert(`Peringatan: Terdapat ${unchecked.length} unit fasilitas aktif yang belum diperiksa checklist & fotonya.`);
-      return;
-    }
-  }
-
-  if (!CURRENT_SHOWROOM_PHOTO_BASE64) {
-    alert("Wajib mengambil foto fisik kunjungan melalui kamera!");
-    return;
-  }
-
-  const dealerSelect = document.getElementById("input-dealer");
-  let dealerId = dealerSelect ? dealerSelect.value : "";
-  const searchInput = document.getElementById("dealer-search-input");
-  const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : "";
-
-  // Auto-resolve jika user mengetik nama mitra tapi select belum terikat
-  if (!dealerId && searchVal) {
-    const matched = MASTER_DEALER_PRIORITY_DATA.find(d => {
-      const dName = String(d.dealer_name || "").toLowerCase();
-      const dFull = `${dName} (${String(d.cabang || '').toLowerCase()})`;
-      return dFull === searchVal || dName === searchVal || dFull.includes(searchVal) || searchVal.includes(dName);
-    });
-    if (matched) {
-      dealerId = matched.dealer_id;
-      selectDealerFromSearch(matched.dealer_id);
-    }
-  }
-
-  if (!dealerId) {
-    alert("Silakan pilih Mitra Partner dari daftar pencarian terlebih dahulu!");
-    if (searchInput) {
-      searchInput.focus();
-      openDealerSearchDropdown();
-    }
-    return;
-  }
-
-  const selectedDealerObj = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId);
-  const dealerName = selectedDealerObj 
-    ? selectedDealerObj.dealer_name 
-    : (dealerSelect?.options[dealerSelect?.selectedIndex]?.text || searchInput?.value || "Unknown Dealer");
-  const lokasiInput = document.getElementById("lokasi-search-input");
-  const lokasi = lokasiInput ? lokasiInput.value.trim() : "Showroom";
-  if (!lokasi) {
-    alert("Silakan pilih atau ketik Lokasi Kunjungan terlebih dahulu!");
-    if (lokasiInput) {
-      lokasiInput.focus();
-      openLokasiSearchDropdown();
-    }
-    return;
-  }
-
-  const bertemuInput = document.getElementById("bertemu-search-input");
-  const bertemu = bertemuInput ? bertemuInput.value.trim() : "Owner";
-  if (!bertemu) {
-    alert("Silakan pilih atau ketik pihak yang Anda temui saat kunjungan!");
-    if (bertemuInput) {
-      bertemuInput.focus();
-      openBertemuSearchDropdown();
-    }
-    return;
-  }
-
-  const isShowroom = lokasi.toLowerCase().includes("showroom");
-  const isBertemu = (
-    bertemu !== "" &&
-    bertemu !== "-" &&
-    !bertemu.toLowerCase().includes("tidak bertemu") &&
-    bertemu.toLowerCase() !== "tidak"
-  );
-  const ownerReason = isBertemu ? "-" : "Tidak Bertemu";
-
-  const isNoShowroomInfo = document.getElementById("toggle-no-showroom-info")?.checked || false;
-
-  let stock = "-";
-  let sales = "-";
-  let issueDigi = "-";
-  let issueInternal = "-";
-  let issueKomp = "-";
-
-  if (!isNoShowroomInfo) {
-    const rawStock = document.getElementById("input-stock-unit")?.value?.trim();
-    const rawSales = document.getElementById("input-sales-unit")?.value?.trim();
-
-    if (rawStock === "" || rawStock === undefined) {
-      alert("Mohon isi Jumlah Stock Unit di Segmen 2 (atau aktifkan centang 'Tidak Ada Informasi' jika informasi tidak didapatkan).");
-      const sInput = document.getElementById("input-stock-unit");
-      if (sInput) sInput.focus();
-      return;
-    }
-    if (rawSales === "" || rawSales === undefined) {
-      alert("Mohon isi Penjualan Bulan Ini di Segmen 2 (atau aktifkan centang 'Tidak Ada Informasi' jika informasi tidak didapatkan).");
-      const slInput = document.getElementById("input-sales-unit");
-      if (slInput) slInput.focus();
-      return;
-    }
-
-    stock = rawStock;
-    sales = rawSales;
-    issueDigi = document.getElementById("input-issue-digiasha")?.value?.trim() || "-";
-    issueInternal = document.getElementById("input-issue-internal")?.value?.trim() || "-";
-    issueKomp = document.getElementById("input-issue-kompetitor")?.value?.trim() || "-";
-  }
-
-  const catatanVisit = document.getElementById("input-catatan-visit")?.value?.trim() || "-";
-
-  let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi}\n*Bertemu:* ${bertemu}\n`;
-
-  if (!isNoShowroomInfo) {
-    waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
-  } else {
-    waText += `*Kondisi Showroom:* (Tidak Ada Informasi)\n\n`;
-  }
-
-  if (ACTIVE_UNITS_STATE.length > 0) {
-    waText += `*PEMERIKSAAN UNIT FASILITAS:*\n`;
-    ACTIVE_UNITS_STATE.forEach((u, i) => {
-      waText += `${i + 1}. *${u.nopol}* - ${u.unit}\n   • Status: ${u.is_ovd ? 'OVERDUE' : 'LANCAR'}\n   • Fisik: ${u.terlihat}${u.terlihat === 'Tidak' ? '(' + u.indikasi + ')' : '[Foto Kamera OK]'}\n   • GPS Match: ${u.gps_match}\n   • Info: ${u.info_unit.join(', ') || '-'}\n`;
-      if (u.is_ovd) {
-        waText += `   • Plan OVD: ${u.ovd_plan || '-'}\n   • Komitmen: ${u.komitmen}${u.tgl_komitmen ? '(' + u.tgl_komitmen + ')' : ''}\n`;
+  try {
+    if (ACTIVE_UNITS_STATE.length > 0) {
+      const unchecked = ACTIVE_UNITS_STATE.filter(u => !u.is_checked);
+      if (unchecked.length > 0) {
+        alert(`Peringatan: Terdapat ${unchecked.length} unit fasilitas aktif yang belum diperiksa checklist & fotonya.`);
+        return;
       }
-    });
-    waText += `\n`;
-  }
-
-  if (!isNoShowroomInfo) {
-    waText += `*CATATAN & ISSUE:*\n• Digiasha: ${issueDigi}\n• Internal Dealer: ${issueInternal}\n• Kompetitor: ${issueKomp}\n`;
-  }
-
-  waText += `• Catatan Visit: ${catatanVisit}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)},${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
-
-  // Update State Lokal Secara Optimistis (Real-time Closed Loop)
-  const isMitraSolved = (
-    isShowroom ||
-    isBertemu
-  );
-  const targetDealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId || d.dealer_name === dealerName);
-  if (targetDealer) {
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    if (isMitraSolved) {
-      targetDealer.is_visited_today = true;
-      targetDealer.last_visit_date = todayStr;
-      targetDealer.aging_visit_mitra = 0;
-      targetDealer.dealer_concern = null;
     }
-    if (targetDealer.units && Array.isArray(ACTIVE_UNITS_STATE)) {
-      ACTIVE_UNITS_STATE.forEach(checkedUnit => {
-        const isVisible = (checkedUnit.terlihat === "Ya" || String(checkedUnit.terlihat || "").toLowerCase().includes("terlihat"));
-        if (isVisible) {
-          const uObj = targetDealer.units.find(u => (checkedUnit.no_fasilitas && u.no_fasilitas === checkedUnit.no_fasilitas) || u.nopol === checkedUnit.nopol);
-          if (uObj) {
-            uObj.unit_concern = null;
-            uObj.last_visit_date = todayStr;
-            uObj.aging_visit_unit = 0;
-            uObj.priority_level = "Normal";
-            uObj.priority_score = 0;
-            uObj.priority_reason = "Kondisi Normal / Terjadwal Baik";
-          }
+
+    if (!CURRENT_SHOWROOM_PHOTO_BASE64) {
+      alert("Wajib mengambil foto fisik kunjungan melalui kamera!");
+      return;
+    }
+
+    const dealerSelect = document.getElementById("input-dealer");
+    let dealerId = dealerSelect ? dealerSelect.value : "";
+    const searchInput = document.getElementById("dealer-search-input");
+    const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+    // Auto-resolve jika user mengetik nama mitra tapi select belum terikat
+    if (!dealerId && searchVal) {
+      const matched = MASTER_DEALER_PRIORITY_DATA.find(d => {
+        const dName = String(d.dealer_name || "").toLowerCase();
+        const dFull = `${dName} (${String(d.cabang || '').toLowerCase()})`;
+        return dFull === searchVal || dName === searchVal || dFull.includes(searchVal) || searchVal.includes(dName);
+      });
+      if (matched) {
+        dealerId = matched.dealer_id;
+        selectDealerFromSearch(matched.dealer_id);
+      }
+    }
+
+    if (!dealerId) {
+      alert("Silakan pilih Mitra Partner dari daftar pencarian terlebih dahulu!");
+      if (searchInput) {
+        searchInput.focus();
+        openDealerSearchDropdown();
+      }
+      return;
+    }
+
+    const selectedDealerObj = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId);
+    const dealerName = selectedDealerObj 
+      ? selectedDealerObj.dealer_name 
+      : (dealerSelect?.options[dealerSelect?.selectedIndex]?.text || searchInput?.value || "Unknown Dealer");
+    const lokasiInput = document.getElementById("lokasi-search-input");
+    const lokasi = lokasiInput ? lokasiInput.value.trim() : "Showroom";
+    if (!lokasi) {
+      alert("Silakan pilih atau ketik Lokasi Kunjungan terlebih dahulu!");
+      if (lokasiInput) {
+        lokasiInput.focus();
+        openLokasiSearchDropdown();
+      }
+      return;
+    }
+
+    const bertemuInput = document.getElementById("bertemu-search-input");
+    const bertemu = bertemuInput ? bertemuInput.value.trim() : "Owner";
+    if (!bertemu) {
+      alert("Silakan pilih atau ketik pihak yang Anda temui saat kunjungan!");
+      if (bertemuInput) {
+        bertemuInput.focus();
+        openBertemuSearchDropdown();
+      }
+      return;
+    }
+
+    const isShowroom = lokasi.toLowerCase().includes("showroom");
+    const isBertemu = (
+      bertemu !== "" &&
+      bertemu !== "-" &&
+      !bertemu.toLowerCase().includes("tidak bertemu") &&
+      bertemu.toLowerCase() !== "tidak"
+    );
+    const ownerReason = isBertemu ? "-" : "Tidak Bertemu";
+
+    const isNoShowroomInfo = document.getElementById("toggle-no-showroom-info")?.checked || false;
+
+    let stock = "-";
+    let sales = "-";
+    let issueDigi = "-";
+    let issueInternal = "-";
+    let issueKomp = "-";
+
+    // Validasi Segmen 2 hanya jika di Showroom dan TIDAK mencentang "Tidak Ada Informasi"
+    if (!isNoShowroomInfo && isShowroom) {
+      const rawStock = document.getElementById("input-stock-unit")?.value?.trim();
+      const rawSales = document.getElementById("input-sales-unit")?.value?.trim();
+
+      if (rawStock === "" || rawStock === undefined) {
+        alert("Mohon isi Jumlah Stock Unit di Segmen 2 (atau aktifkan centang 'Tidak Ada Informasi' jika informasi tidak didapatkan).");
+        const sInput = document.getElementById("input-stock-unit");
+        if (sInput) sInput.focus();
+        return;
+      }
+      if (rawSales === "" || rawSales === undefined) {
+        alert("Mohon isi Penjualan Bulan Ini di Segmen 2 (atau aktifkan centang 'Tidak Ada Informasi' jika informasi tidak didapatkan).");
+        const slInput = document.getElementById("input-sales-unit");
+        if (slInput) slInput.focus();
+        return;
+      }
+
+      stock = rawStock;
+      sales = rawSales;
+      issueDigi = document.getElementById("input-issue-digiasha")?.value?.trim() || "-";
+      issueInternal = document.getElementById("input-issue-internal")?.value?.trim() || "-";
+      issueKomp = document.getElementById("input-issue-kompetitor")?.value?.trim() || "-";
+    } else if (!isNoShowroomInfo && !isShowroom) {
+      // Jika lokasi bukan di Showroom (misal Rumah Owner / Janjian Diluar), isi data jika ada tapi jangan paksa wajib
+      stock = document.getElementById("input-stock-unit")?.value?.trim() || "-";
+      sales = document.getElementById("input-sales-unit")?.value?.trim() || "-";
+      issueDigi = document.getElementById("input-issue-digiasha")?.value?.trim() || "-";
+      issueInternal = document.getElementById("input-issue-internal")?.value?.trim() || "-";
+      issueKomp = document.getElementById("input-issue-kompetitor")?.value?.trim() || "-";
+    }
+
+    const catatanVisit = document.getElementById("input-catatan-visit")?.value?.trim() || "-";
+
+    let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi}\n*Bertemu:* ${bertemu}\n`;
+
+    if (!isNoShowroomInfo && isShowroom) {
+      waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
+    } else {
+      waText += `*Kondisi Showroom:* (Tidak Ada Informasi)\n\n`;
+    }
+
+    if (ACTIVE_UNITS_STATE.length > 0) {
+      waText += `*PEMERIKSAAN UNIT FASILITAS:*\n`;
+      ACTIVE_UNITS_STATE.forEach((u, i) => {
+        waText += `${i + 1}. *${u.nopol}* - ${u.unit}\n   • Status: ${u.is_ovd ? 'OVERDUE' : 'LANCAR'}\n   • Fisik: ${u.terlihat}${u.terlihat === 'Tidak' ? '(' + u.indikasi + ')' : '[Foto Kamera OK]'}\n   • GPS Match: ${u.gps_match}\n   • Info: ${u.info_unit.join(', ') || '-'}\n`;
+        if (u.is_ovd) {
+          waText += `   • Plan OVD: ${u.ovd_plan || '-'}\n   • Komitmen: ${u.komitmen}${u.tgl_komitmen ? '(' + u.tgl_komitmen + ')' : ''}\n`;
         }
       });
+      waText += `\n`;
     }
-    if (isMitraSolved) {
-      const remUrgent = (targetDealer.units || []).filter(u => 
-        u.last_visit_date !== todayStr && 
-        (u.priority_level === "Kritis" || u.priority_level === "Penting" || (u.priority_score && u.priority_score > 0) || u.unit_concern)
-      );
-      targetDealer.urgent_units_count = remUrgent.length;
-      if (remUrgent.length === 0) {
-        targetDealer.priority_level = "Normal";
-        targetDealer.priority_score = 0;
-        targetDealer.priority_reason = "Selesai Dikunjungi Hari Ini";
-      } else {
-        targetDealer.priority_level = "Penting";
-        targetDealer.priority_score = 1;
-        targetDealer.priority_reason = `Selesai Visit Mitra, ${remUrgent.length} unit belum clear`;
+
+    if (!isNoShowroomInfo && isShowroom) {
+      waText += `*CATATAN & ISSUE:*\n• Digiasha: ${issueDigi}\n• Internal Dealer: ${issueInternal}\n• Kompetitor: ${issueKomp}\n`;
+    }
+
+    const geoLat = (CURRENT_USER_GEO && CURRENT_USER_GEO.lat !== null && !isNaN(CURRENT_USER_GEO.lat)) ? CURRENT_USER_GEO.lat : null;
+    const geoLong = (CURRENT_USER_GEO && CURRENT_USER_GEO.long !== null && !isNaN(CURRENT_USER_GEO.long)) ? CURRENT_USER_GEO.long : null;
+    const geoStr = (geoLat !== null && geoLong !== null) ? `${Number(geoLat).toFixed(5)},${Number(geoLong).toFixed(5)}` : "Lokasi Tidak Terdeteksi";
+
+    waText += `• Catatan Visit: ${catatanVisit}\n• Geotag: ${geoStr}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+
+    // Update State Lokal Secara Optimistis (Real-time Closed Loop)
+    const isMitraSolved = (
+      isShowroom ||
+      isBertemu
+    );
+    const targetDealer = MASTER_DEALER_PRIORITY_DATA.find(d => d.dealer_id === dealerId || d.dealer_name === dealerName);
+    if (targetDealer) {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      if (isMitraSolved) {
+        targetDealer.is_visited_today = true;
+        targetDealer.last_visit_date = todayStr;
+        targetDealer.aging_visit_mitra = 0;
+        targetDealer.dealer_concern = null;
+      }
+      if (targetDealer.units && Array.isArray(ACTIVE_UNITS_STATE)) {
+        ACTIVE_UNITS_STATE.forEach(checkedUnit => {
+          const isVisible = (checkedUnit.terlihat === "Ya" || String(checkedUnit.terlihat || "").toLowerCase().includes("terlihat"));
+          if (isVisible) {
+            const uObj = targetDealer.units.find(u => (checkedUnit.no_fasilitas && u.no_fasilitas === checkedUnit.no_fasilitas) || u.nopol === checkedUnit.nopol);
+            if (uObj) {
+              uObj.unit_concern = null;
+              uObj.last_visit_date = todayStr;
+              uObj.aging_visit_unit = 0;
+              uObj.priority_level = "Normal";
+              uObj.priority_score = 0;
+              uObj.priority_reason = "Kondisi Normal / Terjadwal Baik";
+            }
+          }
+        });
+      }
+      if (isMitraSolved) {
+        const remUrgent = (targetDealer.units || []).filter(u => 
+          u.last_visit_date !== todayStr && 
+          (u.priority_level === "Kritis" || u.priority_level === "Penting" || (u.priority_score && u.priority_score > 0) || u.unit_concern)
+        );
+        targetDealer.urgent_units_count = remUrgent.length;
+        if (remUrgent.length === 0) {
+          targetDealer.priority_level = "Normal";
+          targetDealer.priority_score = 0;
+          targetDealer.priority_reason = "Selesai Dikunjungi Hari Ini";
+        } else {
+          targetDealer.priority_level = "Penting";
+          targetDealer.priority_score = 1;
+          targetDealer.priority_reason = `Selesai Visit Mitra, ${remUrgent.length} unit belum clear`;
+        }
+      }
+      if (typeof renderPriorityList === "function") {
+        try { renderPriorityList(); } catch(e) {}
       }
     }
-    if (typeof renderPriorityList === "function") {
-      try { renderPriorityList(); } catch(e) {}
-    }
+
+    // Kirim ke Google Apps Script secara asynchronous
+    callApi("submitVisit", {
+      dealer_id: dealerId,
+      dealer_name: dealerName,
+      lokasi: lokasi,
+      bertemu_owner: bertemu,
+      owner_reason: ownerReason,
+      stock: stock,
+      sales: sales,
+      issue_digi: issueDigi,
+      issue_internal: issueInternal,
+      issue_komp: issueKomp,
+      catatan_visit: catatanVisit,
+      tindak_lanjut_concern: "-",
+      lat: geoLat,
+      long: geoLong,
+      showroom_photo_base64: CURRENT_SHOWROOM_PHOTO_BASE64,
+      unit_check_list: ACTIVE_UNITS_STATE,
+      currentUser: CURRENT_USER
+    });
+
+    openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-emerald-600");
+  } catch (err) {
+    console.error("Error submitting visit:", err);
+    alert("Terjadi kendala saat memproses laporan visit: " + err.message);
   }
-
-  // Kirim ke Google Apps Script secara asynchronous
-  callApi("submitVisit", {
-    dealer_id: dealerId,
-    dealer_name: dealerName,
-    lokasi: lokasi,
-    bertemu_owner: bertemu,
-    owner_reason: ownerReason,
-    stock: stock,
-    sales: sales,
-    issue_digi: issueDigi,
-    issue_internal: issueInternal,
-    issue_komp: issueKomp,
-    catatan_visit: catatanVisit,
-    tindak_lanjut_concern: "-",
-    lat: CURRENT_USER_GEO.lat,
-    long: CURRENT_USER_GEO.long,
-    showroom_photo_base64: CURRENT_SHOWROOM_PHOTO_BASE64,
-    unit_check_list: ACTIVE_UNITS_STATE,
-    currentUser: CURRENT_USER
-  });
-
-  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke WhatsApp Group", waText, "bg-emerald-600");
 }
 
 // =========================================================================
