@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v107";
+const APP_BUILD_VERSION = "20260916_v108";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -242,8 +242,16 @@ function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
   if (!dealer) return false;
   if (!user) return true;
 
+  const uRole = String(user.role || user.role_id || user.jabatan || "").toUpperCase();
   const rawArea = String(user.area_cover || "").trim();
-  const rawBranch = String(user.cabang || "").trim();
+  const rawBranch = String(user.cabang || "").trim().toLowerCase();
+
+  // Super Admin (R-01) atau user Head Office / Kantor Pusat melihat seluruh dealer kecuali jika area_cover dispesifikasikan khusus
+  if (uRole.includes("SUPER ADMIN") || user.role_id === "R-01" || rawBranch === "head office" || rawBranch === "kantor pusat") {
+    if (!rawArea || rawArea === "*" || rawArea.toUpperCase() === "ALL") {
+      return true;
+    }
+  }
 
   // Jika user tidak memiliki batasan area_cover maupun cabang, atau diset '*' / 'ALL', tampilkan semua
   if (!rawArea && !rawBranch) return true;
@@ -1507,6 +1515,20 @@ async function syncMasterDataFromApi() {
         };
       });
 
+      // Re-populate dropdowns if user is currently on assignment, visit, or priority screen
+      if (typeof populateAssignDealerOptions === "function") {
+        const aSel = document.getElementById("assign-select-dealer");
+        if (aSel) populateAssignDealerOptions();
+      }
+      if (typeof populateVisitDealerOptions === "function") {
+        const vSel = document.getElementById("input-dealer");
+        if (vSel) populateVisitDealerOptions();
+      }
+      if (typeof renderPriorityList === "function") {
+        const pCont = document.getElementById("priority-list-container");
+        if (pCont) renderPriorityList();
+      }
+
       return res;
     }
   } catch (err) {
@@ -1657,8 +1679,18 @@ async function loadScreen(screenName, updateHistory = true) {
       // Silently sync di background untuk memastikan assign concern atau status visit terbaru selalu termuat
       syncMasterDataFromApi().then(() => renderPriorityList());
     }
-    if (screenName === "assignment") populateAssignDealerOptions();
-    if (screenName === "visit") populateVisitDealerOptions();
+    if (screenName === "assignment") {
+      populateAssignDealerOptions();
+      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
+        syncMasterDataFromApi().then(() => populateAssignDealerOptions());
+      }
+    }
+    if (screenName === "visit") {
+      populateVisitDealerOptions();
+      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
+        syncMasterDataFromApi().then(() => populateVisitDealerOptions());
+      }
+    }
     if (screenName === "onboarding" && typeof initOnboardingScreen === "function") initOnboardingScreen();
     if (screenName === "pipeline" && typeof initPipeline === "function") initPipeline();
     if (screenName === "gps") initGpsScreen();
