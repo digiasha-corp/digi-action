@@ -241,9 +241,42 @@
             </div>
           </div>
         </div>
-        <div id="modal-box-indikasi" class="hidden">
-          <label class="block font-semibold text-amber-900 mb-1">Indikasi Keberadaan Unit:</label>
-          <input type="text" id="modal-input-indikasi" placeholder="Contoh: Unit dipinjam owner / test drive" class="w-full bg-amber-50 border border-amber-300 rounded-xl p-2.5" />
+        <div id="modal-box-indikasi" class="hidden relative">
+          <label class="block font-semibold text-amber-900 mb-1 text-xs">Indikasi Keberadaan Unit: <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <div class="relative flex items-center">
+              <i class="fa-solid fa-car-side absolute left-3 text-amber-600/70 text-xs pointer-events-none"></i>
+              <input
+                type="text"
+                id="modal-input-indikasi"
+                value=""
+                placeholder="Pilih atau ketik indikasi keberadaan unit..."
+                autocomplete="off"
+                onfocus="openIndikasiSearchDropdown()"
+                onclick="openIndikasiSearchDropdown()"
+                oninput="filterIndikasiSearchOptions(this.value)"
+                onkeydown="onIndikasiSearchKeyDown(event)"
+                onblur="onIndikasiSearchInputBlur()"
+                class="w-full bg-amber-50/70 border border-amber-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-amber-950 placeholder-amber-700/50 focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition outline-none"
+              />
+              <button
+                type="button"
+                id="indikasi-search-clear-btn"
+                onclick="clearIndikasiSearchSelection()"
+                class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+              <i id="indikasi-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-amber-600/60 text-[10px] pointer-events-none"></i>
+            </div>
+
+            <div
+              id="indikasi-search-dropdown"
+              class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-amber-200 rounded-xl shadow-xl max-h-52 overflow-y-auto z-50 divide-y divide-slate-100"
+            >
+              <!-- Dropdown items rendered via JS -->
+            </div>
+          </div>
         </div>
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Titik GPS Sesuai Lokasi Visit?</label>
@@ -480,6 +513,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260916_v116"></script>
+  <script src="/app.js?v=20260916_v117"></script>
 </body>
 </html>

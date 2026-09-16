@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v116";
+const APP_BUILD_VERSION = "20260916_v117";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -7209,6 +7209,156 @@ function onDealerSelected(dealerId) {
   });
 }
 
+// =========================================================================
+// SEARCHABLE DROPDOWN: INDIKASI KEBERADAAN UNIT (PRESET & FREE INPUT)
+// =========================================================================
+const UNIT_INDIKASI_PRESETS = [
+  { value: "Showroom Lain", label: "Showroom Lain", icon: "fa-store", desc: "Berada di cabang showroom lainnya" },
+  { value: "Gudang", label: "Gudang", icon: "fa-warehouse", desc: "Disimpan di gudang / pool penyimpanan" },
+  { value: "Dealer Lain", label: "Dealer Lain", icon: "fa-building", desc: "Dipajang / titip jual di dealer lain" },
+  { value: "Dibawa Karyawan", label: "Dibawa Karyawan", icon: "fa-user-tie", desc: "Sedang dibawa atau dipakai staf/karyawan" },
+  { value: "Dibawa Rekanan", label: "Dibawa Rekanan", icon: "fa-handshake", desc: "Dipinjam / dibawa rekanan usaha mitra" },
+  { value: "Unit Dipembeli", label: "Unit Dipembeli", icon: "fa-cart-shopping", desc: "Sudah laku / sedang test drive pembeli" }
+];
+
+function initIndikasiSearchableDropdown() {
+  if (!window._indikasiDropdownClickAttached) {
+    window._indikasiDropdownClickAttached = true;
+    document.addEventListener("click", (e) => {
+      const wrapper = document.getElementById("modal-box-indikasi");
+      const dropdown = document.getElementById("indikasi-search-dropdown");
+      if (dropdown && wrapper && !wrapper.contains(e.target)) {
+        dropdown.classList.add("hidden");
+      }
+    });
+  }
+}
+
+function openIndikasiSearchDropdown() {
+  const dropdown = document.getElementById("indikasi-search-dropdown");
+  const input = document.getElementById("modal-input-indikasi");
+  if (!dropdown) return;
+  initIndikasiSearchableDropdown();
+  renderIndikasiSearchDropdown(input ? input.value : "");
+  dropdown.classList.remove("hidden");
+}
+
+function closeIndikasiSearchDropdown() {
+  const dropdown = document.getElementById("indikasi-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function renderIndikasiSearchDropdown(query = "") {
+  const dropdown = document.getElementById("indikasi-search-dropdown");
+  if (!dropdown) return;
+  const q = String(query || "").trim().toLowerCase();
+
+  dropdown.innerHTML = "";
+
+  const filtered = UNIT_INDIKASI_PRESETS.filter(item => {
+    if (!q) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-amber-50 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectIndikasiOption(item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc}</div>
+      </div>
+    `;
+    dropdown.appendChild(el);
+  });
+
+  // Jika input teks tidak persis sama dengan salah satu preset, sediakan opsi gunakan teks inputan
+  const rawQ = String(query || "").trim();
+  const exactMatch = UNIT_INDIKASI_PRESETS.some(item => item.value.toLowerCase() === rawQ.toLowerCase());
+  if (rawQ && !exactMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-amber-100/70 hover:bg-amber-200/80 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-amber-200";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectIndikasiOption(rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid fa-pen-to-square"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-amber-950">Gunakan Indikasi: "${rawQ}"</div>
+        <div class="text-[10px] text-amber-800">Indikasi posisi unit kustom sesuai inputan</div>
+      </div>
+    `;
+    dropdown.prepend(customEl);
+  }
+}
+
+function selectIndikasiOption(val) {
+  const input = document.getElementById("modal-input-indikasi");
+  const clearBtn = document.getElementById("indikasi-search-clear-btn");
+  const chevron = document.getElementById("indikasi-search-chevron");
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeIndikasiSearchDropdown();
+}
+
+function filterIndikasiSearchOptions(val) {
+  const clearBtn = document.getElementById("indikasi-search-clear-btn");
+  const chevron = document.getElementById("indikasi-search-chevron");
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderIndikasiSearchDropdown(val);
+  const dropdown = document.getElementById("indikasi-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function clearIndikasiSearchSelection() {
+  const input = document.getElementById("modal-input-indikasi");
+  const clearBtn = document.getElementById("indikasi-search-clear-btn");
+  const chevron = document.getElementById("indikasi-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderIndikasiSearchDropdown("");
+  const dropdown = document.getElementById("indikasi-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function onIndikasiSearchKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = document.getElementById("modal-input-indikasi");
+    const val = input ? input.value.trim() : "";
+    if (val) selectIndikasiOption(val);
+    closeIndikasiSearchDropdown();
+    if (input) input.blur();
+  }
+}
+
+function onIndikasiSearchInputBlur() {
+  setTimeout(() => {
+    closeIndikasiSearchDropdown();
+  }, 200);
+}
+
 function openUnitModal(index) {
   CURRENT_UNIT_INDEX = index;
   const u = ACTIVE_UNITS_STATE[index];
@@ -7233,7 +7383,16 @@ function openUnitModal(index) {
     document.getElementById("modal-unit-photo-preview").classList.add("hidden");
   }
 
-  document.getElementById("modal-input-indikasi").value = u.indikasi;
+  // Setup input indikasi (default blank jika tidak ada data)
+  const indVal = u.indikasi || "";
+  const inputIndikasi = document.getElementById("modal-input-indikasi");
+  const clearBtnIndikasi = document.getElementById("indikasi-search-clear-btn");
+  const chevronIndikasi = document.getElementById("indikasi-search-chevron");
+  if (inputIndikasi) inputIndikasi.value = indVal;
+  if (clearBtnIndikasi) clearBtnIndikasi.classList.toggle("hidden", !indVal);
+  if (chevronIndikasi) chevronIndikasi.classList.toggle("hidden", !!indVal);
+  closeIndikasiSearchDropdown();
+
   document.querySelector(`input[name="modal_gps_match"][value="${u.gps_match}"]`).checked = true;
 
   let hasLainnya = false;
@@ -7292,6 +7451,7 @@ function toggleInfoUnitLainnya(isChecked) {
 }
 
 function closeUnitModal() {
+  closeIndikasiSearchDropdown();
   document.getElementById("modal-unit").classList.add("hidden");
   CURRENT_UNIT_INDEX = null;
   TEMP_MODAL_PHOTO_BASE64 = null;
@@ -7303,9 +7463,16 @@ function toggleUnitAdaUI(isAda) {
   if (isAda) {
     boxFoto.classList.remove("hidden");
     boxIndikasi.classList.add("hidden");
+    closeIndikasiSearchDropdown();
   } else {
     boxFoto.classList.add("hidden");
     boxIndikasi.classList.remove("hidden");
+    const inputIndikasi = document.getElementById("modal-input-indikasi");
+    const clearBtnIndikasi = document.getElementById("indikasi-search-clear-btn");
+    const chevronIndikasi = document.getElementById("indikasi-search-chevron");
+    const hasVal = !!(inputIndikasi && inputIndikasi.value);
+    if (clearBtnIndikasi) clearBtnIndikasi.classList.toggle("hidden", !hasVal);
+    if (chevronIndikasi) chevronIndikasi.classList.toggle("hidden", hasVal);
   }
 }
 
@@ -7344,9 +7511,20 @@ function saveUnitChecklist() {
     return;
   }
 
+  const indVal = (document.getElementById("modal-input-indikasi")?.value || "").trim();
+  if (terlihatVal === "Tidak" && !indVal) {
+    alert("Silakan pilih atau ketik Indikasi Keberadaan Unit!");
+    const indInput = document.getElementById("modal-input-indikasi");
+    if (indInput) {
+      indInput.focus();
+      openIndikasiSearchDropdown();
+    }
+    return;
+  }
+
   u.terlihat = terlihatVal;
   u.foto_unit = (terlihatVal === "Ya") ? TEMP_MODAL_PHOTO_BASE64 : null;
-  u.indikasi = document.getElementById("modal-input-indikasi").value;
+  u.indikasi = indVal;
   u.gps_match = document.querySelector('input[name="modal_gps_match"]:checked').value;
 
   const checkedInfo = [];
