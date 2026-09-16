@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v109";
+const APP_BUILD_VERSION = "20260916_v110";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -5462,22 +5462,79 @@ function calculateMitraUrgency(dealer) {
     }
   }
 
-  // Status Closed / Dormant
+  // Status Closed / Dormant (Productivity: 7.Closed, 5. Dormant)
   const rawProd = String(dealer.productivity || "").trim().toLowerCase();
   const rawStatus = String(dealer.status || "").trim().toLowerCase();
-  const isClosedOrDormant = rawProd.includes("closed") || rawProd.includes("cloesed") || rawProd.includes("dormant") || rawProd.includes("7.closed") || rawProd.includes("5.dormant") || rawStatus.includes("closed") || rawStatus.includes("dormant");
-  const isAgingAllowed = !isClosedOrDormant;
+  const isClosedOrDormant = 
+    rawProd.includes("closed") || 
+    rawProd.includes("dormant") || 
+    rawStatus.includes("closed") || 
+    rawStatus.includes("dormant");
 
+  // Jika mitra berstatus Closed atau Dormant:
+  // TIDAK perlu dikalkulasi otomatis menjadi concern prioritas (aging visit dsb diabaikan).
+  // HANYA menjadi prioritas KECUALI jika ada assign concern (baik concern dealer maupun concern unit tertentu).
+  if (isClosedOrDormant) {
+    let hasUnitConcern = false;
+    let highestUnitConcernScore = 0;
+    let urgentUnitsCount = 0;
+
+    if (Array.isArray(dealer.units)) {
+      dealer.units.forEach(u => {
+        if (u.unit_concern) {
+          hasUnitConcern = true;
+          const uUrgency = typeof u.unit_concern === "object" ? u.unit_concern.urgency : u.unit_concern;
+          const uScore = uUrgency === "Sangat Penting" ? 3 : uUrgency === "Penting" ? 2 : uUrgency === "Moderat" ? 1 : 0;
+          if (!isUnitVisitedToday(u)) {
+            urgentUnitsCount++;
+          }
+          if (uScore > highestUnitConcernScore) {
+            highestUnitConcernScore = uScore;
+          }
+        }
+      });
+    }
+
+    // Jika TIDAK ada assign concern sama sekali (baik dealer concern maupun unit concern)
+    if (!concernUrgency && !hasUnitConcern) {
+      return {
+        level: "Normal",
+        score: 0,
+        mitraLevel: "Normal",
+        mitraScore: 0,
+        mitraReason: "Normal (Mitra Closed / Dormant)",
+        urgentUnitsCount: 0
+      };
+    }
+
+    // Jika ada assign concern:
+    const scoreMap = { "Sangat Penting": 3, "Penting": 2, "Moderat": 1 };
+    const dealerConcernScore = scoreMap[concernUrgency] || 0;
+    const finalScore = Math.max(dealerConcernScore, highestUnitConcernScore);
+    const scoreToLevel = { 3: "Sangat Penting", 2: "Penting", 1: "Moderat", 0: "Normal" };
+    const finalLevel = scoreToLevel[finalScore] || "Normal";
+
+    return {
+      level: finalLevel,
+      score: finalScore,
+      mitraLevel: scoreToLevel[dealerConcernScore] || "Normal",
+      mitraScore: dealerConcernScore,
+      mitraReason: concernUrgency ? `Concern Mitra: '${concernNote || concernUrgency}'` : "Normal (Mitra Closed / Dormant)",
+      urgentUnitsCount: urgentUnitsCount
+    };
+  }
+
+  // --- KONDISI NORMAL (BUKAN CLOSED / DORMANT) ---
   // A. Evaluasi Internal Dealer (Mitra Score)
   let mitraScore = 0;
   let mitraLevel = "Normal";
-  let mitraReason = isClosedOrDormant ? "Mitra Closed / Dormant" : "Kondisi Normal";
+  let mitraReason = "Kondisi Normal";
 
   if (concernUrgency === "Sangat Penting") {
     mitraScore = 3;
     mitraLevel = "Sangat Penting";
     mitraReason = `Concern Mitra: '${concernNote || "Sangat Penting"}'`;
-  } else if (isAgingAllowed && agingMitra >= 61) {
+  } else if (agingMitra >= 61) {
     mitraScore = 3;
     mitraLevel = "Sangat Penting";
     mitraReason = `Aging Visit Mitra >= 61 hr (${agingMitra} hr)`;
@@ -5485,7 +5542,7 @@ function calculateMitraUrgency(dealer) {
     mitraScore = 2;
     mitraLevel = "Penting";
     mitraReason = `Concern Mitra: '${concernNote || "Penting"}'`;
-  } else if (isAgingAllowed && agingMitra >= 31) {
+  } else if (agingMitra >= 31) {
     mitraScore = 2;
     mitraLevel = "Penting";
     mitraReason = `Aging Visit Mitra >= 31 hr (${agingMitra} hr)`;
@@ -5493,7 +5550,7 @@ function calculateMitraUrgency(dealer) {
     mitraScore = 1;
     mitraLevel = "Moderat";
     mitraReason = `Concern Mitra: '${concernNote || "Moderat"}'`;
-  } else if (isAgingAllowed && agingMitra >= 21) {
+  } else if (agingMitra >= 21) {
     mitraScore = 1;
     mitraLevel = "Moderat";
     mitraReason = `Aging Visit Mitra >= 21 hr (${agingMitra} hr)`;
@@ -5516,11 +5573,6 @@ function calculateMitraUrgency(dealer) {
         return;
       }
 
-      // Jika mitra berstatus Closed/Dormant, HANYA terima pemicu jika ada unit LIVE dengan concern atau anomali
-      if (isClosedOrDormant && !isULive && !u.unit_concern) {
-        return;
-      }
-
       const uEval = calculateUnitUrgency(u);
       const isUVisited = isUnitVisitedToday(u);
       // Unit dihitung sebagai penugasan aktif jika skor risiko > 0 dan BELUM dikunjungi hari ini
@@ -5531,18 +5583,6 @@ function calculateMitraUrgency(dealer) {
         highestUnitScore = uEval.score;
       }
     });
-  }
-
-  // Jika mitra Closed/Dormant dan tidak ada concern khusus dealer dan tidak ada unit LIVE yang urgent
-  if (isClosedOrDormant && !concernUrgency && highestUnitScore === 0) {
-    return {
-      level: "Normal",
-      score: 0,
-      mitraLevel: "Normal",
-      mitraScore: 0,
-      mitraReason: "Mitra Closed / Dormant",
-      urgentUnitsCount: urgentUnitsCount
-    };
   }
 
   // Level Akhir Mitra: Nilai Maksimal antara mitraScore dan highestUnitScore
@@ -5694,7 +5734,16 @@ function renderPriorityList() {
     let score = 0;
     let reason = "Kondisi Normal / Terjadwal Baik";
 
-    if (visitedToday && urgentUnits === 0 && !d.dealer_concern && clientCalc.mitraScore === 0) {
+    const rawDProd = String(d.productivity || "").trim().toLowerCase();
+    const isDealerClosedOrDormant = rawDProd.includes("closed") || rawDProd.includes("dormant");
+    const hasAnyActiveConcern = !!d.dealer_concern || (Array.isArray(d.units) && d.units.some(u => !!u.unit_concern));
+
+    if (isDealerClosedOrDormant && !hasAnyActiveConcern) {
+      level = "Normal";
+      score = 0;
+      reason = "Normal (Mitra Closed / Dormant)";
+      urgentUnits = 0;
+    } else if (visitedToday && urgentUnits === 0 && !d.dealer_concern && clientCalc.mitraScore === 0) {
       level = "Normal";
       score = 0;
       reason = "Selesai Dikunjungi Hari Ini";
