@@ -385,6 +385,8 @@ BEGIN
           rec.cabang, rec.priority_level, rec.priority_score, rec.priority_reason, false, NOW(), NOW()
         );
       END IF;
+    END LOOP;
+
     -- C. Tutup tiket otomatis (AUTO_CALCULATE) untuk dealer atau unit yang skornya sudah 0 (misal: normal atau Closed/Dormant)
     UPDATE t_priority_action
     SET is_fu = true,
@@ -466,16 +468,17 @@ GRANT EXECUTE ON FUNCTION mark_priority_fu TO anon, authenticated, service_role;
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'daily-priority-recalc-0300-wib') THEN
-    PERFORM cron.unschedule('daily-priority-recalc-0300-wib');
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'daily-priority-recalc-0300-wib') THEN
+      PERFORM cron.unschedule('daily-priority-recalc-0300-wib');
+    END IF;
+    PERFORM cron.schedule(
+      'daily-priority-recalc-0300-wib',
+      '0 20 * * *',
+      'SELECT recalculate_all_priorities()'
+    );
   END IF;
 END $$;
-
-SELECT cron.schedule(
-  'daily-priority-recalc-0300-wib',
-  '0 20 * * *',
-  $$SELECT recalculate_all_priorities()$$
-);
 
 
 -- ----------------------------------------------------------------------------
