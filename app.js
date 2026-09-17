@@ -16875,40 +16875,71 @@ async function openEmployeeDossierModal(nipOrId) {
   }
 
   CURRENT_DOSSIER_EMP = emp;
+  modal.classList.remove("hidden");
   switchDossierTab("job");
 
-  // Header Dossier
-  document.getElementById("dossier-nama").innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
-  document.getElementById("dossier-nip-badge").innerText = emp.nip || "-";
-  document.getElementById("dossier-jabatan-sub").innerText = `${emp.jabatan || 'Staff'} • ${emp.cabang || 'Head Office'}`;
-  document.getElementById("dossier-status-kerja-badge").innerText = emp.status_kerja || "PKWTT";
+  // Header Detail Personalia
+  try {
+    const elNama = document.getElementById("dossier-nama");
+    if (elNama) elNama.innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
+    const elNip = document.getElementById("dossier-nip-badge");
+    if (elNip) elNip.innerText = emp.nip || "-";
+    const elSub = document.getElementById("dossier-jabatan-sub");
+    if (elSub) elSub.innerText = `${emp.jabatan || 'Staff'} • ${emp.cabang || 'Head Office'}`;
+    const elSk = document.getElementById("dossier-status-kerja-badge");
+    if (elSk) elSk.innerText = emp.status_kerja || "PKWTT";
+    const elAktif = document.getElementById("dossier-status-aktif-badge");
+    if (elAktif) {
+      const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
+      elAktif.innerText = isAktif ? "AKTIF" : "NONAKTIF";
+      elAktif.className = isAktif ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase" : "text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase";
+    }
 
-  // Tab 1: Job & Account
-  document.getElementById("dossier-unit-val").innerText = emp.cabang || "Head Office";
-  document.getElementById("dossier-workloc-val").innerText = `Area: ${emp.area_cover || 'Seluruh Area'}`;
-  document.getElementById("dossier-jabatan-val").innerText = emp.jabatan || "-";
-  document.getElementById("dossier-level-val").innerText = `Role ID: ${emp.role_id || 'R-04'}`;
-  document.getElementById("dossier-atasan-val").innerText = emp.atasan_nama ? `${emp.atasan_nama} (${emp.atasan_nip})` : "Belum ditentukan";
-  document.getElementById("dossier-masakerja-val").innerText = emp.tanggal_masuk ? `Bergabung: ${emp.tanggal_masuk}` : "Aktif";
-  document.getElementById("dossier-kontrak-val").innerText = `Status: ${emp.status_kerja || 'PKWTT'}`;
-  document.getElementById("dossier-email-val").innerText = emp.email || "-";
-  document.getElementById("dossier-role-val").innerText = emp.role || emp.role_id || "Field Staff";
+    // Tab 1: Job & Account
+    const elUnit = document.getElementById("dossier-unit-val");
+    if (elUnit) elUnit.innerText = emp.cabang || "Head Office";
+    const elLoc = document.getElementById("dossier-workloc-val");
+    if (elLoc) elLoc.innerText = `Area: ${emp.area_cover || 'Seluruh Area'}`;
+    const elJabatan = document.getElementById("dossier-jabatan-val");
+    if (elJabatan) elJabatan.innerText = emp.jabatan || "-";
+    const elLevel = document.getElementById("dossier-level-val");
+    if (elLevel) elLevel.innerText = `Role ID: ${emp.role_id || 'R-04'}`;
+    const elAtasan = document.getElementById("dossier-atasan-val");
+    if (elAtasan) elAtasan.innerText = emp.atasan_nama ? `${emp.atasan_nama} (${emp.atasan_nip || ''})` : "Belum ditentukan";
+    const elMasa = document.getElementById("dossier-masakerja-val");
+    if (elMasa) elMasa.innerText = emp.tanggal_masuk ? `Bergabung: ${emp.tanggal_masuk}` : "Aktif";
+    const elKontrak = document.getElementById("dossier-kontrak-val");
+    if (elKontrak) elKontrak.innerText = `Status: ${emp.status_kerja || 'PKWTT'}`;
+    const elEmail = document.getElementById("dossier-email-val");
+    if (elEmail) elEmail.innerText = emp.email || "-";
+    const elRole = document.getElementById("dossier-role-val");
+    if (elRole) elRole.innerText = emp.role || emp.role_id || "Field Staff";
 
-  // Avatar
-  const avatarBox = document.getElementById("dossier-avatar-container");
-  if (emp.foto_profile_url || emp.foto) {
-    avatarBox.innerHTML = `<img src="${emp.foto_profile_url || emp.foto}" class="w-full h-full object-cover" />`;
-  } else {
-    avatarBox.innerHTML = `<i class="fa-solid fa-user-tie"></i>`;
+    // Avatar
+    const avatarBox = document.getElementById("dossier-avatar-container");
+    if (avatarBox) {
+      if (emp.foto_profile_url || emp.foto) {
+        avatarBox.innerHTML = `<img src="${emp.foto_profile_url || emp.foto}" class="w-full h-full object-cover" />`;
+      } else {
+        avatarBox.innerHTML = `<i class="fa-solid fa-user-tie"></i>`;
+      }
+    }
+  } catch (errDOM) {
+    console.warn("Error setting dossier DOM:", errDOM);
   }
 
-  // Load Data Pribadi dari Supabase (employee_personal_details)
-  await loadDossierPersonalDetails(emp);
+  // Load Data Pribadi & Riwayat Karir dari Supabase
+  try {
+    await loadDossierPersonalDetails(emp);
+  } catch (errP) {
+    console.warn("Error loading personal details:", errP);
+  }
 
-  // Load Riwayat Karir & Remunerasi dari Supabase (employee_career_histories)
-  await loadDossierCareerHistories(emp);
-
-  modal.classList.remove("hidden");
+  try {
+    await loadDossierCareerHistories(emp);
+  } catch (errC) {
+    console.warn("Error loading career histories:", errC);
+  }
 }
 
 function closeEmployeeDossierModal() {
