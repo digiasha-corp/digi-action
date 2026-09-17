@@ -293,7 +293,7 @@ function submitAbsensiServer(payload) {
       Number(payload.long || 0),
       payload.lokasi_kantor || payload.nearest_office || "-",
       distanceMeter,
-      isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "N/A",
+      isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "BEBAS_RADIUS",
       lateMinutes,
       statusKehadiran,
       payload.selfie_url || payload.selfie_photo_url || ""
@@ -314,7 +314,7 @@ function submitAbsensiServer(payload) {
         long: Number(payload.long || 0),
         nearest_office: payload.lokasi_kantor || payload.nearest_office || "-",
         distance_meter: distanceMeter,
-        status_geofence: isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "N/A",
+        status_geofence: isDatang ? (distanceMeter <= maxRadius ? "VALID" : "OUTSIDE_RADIUS") : "BEBAS_RADIUS",
         menit_terlambat: lateMinutes,
         status_kehadiran: statusKehadiran,
         selfie_photo_url: payload.selfie_url || payload.selfie_photo_url || ""
