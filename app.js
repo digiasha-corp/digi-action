@@ -2501,16 +2501,37 @@ async function fetchTodayAbsenStatus() {
     localDateStr = now.toISOString().slice(0, 10);
   }
 
-  const todayKey = `DIGIASHA_ABSEN_${CURRENT_USER.nip}_${localDateStr}`;
+  const todayKey = `DIGIASHA_ABSEN_${CURRENT_USER.nip || CURRENT_USER.nama}_${localDateStr}`;
   const localSaved = localStorage.getItem(todayKey);
   if (localSaved) {
     TODAY_ABSEN_STATUS = localSaved;
+    updateDashboardPresensiUI();
   }
 
   try {
-    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      // Cari presensi dalam rentang 24 jam terakhir agar aman dari konversi UTC
-      const startDateUtc = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const startDateUtc = new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    let logs = [];
+
+    if (supabaseClient) {
+      let query = supabaseClient
+        .from("tr_absensi_log")
+        .select("jenis_absen, timestamp, nip, nama_karyawan")
+        .gte("timestamp", `${startDateUtc}T00:00:00`)
+        .order("timestamp", { ascending: true });
+
+      if (CURRENT_USER.nip) {
+        query = query.eq("nip", CURRENT_USER.nip);
+      } else if (CURRENT_USER.nama) {
+        query = query.eq("nama_karyawan", CURRENT_USER.nama);
+      }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        logs = data;
+      }
+    }
+
+    if ((!logs || logs.length === 0) && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && CURRENT_USER.nip) {
       const url = `${CONFIG.SUPABASE_URL}/rest/v1/tr_absensi_log?nip=eq.${encodeURIComponent(CURRENT_USER.nip)}&timestamp=gte.${startDateUtc}T00:00:00&order=timestamp.asc`;
       const res = await fetch(url, {
         headers: {
@@ -2519,41 +2540,35 @@ async function fetchTodayAbsenStatus() {
         }
       });
       if (res.ok) {
-        const logs = await res.json();
-        let hasDatang = false;
-        let hasPulang = false;
-        if (Array.isArray(logs)) {
-          logs.forEach(l => {
-            let logLocalDateStr = "";
-            try {
-              const logDate = new Date(l.timestamp);
-              logLocalDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: clientTz, year: "numeric", month: "2-digit", day: "2-digit" }).format(logDate);
-            } catch (err) {
-              logLocalDateStr = String(l.timestamp || "").slice(0, 10);
-            }
+        const json = await res.json();
+        if (Array.isArray(json)) logs = json;
+      }
+    }
 
-            if (logLocalDateStr === localDateStr) {
-              const j = String(l.jenis_absen || "").toLowerCase();
-              if (j.includes("datang") || j.includes("masuk")) hasDatang = true;
-              if (j.includes("pulang")) hasPulang = true;
-            }
-          });
+    if (Array.isArray(logs) && logs.length > 0) {
+      let hasDatang = false;
+      let hasPulang = false;
+      logs.forEach(l => {
+        let logLocalDateStr = "";
+        try {
+          const logDate = new Date(l.timestamp);
+          logLocalDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: clientTz, year: "numeric", month: "2-digit", day: "2-digit" }).format(logDate);
+        } catch (err) {
+          logLocalDateStr = String(l.timestamp || "").slice(0, 10);
         }
-        if (hasPulang) TODAY_ABSEN_STATUS = "SUDAH_PULANG";
-        else if (hasDatang) TODAY_ABSEN_STATUS = "SUDAH_DATANG";
-        else TODAY_ABSEN_STATUS = "BELUM_ABSEN";
-        localStorage.setItem(todayKey, TODAY_ABSEN_STATUS);
-      }
-    } else {
-      const res = await callApi("getTodayAbsenStatus", {
-        nip: CURRENT_USER.nip,
-        cabang: CURRENT_USER.cabang,
-        timezone: clientTz
+
+        if (logLocalDateStr === localDateStr) {
+          const j = String(l.jenis_absen || "").toLowerCase();
+          if (j.includes("datang") || j.includes("masuk")) hasDatang = true;
+          if (j.includes("pulang")) hasPulang = true;
+        }
       });
-      if (res && res.success) {
-        TODAY_ABSEN_STATUS = res.status || "BELUM_ABSEN";
-        localStorage.setItem(todayKey, TODAY_ABSEN_STATUS);
-      }
+
+      if (hasPulang) TODAY_ABSEN_STATUS = "SUDAH_PULANG";
+      else if (hasDatang) TODAY_ABSEN_STATUS = "SUDAH_DATANG";
+      else TODAY_ABSEN_STATUS = "BELUM_ABSEN";
+
+      localStorage.setItem(todayKey, TODAY_ABSEN_STATUS);
     }
   } catch (e) {
     console.warn("Gagal cek status absensi online:", e);
@@ -2586,42 +2601,48 @@ function openAbsenChoiceModal() {
   const modal = document.getElementById("modal-absen-choice");
   if (!modal) return;
 
-  const datangBadge = document.getElementById("btn-choice-absen-datang-badge");
-  const pulangBadge = document.getElementById("btn-choice-absen-pulang-badge");
+  const btnTitle = document.getElementById("btn-choice-absen-title");
+  const btnDesc = document.getElementById("btn-choice-absen-desc");
+  const btnIcon = document.getElementById("btn-choice-absen-icon");
+  const btnIconBg = document.getElementById("btn-choice-absen-icon-bg");
+  const btnBadge = document.getElementById("btn-choice-absen-badge");
+  const btnMain = document.getElementById("btn-choice-absen-main");
 
   if (TODAY_ABSEN_STATUS === "SUDAH_DATANG") {
-    if (datangBadge) {
-      datangBadge.innerText = "Sudah Absen";
-      datangBadge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300";
-      datangBadge.classList.remove("hidden");
+    if (btnTitle) btnTitle.innerText = "Absen Pulang";
+    if (btnDesc) btnDesc.innerText = "Presensi kepulangan kerja (Bebas radius kantor, geotag real)";
+    if (btnIcon) btnIcon.className = "fa-solid fa-door-open text-amber-400";
+    if (btnIconBg) btnIconBg.className = "w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-lg shrink-0 border border-amber-500/30";
+    if (btnBadge) {
+      btnBadge.innerText = "Siap Pulang";
+      btnBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300";
+      btnBadge.classList.remove("hidden");
     }
-    if (pulangBadge) {
-      pulangBadge.innerText = "Langkah Sekarang";
-      pulangBadge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-amber-400 text-slate-950 font-extrabold shadow-sm animate-pulse";
-      pulangBadge.classList.remove("hidden");
+    if (btnMain) {
+      btnMain.className = "p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-amber-600/40 active:scale-[0.99]";
     }
   } else if (TODAY_ABSEN_STATUS === "SUDAH_PULANG") {
-    if (datangBadge) {
-      datangBadge.innerText = "Sudah Absen";
-      datangBadge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300";
-      datangBadge.classList.remove("hidden");
+    if (btnTitle) btnTitle.innerText = "Presensi Selesai";
+    if (btnDesc) btnDesc.innerText = "Presensi hari ini sudah lengkap (Datang & Pulang)";
+    if (btnIcon) btnIcon.className = "fa-solid fa-circle-check text-emerald-400";
+    if (btnIconBg) btnIconBg.className = "w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-lg shrink-0";
+    if (btnBadge) {
+      btnBadge.innerText = "Selesai";
+      btnBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300";
+      btnBadge.classList.remove("hidden");
     }
-    if (pulangBadge) {
-      pulangBadge.innerText = "Sudah Pulang";
-      pulangBadge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300";
-      pulangBadge.classList.remove("hidden");
+    if (btnMain) {
+      btnMain.className = "p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-slate-700 active:scale-[0.99]";
     }
   } else {
     // BELUM_ABSEN
-    if (datangBadge) {
-      datangBadge.innerText = "Masuk Kerja";
-      datangBadge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-400 text-slate-950 font-extrabold shadow-sm animate-pulse";
-      datangBadge.classList.remove("hidden");
-    }
-    if (pulangBadge) {
-      pulangBadge.innerText = "Bebas Radius";
-      pulangBadge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300";
-      pulangBadge.classList.remove("hidden");
+    if (btnTitle) btnTitle.innerText = "Absen Datang";
+    if (btnDesc) btnDesc.innerText = "Presensi masuk kerja (Wajib radius kantor)";
+    if (btnIcon) btnIcon.className = "fa-solid fa-building text-emerald-400";
+    if (btnIconBg) btnIconBg.className = "w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0";
+    if (btnBadge) btnBadge.classList.add("hidden");
+    if (btnMain) {
+      btnMain.className = "p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-slate-700 active:scale-[0.99]";
     }
   }
 
@@ -2635,6 +2656,14 @@ function closeAbsenChoiceModal() {
 
 function handleChoiceAbsenClick() {
   closeAbsenChoiceModal();
+  if (TODAY_ABSEN_STATUS === "SUDAH_PULANG") {
+    showCenterAlertModal({
+      title: "Presensi Lengkap",
+      message: "Anda telah menyelesaikan presensi kedatangan dan kepulangan untuk hari ini.",
+      type: "info"
+    });
+    return;
+  }
   if (TODAY_ABSEN_STATUS === "SUDAH_DATANG") {
     selectAbsenType("Absen Pulang");
   } else {
@@ -2653,59 +2682,11 @@ function selectIzinChoice() {
   loadScreen("izin");
 }
 
-function switchAbsenType(type) {
-  ACTIVE_ABSEN_TYPE = type;
-  applyAbsenTypeUI(type);
-
-  // Jika switch ke Absen Pulang: langsung bebas radius
-  if (ACTIVE_ABSEN_TYPE === "Absen Pulang") {
-    CURRENT_USER_GEO.isInsideRadius = true;
-    const badge = document.getElementById("absen-geofence-badge");
-    if (badge && CURRENT_USER_GEO.lat) {
-      badge.innerText = "Geotag Terkunci (Bebas Radius)";
-      badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-teal-100 text-teal-800 border border-teal-300";
-    }
-    const alertBox = document.getElementById("absen-gps-alert-box");
-    if (alertBox && CURRENT_USER_GEO.lat) alertBox.classList.add("hidden");
-  } else {
-    // Absen Datang: evaluasi ulang radius kantor jika koordinat sudah ada
-    if (CURRENT_USER_GEO.lat && CURRENT_USER_GEO.nearestOffice) {
-      const maxR = CURRENT_USER_GEO.nearestOffice.maxRadiusMeter || 100;
-      CURRENT_USER_GEO.isInsideRadius = (CURRENT_USER_GEO.distanceToOffice <= maxR);
-      const badge = document.getElementById("absen-geofence-badge");
-      const alertBox = document.getElementById("absen-gps-alert-box");
-      const alertTitle = document.getElementById("absen-gps-alert-title");
-      const alertDesc = document.getElementById("absen-gps-alert-desc");
-      if (CURRENT_USER_GEO.isInsideRadius) {
-        if (badge) {
-          badge.innerText = `Radius Valid (${CURRENT_USER_GEO.nearestOffice.name})`;
-          badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300";
-        }
-        if (alertBox) alertBox.classList.add("hidden");
-      } else {
-        if (badge) {
-          badge.innerText = `Di Luar Radius (${CURRENT_USER_GEO.distanceToOffice}m)`;
-          badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-800 border border-rose-300";
-        }
-        if (alertBox) {
-          alertBox.classList.remove("hidden");
-          if (alertTitle) alertTitle.innerText = `Anda Berada di Luar Radius Kantor (${CURRENT_USER_GEO.distanceToOffice}m)`;
-          if (alertDesc) alertDesc.innerText = `Jarak Anda ke ${CURRENT_USER_GEO.nearestOffice.name} adalah ${CURRENT_USER_GEO.distanceToOffice} meter. Batas toleransi presensi masuk adalah ${maxR} meter. Silakan merapat ke kantor sebelum absen.`;
-        }
-      }
-    }
-  }
-
-  updateAbsenCameraState();
-}
-
 function applyAbsenTypeUI(type) {
   const bannerTitle = document.getElementById("absen-type-title");
   const bannerIcon = document.getElementById("absen-type-icon");
   const banner = document.getElementById("absen-type-banner");
   const boxDist = document.getElementById("box-distance-office");
-  const tabDatang = document.getElementById("tab-absen-datang");
-  const tabPulang = document.getElementById("tab-absen-pulang");
   const isPulang = (type === "Absen Pulang");
 
   if (bannerTitle) bannerTitle.innerText = isPulang ? "Absen Pulang" : "Absen Datang";
@@ -2713,28 +2694,19 @@ function applyAbsenTypeUI(type) {
   if (isPulang) {
     if (banner) banner.className = "p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-amber-700 transition-colors duration-300";
     if (bannerIcon) bannerIcon.className = "fa-solid fa-door-open text-2xl text-amber-200";
-    if (boxDist) boxDist.classList.add("hidden"); // Absen pulang tidak wajib di kantor
-    if (tabPulang) {
-      tabPulang.className = "flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 bg-amber-600 text-white shadow-sm";
-    }
-    if (tabDatang) {
-      tabDatang.className = "flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900";
-    }
+    if (boxDist) boxDist.classList.add("hidden"); // Absen pulang bebas radius kantor
   } else {
     if (banner) banner.className = "p-3.5 rounded-2xl text-white shadow-sm flex items-center justify-between bg-slate-900 transition-colors duration-300";
     if (bannerIcon) bannerIcon.className = "fa-solid fa-building text-2xl text-emerald-400";
     if (boxDist) boxDist.classList.remove("hidden");
-    if (tabDatang) {
-      tabDatang.className = "flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 bg-white text-slate-900 shadow-sm";
-    }
-    if (tabPulang) {
-      tabPulang.className = "flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900";
-    }
   }
 }
 
 function initAbsensiScreen() {
-  if (!ACTIVE_ABSEN_TYPE) ACTIVE_ABSEN_TYPE = "Absen Datang";
+  // Jika belum ditentukan secara spesifik, otomatis sesuaikan dengan status hari ini
+  if (!ACTIVE_ABSEN_TYPE) {
+    ACTIVE_ABSEN_TYPE = (TODAY_ABSEN_STATUS === "SUDAH_DATANG") ? "Absen Pulang" : "Absen Datang";
+  }
   applyAbsenTypeUI(ACTIVE_ABSEN_TYPE);
 
   // Reset state koordinat presensi

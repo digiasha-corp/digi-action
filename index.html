@@ -115,36 +115,22 @@
         <p class="text-[11px] text-slate-400 mt-0.5">Pilih aktivitas kehadiran atau pengajuan izin</p>
       </div>
       <div class="grid grid-cols-1 gap-2.5">
-        <!-- Opsi 1: Absen Datang -->
-        <button id="btn-choice-absen-datang" type="button" onclick="selectAbsenType('Absen Datang')" class="p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-slate-700 active:scale-[0.99]">
-          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg shrink-0 border border-emerald-500/30">
-            <i class="fa-solid fa-building"></i>
+        <!-- Opsi 1: Absen Datang / Absen Pulang (Dinamis Sesuai Status Kehadiran Hari Ini) -->
+        <button id="btn-choice-absen-main" type="button" onclick="handleChoiceAbsenClick()" class="p-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-slate-700 active:scale-[0.99]">
+          <div id="btn-choice-absen-icon-bg" class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+            <i id="btn-choice-absen-icon" class="fa-solid fa-building text-emerald-400"></i>
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between">
-              <span class="font-bold text-xs block">Absen Datang</span>
-              <span id="btn-choice-absen-datang-badge" class="text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 hidden">Sudah Absen</span>
+              <span id="btn-choice-absen-title" class="font-bold text-xs block">Absen Datang</span>
+              <span id="btn-choice-absen-badge" class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 hidden">Selesai</span>
             </div>
-            <span class="text-[10px] text-slate-300 line-clamp-1">Presensi masuk kerja (Wajib radius kantor)</span>
+            <span id="btn-choice-absen-desc" class="text-[10px] text-slate-300 line-clamp-1">Presensi masuk kerja (Wajib radius kantor)</span>
           </div>
         </button>
 
-        <!-- Opsi 2: Absen Pulang -->
-        <button id="btn-choice-absen-pulang" type="button" onclick="selectAbsenType('Absen Pulang')" class="p-3.5 bg-amber-950/80 hover:bg-amber-900/90 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-amber-600/40 active:scale-[0.99]">
-          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-lg shrink-0 border border-amber-500/30">
-            <i class="fa-solid fa-door-open"></i>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-xs block text-amber-200">Absen Pulang</span>
-              <span id="btn-choice-absen-pulang-badge" class="text-[9px] px-2 py-0.5 rounded font-bold bg-amber-500/30 text-amber-300 hidden">Siap Pulang</span>
-            </div>
-            <span class="text-[10px] text-amber-100/80 line-clamp-1">Presensi kepulangan (Bebas radius kantor, geotag real)</span>
-          </div>
-        </button>
-
-        <!-- Opsi 3: Izin (WFA, Datang Terlambat, Cuti, Sakit) -->
-        <button id="btn-choice-izin" type="button" onclick="selectIzinChoice()" class="p-3.5 bg-teal-800 hover:bg-teal-900 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-teal-700 active:scale-[0.99]">
+        <!-- Opsi 2: Izin (WFA, Datang Terlambat, Cuti, Sakit) -->
+        <button id="btn-choice-izin" type="button" onclick="selectIzinChoice()" class="p-3.5 bg-teal-700 hover:bg-teal-800 text-white rounded-2xl flex items-center space-x-3 transition text-left shadow-sm border border-teal-600 active:scale-[0.99]">
           <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
             <i class="fa-solid fa-file-signature text-teal-200"></i>
           </div>
@@ -1121,6 +1107,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260917_v136"></script>
+  <script src="/app.js?v=20260917_v137"></script>
 </body>
 </html>
