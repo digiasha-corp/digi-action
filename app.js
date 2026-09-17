@@ -15793,6 +15793,7 @@ async function initOrganizationSettingScreen() {
     loadWorkLocations(),
     loadOrgUnits(),
     loadOrgPositions(),
+    loadAllJobPositionPermissions(),
     loadSsoClients()
   ]);
 
@@ -16487,10 +16488,16 @@ function renderOrgPositionsList(list) {
             ${parentPos ? `<span>•</span><span>Melapor Ke: <strong class="text-indigo-700">${parentPos.nama_jabatan}</strong></span>` : ''}
           </div>
         </div>
-        <button type="button" onclick="openEditJobPositionModal('${pos.id_position}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
-          <i class="fa-solid fa-pen-to-square"></i>
-          <span>Edit</span>
-        </button>
+        <div class="flex items-center space-x-1.5 shrink-0">
+          <button type="button" onclick="openPositionPermissionsModal('${pos.id_position}')" class="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-indigo-200 transition" title="Atur Hak Akses Multi-Aplikasi">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span class="hidden sm:inline">Hak Akses</span>
+          </button>
+          <button type="button" onclick="openEditJobPositionModal('${pos.id_position}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Edit</span>
+          </button>
+        </div>
       </div>
     `;
   }).join("");
@@ -17208,99 +17215,530 @@ async function runSsoTokenSimulation() {
   }, 600);
 }
 
-// ---------------- 6. ROLE & HAK AKSES PERMISSION MATRIX ----------------
-let ORG_ROLE_PERMS_DATA = { ...ROLE_PERMISSIONS };
+// ---------------- 6. HAK AKSES MULTI-APLIKASI BERBASIS JABATAN (CENTRALIZED RBAC) ----------------
+const ORG_APPS_CONFIG = {
+  digicore: {
+    name: "Digiasha Core",
+    icon: "fa-laptop",
+    modules: [
+      { key: "org_structure", label: "Organization Structure" },
+      { key: "employee_mgmt", label: "Employee Management" },
+      { key: "approval_onboarding", label: "Approval: Onboarding Partner" },
+      { key: "approval_pre_komite", label: "Approval: Pre Komite Fasilitas" },
+      { key: "approval_final_komite", label: "Approval: Final Komite Fasilitas" },
+      { key: "approval_cek_bpkb", label: "Approval: Cek BPKB" },
+      { key: "approval_inspeksi", label: "Approval: Inspeksi Kendaraan" },
+      { key: "vehicle_pricelist", label: "Vehicle Pricelist Maintenance" },
+      { key: "package_maintenance", label: "Package Maintenance" }
+    ]
+  },
+  digi_workapp: {
+    name: "Digi Appwork",
+    icon: "fa-mobile-screen",
+    modules: [
+      { key: "attendance_gps", label: "Presensi GPS & Selfie Kehadiran" },
+      { key: "task_assignment", label: "Penugasan & Task Pipeline" },
+      { key: "visit_dealer", label: "Kunjungan Lapangan & Visit Mitra" },
+      { key: "onboarding_partner", label: "Onboarding Mitra Dealer Baru" },
+      { key: "daily_activity", label: "Laporan Aktivitas Harian (Daily Report)" },
+      { key: "expense_claim", label: "Pengajuan Klaim Biaya & Bensin" },
+      { key: "leave_permit", label: "Pengajuan Izin, Cuti & Sakit" },
+      { key: "payslip_info", label: "Slip Gaji & Info Payroll" }
+    ]
+  },
+  digi_spector: {
+    name: "Digispector",
+    icon: "fa-magnifying-glass",
+    modules: [
+      { key: "inspection_queue", label: "Antrean & Penugasan Inspeksi" },
+      { key: "field_inspection_form", label: "Formulir Inspeksi Lapangan" },
+      { key: "engine_body_checklist", label: "Checklist Mesin, Bodi & Interior" },
+      { key: "vehicle_photo_doc", label: "Upload Foto Unit & Dokumen Fisik" },
+      { key: "bpkb_stnk_validation", label: "Validasi BPKB & STNK" },
+      { key: "market_price_scoring", label: "Estimasi Harga Pasar & Skor Kelayakan" },
+      { key: "inspection_approval", label: "Approval Hasil Inspeksi Unit" }
+    ]
+  }
+};
 
-const ORG_ALL_MODULES = [
-  { key: "dashboard", label: "Dashboard Ringkasan", icon: "fa-gauge" },
-  { key: "assignment", label: "Penugasan & Task", icon: "fa-list-check" },
-  { key: "visit", label: "Kunjungan Lapangan & GPS", icon: "fa-map-location-dot" },
-  { key: "onboarding", label: "Onboarding Mitra", icon: "fa-handshake" },
-  { key: "pipeline", label: "Pipeline Prospek", icon: "fa-chart-line" },
-  { key: "gps", label: "Tracking & Perangkat GPS", icon: "fa-satellite-dish" },
-  { key: "fac", label: "Monitoring Kinerja FAC", icon: "fa-user-astronaut" },
-  { key: "history", label: "Riwayat Aktivitas", icon: "fa-clock-rotate-left" },
-  { key: "personalia", label: "Data Personalia & Core HR", icon: "fa-address-card" },
-  { key: "organization_setting", label: "Organization Setting", icon: "fa-sitemap" },
-  { key: "sop_management", label: "SOP Management", icon: "fa-book" },
-  { key: "settings", label: "Pengaturan Sistem", icon: "fa-gear" }
-];
+const DEFAULT_POSITION_PERMISSIONS = {
+  "POS-DIR-UTAMA": [
+    "digicore:org_structure:view", "digicore:org_structure:edit",
+    "digicore:employee_mgmt:view", "digicore:employee_mgmt:edit",
+    "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
+    "digicore:approval_pre_komite:view", "digicore:approval_pre_komite:edit",
+    "digicore:approval_final_komite:view", "digicore:approval_final_komite:edit",
+    "digicore:approval_cek_bpkb:view", "digicore:approval_cek_bpkb:edit",
+    "digicore:approval_inspeksi:view", "digicore:approval_inspeksi:edit",
+    "digicore:vehicle_pricelist:view", "digicore:vehicle_pricelist:edit",
+    "digicore:package_maintenance:view", "digicore:package_maintenance:edit",
+    "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
+    "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
+    "digi_workapp:visit_dealer:view", "digi_workapp:visit_dealer:edit",
+    "digi_workapp:onboarding_partner:view", "digi_workapp:onboarding_partner:edit",
+    "digi_workapp:daily_activity:view", "digi_workapp:daily_activity:edit",
+    "digi_workapp:expense_claim:view", "digi_workapp:expense_claim:edit",
+    "digi_workapp:leave_permit:view", "digi_workapp:leave_permit:edit",
+    "digi_workapp:payslip_info:view", "digi_workapp:payslip_info:edit",
+    "digi_spector:inspection_queue:view", "digi_spector:inspection_queue:edit",
+    "digi_spector:field_inspection_form:view", "digi_spector:field_inspection_form:edit",
+    "digi_spector:engine_body_checklist:view", "digi_spector:engine_body_checklist:edit",
+    "digi_spector:vehicle_photo_doc:view", "digi_spector:vehicle_photo_doc:edit",
+    "digi_spector:bpkb_stnk_validation:view", "digi_spector:bpkb_stnk_validation:edit",
+    "digi_spector:market_price_scoring:view", "digi_spector:market_price_scoring:edit",
+    "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
+  ],
+  "POS-GM-OPS": [
+    "digicore:org_structure:view", "digicore:org_structure:edit",
+    "digicore:employee_mgmt:view", "digicore:employee_mgmt:edit",
+    "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
+    "digicore:approval_pre_komite:view", "digicore:approval_pre_komite:edit",
+    "digicore:approval_final_komite:view", "digicore:approval_final_komite:edit",
+    "digicore:approval_inspeksi:view", "digicore:approval_inspeksi:edit",
+    "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
+    "digi_workapp:visit_dealer:view", "digi_workapp:visit_dealer:edit",
+    "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
+  ],
+  "POS-BM-SERANG": [
+    "digicore:org_structure:view",
+    "digicore:employee_mgmt:view",
+    "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
+    "digicore:approval_pre_komite:view", "digicore:approval_pre_komite:edit",
+    "digicore:approval_cek_bpkb:view",
+    "digicore:approval_inspeksi:view",
+    "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
+    "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
+    "digi_workapp:visit_dealer:view",
+    "digi_workapp:daily_activity:view",
+    "digi_workapp:expense_claim:view", "digi_workapp:expense_claim:edit",
+    "digi_workapp:leave_permit:view", "digi_workapp:leave_permit:edit",
+    "digi_workapp:payslip_info:view",
+    "digi_spector:inspection_queue:view",
+    "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
+  ],
+  "POS-BM-TGR": [
+    "digicore:org_structure:view",
+    "digicore:employee_mgmt:view",
+    "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
+    "digicore:approval_pre_komite:view", "digicore:approval_pre_komite:edit",
+    "digicore:approval_cek_bpkb:view",
+    "digicore:approval_inspeksi:view",
+    "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
+    "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
+    "digi_workapp:visit_dealer:view",
+    "digi_workapp:daily_activity:view",
+    "digi_workapp:expense_claim:view", "digi_workapp:expense_claim:edit",
+    "digi_workapp:leave_permit:view", "digi_workapp:leave_permit:edit",
+    "digi_workapp:payslip_info:view",
+    "digi_spector:inspection_queue:view",
+    "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
+  ],
+  "POS-SPV-FAC": [
+    "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
+    "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
+    "digi_workapp:visit_dealer:view", "digi_workapp:visit_dealer:edit",
+    "digi_workapp:onboarding_partner:view", "digi_workapp:onboarding_partner:edit",
+    "digi_workapp:daily_activity:view", "digi_workapp:daily_activity:edit",
+    "digi_workapp:expense_claim:view", "digi_workapp:expense_claim:edit",
+    "digi_workapp:leave_permit:view", "digi_workapp:leave_permit:edit",
+    "digi_workapp:payslip_info:view",
+    "digi_spector:inspection_queue:view", "digi_spector:inspection_queue:edit",
+    "digi_spector:field_inspection_form:view", "digi_spector:field_inspection_form:edit",
+    "digi_spector:engine_body_checklist:view", "digi_spector:engine_body_checklist:edit",
+    "digi_spector:vehicle_photo_doc:view", "digi_spector:vehicle_photo_doc:edit",
+    "digi_spector:bpkb_stnk_validation:view"
+  ],
+  "POS-FAC-OFFICER": [
+    "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
+    "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
+    "digi_workapp:visit_dealer:view", "digi_workapp:visit_dealer:edit",
+    "digi_workapp:onboarding_partner:view", "digi_workapp:onboarding_partner:edit",
+    "digi_workapp:daily_activity:view", "digi_workapp:daily_activity:edit",
+    "digi_workapp:expense_claim:view", "digi_workapp:expense_claim:edit",
+    "digi_workapp:leave_permit:view", "digi_workapp:leave_permit:edit",
+    "digi_workapp:payslip_info:view"
+  ],
+  "POS-ADMIN-HO": [
+    "digicore:org_structure:view", "digicore:org_structure:edit",
+    "digicore:employee_mgmt:view", "digicore:employee_mgmt:edit",
+    "digicore:vehicle_pricelist:view", "digicore:vehicle_pricelist:edit",
+    "digicore:package_maintenance:view", "digicore:package_maintenance:edit",
+    "digi_workapp:attendance_gps:view",
+    "digi_workapp:payslip_info:view", "digi_workapp:payslip_info:edit"
+  ]
+};
+
+let ORG_POSITION_PERMS_DATA = { ...DEFAULT_POSITION_PERMISSIONS };
+let CURRENT_PERM_POSITION_ID = null;
+let CURRENT_PERM_APP_TAB = "digicore";
+let CURRENT_TEMP_PERMS_SET = new Set();
+let CURRENT_ROLE_FILTER_KEYWORD = "";
+
+async function loadAllJobPositionPermissions() {
+  if (!supabaseClient) return;
+  try {
+    let rows = null;
+    try {
+      const { data, error } = await supabaseClient
+        .from("hr_job_position_permissions")
+        .select("position_id, permission_code");
+      if (!error && Array.isArray(data) && data.length > 0) rows = data;
+    } catch (e) {}
+
+    if (!rows) {
+      try {
+        const { data, error } = await supabaseClient
+          .from("job_position_permissions")
+          .select("position_id, permission_code");
+        if (!error && Array.isArray(data) && data.length > 0) rows = data;
+      } catch (e) {}
+    }
+
+    if (rows && rows.length > 0) {
+      const map = {};
+      rows.forEach(r => {
+        if (!map[r.position_id]) map[r.position_id] = [];
+        map[r.position_id].push(r.permission_code);
+      });
+      // Merge with defaults
+      ORG_POSITION_PERMS_DATA = { ...DEFAULT_POSITION_PERMISSIONS, ...map };
+      console.log("[Core HR] Berhasil memuat hak akses untuk", Object.keys(map).length, "jabatan dari Supabase");
+    }
+  } catch (err) {
+    console.warn("[Core HR] loadAllJobPositionPermissions exception:", err);
+  }
+}
 
 async function loadOrgRolePermissions() {
+  await loadAllJobPositionPermissions();
+  renderOrgRolePermissions(CURRENT_ROLE_FILTER_KEYWORD);
+}
+
+function filterOrgRolePermissions(val) {
+  CURRENT_ROLE_FILTER_KEYWORD = (val || "").trim();
+  renderOrgRolePermissions(CURRENT_ROLE_FILTER_KEYWORD);
+}
+
+function renderOrgRolePermissions(filterKeyword = "") {
   const container = document.getElementById("role-permissions-matrix-container");
   if (!container) return;
 
-  const roles = [
-    { code: "R-01", title: "Super Admin / Direksi", badge: "bg-purple-100 text-purple-800" },
-    { code: "Admin", title: "Administrator Sistem", badge: "bg-indigo-100 text-indigo-800" },
-    { code: "R-02", title: "Branch Manager (BM)", badge: "bg-blue-100 text-blue-800" },
-    { code: "R-03", title: "Supervisor FAC", badge: "bg-emerald-100 text-emerald-800" },
-    { code: "R-04", title: "Field Action Coordinator (FAC)", badge: "bg-amber-100 text-amber-800" }
-  ];
+  const positions = (ORG_POSITIONS_DATA || []).filter(p => {
+    if (!filterKeyword) return true;
+    const kw = filterKeyword.toLowerCase();
+    return (p.nama_jabatan || "").toLowerCase().includes(kw) ||
+           (p.id_position || "").toLowerCase().includes(kw) ||
+           (p.unit_id || "").toLowerCase().includes(kw);
+  });
 
-  let html = `
+  if (positions.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-user-slash text-2xl text-slate-300 mb-2 block"></i>
+        Tidak ada jabatan yang sesuai pencarian.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs border-collapse">
-        <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+        <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
           <tr>
-            <th class="p-3 min-w-[200px]">Modul / Fitur Aplikasi</th>
-            ${roles.map(r => `
-              <th class="p-3 text-center min-w-[120px]">
-                <span class="block text-slate-900">${r.title}</span>
-                <span class="font-mono text-[9px] px-1.5 py-0.5 rounded font-bold ${r.badge}">${r.code}</span>
-              </th>
-            `).join("")}
+            <th class="p-3 min-w-[200px]">Posisi / Jabatan</th>
+            <th class="p-3 min-w-[140px]">Unit Penempatan</th>
+            <th class="p-3 min-w-[100px]">Level / Grade</th>
+            <th class="p-3 text-center w-24">Status</th>
+            <th class="p-3 min-w-[240px]">Akses Aplikasi Aktif</th>
+            <th class="p-3 text-right w-32">Aksi</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
-          ${ORG_ALL_MODULES.map(m => `
-            <tr class="hover:bg-slate-50 transition">
-              <td class="p-3 font-semibold text-slate-800 flex items-center space-x-2">
-                <i class="fa-solid ${m.icon} text-slate-400 w-4 text-center"></i>
-                <span>${m.label}</span>
-              </td>
-              ${roles.map(r => {
-                const perms = ORG_ROLE_PERMS_DATA[r.code] || [];
-                const isChecked = perms.includes(m.key) || perms.includes("all");
-                return `
-                  <td class="p-3 text-center">
-                    <input type="checkbox" ${isChecked ? "checked" : ""} 
-                      onchange="toggleOrgRolePermission('${r.code}', '${m.key}', this.checked)"
-                      class="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer" />
-                  </td>
-                `;
-              }).join("")}
-            </tr>
-          `).join("")}
+        <tbody class="divide-y divide-slate-100 bg-white">
+          ${positions.map(pos => {
+            const unit = (ORG_UNITS_DATA || []).find(u => u.id_unit === pos.unit_id);
+            const level = (ORG_LEVELS_DATA || []).find(l => l.id_level === pos.level_id);
+            const isActive = pos.is_active !== false;
+            const perms = ORG_POSITION_PERMS_DATA[pos.id_position] || [];
+
+            const coreCount = perms.filter(c => c.startsWith("digicore:") && c.endsWith(":view")).length;
+            const workappCount = perms.filter(c => c.startsWith("digi_workapp:") && c.endsWith(":view")).length;
+            const spectorCount = perms.filter(c => c.startsWith("digi_spector:") && c.endsWith(":view")).length;
+
+            return `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="p-3">
+                  <div class="font-bold text-slate-900">${pos.nama_jabatan}</div>
+                  <div class="font-mono text-[10px] text-slate-400 font-bold">${pos.id_position}</div>
+                </td>
+                <td class="p-3 text-slate-700 font-medium">
+                  ${unit?.nama_unit || pos.unit_id || '-'}
+                </td>
+                <td class="p-3">
+                  <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    ${level?.nama_level || pos.level_id || '-'}
+                  </span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">
+                    ${isActive ? 'AKTIF' : 'NONAKTIF'}
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${coreCount > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}">
+                      <i class="fa-solid fa-laptop mr-1"></i>Core: ${coreCount}
+                    </span>
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${workappCount > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}">
+                      <i class="fa-solid fa-mobile-screen mr-1"></i>Appwork: ${workappCount}
+                    </span>
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${spectorCount > 0 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200'}">
+                      <i class="fa-solid fa-magnifying-glass mr-1"></i>Spector: ${spectorCount}
+                    </span>
+                  </div>
+                </td>
+                <td class="p-3 text-right">
+                  <button type="button" onclick="openPositionPermissionsModal('${pos.id_position}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-xs inline-flex items-center space-x-1.5 transition">
+                    <i class="fa-solid fa-shield-halved text-xs"></i>
+                    <span>Atur Akses</span>
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join("")}
         </tbody>
       </table>
     </div>
   `;
-
-  container.innerHTML = html;
 }
 
-function toggleOrgRolePermission(roleCode, modKey, checked) {
-  if (!ORG_ROLE_PERMS_DATA[roleCode]) ORG_ROLE_PERMS_DATA[roleCode] = [];
-  if (checked) {
-    if (!ORG_ROLE_PERMS_DATA[roleCode].includes(modKey)) ORG_ROLE_PERMS_DATA[roleCode].push(modKey);
-  } else {
-    ORG_ROLE_PERMS_DATA[roleCode] = ORG_ROLE_PERMS_DATA[roleCode].filter(k => k !== modKey);
+function openPositionPermissionsModal(positionId) {
+  const pos = (ORG_POSITIONS_DATA || []).find(p => p.id_position === positionId);
+  if (!pos) {
+    alert("Jabatan tidak ditemukan: " + positionId);
+    return;
   }
-  // Sinkronisasi ke variabel global
-  ROLE_PERMISSIONS[roleCode] = [...ORG_ROLE_PERMS_DATA[roleCode]];
-  showToast(`Hak akses modul ${modKey} untuk ${roleCode} berhasil diperbarui!`, "success", 1200);
+
+  CURRENT_PERM_POSITION_ID = positionId;
+  CURRENT_PERM_APP_TAB = "digicore";
+
+  // Ambil data izin yang sudah tersimpan untuk jabatan ini ke dalam working set
+  const savedPerms = ORG_POSITION_PERMS_DATA[positionId] || DEFAULT_POSITION_PERMISSIONS[positionId] || [];
+  CURRENT_TEMP_PERMS_SET = new Set(savedPerms);
+
+  // Set Header Modal
+  document.getElementById("perm-modal-title").innerText = `Hak Akses: ${pos.nama_jabatan}`;
+  document.getElementById("perm-modal-subtitle").innerText = `ID Position: ${pos.id_position}`;
+
+  // Buka tab default
+  switchPositionPermAppTab("digicore");
+
+  document.getElementById("modal-position-permissions").classList.remove("hidden");
 }
 
-function openAddRoleModal() {
-  const roleName = prompt("Masukkan nama Role baru (contoh: Finance / HR Officer):");
-  if (!roleName) return;
-  const roleCode = prompt("Masukkan kode Role (contoh: R-06):", `R-${Math.floor(10 + Math.random() * 90)}`);
-  if (!roleCode) return;
-  ORG_ROLE_PERMS_DATA[roleCode] = ["priority", "history"];
-  ROLE_PERMISSIONS[roleCode] = ["priority", "history"];
-  loadOrgRolePermissions();
-  showToast(`Role ${roleName} (${roleCode}) berhasil didaftarkan!`, "success", 1500);
+function closePositionPermissionsModal() {
+  document.getElementById("modal-position-permissions").classList.add("hidden");
+  CURRENT_PERM_POSITION_ID = null;
+  CURRENT_TEMP_PERMS_SET.clear();
+}
+
+function switchPositionPermAppTab(appKey) {
+  CURRENT_PERM_APP_TAB = appKey;
+  const appKeys = ["digicore", "digi_workapp", "digi_spector"];
+
+  appKeys.forEach(key => {
+    const btn = document.getElementById(`perm-tab-btn-${key}`);
+    if (btn) {
+      if (key === appKey) {
+        btn.className = "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-indigo-600 text-indigo-700";
+      } else {
+        btn.className = "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800";
+      }
+    }
+  });
+
+  renderPositionPermTable();
+}
+
+function renderPositionPermTable() {
+  const container = document.getElementById("perm-module-rows-container");
+  if (!container) return;
+
+  const appConfig = ORG_APPS_CONFIG[CURRENT_PERM_APP_TAB];
+  if (!appConfig) return;
+
+  let allViewChecked = true;
+  let allEditChecked = true;
+
+  const rowsHtml = appConfig.modules.map(mod => {
+    const viewCode = `${CURRENT_PERM_APP_TAB}:${mod.key}:view`;
+    const editCode = `${CURRENT_PERM_APP_TAB}:${mod.key}:edit`;
+
+    const isView = CURRENT_TEMP_PERMS_SET.has(viewCode);
+    const isEdit = CURRENT_TEMP_PERMS_SET.has(editCode);
+
+    if (!isView) allViewChecked = false;
+    if (!isEdit) allEditChecked = false;
+
+    return `
+      <tr class="hover:bg-slate-50/80 transition">
+        <td class="py-2.5 px-3 font-semibold text-slate-800 text-xs">
+          ${mod.label}
+        </td>
+        <td class="py-2.5 px-3 text-center">
+          <input type="checkbox" id="perm-view-${mod.key}" 
+            ${isView ? 'checked' : ''} 
+            onchange="togglePositionPerm('${mod.key}', 'view', this.checked)"
+            class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
+        </td>
+        <td class="py-2.5 px-3 text-center">
+          <input type="checkbox" id="perm-edit-${mod.key}" 
+            ${isEdit ? 'checked' : ''} 
+            onchange="togglePositionPerm('${mod.key}', 'edit', this.checked)"
+            class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  container.innerHTML = rowsHtml;
+
+  // Update check all checkboxes
+  const chkAllView = document.getElementById("check-all-view");
+  if (chkAllView) chkAllView.checked = (appConfig.modules.length > 0) && allViewChecked;
+  const chkAllEdit = document.getElementById("check-all-edit");
+  if (chkAllEdit) chkAllEdit.checked = (appConfig.modules.length > 0) && allEditChecked;
+}
+
+function togglePositionPerm(modKey, action, checked) {
+  const code = `${CURRENT_PERM_APP_TAB}:${modKey}:${action}`;
+  const viewCode = `${CURRENT_PERM_APP_TAB}:${modKey}:view`;
+  const editCode = `${CURRENT_PERM_APP_TAB}:${modKey}:edit`;
+
+  if (action === "edit") {
+    if (checked) {
+      CURRENT_TEMP_PERMS_SET.add(editCode);
+      CURRENT_TEMP_PERMS_SET.add(viewCode);
+      const chkView = document.getElementById(`perm-view-${modKey}`);
+      if (chkView) chkView.checked = true;
+    } else {
+      CURRENT_TEMP_PERMS_SET.delete(editCode);
+    }
+  } else if (action === "view") {
+    if (checked) {
+      CURRENT_TEMP_PERMS_SET.add(viewCode);
+    } else {
+      CURRENT_TEMP_PERMS_SET.delete(viewCode);
+      CURRENT_TEMP_PERMS_SET.delete(editCode);
+      const chkEdit = document.getElementById(`perm-edit-${modKey}`);
+      if (chkEdit) chkEdit.checked = false;
+    }
+  }
+
+  // Update status check-all
+  const appConfig = ORG_APPS_CONFIG[CURRENT_PERM_APP_TAB];
+  if (appConfig) {
+    let allV = true;
+    let allE = true;
+    appConfig.modules.forEach(m => {
+      if (!CURRENT_TEMP_PERMS_SET.has(`${CURRENT_PERM_APP_TAB}:${m.key}:view`)) allV = false;
+      if (!CURRENT_TEMP_PERMS_SET.has(`${CURRENT_PERM_APP_TAB}:${m.key}:edit`)) allE = false;
+    });
+    const cV = document.getElementById("check-all-view");
+    if (cV) cV.checked = allV;
+    const cE = document.getElementById("check-all-edit");
+    if (cE) cE.checked = allE;
+  }
+}
+
+function toggleCheckAllCurrentApp(action, checked) {
+  const appConfig = ORG_APPS_CONFIG[CURRENT_PERM_APP_TAB];
+  if (!appConfig) return;
+
+  appConfig.modules.forEach(mod => {
+    const viewCode = `${CURRENT_PERM_APP_TAB}:${mod.key}:view`;
+    const editCode = `${CURRENT_PERM_APP_TAB}:${mod.key}:edit`;
+
+    if (action === "view") {
+      if (checked) {
+        CURRENT_TEMP_PERMS_SET.add(viewCode);
+      } else {
+        CURRENT_TEMP_PERMS_SET.delete(viewCode);
+        CURRENT_TEMP_PERMS_SET.delete(editCode);
+      }
+    } else if (action === "edit") {
+      if (checked) {
+        CURRENT_TEMP_PERMS_SET.add(viewCode);
+        CURRENT_TEMP_PERMS_SET.add(editCode);
+      } else {
+        CURRENT_TEMP_PERMS_SET.delete(editCode);
+      }
+    }
+  });
+
+  renderPositionPermTable();
+}
+
+async function handleSavePositionPermissions() {
+  if (!CURRENT_PERM_POSITION_ID) return;
+  const btn = document.getElementById("btn-save-position-perms");
+  const origHtml = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  }
+
+  const positionId = CURRENT_PERM_POSITION_ID;
+  const permsArray = Array.from(CURRENT_TEMP_PERMS_SET);
+
+  try {
+    if (supabaseClient) {
+      // 1. Hapus izin lama posisi ini
+      try {
+        await supabaseClient.from("hr_job_position_permissions").delete().eq("position_id", positionId);
+      } catch (e) {}
+      try {
+        await supabaseClient.from("job_position_permissions").delete().eq("position_id", positionId);
+      } catch (e) {}
+
+      // 2. Insert batch izin baru jika ada
+      if (permsArray.length > 0) {
+        const insertRows = permsArray.map(code => ({
+          position_id: positionId,
+          permission_code: code
+        }));
+
+        let inserted = false;
+        try {
+          const { error } = await supabaseClient.from("hr_job_position_permissions").insert(insertRows);
+          if (!error) inserted = true;
+        } catch (e) {}
+
+        if (!inserted) {
+          try {
+            await supabaseClient.from("job_position_permissions").insert(insertRows);
+          } catch (e) {}
+        }
+      }
+    }
+
+    // Update in-memory storage
+    ORG_POSITION_PERMS_DATA[positionId] = permsArray;
+
+    // Refresh view matriks
+    renderOrgRolePermissions(CURRENT_ROLE_FILTER_KEYWORD);
+    closePositionPermissionsModal();
+
+    const pos = (ORG_POSITIONS_DATA || []).find(p => p.id_position === positionId);
+    showToast(`Hak akses multi-aplikasi untuk "${pos?.nama_jabatan || positionId}" berhasil disimpan!`, "success", 2000);
+  } catch (err) {
+    alert("Gagal menyimpan hak akses: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
 }
 
 // ---------------- 7. DETAIL PERSONALIA KARYAWAN & RIWAYAT KARIR ----------------
