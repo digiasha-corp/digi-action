@@ -44,7 +44,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, ketentuan, SOP management, dan pengaturan sistem.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
-      "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
+      "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji", "personalia",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
       "sop_management", "organization_setting", "settings"
     ]
@@ -57,7 +57,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, ketentuan, dan layanan support karyawan.",
     permissions: [
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "laporan_activity",
-      "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
+      "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji", "personalia",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan"
     ]
   },
@@ -105,6 +105,7 @@ const ALL_APP_MODULES = [
   { key: "attendance_summary", title: "Rekap Absen", desc: "Kalender presensi saya sendiri", icon: "fa-calendar-check", category: "Personalia" },
   { key: "rekap_tim", title: "Presensi Tim", desc: "Monitoring presensi staf / PIC lain", icon: "fa-users-viewfinder", category: "Personalia" },
   { key: "slip_gaji", title: "Slip Gaji", desc: "E-Slip gaji & kompensasi resmi karyawan", icon: "fa-file-invoice-dollar", category: "Personalia" },
+  { key: "personalia", title: "Data Karyawan", desc: "Master kepegawaian, dossier 360° & riwayat karir", icon: "fa-id-card-clip", category: "Personalia" },
 
   // 3. Layanan & Support Karyawan
   { key: "expense_claim", title: "Klaim Biaya (Reimbursement)", desc: "Pengajuan biaya BBM/Tol/Ops", icon: "fa-money-bill-wave", category: "Layanan & Support" },
@@ -1534,7 +1535,7 @@ const VALID_APP_SCREENS = [
   "dashboard", "priority", "assignment", "visit", "onboarding", "pipeline",
   "gps", "fac", "history", "laporan_activity", "absensi", "izin",
   "persetujuan", "attendance_summary", "rekap_absen", "rekap_tim",
-  "slip_gaji", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
+  "slip_gaji", "personalia", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
   "ketentuan", "sop_management", "organization_setting", "settings", "login"
 ];
 
@@ -1619,6 +1620,7 @@ async function loadScreen(screenName, updateHistory = true) {
     attendance_summary: "Rekap Presensi & Kalender",
     rekap_tim: "Presensi Tim & Monitoring PIC",
     slip_gaji: "E-Slip Gaji Karyawan",
+    personalia: "Data Karyawan & Personalia",
     laporan_activity: "Laporan Activity & Monitoring Kunjungan",
     expense_claim: "Klaim Biaya Operasional",
     internal_memo: "Memo Pengajuan Internal",
@@ -1697,6 +1699,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "rekap_absen" || screenName === "attendance_summary") initRekapAbsenScreen();
     if (screenName === "rekap_tim") initRekapTimScreen();
     if (screenName === "slip_gaji" && typeof initSlipGajiScreen === "function") initSlipGajiScreen();
+    if (screenName === "personalia" && typeof initPersonaliaScreen === "function") initPersonaliaScreen();
     if (screenName === "laporan_activity") initLaporanActivityScreen();
     if (screenName === "ketentuan" && typeof initKetentuanScreen === "function") initKetentuanScreen();
     if (screenName === "sop_management" && typeof initSopManagementScreen === "function") initSopManagementScreen();
@@ -10107,16 +10110,10 @@ function renderEmployeeList(list) {
             ${emp.atasan_nama ? `<span>•</span><span>Atasan: <strong class="text-slate-700">${emp.atasan_nama}</strong></span>` : ''}
           </div>
         </div>
-        <div class="flex items-center space-x-1.5 shrink-0">
-          <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Dossier 360° Karyawan" class="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs flex items-center space-x-1 border border-indigo-200 transition shadow-2xs">
-            <i class="fa-solid fa-id-badge text-indigo-600"></i>
-            <span>Dossier</span>
-          </button>
-          <button type="button" onclick="openEditEmployeeModal('${emp.nip}')" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1 border border-slate-200 transition">
-            <i class="fa-solid fa-pen-to-square"></i>
-            <span>Edit</span>
-          </button>
-        </div>
+        <button type="button" onclick="openEditEmployeeModal('${emp.nip}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
       </div>
     `;
   }).join("");
@@ -17182,6 +17179,242 @@ function loadOrgRolePermissions() {
       }).join("")}
     </div>
   `;
+}
+
+// =========================================================================
+// CONTROLLER: PERSONALIA & DATA KEPEGAWAIAN (CORE HR MASTER & DOSSIER)
+// =========================================================================
+let PERSONALIA_EMPLOYEES_DATA = [];
+
+async function initPersonaliaScreen() {
+  await loadPersonaliaEmployees();
+}
+
+async function loadPersonaliaEmployees() {
+  const container = document.getElementById("personalia-employee-list-container");
+  if (!container) return;
+
+  if (supabaseClient) {
+    try {
+      // 1. Coba load dari master employees baru (dengan relasi work_locations, organization_units, job_positions, master_levels)
+      const { data: empData, error: empErr } = await supabaseClient
+        .from("employees")
+        .select(`
+          *,
+          work_locations (nama_lokasi),
+          organization_units (nama_unit),
+          job_positions (nama_jabatan),
+          master_levels (nama_level, kode_level)
+        `)
+        .order("nama_lengkap");
+
+      if (!empErr && empData && empData.length > 0) {
+        PERSONALIA_EMPLOYEES_DATA = empData.map(e => ({
+          ...e,
+          cabang: e.work_locations?.nama_lokasi || e.cabang || "Head Office",
+          jabatan: e.job_positions?.nama_jabatan || e.jabatan || "Staff",
+          level: e.master_levels?.nama_level || e.level || "Staff Operasional"
+        }));
+        populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
+        updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
+        renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
+        return;
+      }
+
+      // 2. Fallback ke m_employee jika employees baru belum di-seed
+      const { data: legacyData, error: legacyErr } = await supabaseClient
+        .from("m_employee")
+        .select("*")
+        .order("nama_lengkap");
+
+      if (!legacyErr && legacyData && legacyData.length > 0) {
+        PERSONALIA_EMPLOYEES_DATA = legacyData;
+        populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
+        updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
+        renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("[Personalia] Error loading from supabase:", e);
+    }
+  }
+
+  // 3. Fallback ke APP_STATE / default
+  if (APP_STATE.employees && APP_STATE.employees.length > 0) {
+    PERSONALIA_EMPLOYEES_DATA = APP_STATE.employees;
+  } else if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
+    PERSONALIA_EMPLOYEES_DATA = SETTINGS_EMPLOYEES_DATA;
+  } else {
+    PERSONALIA_EMPLOYEES_DATA = [];
+  }
+
+  populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
+  updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
+  renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
+}
+
+function updatePersonaliaStats(list) {
+  const total = list.length;
+  const active = list.filter(e => e.status_aktif === "AKTIF" || e.status_aktif === true).length;
+  const pkwtt = list.filter(e => (e.status_kerja || "PKWTT").toUpperCase() === "PKWTT").length;
+  const pkwt = list.filter(e => (e.status_kerja || "").toUpperCase() === "PKWT").length;
+
+  const elTotal = document.getElementById("personalia-stat-total");
+  const elActive = document.getElementById("personalia-stat-active");
+  const elPkwtt = document.getElementById("personalia-stat-pkwtt");
+  const elPkwt = document.getElementById("personalia-stat-pkwt");
+
+  if (elTotal) elTotal.innerText = total;
+  if (elActive) elActive.innerText = active;
+  if (elPkwtt) elPkwtt.innerText = pkwtt;
+  if (elPkwt) elPkwt.innerText = pkwt;
+}
+
+function populatePersonaliaFilters(list) {
+  const branchSelect = document.getElementById("personalia-filter-branch");
+  if (!branchSelect) return;
+
+  const currentVal = branchSelect.value;
+  const branches = Array.from(new Set(list.map(e => e.cabang).filter(Boolean))).sort();
+
+  branchSelect.innerHTML = '<option value="ALL">Semua Cabang / Unit</option>' +
+    branches.map(b => `<option value="${b}">${b}</option>`).join("");
+
+  if (branches.includes(currentVal)) {
+    branchSelect.value = currentVal;
+  }
+}
+
+function filterPersonaliaEmployees() {
+  const keyword = String(document.getElementById("personalia-search-input")?.value || "").trim().toLowerCase();
+  const branch = document.getElementById("personalia-filter-branch")?.value || "ALL";
+  const statusKerja = document.getElementById("personalia-filter-status-kerja")?.value || "ALL";
+  const activeFilter = document.getElementById("personalia-filter-active")?.value || "ALL";
+
+  const filtered = PERSONALIA_EMPLOYEES_DATA.filter(emp => {
+    // 1. Search keyword
+    if (keyword) {
+      const matchNip = String(emp.nip || "").toLowerCase().includes(keyword);
+      const matchName = String(emp.nama_lengkap || emp.nama || "").toLowerCase().includes(keyword);
+      const matchJob = String(emp.jabatan || "").toLowerCase().includes(keyword);
+      const matchBranch = String(emp.cabang || "").toLowerCase().includes(keyword);
+      const matchArea = String(emp.area_cover || "").toLowerCase().includes(keyword);
+      if (!matchNip && !matchName && !matchJob && !matchBranch && !matchArea) return false;
+    }
+
+    // 2. Filter Branch
+    if (branch !== "ALL" && emp.cabang !== branch) return false;
+
+    // 3. Filter Status Kerja
+    if (statusKerja !== "ALL") {
+      const sk = String(emp.status_kerja || "PKWTT").toUpperCase();
+      if (sk !== statusKerja) return false;
+    }
+
+    // 4. Filter Active
+    const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
+    if (activeFilter === "ACTIVE" && !isAktif) return false;
+    if (activeFilter === "INACTIVE" && isAktif) return false;
+
+    return true;
+  });
+
+  renderPersonaliaEmployees(filtered);
+}
+
+function renderPersonaliaEmployees(list) {
+  const container = document.getElementById("personalia-employee-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <i class="fa-solid fa-user-slash text-2xl text-slate-300 mb-2 block"></i>
+        Tidak ada data karyawan yang cocok dengan filter pencarian.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(emp => {
+    const rId = String(emp.role_id || emp.role || "R-04").trim();
+    let roleObj = ROLE_PERMISSIONS_STATE[rId];
+    if (!roleObj) {
+      roleObj = Object.values(ROLE_PERMISSIONS_STATE).find(r => r.name.toLowerCase() === rId.toLowerCase());
+    }
+    const rBadge = roleObj?.badgeBg || "bg-slate-100 text-slate-700 border-slate-200";
+    const rName = roleObj?.name || rId;
+    const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
+    const statusKerja = emp.status_kerja || "PKWTT";
+    const skColor = statusKerja === "PKWTT" 
+      ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+      : "bg-amber-50 text-amber-700 border-amber-200";
+
+    const avatarHtml = (emp.foto_profile_url || emp.foto)
+      ? `<img src="${emp.foto_profile_url || emp.foto}" class="w-full h-full object-cover" />`
+      : `<i class="fa-solid fa-user-tie text-indigo-400"></i>`;
+
+    return `
+      <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-indigo-300 hover:shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <!-- Identitas Karyawan -->
+        <div class="flex items-start space-x-3 min-w-0 flex-1">
+          <div class="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-base shrink-0 overflow-hidden mt-0.5">
+            ${avatarHtml}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+              <span class="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${emp.nip}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${skColor} uppercase">${statusKerja}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${rBadge} uppercase">${rName}</span>
+              ${isAktif 
+                ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">AKTIF</span>' 
+                : '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 uppercase">NONAKTIF</span>'}
+            </div>
+            <h4 class="font-bold text-sm text-slate-900 mt-1 truncate">${emp.nama_lengkap || emp.nama || "-"}</h4>
+            <div class="text-[11px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
+              <span class="font-semibold text-indigo-950">${emp.jabatan || "Staff"}</span>
+              <span>•</span>
+              <span>Unit: <strong class="text-slate-700">${emp.cabang || "Head Office"}</strong></span>
+              ${emp.area_cover ? `<span>•</span><span>Area: <strong class="text-indigo-900">${emp.area_cover}</strong></span>` : ''}
+              ${emp.atasan_nama ? `<span>•</span><span>Atasan: <strong class="text-slate-600">${emp.atasan_nama}</strong></span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Tombol Aksi Personalia & Dossier -->
+        <div class="flex items-center space-x-2 shrink-0 border-t sm:border-t-0 pt-2.5 sm:pt-0 border-slate-100 justify-end">
+          <button type="button" onclick="openAddCareerTransactionModalFor('${emp.nip}')" title="Catat Mutasi / Promosi / Penyesuaian Gaji" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-bold text-xs flex items-center space-x-1.5 border border-emerald-200 transition">
+            <i class="fa-solid fa-file-contract text-emerald-600"></i>
+            <span>Catat Transaksi</span>
+          </button>
+          <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Rekam Jejak Dossier 360°" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-sm transition">
+            <i class="fa-solid fa-id-badge text-indigo-200"></i>
+            <span>Dossier 360°</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddCareerTransactionModalFor(nip) {
+  const emp = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(nip)) ||
+              (SETTINGS_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(nip)) ||
+              (APP_STATE.employees || []).find(e => String(e.nip) === String(nip));
+  if (!emp) {
+    alert("Karyawan tidak ditemukan: " + nip);
+    return;
+  }
+  CURRENT_DOSSIER_EMP = emp;
+  openAddCareerTransactionModal();
+}
+
+function openAddPersonaliaEmployeeModal() {
+  if (typeof openAddEmployeeModal === "function") {
+    openAddEmployeeModal();
+  } else {
+    alert("Formulir penambahan karyawan baru siap dibuka.");
+  }
 }
 
 // Listener Tombol Back & Forward Browser HP / Desktop
