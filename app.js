@@ -15935,6 +15935,18 @@ async function deleteOrgCoreTable(baseName, filterCol, filterVal) {
   return { success: true };
 }
 
+async function updateOrgCoreTableActiveStatus(baseName, filterCol, filterVal, isActive) {
+  if (!supabaseClient) return { success: false };
+  const updateData = { is_active: isActive, updated_at: new Date().toISOString() };
+  try {
+    await supabaseClient.from("hr_" + baseName).update(updateData).eq(filterCol, filterVal);
+  } catch (e) {}
+  try {
+    await supabaseClient.from(baseName).update(updateData).eq(filterCol, filterVal);
+  } catch (e) {}
+  return { success: true };
+}
+
 // ---------------- 1. WORK LOCATION (TEMPAT KERJA FISIK) ----------------
 async function loadWorkLocations() {
   const container = document.getElementById("work-locations-list-container");
@@ -15963,18 +15975,19 @@ function renderWorkLocationsList(list) {
     const lat = parseFloat(item.latitude || 0).toFixed(6);
     const lng = parseFloat(item.longitude || 0).toFixed(6);
     const radius = item.radius_meter || 100;
+    const isActive = item.is_active !== false;
 
     // Temukan unit/cabang yang menggunakan work location ini
     const assignedUnits = (ORG_UNITS_DATA || []).filter(u => u.work_location_id === item.id_work_location);
     const unitBadges = assignedUnits.map(u => `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">${u.nama_unit}</span>`).join(" ") || '<span class="text-[10px] text-slate-400 italic">Belum ada unit yang terhubung</span>';
 
     return `
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-emerald-300 transition">
+      <div class="bg-white p-4 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-emerald-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
         <div class="min-w-0 flex-1 space-y-1">
           <div class="flex items-center space-x-2">
-            <span class="font-mono text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">${item.id_work_location}</span>
+            <span class="font-mono text-[10px] font-bold ${isActive ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-slate-100 border-slate-300'} px-2 py-0.5 rounded-md border">${item.id_work_location}</span>
             <h4 class="font-bold text-xs sm:text-sm text-slate-900 truncate">${item.nama_lokasi}</h4>
-            <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">AKTIF</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span>
           </div>
           <p class="text-[11px] text-slate-600">${item.alamat_lengkap || '-'}, ${item.kota || ''}</p>
           <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-mono flex-wrap">
@@ -16009,6 +16022,7 @@ function openAddWorkLocationModal() {
   document.getElementById("workloc-input-lat").value = "";
   document.getElementById("workloc-input-long").value = "";
   document.getElementById("workloc-input-radius").value = "100";
+  if (document.getElementById("workloc-input-status")) document.getElementById("workloc-input-status").value = "true";
   document.getElementById("btn-delete-workloc")?.classList.add("hidden");
   document.getElementById("modal-workloc-edit").classList.remove("hidden");
 }
@@ -16029,6 +16043,7 @@ function openEditWorkLocationModal(id) {
   document.getElementById("workloc-input-lat").value = item.latitude || "";
   document.getElementById("workloc-input-long").value = item.longitude || "";
   document.getElementById("workloc-input-radius").value = item.radius_meter || 100;
+  if (document.getElementById("workloc-input-status")) document.getElementById("workloc-input-status").value = (item.is_active !== false) ? "true" : "false";
   document.getElementById("btn-delete-workloc")?.classList.remove("hidden");
   document.getElementById("modal-workloc-edit").classList.remove("hidden");
 }
@@ -16039,19 +16054,70 @@ function closeWorkLocModal() {
 
 async function handleDeleteWorkLocation(id) {
   if (!id) return;
-  if (!confirm(`Hapus tempat kerja fisik "${id}"? Lokasi ini akan dihapus permanen dari database.`)) return;
 
   const btn = document.getElementById("btn-delete-workloc");
   if (btn) btn.disabled = true;
 
   try {
-    await deleteOrgCoreTable("work_locations", "id_work_location", id);
-    ORG_WORK_LOCATIONS_DATA = ORG_WORK_LOCATIONS_DATA.filter(w => w.id_work_location !== id);
-    renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
-    closeWorkLocModal();
-    showToast(`Tempat kerja "${id}" berhasil dihapus dari database!`, "success", 1500);
+    const item = ORG_WORK_LOCATIONS_DATA.find(w => w.id_work_location === id) || { nama_lokasi: id };
+
+    // 1. Cek ketergantungan di tabel lain (organization_units / hr_organization_units)
+    let unitsUsing = (ORG_UNITS_DATA || []).filter(u => u.work_location_id === id);
+    if (supabaseClient) {
+      try {
+        const { data } = await supabaseClient
+          .from("hr_organization_units")
+          .select("id_unit, nama_unit")
+          .eq("work_location_id", id);
+        if (data && data.length > 0) unitsUsing = data;
+      } catch (e) {
+        try {
+          const { data } = await supabaseClient
+            .from("organization_units")
+            .select("id_unit, nama_unit")
+            .eq("work_location_id", id);
+          if (data && data.length > 0) unitsUsing = data;
+        } catch (err) {}
+      }
+    }
+
+    if (unitsUsing.length > 0) {
+      // KONDISI 1: DATA SEDANG DIGUNAKAN DI TABEL LAIN -> HANYA UBAH JADI NONAKTIF (SOFT DELETE)
+      const unitNames = unitsUsing.map(u => `• ${u.nama_unit || u.id_unit} (${u.id_unit})`).slice(0, 5).join("\n");
+      const moreText = unitsUsing.length > 5 ? `\n...dan ${unitsUsing.length - 5} unit lainnya.` : "";
+
+      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nTempat kerja "${item.nama_lokasi}" (${id}) saat ini terhubung dengan ${unitsUsing.length} Unit Organisasi:\n${unitNames}${moreText}\n\nKarena sedang digunakan, data ini TIDAK BISA DIHAPUS PERMANEN demi menjaga integritas database dan relasi cabang.\n\nSistem akan mengubah status tempat kerja ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await updateOrgCoreTableActiveStatus("work_locations", "id_work_location", id, false);
+
+      const target = ORG_WORK_LOCATIONS_DATA.find(w => w.id_work_location === id);
+      if (target) target.is_active = false;
+
+      renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+      closeWorkLocModal();
+      showToast(`Tempat kerja "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
+    } else {
+      // KONDISI 2: DATA TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN DARI DATABASE
+      const msg = `🗑️ HAPUS PERMANEN\n\nTempat kerja "${item.nama_lokasi}" (${id}) TIDAK DIGUNAKAN oleh unit organisasi manapun.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await deleteOrgCoreTable("work_locations", "id_work_location", id);
+      ORG_WORK_LOCATIONS_DATA = ORG_WORK_LOCATIONS_DATA.filter(w => w.id_work_location !== id);
+      renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+      closeWorkLocModal();
+      showToast(`Tempat kerja "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+    }
   } catch (e) {
-    alert("Gagal menghapus: " + e.message);
+    alert("Gagal memproses penghapusan: " + e.message);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -16081,6 +16147,7 @@ async function handleSaveWorkLocation(e) {
   const lat = parseFloat(document.getElementById("workloc-input-lat").value);
   const long = parseFloat(document.getElementById("workloc-input-long").value);
   const radius = parseInt(document.getElementById("workloc-input-radius").value) || 100;
+  const isActive = document.getElementById("workloc-input-status") ? (document.getElementById("workloc-input-status").value !== "false") : true;
 
   const payload = {
     id_work_location: id,
@@ -16091,7 +16158,7 @@ async function handleSaveWorkLocation(e) {
     latitude: lat,
     longitude: long,
     radius_meter: radius,
-    is_active: true,
+    is_active: isActive,
     updated_at: new Date().toISOString()
   };
 
@@ -16150,13 +16217,15 @@ function renderOrgUnitsList(list) {
 
     const parentUnit = list.find(p => p.id_unit === u.parent_unit_id);
     const workLoc = (ORG_WORK_LOCATIONS_DATA || []).find(w => w.id_work_location === u.work_location_id);
+    const isActive = u.is_active !== false;
 
     return `
-      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+      <div class="bg-white p-3.5 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
         <div class="min-w-0 flex-1">
           <div class="flex items-center space-x-2">
             <span class="font-mono text-xs font-bold text-slate-900">${u.id_unit}</span>
             <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${badgeColor}">${u.tipe_unit}</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span>
           </div>
           <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${u.nama_unit}</h4>
           <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
@@ -16181,6 +16250,7 @@ function openAddOrgUnitModal() {
   idInput.disabled = false;
   document.getElementById("unit-input-tipe").value = "CABANG";
   document.getElementById("unit-input-name").value = "";
+  if (document.getElementById("unit-input-status")) document.getElementById("unit-input-status").value = "true";
   document.getElementById("btn-delete-unit")?.classList.add("hidden");
 
   populateOrgUnitParentSelect("");
@@ -16199,6 +16269,7 @@ function openEditOrgUnitModal(id) {
   idInput.disabled = true;
   document.getElementById("unit-input-tipe").value = item.tipe_unit || "CABANG";
   document.getElementById("unit-input-name").value = item.nama_unit || "";
+  if (document.getElementById("unit-input-status")) document.getElementById("unit-input-status").value = (item.is_active !== false) ? "true" : "false";
   document.getElementById("btn-delete-unit")?.classList.remove("hidden");
 
   populateOrgUnitParentSelect(item.parent_unit_id, id);
@@ -16212,20 +16283,99 @@ function closeOrgUnitModal() {
 
 async function handleDeleteOrgUnit(id) {
   if (!id) return;
-  if (!confirm(`Hapus unit organisasi "${id}"? Unit ini akan dihapus permanen dari database.`)) return;
-
   const btn = document.getElementById("btn-delete-unit");
   if (btn) btn.disabled = true;
 
   try {
-    await deleteOrgCoreTable("organization_units", "id_unit", id);
-    ORG_UNITS_DATA = ORG_UNITS_DATA.filter(u => u.id_unit !== id);
-    renderOrgUnitsList(ORG_UNITS_DATA);
-    populateOrgFilterUnits();
-    closeOrgUnitModal();
-    showToast(`Unit organisasi "${id}" berhasil dihapus dari database!`, "success", 1500);
+    const item = ORG_UNITS_DATA.find(u => u.id_unit === id) || { nama_unit: id };
+
+    // 1. Cek sub-unit turunan (parent_unit_id)
+    let childUnits = (ORG_UNITS_DATA || []).filter(u => u.parent_unit_id === id && u.id_unit !== id);
+    if (supabaseClient) {
+      try {
+        const { data: cUnits } = await supabaseClient.from("hr_organization_units").select("id_unit, nama_unit").eq("parent_unit_id", id);
+        if (cUnits && cUnits.length > 0) childUnits = cUnits.filter(u => u.id_unit !== id);
+      } catch (e) {}
+    }
+
+    // 2. Cek posisi/jabatan di unit ini (unit_id)
+    let positions = (ORG_POSITIONS_DATA || []).filter(p => p.unit_id === id);
+    if (supabaseClient) {
+      try {
+        const { data: pData } = await supabaseClient.from("hr_job_positions").select("id_position, nama_jabatan").eq("unit_id", id);
+        if (pData && pData.length > 0) positions = pData;
+      } catch (e) {
+        try {
+          const { data: pData } = await supabaseClient.from("job_positions").select("id_position, nama_jabatan").eq("unit_id", id);
+          if (pData && pData.length > 0) positions = pData;
+        } catch (err) {}
+      }
+    }
+
+    // 3. Cek karyawan di unit ini (hr_employees.location_id)
+    let employees = [];
+    if (supabaseClient) {
+      try {
+        const { data: empData } = await supabaseClient.from("hr_employees").select("id, nip, name").eq("location_id", id);
+        if (empData && empData.length > 0) employees = empData;
+      } catch (e) {
+        try {
+          const { data: empData } = await supabaseClient.from("employees").select("id, nip, name").eq("location_id", id);
+          if (empData && empData.length > 0) employees = empData;
+        } catch (err) {}
+      }
+    }
+
+    const isUsed = childUnits.length > 0 || positions.length > 0 || employees.length > 0;
+
+    if (isUsed) {
+      // KONDISI 1: DIGUNAKAN DI TABEL LAIN -> UBAH JADI NONAKTIF (SOFT DELETE)
+      let reasons = [];
+      if (childUnits.length > 0) {
+        reasons.push(`${childUnits.length} Sub-Unit Bawahan (${childUnits.slice(0, 3).map(u => u.nama_unit || u.id_unit).join(", ")})`);
+      }
+      if (positions.length > 0) {
+        reasons.push(`${positions.length} Posisi Jabatan (${positions.slice(0, 3).map(p => p.nama_jabatan || p.id_position).join(", ")})`);
+      }
+      if (employees.length > 0) {
+        reasons.push(`${employees.length} Karyawan (${employees.slice(0, 3).map(e => e.name || e.nip).join(", ")})`);
+      }
+
+      const reasonsText = reasons.map(r => `• ${r}`).join("\n");
+      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nUnit Organisasi "${item.nama_unit}" (${id}) saat ini terhubung dengan:\n${reasonsText}\n\nKarena sedang digunakan, unit ini TIDAK BISA DIHAPUS PERMANEN demi menjaga integritas database dan data historis karyawan.\n\nSistem akan mengubah status unit ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await updateOrgCoreTableActiveStatus("organization_units", "id_unit", id, false);
+
+      const target = ORG_UNITS_DATA.find(u => u.id_unit === id);
+      if (target) target.is_active = false;
+
+      renderOrgUnitsList(ORG_UNITS_DATA);
+      populateOrgFilterUnits();
+      closeOrgUnitModal();
+      showToast(`Unit "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
+    } else {
+      // KONDISI 2: TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN
+      const msg = `🗑️ HAPUS PERMANEN\n\nUnit Organisasi "${item.nama_unit}" (${id}) TIDAK DIGUNAKAN oleh karyawan, jabatan, atau sub-unit manapun.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await deleteOrgCoreTable("organization_units", "id_unit", id);
+      ORG_UNITS_DATA = ORG_UNITS_DATA.filter(u => u.id_unit !== id);
+      renderOrgUnitsList(ORG_UNITS_DATA);
+      populateOrgFilterUnits();
+      closeOrgUnitModal();
+      showToast(`Unit organisasi "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+    }
   } catch (e) {
-    alert("Gagal menghapus: " + e.message);
+    alert("Gagal memproses penghapusan: " + e.message);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -16237,7 +16387,8 @@ function populateOrgUnitParentSelect(selectedId = "", excludeId = "") {
 
   const eligible = ORG_UNITS_DATA.filter(u => u.id_unit !== excludeId);
   select.innerHTML = '<option value="">- Tidak Ada (Root) -</option>' + eligible.map(u => {
-    return `<option value="${u.id_unit}" ${u.id_unit === selectedId ? 'selected' : ''}>${u.nama_unit} (${u.tipe_unit})</option>`;
+    const nonaktifTag = u.is_active === false ? ' [NONAKTIF]' : '';
+    return `<option value="${u.id_unit}" ${u.id_unit === selectedId ? 'selected' : ''}>${u.nama_unit} (${u.tipe_unit})${nonaktifTag}</option>`;
   }).join("");
 }
 
@@ -16246,7 +16397,8 @@ function populateOrgUnitWorkLocSelect(selectedId = "") {
   if (!select) return;
 
   select.innerHTML = '<option value="">- Pilih Work Location -</option>' + (ORG_WORK_LOCATIONS_DATA || []).map(w => {
-    return `<option value="${w.id_work_location}" ${w.id_work_location === selectedId ? 'selected' : ''}>${w.nama_lokasi} (${w.id_work_location})</option>`;
+    const nonaktifTag = w.is_active === false ? ' [NONAKTIF]' : '';
+    return `<option value="${w.id_work_location}" ${w.id_work_location === selectedId ? 'selected' : ''}>${w.nama_lokasi} (${w.id_work_location})${nonaktifTag}</option>`;
   }).join("");
 }
 
@@ -16257,6 +16409,7 @@ async function handleSaveOrgUnit(e) {
   const name = document.getElementById("unit-input-name").value.trim();
   const parent = document.getElementById("unit-input-parent").value || null;
   const workloc = document.getElementById("unit-input-workloc").value || null;
+  const isActive = document.getElementById("unit-input-status") ? (document.getElementById("unit-input-status").value !== "false") : true;
 
   const payload = {
     id_unit: id,
@@ -16264,7 +16417,7 @@ async function handleSaveOrgUnit(e) {
     nama_unit: name,
     parent_unit_id: parent,
     work_location_id: workloc,
-    is_active: true,
+    is_active: isActive,
     updated_at: new Date().toISOString()
   };
 
@@ -16318,13 +16471,15 @@ function renderOrgPositionsList(list) {
     const parentPos = list.find(p => p.id_position === pos.reports_to_unit_id);
     const unit = (ORG_UNITS_DATA || []).find(u => u.id_unit === pos.unit_id);
     const level = (ORG_LEVELS_DATA || []).find(l => l.id_level === pos.level_id);
+    const isActive = pos.is_active !== false;
 
     return `
-      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+      <div class="bg-white p-3.5 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
         <div class="min-w-0 flex-1">
           <div class="flex items-center space-x-2">
             <span class="font-mono text-xs font-bold text-slate-900">${pos.id_position}</span>
             <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">${level?.nama_level || pos.level_id || '-'}</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span>
           </div>
           <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${pos.nama_jabatan}</h4>
           <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
@@ -16348,6 +16503,7 @@ function openAddJobPositionModal() {
   idInput.value = "";
   idInput.disabled = false;
   document.getElementById("pos-input-name").value = "";
+  if (document.getElementById("pos-input-status")) document.getElementById("pos-input-status").value = "true";
   document.getElementById("btn-delete-pos")?.classList.add("hidden");
 
   populateJobPosLevelSelect("");
@@ -16366,6 +16522,7 @@ function openEditJobPositionModal(id) {
   idInput.value = item.id_position;
   idInput.disabled = true;
   document.getElementById("pos-input-name").value = item.nama_jabatan || "";
+  if (document.getElementById("pos-input-status")) document.getElementById("pos-input-status").value = (item.is_active !== false) ? "true" : "false";
   document.getElementById("btn-delete-pos")?.classList.remove("hidden");
 
   populateJobPosLevelSelect(item.level_id);
@@ -16380,19 +16537,83 @@ function closeJobPosModal() {
 
 async function handleDeleteJobPosition(id) {
   if (!id) return;
-  if (!confirm(`Hapus posisi jabatan "${id}"? Jabatan ini akan dihapus permanen dari database.`)) return;
-
   const btn = document.getElementById("btn-delete-pos");
   if (btn) btn.disabled = true;
 
   try {
-    await deleteOrgCoreTable("job_positions", "id_position", id);
-    ORG_POSITIONS_DATA = ORG_POSITIONS_DATA.filter(p => p.id_position !== id);
-    renderOrgPositionsList(ORG_POSITIONS_DATA);
-    closeJobPosModal();
-    showToast(`Posisi jabatan "${id}" berhasil dihapus dari database!`, "success", 1500);
+    const item = ORG_POSITIONS_DATA.find(p => p.id_position === id) || { nama_jabatan: id };
+
+    // 1. Cek bawahan yang melapor ke posisi ini (reports_to_unit_id / coordination_to_unit_id)
+    let subordinates = (ORG_POSITIONS_DATA || []).filter(p => (p.reports_to_unit_id === id || p.coordination_to_unit_id === id) && p.id_position !== id);
+    if (supabaseClient) {
+      try {
+        const { data: subPos } = await supabaseClient
+          .from("hr_job_positions")
+          .select("id_position, nama_jabatan")
+          .or(`reports_to_unit_id.eq.${id},coordination_to_unit_id.eq.${id}`);
+        if (subPos && subPos.length > 0) subordinates = subPos.filter(p => p.id_position !== id);
+      } catch (e) {}
+    }
+
+    // 2. Cek karyawan dengan jabatan ini (hr_employees.position_id)
+    let employees = [];
+    if (supabaseClient) {
+      try {
+        const { data: empData } = await supabaseClient.from("hr_employees").select("id, nip, name").eq("position_id", id);
+        if (empData && empData.length > 0) employees = empData;
+      } catch (e) {
+        try {
+          const { data: empData } = await supabaseClient.from("employees").select("id, nip, name").eq("position_id", id);
+          if (empData && empData.length > 0) employees = empData;
+        } catch (err) {}
+      }
+    }
+
+    const isUsed = subordinates.length > 0 || employees.length > 0;
+
+    if (isUsed) {
+      // KONDISI 1: DIGUNAKAN DI TABEL LAIN -> UBAH JADI NONAKTIF (SOFT DELETE)
+      let reasons = [];
+      if (subordinates.length > 0) {
+        reasons.push(`${subordinates.length} Jabatan Bawahan/Struktur (${subordinates.slice(0, 3).map(s => s.nama_jabatan || s.id_position).join(", ")})`);
+      }
+      if (employees.length > 0) {
+        reasons.push(`${employees.length} Karyawan Aktif (${employees.slice(0, 3).map(e => e.name || e.nip).join(", ")})`);
+      }
+
+      const reasonsText = reasons.map(r => `• ${r}`).join("\n");
+      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nPosisi Jabatan "${item.nama_jabatan}" (${id}) saat ini terhubung dengan:\n${reasonsText}\n\nKarena sedang digunakan, jabatan ini TIDAK BISA DIHAPUS PERMANEN demi menjaga hierarki organisasi dan data karyawan.\n\nSistem akan mengubah status jabatan ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await updateOrgCoreTableActiveStatus("job_positions", "id_position", id, false);
+
+      const target = ORG_POSITIONS_DATA.find(p => p.id_position === id);
+      if (target) target.is_active = false;
+
+      renderOrgPositionsList(ORG_POSITIONS_DATA);
+      closeJobPosModal();
+      showToast(`Posisi jabatan "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
+    } else {
+      // KONDISI 2: TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN
+      const msg = `🗑️ HAPUS PERMANEN\n\nPosisi Jabatan "${item.nama_jabatan}" (${id}) TIDAK DIGUNAKAN oleh karyawan maupun struktur jabatan lain.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await deleteOrgCoreTable("job_positions", "id_position", id);
+      ORG_POSITIONS_DATA = ORG_POSITIONS_DATA.filter(p => p.id_position !== id);
+      renderOrgPositionsList(ORG_POSITIONS_DATA);
+      closeJobPosModal();
+      showToast(`Posisi jabatan "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+    }
   } catch (e) {
-    alert("Gagal menghapus: " + e.message);
+    alert("Gagal memproses penghapusan: " + e.message);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -16402,7 +16623,8 @@ function populateJobPosLevelSelect(selected = "") {
   const select = document.getElementById("pos-input-level");
   if (!select) return;
   select.innerHTML = (ORG_LEVELS_DATA || []).map(l => {
-    return `<option value="${l.id_level}" ${l.id_level === selected ? 'selected' : ''}>${l.nama_level} (${l.id_level})</option>`;
+    const nonaktifTag = l.is_active === false ? ' [NONAKTIF]' : '';
+    return `<option value="${l.id_level}" ${l.id_level === selected ? 'selected' : ''}>${l.nama_level} (${l.id_level})${nonaktifTag}</option>`;
   }).join("");
 }
 
@@ -16410,7 +16632,8 @@ function populateJobPosUnitSelect(selected = "") {
   const select = document.getElementById("pos-input-unit");
   if (!select) return;
   select.innerHTML = (ORG_UNITS_DATA || []).map(u => {
-    return `<option value="${u.id_unit}" ${u.id_unit === selected ? 'selected' : ''}>${u.nama_unit} (${u.tipe_unit})</option>`;
+    const nonaktifTag = u.is_active === false ? ' [NONAKTIF]' : '';
+    return `<option value="${u.id_unit}" ${u.id_unit === selected ? 'selected' : ''}>${u.nama_unit} (${u.tipe_unit})${nonaktifTag}</option>`;
   }).join("");
 }
 
@@ -16419,7 +16642,8 @@ function populateJobPosReportsToSelect(selected = "", excludeId = "") {
   if (!select) return;
   const eligible = ORG_POSITIONS_DATA.filter(p => p.id_position !== excludeId);
   select.innerHTML = '<option value="">- Tidak Ada (Puncak / Direksi) -</option>' + eligible.map(p => {
-    return `<option value="${p.id_position}" ${p.id_position === selected ? 'selected' : ''}>${p.nama_jabatan} (${p.id_position})</option>`;
+    const nonaktifTag = p.is_active === false ? ' [NONAKTIF]' : '';
+    return `<option value="${p.id_position}" ${p.id_position === selected ? 'selected' : ''}>${p.nama_jabatan} (${p.id_position})${nonaktifTag}</option>`;
   }).join("");
 }
 
@@ -16430,6 +16654,7 @@ async function handleSaveJobPosition(e) {
   const level = document.getElementById("pos-input-level").value;
   const unit = document.getElementById("pos-input-unit").value;
   const reportsTo = document.getElementById("pos-input-reportsto").value || null;
+  const isActive = document.getElementById("pos-input-status") ? (document.getElementById("pos-input-status").value !== "false") : true;
 
   const payload = {
     id_position: id,
@@ -16437,7 +16662,7 @@ async function handleSaveJobPosition(e) {
     level_id: level,
     unit_id: unit,
     reports_to_unit_id: reportsTo,
-    is_active: true,
+    is_active: isActive,
     updated_at: new Date().toISOString()
   };
 
@@ -16487,16 +16712,17 @@ function renderOrgLevelsList(list) {
   }
 
   container.innerHTML = list.map(l => {
+    const isActive = l.is_active !== false;
     return `
-      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+      <div class="bg-white p-3.5 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
         <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center font-bold text-xs">
+          <div class="w-8 h-8 rounded-xl ${isActive ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-500 border-slate-300'} border flex items-center justify-center font-bold text-xs">
             ${l.bobot_level}
           </div>
           <div>
             <div class="flex items-center space-x-2">
               <span class="font-mono text-xs font-bold text-slate-900">${l.id_level}</span>
-              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">AKTIF</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span>
             </div>
             <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-0.5">${l.nama_level}</h4>
           </div>
@@ -16518,6 +16744,8 @@ function openAddMasterLevelModal() {
   idInput.disabled = false;
   document.getElementById("lvl-input-name").value = "";
   document.getElementById("lvl-input-bobot").value = (ORG_LEVELS_DATA.length + 1).toString();
+  if (document.getElementById("lvl-input-status")) document.getElementById("lvl-input-status").value = "true";
+  document.getElementById("btn-delete-lvl")?.classList.add("hidden");
   document.getElementById("modal-level-edit").classList.remove("hidden");
 }
 
@@ -16532,6 +16760,8 @@ function openEditMasterLevelModal(id) {
   idInput.disabled = true;
   document.getElementById("lvl-input-name").value = item.nama_level || "";
   document.getElementById("lvl-input-bobot").value = item.bobot_level || 1;
+  if (document.getElementById("lvl-input-status")) document.getElementById("lvl-input-status").value = (item.is_active !== false) ? "true" : "false";
+  document.getElementById("btn-delete-lvl")?.classList.remove("hidden");
   document.getElementById("modal-level-edit").classList.remove("hidden");
 }
 
@@ -16539,17 +16769,82 @@ function closeMasterLevelModal() {
   document.getElementById("modal-level-edit").classList.add("hidden");
 }
 
+async function handleDeleteMasterLevel(id) {
+  if (!id) return;
+  const btn = document.getElementById("btn-delete-lvl");
+  if (btn) btn.disabled = true;
+
+  try {
+    const item = ORG_LEVELS_DATA.find(l => l.id_level === id) || { nama_level: id };
+
+    // Cek jabatan yang menggunakan level ini (job_positions.level_id)
+    let positionsUsing = (ORG_POSITIONS_DATA || []).filter(p => p.level_id === id);
+    if (supabaseClient) {
+      try {
+        const { data } = await supabaseClient.from("hr_job_positions").select("id_position, nama_jabatan").eq("level_id", id);
+        if (data && data.length > 0) positionsUsing = data;
+      } catch (e) {
+        try {
+          const { data } = await supabaseClient.from("job_positions").select("id_position, nama_jabatan").eq("level_id", id);
+          if (data && data.length > 0) positionsUsing = data;
+        } catch (err) {}
+      }
+    }
+
+    if (positionsUsing.length > 0) {
+      // KONDISI 1: DIGUNAKAN DI TABEL LAIN -> UBAH JADI NONAKTIF (SOFT DELETE)
+      const posNames = positionsUsing.map(p => `• ${p.nama_jabatan || p.id_position} (${p.id_position})`).slice(0, 5).join("\n");
+      const moreText = positionsUsing.length > 5 ? `\n...dan ${positionsUsing.length - 5} jabatan lainnya.` : "";
+
+      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nMaster Level "${item.nama_level}" (${id}) saat ini terhubung dengan ${positionsUsing.length} Posisi Jabatan:\n${posNames}${moreText}\n\nKarena sedang digunakan, level ini TIDAK BISA DIHAPUS PERMANEN demi menjaga hierarki jabatan.\n\nSistem akan mengubah status level ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await updateOrgCoreTableActiveStatus("master_levels", "id_level", id, false);
+
+      const target = ORG_LEVELS_DATA.find(l => l.id_level === id);
+      if (target) target.is_active = false;
+
+      renderOrgLevelsList(ORG_LEVELS_DATA);
+      closeMasterLevelModal();
+      showToast(`Master level "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
+    } else {
+      // KONDISI 2: TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN
+      const msg = `🗑️ HAPUS PERMANEN\n\nMaster Level "${item.nama_level}" (${id}) TIDAK DIGUNAKAN oleh jabatan manapun.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+
+      if (!confirm(msg)) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      await deleteOrgCoreTable("master_levels", "id_level", id);
+      ORG_LEVELS_DATA = ORG_LEVELS_DATA.filter(l => l.id_level !== id);
+      renderOrgLevelsList(ORG_LEVELS_DATA);
+      closeMasterLevelModal();
+      showToast(`Master level "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+    }
+  } catch (e) {
+    alert("Gagal memproses penghapusan: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function handleSaveMasterLevel(e) {
   e.preventDefault();
   const id = document.getElementById("lvl-input-id").value.trim().toUpperCase();
   const name = document.getElementById("lvl-input-name").value.trim();
   const bobot = parseInt(document.getElementById("lvl-input-bobot").value) || 1;
+  const isActive = document.getElementById("lvl-input-status") ? (document.getElementById("lvl-input-status").value !== "false") : true;
 
   const payload = {
     id_level: id,
     nama_level: name,
     bobot_level: bobot,
-    is_active: true,
+    is_active: isActive,
     updated_at: new Date().toISOString()
   };
 
