@@ -690,7 +690,46 @@
 
         <!-- TAB CONTENT 3: TRANSAKSI KARIR & REMUNERASI (HISTORIS LENGKAP) -->
         <div id="dossier-content-career" class="space-y-3 hidden">
-          <div class="flex items-center justify-between">
+          <!-- RINGKASAN STATUS PAYROLL & REMUNERASI AKTIF -->
+          <div class="bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm space-y-2.5">
+            <div class="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+              <div class="flex items-center space-x-2">
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-money-bill-wave"></i>
+                </div>
+                <div>
+                  <h5 class="font-bold text-xs text-white">Status Payroll & Remunerasi Terkini</h5>
+                  <span class="text-[10px] text-emerald-300">Gaji Pokok, Rekening Payroll & Jaminan Sosial</span>
+                </div>
+              </div>
+              <span id="dossier-remun-sk-badge" class="font-mono text-[9px] bg-white/10 px-2 py-0.5 rounded border border-white/15 text-emerald-200">SK: -</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-emerald-300 font-bold uppercase block">Gaji Pokok</span>
+                <span id="dossier-remun-gaji-val" class="font-bold text-xs sm:text-sm text-emerald-400 block mt-0.5">Rp -</span>
+                <span id="dossier-remun-tunjangan-val" class="text-[9px] text-slate-300 block">Tunjangan: -</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-emerald-300 font-bold uppercase block">Bank & Rekening</span>
+                <span id="dossier-remun-bank-val" class="font-bold text-xs text-white block mt-0.5">-</span>
+                <span id="dossier-remun-rekening-val" class="font-mono text-[10px] text-slate-300 block">-</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-emerald-300 font-bold uppercase block">BPJS Kes / TK</span>
+                <span id="dossier-remun-bpjskes-val" class="font-mono text-[10px] text-slate-200 block mt-0.5">Kes: -</span>
+                <span id="dossier-remun-bpjstk-val" class="font-mono text-[10px] text-slate-200 block">TK: -</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-emerald-300 font-bold uppercase block">Pajak (NPWP & PTKP)</span>
+                <span id="dossier-remun-npwp-val" class="font-mono text-[10px] text-slate-200 block mt-0.5">NPWP: -</span>
+                <span id="dossier-remun-ptkp-val" class="font-bold text-[10px] text-emerald-300 block">PTKP: -</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
             <div>
               <h5 class="font-bold text-xs text-slate-800">Timeline Transaksi Karir & Remunerasi</h5>
               <p class="text-[10px] text-slate-500">Rekam jejak mutasi, promosi, SK, perubahan gaji, rekening & BPJS</p>
@@ -712,12 +751,212 @@
       <div class="p-3.5 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
         <button type="button" onclick="openEditEmployeeFullModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
           <i class="fa-solid fa-pen-to-square"></i>
-          <span>Edit Data Karyawan</span>
+          <span>Edit Data Karyawan & Payroll</span>
         </button>
         <button type="button" onclick="closeEmployeeDossierModal()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold rounded-xl text-xs transition">
           Tutup
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT DATA PERSONALIA & PAYROLL KARYAWAN (LENGKAP) -->
+  <div id="modal-employee-edit-full" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-user-pen"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs sm:text-sm">Edit Data Personalia & Payroll</h4>
+            <p class="text-[10px] text-slate-300" id="edit-full-emp-subtitle">Karyawan: -</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEditEmployeeFullModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <!-- Tab Switcher Edit Modal -->
+      <div class="flex border-b border-slate-200 bg-slate-50 px-3 pt-2 space-x-1 text-xs font-bold shrink-0">
+        <button type="button" id="edit-full-tab-btn-sipil" onclick="switchEditFullTab('sipil')" class="px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200">
+          <i class="fa-solid fa-id-card mr-1"></i> Data Identitas Sipil
+        </button>
+        <button type="button" id="edit-full-tab-btn-payroll" onclick="switchEditFullTab('payroll')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-money-bill-wave mr-1"></i> Remunerasi & Payroll
+        </button>
+      </div>
+
+      <form id="form-employee-edit-full" onsubmit="handleSaveEmployeeFull(event)" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
+        <input type="hidden" id="edit-full-emp-nip" />
+        <input type="hidden" id="edit-full-emp-id" />
+
+        <!-- TAB 1: IDENTITAS SIPIL PRIBADI -->
+        <div id="edit-full-content-sipil" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Nomor Induk Kependudukan (NIK KTP):</label>
+              <input type="text" id="edit-full-nik" maxlength="16" placeholder="16 digit nomor KTP" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Nomor WhatsApp / HP Pribadi:</label>
+              <input type="text" id="edit-full-phone" placeholder="08xxxxxxxxxx" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Tempat Lahir:</label>
+              <input type="text" id="edit-full-pob" placeholder="Contoh: Jakarta" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Tanggal Lahir:</label>
+              <input type="date" id="edit-full-dob" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Jenis Kelamin:</label>
+              <select id="edit-full-gender" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Agama:</label>
+              <select id="edit-full-religion" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                <option value="Islam">Islam</option>
+                <option value="Kristen Protestan">Kristen Protestan</option>
+                <option value="Katolik">Katolik</option>
+                <option value="Hindu">Hindu</option>
+                <option value="Buddha">Buddha</option>
+                <option value="Konghucu">Konghucu</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Status Pernikahan:</label>
+              <select id="edit-full-marital" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                <option value="Lajang">Lajang</option>
+                <option value="Menikah">Menikah</option>
+                <option value="Cerai Hidup">Cerai Hidup</option>
+                <option value="Cerai Mati">Cerai Mati</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Jumlah Tanggungan Anak/Keluarga:</label>
+              <input type="number" id="edit-full-dependents" min="0" max="10" value="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Alamat Sesuai KTP:</label>
+            <textarea id="edit-full-alamat-ktp" rows="2" placeholder="Nama jalan, RT/RW, Kelurahan, Kecamatan, Kota" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 outline-none focus:border-indigo-600"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Alamat Domisili Sekarang (Tempat Tinggal):</label>
+            <textarea id="edit-full-alamat-dom" rows="2" placeholder="Alamat saat ini (kos/kontrakan/rumah)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 outline-none focus:border-indigo-600"></textarea>
+          </div>
+
+          <div class="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+            <span class="text-[10px] font-bold text-rose-800 uppercase block"><i class="fa-solid fa-truck-medical mr-1"></i> Kontak Darurat (Emergency Contact)</span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label class="block text-[9px] font-bold text-rose-700 mb-0.5">Nama Kontak:</label>
+                <input type="text" id="edit-full-emerg-name" placeholder="Nama Istri/Orang Tua" class="w-full bg-white border border-rose-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 outline-none" />
+              </div>
+              <div>
+                <label class="block text-[9px] font-bold text-rose-700 mb-0.5">Hubungan:</label>
+                <input type="text" id="edit-full-emerg-rel" placeholder="Istri / Ibu / Saudara" class="w-full bg-white border border-rose-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 outline-none" />
+              </div>
+              <div>
+                <label class="block text-[9px] font-bold text-rose-700 mb-0.5">Nomor HP Darurat:</label>
+                <input type="text" id="edit-full-emerg-phone" placeholder="08xxxxxxxxxx" class="w-full bg-white border border-rose-200 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-800 outline-none" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: REMUNERASI & PAYROLL -->
+        <div id="edit-full-content-payroll" class="space-y-3 hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Gaji Pokok Terkini (Basic Salary Rp):</label>
+              <input type="number" id="edit-full-gaji" placeholder="Contoh: 7500000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-emerald-700 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Tunjangan Tetap / Operasional (Rp):</label>
+              <input type="number" id="edit-full-tunjangan" placeholder="Contoh: 1500000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Bank Payroll:</label>
+              <select id="edit-full-bank" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                <option value="BCA">BCA</option>
+                <option value="MANDIRI">Bank Mandiri</option>
+                <option value="BRI">BRI</option>
+                <option value="BNI">BNI</option>
+                <option value="BSI">BSI (Syariah)</option>
+                <option value="CIMB">CIMB Niaga</option>
+                <option value="PERMATA">Permata</option>
+                <option value="OTHER">Bank Lainnya</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Nomor Rekening Payroll:</label>
+              <input type="text" id="edit-full-rekening" placeholder="1234567890" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Atas Nama Rekening:</label>
+              <input type="text" id="edit-full-rek-name" placeholder="Nama Pemilik Rekening" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Nomor BPJS Kesehatan:</label>
+              <input type="text" id="edit-full-bpjskes" placeholder="13 digit kartu BPJS Kes" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Nomor BPJS Ketenagakerjaan (TK):</label>
+              <input type="text" id="edit-full-bpjstk" placeholder="11 digit kartu BPJS TK" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Nomor NPWP Pajak:</label>
+              <input type="text" id="edit-full-npwp" placeholder="16 digit NPWP / NIK" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Status Pajak (PTKP):</label>
+              <select id="edit-full-ptkp" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                <option value="TK/0">TK/0 - Tidak Kawin (Tanpa Tanggungan)</option>
+                <option value="TK/1">TK/1 - Tidak Kawin (1 Tanggungan)</option>
+                <option value="TK/2">TK/2 - Tidak Kawin (2 Tanggungan)</option>
+                <option value="TK/3">TK/3 - Tidak Kawin (3 Tanggungan)</option>
+                <option value="K/0">K/0 - Kawin (Tanpa Tanggungan)</option>
+                <option value="K/1">K/1 - Kawin (1 Tanggungan)</option>
+                <option value="K/2">K/2 - Kawin (2 Tanggungan)</option>
+                <option value="K/3">K/3 - Kawin (3 Tanggungan)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end space-x-2 shrink-0 pt-3">
+          <button type="button" onclick="closeEditEmployeeFullModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-save-edit-full" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Simpan Perubahan</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -868,6 +1107,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260917_v127"></script>
+  <script src="/app.js?v=20260917_v128"></script>
 </body>
 </html>

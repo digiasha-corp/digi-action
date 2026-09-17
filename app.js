@@ -17026,6 +17026,52 @@ async function loadDossierCareerHistories(emp) {
 
   CURRENT_DOSSIER_CAREER_LIST = list;
 
+  // 1. POPULATE KARTU STATUS PAYROLL & REMUNERASI AKTIF
+  try {
+    const latestTx = list.find(t => (t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || t.bank_name || t.bank_account_no) || list[0];
+    const elRemunSk = document.getElementById("dossier-remun-sk-badge");
+    const elRemunGaji = document.getElementById("dossier-remun-gaji-val");
+    const elRemunTunjangan = document.getElementById("dossier-remun-tunjangan-val");
+    const elRemunBank = document.getElementById("dossier-remun-bank-val");
+    const elRemunRek = document.getElementById("dossier-remun-rekening-val");
+    const elRemunBpjsKes = document.getElementById("dossier-remun-bpjskes-val");
+    const elRemunBpjsTk = document.getElementById("dossier-remun-bpjstk-val");
+    const elRemunNpwp = document.getElementById("dossier-remun-npwp-val");
+    const elRemunPtkp = document.getElementById("dossier-remun-ptkp-val");
+
+    if (latestTx && (latestTx.new_basic_salary || latestTx.bank_name || latestTx.bank_account_no)) {
+      if (elRemunSk) elRemunSk.innerText = latestTx.no_sk ? `SK: ${latestTx.no_sk}` : "SK: Pengangkatan";
+      if (elRemunGaji) {
+        elRemunGaji.innerText = latestTx.new_basic_salary ? `Rp ${parseInt(latestTx.new_basic_salary).toLocaleString('id-ID')}` : "Rp -";
+      }
+      if (elRemunTunjangan) {
+        elRemunTunjangan.innerText = latestTx.new_allowances ? `Tunjangan: Rp ${parseInt(latestTx.new_allowances).toLocaleString('id-ID')}` : "Tunjangan: -";
+      }
+      if (elRemunBank) elRemunBank.innerText = latestTx.bank_name || "-";
+      if (elRemunRek) {
+        const no = latestTx.bank_account_no || "-";
+        const holder = latestTx.bank_account_holder ? `(a/n ${latestTx.bank_account_holder})` : "";
+        elRemunRek.innerText = `${no} ${holder}`.trim();
+      }
+      if (elRemunBpjsKes) elRemunBpjsKes.innerText = `Kes: ${latestTx.bpjs_kesehatan_number || '-'}`;
+      if (elRemunBpjsTk) elRemunBpjsTk.innerText = `TK: ${latestTx.bpjs_ketenagakerjaan_number || '-'}`;
+      if (elRemunNpwp) elRemunNpwp.innerText = `NPWP: ${latestTx.npwp_number || '-'}`;
+      if (elRemunPtkp) elRemunPtkp.innerText = `PTKP: ${latestTx.tax_status || 'TK/0'}`;
+    } else {
+      if (elRemunSk) elRemunSk.innerText = "SK: Belum Diinput";
+      if (elRemunGaji) elRemunGaji.innerText = "Rp - (Belum Diisi)";
+      if (elRemunTunjangan) elRemunTunjangan.innerText = "Tunjangan: -";
+      if (elRemunBank) elRemunBank.innerText = "Belum Diisi";
+      if (elRemunRek) elRemunRek.innerText = "Klik 'Edit Data Karyawan & Payroll'";
+      if (elRemunBpjsKes) elRemunBpjsKes.innerText = "Kes: -";
+      if (elRemunBpjsTk) elRemunBpjsTk.innerText = "TK: -";
+      if (elRemunNpwp) elRemunNpwp.innerText = "NPWP: -";
+      if (elRemunPtkp) elRemunPtkp.innerText = "PTKP: TK/0";
+    }
+  } catch (errRemun) {
+    console.warn("Error populating active remuneration card:", errRemun);
+  }
+
   if (list.length === 0) {
     container.innerHTML = `
       <div class="relative pb-3">
@@ -17201,9 +17247,169 @@ async function handleSaveCareerTransaction(e) {
 
 function openEditEmployeeFullModal() {
   if (!CURRENT_DOSSIER_EMP) return;
-  closeEmployeeDossierModal();
-  if (typeof openEditEmployeeModal === "function") {
-    openEditEmployeeModal(CURRENT_DOSSIER_EMP.nip);
+  const modal = document.getElementById("modal-employee-edit-full");
+  if (!modal) return;
+
+  const emp = CURRENT_DOSSIER_EMP;
+  const personal = CURRENT_DOSSIER_PERSONAL || {};
+  const latestTx = (CURRENT_DOSSIER_CAREER_LIST && CURRENT_DOSSIER_CAREER_LIST.length > 0)
+    ? (CURRENT_DOSSIER_CAREER_LIST.find(t => t.new_basic_salary || t.bank_name) || CURRENT_DOSSIER_CAREER_LIST[0])
+    : {};
+
+  document.getElementById("edit-full-emp-subtitle").innerText = `Karyawan: ${emp.nama_lengkap || emp.nama} (${emp.nip})`;
+  document.getElementById("edit-full-emp-nip").value = emp.nip;
+  document.getElementById("edit-full-emp-id").value = emp.id || emp.nip;
+
+  // Tab 1: Sipil
+  document.getElementById("edit-full-nik").value = personal.ktp_number || emp.nik_ktp || "";
+  document.getElementById("edit-full-phone").value = personal.phone || emp.phone || "";
+  document.getElementById("edit-full-pob").value = personal.pob || "";
+  document.getElementById("edit-full-dob").value = personal.dob || "";
+  document.getElementById("edit-full-gender").value = personal.gender || "Laki-laki";
+  document.getElementById("edit-full-religion").value = personal.religion || "Islam";
+  document.getElementById("edit-full-marital").value = personal.marital_status || "Lajang";
+  document.getElementById("edit-full-dependents").value = personal.number_of_dependents || 0;
+  document.getElementById("edit-full-alamat-ktp").value = personal.address_ktp || "";
+  document.getElementById("edit-full-alamat-dom").value = personal.address_domicile || "";
+  document.getElementById("edit-full-emerg-name").value = personal.emergency_contact_name || "";
+  document.getElementById("edit-full-emerg-rel").value = personal.emergency_contact_relation || "";
+  document.getElementById("edit-full-emerg-phone").value = personal.emergency_contact_phone || "";
+
+  // Tab 2: Payroll
+  document.getElementById("edit-full-gaji").value = latestTx.new_basic_salary || "";
+  document.getElementById("edit-full-tunjangan").value = latestTx.new_allowances || "";
+  document.getElementById("edit-full-bank").value = latestTx.bank_name || "BCA";
+  document.getElementById("edit-full-rekening").value = latestTx.bank_account_no || "";
+  document.getElementById("edit-full-rek-name").value = latestTx.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+  document.getElementById("edit-full-bpjskes").value = latestTx.bpjs_kesehatan_number || "";
+  document.getElementById("edit-full-bpjstk").value = latestTx.bpjs_ketenagakerjaan_number || "";
+  document.getElementById("edit-full-npwp").value = latestTx.npwp_number || "";
+  document.getElementById("edit-full-ptkp").value = latestTx.tax_status || "TK/0";
+
+  switchEditFullTab("sipil");
+  modal.classList.remove("hidden");
+}
+
+function closeEditEmployeeFullModal() {
+  document.getElementById("modal-employee-edit-full")?.classList.add("hidden");
+}
+
+function switchEditFullTab(tab) {
+  const isSipil = tab === "sipil";
+  const btnSipil = document.getElementById("edit-full-tab-btn-sipil");
+  const btnPay = document.getElementById("edit-full-tab-btn-payroll");
+  const contentSipil = document.getElementById("edit-full-content-sipil");
+  const contentPay = document.getElementById("edit-full-content-payroll");
+
+  if (isSipil) {
+    if (btnSipil) btnSipil.className = "px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs font-bold";
+    if (btnPay) btnPay.className = "px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 font-bold";
+    contentSipil?.classList.remove("hidden");
+    contentPay?.classList.add("hidden");
+  } else {
+    if (btnPay) btnPay.className = "px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs font-bold";
+    if (btnSipil) btnSipil.className = "px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 font-bold";
+    contentPay?.classList.remove("hidden");
+    contentSipil?.classList.add("hidden");
+  }
+}
+
+async function handleSaveEmployeeFull(event) {
+  event.preventDefault();
+  const emp = CURRENT_DOSSIER_EMP;
+  if (!emp) return;
+
+  const btn = document.getElementById("btn-save-edit-full");
+  const origText = btn ? btn.innerHTML : "Simpan";
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+    btn.disabled = true;
+  }
+
+  try {
+    let empId = emp.id;
+    if (supabaseClient && (!empId || typeof empId === "number")) {
+      const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+      if (eRow?.id) empId = eRow.id;
+    }
+
+    // 1. Simpan Data Pribadi Sipil (employee_personal_details)
+    const personalPayload = {
+      employee_id: empId,
+      ktp_number: document.getElementById("edit-full-nik").value.trim() || null,
+      phone: document.getElementById("edit-full-phone").value.trim() || null,
+      pob: document.getElementById("edit-full-pob").value.trim() || null,
+      dob: document.getElementById("edit-full-dob").value || null,
+      gender: document.getElementById("edit-full-gender").value,
+      religion: document.getElementById("edit-full-religion").value,
+      marital_status: document.getElementById("edit-full-marital").value,
+      number_of_dependents: parseInt(document.getElementById("edit-full-dependents").value) || 0,
+      address_ktp: document.getElementById("edit-full-alamat-ktp").value.trim() || null,
+      address_domicile: document.getElementById("edit-full-alamat-dom").value.trim() || null,
+      emergency_contact_name: document.getElementById("edit-full-emerg-name").value.trim() || null,
+      emergency_contact_relation: document.getElementById("edit-full-emerg-rel").value.trim() || null,
+      emergency_contact_phone: document.getElementById("edit-full-emerg-phone").value.trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    if (supabaseClient && empId) {
+      const { error: pErr } = await supabaseClient
+        .from("employee_personal_details")
+        .upsert([personalPayload], { onConflict: "employee_id" });
+      if (pErr) console.warn("Upsert personal details warning:", pErr);
+    }
+
+    // 2. Simpan Data Payroll / Remunerasi ke Transaksi Karir (employee_career_histories)
+    const gajiVal = document.getElementById("edit-full-gaji").value ? parseFloat(document.getElementById("edit-full-gaji").value) : null;
+    const tunjanganVal = document.getElementById("edit-full-tunjangan").value ? parseFloat(document.getElementById("edit-full-tunjangan").value) : null;
+    const bankVal = document.getElementById("edit-full-bank").value;
+    const rekVal = document.getElementById("edit-full-rekening").value.trim() || null;
+    const rekNameVal = document.getElementById("edit-full-rek-name").value.trim() || null;
+    const bpjsKesVal = document.getElementById("edit-full-bpjskes").value.trim() || null;
+    const bpjsTkVal = document.getElementById("edit-full-bpjstk").value.trim() || null;
+    const npwpVal = document.getElementById("edit-full-npwp").value.trim() || null;
+    const ptkpVal = document.getElementById("edit-full-ptkp").value;
+
+    if (supabaseClient && empId && (gajiVal || bankVal || rekVal || bpjsKesVal)) {
+      const careerPayload = {
+        employee_id: empId,
+        transaction_date: new Date().toISOString().split("T")[0],
+        effective_date: new Date().toISOString().split("T")[0],
+        transaction_type: "SALARY_ADJUSTMENT",
+        no_sk: "SK/PAYROLL/" + new Date().getFullYear() + "/" + emp.nip,
+        description: "Pembaruan Profil Payroll, Rekening & Kompensasi Karyawan",
+        new_basic_salary: gajiVal,
+        new_allowances: tunjanganVal,
+        bank_name: bankVal,
+        bank_account_no: rekVal,
+        bank_account_holder: rekNameVal,
+        bpjs_kesehatan_number: bpjsKesVal,
+        bpjs_ketenagakerjaan_number: bpjsTkVal,
+        npwp_number: npwpVal,
+        tax_status: ptkpVal,
+        created_at: new Date().toISOString()
+      };
+
+      const { error: cErr } = await supabaseClient
+        .from("employee_career_histories")
+        .insert([careerPayload]);
+      if (cErr) console.warn("Insert career history warning:", cErr);
+    }
+
+    closeEditEmployeeFullModal();
+    if (typeof showToast === "function") showToast("Data personalia & payroll berhasil diperbarui!", "success");
+    else alert("Data personalia & payroll berhasil diperbarui!");
+
+    // Refresh Tampilan Detail Personalia
+    await loadDossierPersonalDetails(emp);
+    await loadDossierCareerHistories(emp);
+  } catch (err) {
+    alert("Gagal menyimpan data: " + err.message);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
   }
 }
 
