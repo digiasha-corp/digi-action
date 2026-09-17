@@ -19,7 +19,7 @@ DROP FUNCTION IF EXISTS public.sync_employees_to_legacy_m_employee();
 
 -- 2. PASTIKAN MASTER UNIT TERISI DARI CABANG m_employee
 INSERT INTO public.organization_units (id_unit, tipe_unit, nama_unit, parent_unit_id, is_active)
-SELECT 
+SELECT DISTINCT
     'UNIT-' || UPPER(REPLACE(REPLACE(TRIM(cabang), ' ', '-'), '/', '-')),
     'CABANG',
     TRIM(cabang),
@@ -33,7 +33,7 @@ ON CONFLICT (id_unit) DO UPDATE SET
 
 -- 3. PASTIKAN MASTER JABATAN TERISI DARI JABATAN m_employee
 INSERT INTO public.job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
-SELECT 
+SELECT DISTINCT
     'POS-' || UPPER(REPLACE(REPLACE(REPLACE(TRIM(jabatan), ' ', '-'), '/', '-'), '&', 'AND')),
     TRIM(jabatan),
     'L-04',
@@ -60,7 +60,7 @@ INSERT INTO public.employees (
     created_at,
     updated_at
 )
-SELECT 
+SELECT DISTINCT ON (m.nip)
     gen_random_uuid(),
     m.nip,
     COALESCE(m.nama_lengkap, m.nip),
