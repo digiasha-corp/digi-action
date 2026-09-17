@@ -15858,26 +15858,74 @@ function switchOrgStructureSubtab(sub) {
   }
 }
 
+// ---------------- 0. HELPER DATABASE CORE HR DUAL-TARGET (hr_* BASE TABLE & VIEW) ----------------
+async function upsertOrgCoreTable(baseName, payload, conflictCol) {
+  if (!supabaseClient) return { success: false, error: "No Supabase client" };
+  
+  // 1. Prioritaskan tabel fisik berprefix hr_* karena BASE TABLE mendukung penuh ON CONFLICT di PostgreSQL
+  try {
+    const { data, error } = await supabaseClient
+      .from("hr_" + baseName)
+      .upsert(payload, { onConflict: conflictCol });
+    if (!error) {
+      console.log(`[Org Core HR] Berhasil simpan ke hr_${baseName}:`, payload[conflictCol]);
+      return { success: true, data };
+    }
+    console.warn(`[Org Core HR] hr_${baseName} upsert returned:`, error);
+  } catch (e) {
+    console.warn(`[Org Core HR] Exception hr_${baseName}:`, e);
+  }
+
+  // 2. Fallback jika sistem menggunakan nama tabel standar tanpa prefix hr_
+  try {
+    const { data, error } = await supabaseClient
+      .from(baseName)
+      .upsert(payload, { onConflict: conflictCol });
+    if (!error) {
+      console.log(`[Org Core HR] Berhasil simpan ke ${baseName}:`, payload[conflictCol]);
+      return { success: true, data };
+    }
+    console.error(`[Org Core HR] Gagal simpan ke ${baseName}:`, error);
+    throw error;
+  } catch (e) {
+    throw e;
+  }
+}
+
+async function loadOrgCoreTable(baseName, orderCol = "created_at", ascending = true) {
+  if (!supabaseClient) return [];
+  // 1. Coba baca dari tabel fisik hr_*
+  try {
+    const { data, error } = await supabaseClient
+      .from("hr_" + baseName)
+      .select("*")
+      .order(orderCol, { ascending });
+    if (!error && data && data.length > 0) return data;
+  } catch (e) {}
+
+  // 2. Coba baca dari view / nama tabel biasa
+  try {
+    const { data, error } = await supabaseClient
+      .from(baseName)
+      .select("*")
+      .order(orderCol, { ascending });
+    if (!error && data && data.length > 0) return data;
+  } catch (e) {}
+
+  return [];
+}
+
 // ---------------- 1. WORK LOCATION (TEMPAT KERJA FISIK) ----------------
 async function loadWorkLocations() {
   const container = document.getElementById("work-locations-list-container");
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient
-        .from("work_locations")
-        .select("*")
-        .order("id_work_location");
-      if (!error && data && data.length > 0) {
-        ORG_WORK_LOCATIONS_DATA = data;
-        renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
-        return;
-      }
-    } catch (e) {
-      console.warn("Table work_locations not yet created, using fallback:", e);
-    }
+  const data = await loadOrgCoreTable("work_locations", "id_work_location");
+  if (data && data.length > 0) {
+    ORG_WORK_LOCATIONS_DATA = data;
+    renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+    return;
   }
 
-  // Fallback
+  // Fallback default jika tabel belum ada isinya
   ORG_WORK_LOCATIONS_DATA = DEFAULT_ORG_WORK_LOCS;
   renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
 }
@@ -16011,12 +16059,7 @@ async function handleSaveWorkLocation(e) {
   btn.disabled = true;
 
   try {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("work_locations")
-        .upsert(payload, { onConflict: "id_work_location" });
-      if (error) console.warn("Supabase save work_location:", error);
-    }
+    await upsertOrgCoreTable("work_locations", payload, "id_work_location");
 
     const idx = ORG_WORK_LOCATIONS_DATA.findIndex(w => w.id_work_location === id);
     if (idx >= 0) ORG_WORK_LOCATIONS_DATA[idx] = payload;
@@ -16024,7 +16067,7 @@ async function handleSaveWorkLocation(e) {
 
     renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
     closeWorkLocModal();
-    showToast("Tempat kerja fisik berhasil disimpan!", "success", 1500);
+    showToast("Tempat kerja fisik berhasil disimpan ke database!", "success", 1500);
   } catch (err) {
     alert("Gagal menyimpan tempat kerja: " + err.message);
   } finally {
@@ -16035,21 +16078,12 @@ async function handleSaveWorkLocation(e) {
 
 // ---------------- 2. UNIT ORGANISASI (HO, AREA, CABANG) ----------------
 async function loadOrgUnits() {
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient
-        .from("organization_units")
-        .select("*")
-        .order("id_unit");
-      if (!error && data && data.length > 0) {
-        ORG_UNITS_DATA = data;
-        renderOrgUnitsList(ORG_UNITS_DATA);
-        populateOrgFilterUnits();
-        return;
-      }
-    } catch (e) {
-      console.warn("Table organization_units not yet created, using fallback:", e);
-    }
+  const data = await loadOrgCoreTable("organization_units", "id_unit");
+  if (data && data.length > 0) {
+    ORG_UNITS_DATA = data;
+    renderOrgUnitsList(ORG_UNITS_DATA);
+    populateOrgFilterUnits();
+    return;
   }
 
   ORG_UNITS_DATA = DEFAULT_ORG_UNITS;
@@ -16175,12 +16209,7 @@ async function handleSaveOrgUnit(e) {
   btn.disabled = true;
 
   try {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("organization_units")
-        .upsert(payload, { onConflict: "id_unit" });
-      if (error) console.warn("Supabase save organization_unit:", error);
-    }
+    await upsertOrgCoreTable("organization_units", payload, "id_unit");
 
     const idx = ORG_UNITS_DATA.findIndex(u => u.id_unit === id);
     if (idx >= 0) ORG_UNITS_DATA[idx] = payload;
@@ -16189,7 +16218,7 @@ async function handleSaveOrgUnit(e) {
     renderOrgUnitsList(ORG_UNITS_DATA);
     populateOrgFilterUnits();
     closeOrgUnitModal();
-    showToast("Unit organisasi berhasil disimpan!", "success", 1500);
+    showToast("Unit organisasi berhasil disimpan ke database!", "success", 1500);
   } catch (err) {
     alert("Gagal menyimpan unit: " + err.message);
   } finally {
@@ -16200,20 +16229,11 @@ async function handleSaveOrgUnit(e) {
 
 // ---------------- 3. MASTER POSISI / JABATAN ----------------
 async function loadOrgPositions() {
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient
-        .from("job_positions")
-        .select("*")
-        .order("id_position");
-      if (!error && data && data.length > 0) {
-        ORG_POSITIONS_DATA = data;
-        renderOrgPositionsList(ORG_POSITIONS_DATA);
-        return;
-      }
-    } catch (e) {
-      console.warn("Table job_positions not yet created, using fallback:", e);
-    }
+  const data = await loadOrgCoreTable("job_positions", "id_position");
+  if (data && data.length > 0) {
+    ORG_POSITIONS_DATA = data;
+    renderOrgPositionsList(ORG_POSITIONS_DATA);
+    return;
   }
 
   ORG_POSITIONS_DATA = DEFAULT_ORG_POSITIONS;
@@ -16340,12 +16360,7 @@ async function handleSaveJobPosition(e) {
   btn.disabled = true;
 
   try {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("job_positions")
-        .upsert(payload, { onConflict: "id_position" });
-      if (error) console.warn("Supabase save job_position:", error);
-    }
+    await upsertOrgCoreTable("job_positions", payload, "id_position");
 
     const idx = ORG_POSITIONS_DATA.findIndex(p => p.id_position === id);
     if (idx >= 0) ORG_POSITIONS_DATA[idx] = payload;
@@ -16353,7 +16368,7 @@ async function handleSaveJobPosition(e) {
 
     renderOrgPositionsList(ORG_POSITIONS_DATA);
     closeJobPosModal();
-    showToast("Posisi jabatan berhasil disimpan!", "success", 1500);
+    showToast("Posisi jabatan berhasil disimpan ke database!", "success", 1500);
   } catch (err) {
     alert("Gagal menyimpan jabatan: " + err.message);
   } finally {
@@ -16364,20 +16379,11 @@ async function handleSaveJobPosition(e) {
 
 // ---------------- 4. MASTER LEVEL (GRADE) ----------------
 async function loadOrgLevels() {
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient
-        .from("master_levels")
-        .select("*")
-        .order("bobot_level", { ascending: true });
-      if (!error && data && data.length > 0) {
-        ORG_LEVELS_DATA = data;
-        renderOrgLevelsList(ORG_LEVELS_DATA);
-        return;
-      }
-    } catch (e) {
-      console.warn("Table master_levels not yet created, using fallback:", e);
-    }
+  const data = await loadOrgCoreTable("master_levels", "bobot_level");
+  if (data && data.length > 0) {
+    ORG_LEVELS_DATA = data;
+    renderOrgLevelsList(ORG_LEVELS_DATA);
+    return;
   }
 
   ORG_LEVELS_DATA = DEFAULT_ORG_LEVELS;
@@ -16466,12 +16472,7 @@ async function handleSaveMasterLevel(e) {
   btn.disabled = true;
 
   try {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("master_levels")
-        .upsert(payload, { onConflict: "id_level" });
-      if (error) console.warn("Supabase save master_level:", error);
-    }
+    await upsertOrgCoreTable("master_levels", payload, "id_level");
 
     const idx = ORG_LEVELS_DATA.findIndex(l => l.id_level === id);
     if (idx >= 0) ORG_LEVELS_DATA[idx] = payload;
@@ -16480,7 +16481,7 @@ async function handleSaveMasterLevel(e) {
     ORG_LEVELS_DATA.sort((a, b) => a.bobot_level - b.bobot_level);
     renderOrgLevelsList(ORG_LEVELS_DATA);
     closeMasterLevelModal();
-    showToast("Master level berhasil disimpan!", "success", 1500);
+    showToast("Master level berhasil disimpan ke database!", "success", 1500);
   } catch (err) {
     alert("Gagal menyimpan level: " + err.message);
   } finally {
@@ -16825,7 +16826,102 @@ async function runSsoTokenSimulation() {
   }, 600);
 }
 
-// ---------------- 7. DOSSIER 360° KARYAWAN & RIWAYAT KARIR ----------------
+// ---------------- 6. ROLE & HAK AKSES PERMISSION MATRIX ----------------
+let ORG_ROLE_PERMS_DATA = { ...ROLE_PERMISSIONS };
+
+const ORG_ALL_MODULES = [
+  { key: "dashboard", label: "Dashboard Ringkasan", icon: "fa-gauge" },
+  { key: "assignment", label: "Penugasan & Task", icon: "fa-list-check" },
+  { key: "visit", label: "Kunjungan Lapangan & GPS", icon: "fa-map-location-dot" },
+  { key: "onboarding", label: "Onboarding Mitra", icon: "fa-handshake" },
+  { key: "pipeline", label: "Pipeline Prospek", icon: "fa-chart-line" },
+  { key: "gps", label: "Tracking & Perangkat GPS", icon: "fa-satellite-dish" },
+  { key: "fac", label: "Monitoring Kinerja FAC", icon: "fa-user-astronaut" },
+  { key: "history", label: "Riwayat Aktivitas", icon: "fa-clock-rotate-left" },
+  { key: "personalia", label: "Data Personalia & Core HR", icon: "fa-address-card" },
+  { key: "organization_setting", label: "Organization Setting", icon: "fa-sitemap" },
+  { key: "sop_management", label: "SOP Management", icon: "fa-book" },
+  { key: "settings", label: "Pengaturan Sistem", icon: "fa-gear" }
+];
+
+async function loadOrgRolePermissions() {
+  const container = document.getElementById("role-permissions-matrix-container");
+  if (!container) return;
+
+  const roles = [
+    { code: "R-01", title: "Super Admin / Direksi", badge: "bg-purple-100 text-purple-800" },
+    { code: "Admin", title: "Administrator Sistem", badge: "bg-indigo-100 text-indigo-800" },
+    { code: "R-02", title: "Branch Manager (BM)", badge: "bg-blue-100 text-blue-800" },
+    { code: "R-03", title: "Supervisor FAC", badge: "bg-emerald-100 text-emerald-800" },
+    { code: "R-04", title: "Field Action Coordinator (FAC)", badge: "bg-amber-100 text-amber-800" }
+  ];
+
+  let html = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+          <tr>
+            <th class="p-3 min-w-[200px]">Modul / Fitur Aplikasi</th>
+            ${roles.map(r => `
+              <th class="p-3 text-center min-w-[120px]">
+                <span class="block text-slate-900">${r.title}</span>
+                <span class="font-mono text-[9px] px-1.5 py-0.5 rounded font-bold ${r.badge}">${r.code}</span>
+              </th>
+            `).join("")}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          ${ORG_ALL_MODULES.map(m => `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-3 font-semibold text-slate-800 flex items-center space-x-2">
+                <i class="fa-solid ${m.icon} text-slate-400 w-4 text-center"></i>
+                <span>${m.label}</span>
+              </td>
+              ${roles.map(r => {
+                const perms = ORG_ROLE_PERMS_DATA[r.code] || [];
+                const isChecked = perms.includes(m.key) || perms.includes("all");
+                return `
+                  <td class="p-3 text-center">
+                    <input type="checkbox" ${isChecked ? "checked" : ""} 
+                      onchange="toggleOrgRolePermission('${r.code}', '${m.key}', this.checked)"
+                      class="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer" />
+                  </td>
+                `;
+              }).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+function toggleOrgRolePermission(roleCode, modKey, checked) {
+  if (!ORG_ROLE_PERMS_DATA[roleCode]) ORG_ROLE_PERMS_DATA[roleCode] = [];
+  if (checked) {
+    if (!ORG_ROLE_PERMS_DATA[roleCode].includes(modKey)) ORG_ROLE_PERMS_DATA[roleCode].push(modKey);
+  } else {
+    ORG_ROLE_PERMS_DATA[roleCode] = ORG_ROLE_PERMS_DATA[roleCode].filter(k => k !== modKey);
+  }
+  // Sinkronisasi ke variabel global
+  ROLE_PERMISSIONS[roleCode] = [...ORG_ROLE_PERMS_DATA[roleCode]];
+  showToast(`Hak akses modul ${modKey} untuk ${roleCode} berhasil diperbarui!`, "success", 1200);
+}
+
+function openAddRoleModal() {
+  const roleName = prompt("Masukkan nama Role baru (contoh: Finance / HR Officer):");
+  if (!roleName) return;
+  const roleCode = prompt("Masukkan kode Role (contoh: R-06):", `R-${Math.floor(10 + Math.random() * 90)}`);
+  if (!roleCode) return;
+  ORG_ROLE_PERMS_DATA[roleCode] = ["priority", "history"];
+  ROLE_PERMISSIONS[roleCode] = ["priority", "history"];
+  loadOrgRolePermissions();
+  showToast(`Role ${roleName} (${roleCode}) berhasil didaftarkan!`, "success", 1500);
+}
+
+// ---------------- 7. DETAIL PERSONALIA KARYAWAN & RIWAYAT KARIR ----------------
 async function openEmployeeDossierModal(nipOrId) {
   const modal = document.getElementById("modal-employee-dossier");
   if (!modal) return;
@@ -16841,10 +16937,8 @@ async function openEmployeeDossierModal(nipOrId) {
         .from("employees")
         .select(`
           *,
-          work_locations (name, code),
-          organization_units (name, code),
-          job_positions (title, code),
-          master_levels (name, grade_code)
+          organization_units (nama_unit),
+          job_positions (nama_jabatan)
         `)
         .or(`nip.eq.${nipOrId},id.eq.${nipOrId}`)
         .maybeSingle();
@@ -16852,8 +16946,8 @@ async function openEmployeeDossierModal(nipOrId) {
       if (eRow) {
         emp = {
           ...eRow,
-          cabang: eRow.work_locations?.name || eRow.cabang || "Head Office",
-          jabatan: eRow.job_positions?.title || eRow.jabatan || "Staff"
+          cabang: eRow.organization_units?.nama_unit || eRow.cabang || "Head Office",
+          jabatan: eRow.job_positions?.nama_jabatan || eRow.jabatan || "Staff"
         };
       } else {
         // 2. Fallback cari di m_employee
