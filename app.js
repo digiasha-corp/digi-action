@@ -16924,10 +16924,12 @@ function renderVisualOrgChartTree() {
 
   const filterUnit = document.getElementById("org-chart-filter-unit")?.value || "ALL";
 
-  // Ambil daftar karyawan aktif dari state
-  const employees = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0)
-    ? SETTINGS_EMPLOYEES_DATA
-    : (APP_STATE.employees || []);
+  // Ambil daftar karyawan aktif dari state / personalia
+  const employees = (PERSONALIA_EMPLOYEES_DATA && PERSONALIA_EMPLOYEES_DATA.length > 0)
+    ? PERSONALIA_EMPLOYEES_DATA
+    : ((SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0)
+        ? SETTINGS_EMPLOYEES_DATA
+        : (APP_STATE.employees || []));
 
   // Filter sesuai unit bila dipilih
   let filteredPositions = ORG_POSITIONS_DATA;
@@ -17022,7 +17024,12 @@ function handleOrgNodeClick(nip, posId) {
   if (nip && nip !== "-") {
     openEmployeeDossierModal(nip);
   } else {
-    openEditJobPositionModal(posId);
+    const modal = document.getElementById("modal-org-position");
+    if (modal) {
+      openEditJobPositionModal(posId);
+    } else {
+      showToast(`Jabatan ${posId} belum ditugaskan karyawan. Kelola di Organization Setting.`, "info", 2500);
+    }
   }
 }
 
@@ -18370,9 +18377,58 @@ function loadOrgRolePermissions() {
 // CONTROLLER: PERSONALIA & DATA KEPEGAWAIAN (CORE HR MASTER & DOSSIER)
 // =========================================================================
 let PERSONALIA_EMPLOYEES_DATA = [];
+let CURRENT_PERSONALIA_TAB = "chart";
+
+function switchPersonaliaTab(tab) {
+  CURRENT_PERSONALIA_TAB = tab;
+  const isChart = tab === "chart";
+
+  const btnChart = document.getElementById("tab-btn-personalia-chart");
+  const btnDetail = document.getElementById("tab-btn-personalia-detail");
+  const tabChart = document.getElementById("personalia-tab-chart");
+  const tabDetail = document.getElementById("personalia-tab-detail");
+
+  if (btnChart) {
+    btnChart.className = isChart
+      ? "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2 font-bold"
+      : "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 font-bold";
+  }
+  if (btnDetail) {
+    btnDetail.className = !isChart
+      ? "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2 font-bold"
+      : "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 font-bold";
+  }
+
+  if (tabChart) {
+    if (isChart) tabChart.classList.remove("hidden");
+    else tabChart.classList.add("hidden");
+  }
+  if (tabDetail) {
+    if (!isChart) tabDetail.classList.remove("hidden");
+    else tabDetail.classList.add("hidden");
+  }
+
+  if (isChart) {
+    populateOrgFilterUnits();
+    renderVisualOrgChartTree();
+  }
+}
 
 async function initPersonaliaScreen() {
-  await loadPersonaliaEmployees();
+  // 1. Pastikan data master posisi & unit terload untuk Bagan Pohon
+  const promises = [loadPersonaliaEmployees()];
+  if (!ORG_POSITIONS_DATA || ORG_POSITIONS_DATA.length === 0) {
+    promises.push(loadOrgPositions());
+  }
+  if (!ORG_UNITS_DATA || ORG_UNITS_DATA.length === 0) {
+    promises.push(loadOrgUnits());
+  }
+  await Promise.allSettled(promises);
+
+  // 2. Setup bagan visual & default ke Tab 1 (Bagan Organisasi)
+  populateOrgFilterUnits();
+  renderVisualOrgChartTree();
+  switchPersonaliaTab("chart");
 }
 
 async function loadPersonaliaEmployees() {

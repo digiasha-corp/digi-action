@@ -7,101 +7,162 @@
           Core HR & Personalia
         </span>
         <span class="px-2 py-0.5 text-[9px] font-bold rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-          Master Kepegawaian
+          Bagan & Master Pegawai
         </span>
       </div>
       <h3 class="text-base sm:text-lg font-black mt-1.5 leading-tight truncate">Data Karyawan & Personalia</h3>
-      <p class="text-[11px] text-slate-300 truncate mt-0.5">Buku Induk & Detail Personalia, Identitas Pribadi Sipil, Mutasi Karir & Remunerasi</p>
+      <p class="text-[11px] text-slate-300 truncate mt-0.5">Bagan Hirarki Organisasi, Buku Induk Kepegawaian & Detail Personalia Sipil</p>
     </div>
     <div class="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center text-xl text-indigo-300 shrink-0 border border-white/10 shadow-inner">
-      <i class="fa-solid fa-id-card-clip"></i>
+      <i class="fa-solid fa-users-viewfinder"></i>
     </div>
   </div>
 
-  <!-- KPI SUMMARY METRICS -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-      <div class="flex items-center justify-between">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Karyawan</span>
-        <i class="fa-solid fa-users text-slate-400 text-xs"></i>
-      </div>
-      <div class="text-lg font-black text-slate-900 mt-1" id="personalia-stat-total">0</div>
-      <span class="text-[10px] text-slate-500 font-semibold">Seluruh database</span>
-    </div>
-
-    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-      <div class="flex items-center justify-between">
-        <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Aktif</span>
-        <i class="fa-solid fa-user-check text-emerald-500 text-xs"></i>
-      </div>
-      <div class="text-lg font-black text-emerald-700 mt-1" id="personalia-stat-active">0</div>
-      <span class="text-[10px] text-emerald-600 font-semibold">Dapat login & bertugas</span>
-    </div>
-
-    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-      <div class="flex items-center justify-between">
-        <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">PKWTT (Tetap)</span>
-        <i class="fa-solid fa-file-signature text-indigo-500 text-xs"></i>
-      </div>
-      <div class="text-lg font-black text-indigo-800 mt-1" id="personalia-stat-pkwtt">0</div>
-      <span class="text-[10px] text-indigo-600 font-semibold">Karyawan permanen</span>
-    </div>
-
-    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-      <div class="flex items-center justify-between">
-        <span class="text-[10px] font-bold text-amber-600 uppercase tracking-wider">PKWT / Kontrak</span>
-        <i class="fa-solid fa-clock text-amber-500 text-xs"></i>
-      </div>
-      <div class="text-lg font-black text-amber-800 mt-1" id="personalia-stat-pkwt">0</div>
-      <span class="text-[10px] text-amber-600 font-semibold">Masa kontrak aktif</span>
-    </div>
+  <!-- NAVIGASI 2 TAB UTAMA: TAB 1 BAGAN ORGANISASI, TAB 2 DETAIL KARYAWAN -->
+  <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold shadow-inner">
+    <button type="button" id="tab-btn-personalia-chart" onclick="switchPersonaliaTab('chart')" class="flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2">
+      <i class="fa-solid fa-sitemap text-indigo-600"></i>
+      <span>Bagan Organisasi</span>
+    </button>
+    <button type="button" id="tab-btn-personalia-detail" onclick="switchPersonaliaTab('detail')" class="flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2">
+      <i class="fa-solid fa-id-card-clip text-emerald-600"></i>
+      <span>Detail Karyawan</span>
+    </button>
   </div>
 
-  <!-- TOOLBAR & FILTER PENCARIAN -->
-  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2.5">
-    <div class="flex items-center justify-between gap-2">
-      <div class="relative flex-1">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" id="personalia-search-input" oninput="filterPersonaliaEmployees()" placeholder="Cari NIP, nama, jabatan, atau cabang..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 outline-none transition shadow-2xs" />
+  <!-- ========================================================================= -->
+  <!-- TAB 1: BAGAN ORGANISASI (ORG CHART TREE VISUAL)                           -->
+  <!-- ========================================================================= -->
+  <div id="personalia-tab-chart" class="space-y-3">
+    <!-- Toolbar Kontrol Org Chart -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+        <label class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+          <i class="fa-solid fa-filter text-indigo-600"></i> Fokus Unit:
+        </label>
+        <select id="org-chart-filter-unit" onchange="renderVisualOrgChartTree()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-600">
+          <option value="ALL">Semua Unit (Seluruh Organisasi)</option>
+        </select>
       </div>
-      <button type="button" onclick="openAddPersonaliaEmployeeModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 shadow flex items-center space-x-1.5 transition">
-        <i class="fa-solid fa-user-plus text-xs"></i>
-        <span>Tambah Karyawan</span>
-      </button>
+
+      <div class="flex items-center space-x-1.5">
+        <button type="button" onclick="zoomOrgChart(1.15)" title="Perbesar Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-magnifying-glass-plus"></i>
+        </button>
+        <button type="button" onclick="zoomOrgChart(0.85)" title="Perkecil Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-magnifying-glass-minus"></i>
+        </button>
+        <button type="button" onclick="resetOrgChartZoom()" title="Reset Tampilan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+        <button type="button" onclick="expandAllOrgTreeNodes(true)" class="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold border border-indigo-200 transition">
+          Buka Semua Cabang
+        </button>
+      </div>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      <div>
-        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Filter Cabang / Unit:</label>
-        <select id="personalia-filter-branch" onchange="filterPersonaliaEmployees()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
-          <option value="ALL">Semua Cabang / Unit</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Status Kerja:</label>
-        <select id="personalia-filter-status-kerja" onchange="filterPersonaliaEmployees()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
-          <option value="ALL">Semua Status Kerja</option>
-          <option value="PKWTT">PKWTT (Tetap)</option>
-          <option value="PKWT">PKWT (Kontrak)</option>
-          <option value="PROBATION">Probation</option>
-          <option value="INTERNSHIP">Magang</option>
-        </select>
-      </div>
-      <div class="col-span-2 sm:col-span-1">
-        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Status Login & Aktif:</label>
-        <select id="personalia-filter-active" onchange="filterPersonaliaEmployees()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
-          <option value="ALL">Semua Status Akun</option>
-          <option value="ACTIVE">Hanya AKTIF</option>
-          <option value="INACTIVE">Hanya NONAKTIF</option>
-        </select>
+    <!-- Canvas Area Bagan Pohon Org Chart -->
+    <div id="org-chart-viewport" class="bg-slate-50/70 border border-slate-200 rounded-3xl p-4 sm:p-6 overflow-auto min-h-[500px] max-h-[75vh] relative shadow-inner">
+      <div id="org-chart-container" class="org-tree-root flex justify-center transition-transform duration-200 origin-top">
+        <div class="p-8 text-center text-xs text-slate-400">
+          <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-2 block"></i> Memuat Bagan Struktur Organisasi...
+        </div>
       </div>
     </div>
+    <p class="text-[10px] text-slate-400 text-center italic">
+      <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> Klik pada kartu karyawan/jabatan di atas untuk membuka Detail Personalia & Riwayat Karir.
+    </p>
   </div>
 
-  <!-- DAFTAR KARYAWAN (CARDS) -->
-  <div id="personalia-employee-list-container" class="space-y-2.5">
-    <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
-      <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat data master personalia...
+  <!-- ========================================================================= -->
+  <!-- TAB 2: DETAIL KARYAWAN (METRIK, PENCARIAN & DAFTAR BUKU INDUK)            -->
+  <!-- ========================================================================= -->
+  <div id="personalia-tab-detail" class="space-y-4 hidden">
+    <!-- KPI SUMMARY METRICS -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Karyawan</span>
+          <i class="fa-solid fa-users text-slate-400 text-xs"></i>
+        </div>
+        <div class="text-lg font-black text-slate-900 mt-1" id="personalia-stat-total">0</div>
+        <span class="text-[10px] text-slate-500 font-semibold">Seluruh database</span>
+      </div>
+
+      <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Aktif</span>
+          <i class="fa-solid fa-user-check text-emerald-500 text-xs"></i>
+        </div>
+        <div class="text-lg font-black text-emerald-700 mt-1" id="personalia-stat-active">0</div>
+        <span class="text-[10px] text-emerald-600 font-semibold">Dapat login & bertugas</span>
+      </div>
+
+      <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">PKWTT (Tetap)</span>
+          <i class="fa-solid fa-file-signature text-indigo-500 text-xs"></i>
+        </div>
+        <div class="text-lg font-black text-indigo-800 mt-1" id="personalia-stat-pkwtt">0</div>
+        <span class="text-[10px] text-indigo-600 font-semibold">Karyawan permanen</span>
+      </div>
+
+      <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-amber-600 uppercase tracking-wider">PKWT / Kontrak</span>
+          <i class="fa-solid fa-clock text-amber-500 text-xs"></i>
+        </div>
+        <div class="text-lg font-black text-amber-800 mt-1" id="personalia-stat-pkwt">0</div>
+        <span class="text-[10px] text-amber-600 font-semibold">Masa kontrak aktif</span>
+      </div>
+    </div>
+
+    <!-- TOOLBAR & FILTER PENCARIAN -->
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2.5">
+      <div class="flex items-center justify-between gap-2">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="personalia-search-input" oninput="filterPersonaliaEmployees()" placeholder="Cari NIP, nama, jabatan, atau cabang..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 outline-none transition shadow-2xs" />
+        </div>
+        <button type="button" onclick="openAddPersonaliaEmployeeModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 shadow flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-user-plus text-xs"></i>
+          <span>Tambah Karyawan</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Filter Cabang / Unit:</label>
+          <select id="personalia-filter-branch" onchange="filterPersonaliaEmployees()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+            <option value="ALL">Semua Cabang / Unit</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Status Kerja:</label>
+          <select id="personalia-filter-status-kerja" onchange="filterPersonaliaEmployees()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+            <option value="ALL">Semua Status Kerja</option>
+            <option value="PKWTT">PKWTT (Tetap)</option>
+            <option value="PKWT">PKWT (Kontrak)</option>
+            <option value="PROBATION">Probation</option>
+            <option value="INTERNSHIP">Magang</option>
+          </select>
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Status Login & Aktif:</label>
+          <select id="personalia-filter-active" onchange="filterPersonaliaEmployees()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+            <option value="ALL">Semua Status Akun</option>
+            <option value="ACTIVE">Hanya AKTIF</option>
+            <option value="INACTIVE">Hanya NONAKTIF</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAFTAR KARYAWAN (CARDS) -->
+    <div id="personalia-employee-list-container" class="space-y-2.5">
+      <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat data master personalia...
+      </div>
     </div>
   </div>
 </div>

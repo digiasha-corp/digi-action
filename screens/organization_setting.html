@@ -21,7 +21,7 @@
   <!-- NAVIGASI 4 TAB UTAMA -->
   <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold overflow-x-auto shadow-inner">
     <button type="button" id="tab-btn-org-structure" onclick="switchOrgSettingTab('structure')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm">
-      <i class="fa-solid fa-sitemap mr-1.5 text-indigo-600"></i> Struktur & Bagan
+      <i class="fa-solid fa-sitemap mr-1.5 text-indigo-600"></i> Struktur & Unit
     </button>
     <button type="button" id="tab-btn-org-workloc" onclick="switchOrgSettingTab('workloc')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
       <i class="fa-solid fa-building-shield mr-1.5 text-emerald-600"></i> Work Location
@@ -35,16 +35,13 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- TAB 1: STRUKTUR ORGANISASI & BAGAN HIERARKI -->
+  <!-- TAB 1: STRUKTUR ORGANISASI & UNIT                                         -->
   <!-- ========================================================================= -->
   <div id="org-setting-tab-structure" class="space-y-3.5">
     <!-- SUB-NAVIGASI STRUKTUR -->
     <div class="flex items-center space-x-1 border-b border-slate-200 pb-2 overflow-x-auto text-[11px] font-bold">
-      <button type="button" id="subtab-btn-chart" onclick="switchOrgStructureSubtab('chart')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs whitespace-nowrap">
-        <i class="fa-solid fa-diagram-project mr-1 text-indigo-600"></i> Bagan Visual (Org Chart)
-      </button>
-      <button type="button" id="subtab-btn-unit" onclick="switchOrgStructureSubtab('unit')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
-        <i class="fa-solid fa-building mr-1 text-slate-500"></i> Unit Organisasi (HO, Area, Cabang)
+      <button type="button" id="subtab-btn-unit" onclick="switchOrgStructureSubtab('unit')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs whitespace-nowrap">
+        <i class="fa-solid fa-building mr-1 text-indigo-600"></i> Unit Organisasi (HO, Area, Cabang)
       </button>
       <button type="button" id="subtab-btn-position" onclick="switchOrgStructureSubtab('position')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
         <i class="fa-solid fa-user-tie mr-1 text-slate-500"></i> Master Jabatan & Reporting
@@ -52,10 +49,16 @@
       <button type="button" id="subtab-btn-level" onclick="switchOrgStructureSubtab('level')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
         <i class="fa-solid fa-layer-group mr-1 text-slate-500"></i> Master Level (Grade)
       </button>
+      <button type="button" id="subtab-btn-chart" onclick="switchOrgStructureSubtab('chart')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
+        <i class="fa-solid fa-diagram-project mr-1 text-slate-500"></i> Bagan Visual (Preview)
+      </button>
+      <button type="button" onclick="loadScreen('personalia')" class="ml-auto px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 whitespace-nowrap flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-users-viewfinder text-indigo-600"></i> Buka Bagan di Menu Karyawan <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-indigo-400"></i>
+      </button>
     </div>
 
     <!-- SUB-VIEW 1: BAGAN VISUAL ORG CHART TREE -->
-    <div id="org-subview-chart" class="space-y-3">
+    <div id="org-subview-chart" class="space-y-3 hidden">
       <!-- Toolbar Kontrol Org Chart -->
       <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
         <div class="flex items-center space-x-2 flex-wrap gap-y-1">
@@ -98,7 +101,7 @@
     </div>
 
     <!-- SUB-VIEW 2: UNIT ORGANISASI (HO, AREA, CABANG) -->
-    <div id="org-subview-unit" class="space-y-3 hidden">
+    <div id="org-subview-unit" class="space-y-3">
       <div class="flex items-center justify-between gap-2">
         <div>
           <h4 class="text-xs font-bold text-slate-800">Daftar Unit Organisasi</h4>
