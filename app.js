@@ -105,7 +105,7 @@ const ALL_APP_MODULES = [
   { key: "attendance_summary", title: "Rekap Absen", desc: "Kalender presensi saya sendiri", icon: "fa-calendar-check", category: "Personalia" },
   { key: "rekap_tim", title: "Presensi Tim", desc: "Monitoring presensi staf / PIC lain", icon: "fa-users-viewfinder", category: "Personalia" },
   { key: "slip_gaji", title: "Slip Gaji", desc: "E-Slip gaji & kompensasi resmi karyawan", icon: "fa-file-invoice-dollar", category: "Personalia" },
-  { key: "personalia", title: "Data Karyawan", desc: "Master kepegawaian, dossier 360° & riwayat karir", icon: "fa-id-card-clip", category: "Personalia" },
+  { key: "personalia", title: "Data Karyawan", desc: "Master kepegawaian, detail personalia & riwayat karir", icon: "fa-id-card-clip", category: "Personalia" },
 
   // 3. Layanan & Support Karyawan
   { key: "expense_claim", title: "Klaim Biaya (Reimbursement)", desc: "Pengajuan biaya BBM/Tol/Ops", icon: "fa-money-bill-wave", category: "Layanan & Support" },
@@ -17421,9 +17421,9 @@ function renderPersonaliaEmployees(list) {
             <i class="fa-solid fa-file-contract text-emerald-600"></i>
             <span>Catat Transaksi</span>
           </button>
-          <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Rekam Jejak Dossier 360°" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-sm transition">
+          <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Detail Personalia & Buku Induk" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-sm transition">
             <i class="fa-solid fa-id-badge text-indigo-200"></i>
-            <span>Dossier 360°</span>
+            <span>Detail Personalia</span>
           </button>
         </div>
       </div>
