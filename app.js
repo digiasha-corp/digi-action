@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260917_v120";
+const APP_BUILD_VERSION = "20260917_v121";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -7575,31 +7575,77 @@ function saveUnitChecklist() {
 function getPreciseLocation() {
   const geoDisplay = document.getElementById("geo-location-display");
   const onbGeoDisplay = document.getElementById("onb-geo-display");
+  const geoBadge = document.getElementById("geo-status-badge");
 
   CURRENT_USER_GEO.lat = null;
   CURRENT_USER_GEO.long = null;
+  CURRENT_USER_GEO.accuracy = null;
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const crd = pos.coords;
-        CURRENT_USER_GEO.lat = crd.latitude;
-        CURRENT_USER_GEO.long = crd.longitude;
-        CURRENT_USER_GEO.accuracy = crd.accuracy;
-        const locStr = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
-        if (geoDisplay) geoDisplay.innerText = locStr;
-        if (onbGeoDisplay) onbGeoDisplay.innerText = locStr;
-      },
-      () => {
-        CURRENT_USER_GEO.lat = null;
-        CURRENT_USER_GEO.long = null;
-        const fallback = "Lokasi Tidak Terdeteksi (GPS Tidak Aktif)";
-        if (geoDisplay) geoDisplay.innerText = fallback;
-        if (onbGeoDisplay) onbGeoDisplay.innerText = fallback;
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
+  if (geoDisplay) {
+    geoDisplay.innerHTML = '<span class="text-amber-600 font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Mengunci titik koordinat GPS...</span>';
   }
+  if (geoBadge) {
+    geoBadge.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-0.5"></i> Mencari...';
+    geoBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0";
+  }
+
+  if (!navigator.geolocation) {
+    const notSupported = "Perangkat / Browser Tidak Mendukung GPS";
+    if (geoDisplay) geoDisplay.innerHTML = `<span class="text-rose-600 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${notSupported}</span>`;
+    if (onbGeoDisplay) onbGeoDisplay.innerText = notSupported;
+    if (geoBadge) {
+      geoBadge.innerHTML = '<i class="fa-solid fa-ban mr-0.5"></i> Not Supported';
+      geoBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0";
+    }
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const crd = pos.coords;
+      CURRENT_USER_GEO.lat = crd.latitude;
+      CURRENT_USER_GEO.long = crd.longitude;
+      CURRENT_USER_GEO.accuracy = crd.accuracy;
+      const locStr = `${crd.latitude.toFixed(6)}, ${crd.longitude.toFixed(6)} (±${Math.round(crd.accuracy)}m)`;
+      if (geoDisplay) {
+        geoDisplay.innerHTML = `<span class="text-emerald-700 font-bold"><i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>${locStr}</span>`;
+      }
+      if (onbGeoDisplay) onbGeoDisplay.innerText = locStr;
+      if (geoBadge) {
+        geoBadge.innerHTML = '<i class="fa-solid fa-satellite-dish mr-0.5"></i> Terkunci';
+        geoBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0";
+      }
+    },
+    err => {
+      CURRENT_USER_GEO.lat = null;
+      CURRENT_USER_GEO.long = null;
+      CURRENT_USER_GEO.accuracy = null;
+
+      let errReason = "GPS Tidak Aktif / Akses Ditolak";
+      let shortBadge = "GPS Off";
+
+      if (err && err.code === 1) { // PERMISSION_DENIED
+        errReason = "Izin GPS Ditolak / Diblokir Browser";
+        shortBadge = "Izin Ditolak";
+      } else if (err && err.code === 2) { // POSITION_UNAVAILABLE
+        errReason = "Sinyal GPS Tidak Ditemukan / GPS HP Mati";
+        shortBadge = "Sinyal Hilang";
+      } else if (err && err.code === 3) { // TIMEOUT
+        errReason = "Waktu Pencarian GPS Habis (Coba Refresh)";
+        shortBadge = "Timeout";
+      }
+
+      if (geoDisplay) {
+        geoDisplay.innerHTML = `<span class="text-rose-600 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${errReason}</span>`;
+      }
+      if (onbGeoDisplay) onbGeoDisplay.innerText = errReason;
+      if (geoBadge) {
+        geoBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-0.5"></i> ${shortBadge}`;
+        geoBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0";
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
 }
 
 async function handleShowroomPhotoSelected(input) {
@@ -7630,6 +7676,15 @@ async function handleFormSubmit(e) {
   e.preventDefault();
 
   try {
+    // 1. Strict GPS Check: Sama seperti absensi, wajib GPS aktif dan dapat koordinat riil
+    if (!CURRENT_USER_GEO.lat || !CURRENT_USER_GEO.long) {
+      alert("GPS Wajib Aktif & Diberikan Izin!\n\nKoordinat lokasi kunjungan belum berhasil didapatkan.\n\nPastikan:\n1. Fitur Lokasi / GPS di HP Anda sudah aktif (ON)\n2. Browser telah diberi izin mengakses lokasi\n\nSilakan klik tombol 'Refresh' pada bagian Geotag Presisi untuk mengunci koordinat sebelum mengirim laporan.");
+      getPreciseLocation();
+      const geoElem = document.getElementById("geo-location-display");
+      if (geoElem) geoElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     if (ACTIVE_UNITS_STATE.length > 0) {
       const unchecked = ACTIVE_UNITS_STATE.filter(u => !u.is_checked);
       if (unchecked.length > 0) {
