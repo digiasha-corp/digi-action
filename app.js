@@ -17467,58 +17467,38 @@ async function loadPersonaliaEmployees() {
 
   if (supabaseClient) {
     try {
-      // 1. Coba load dari master employees baru (dengan relasi work_locations, organization_units, job_positions, master_levels)
+      // Load eksklusif dari master employees baru (Core HR New Database)
       const { data: empData, error: empErr } = await supabaseClient
         .from("employees")
         .select(`
           *,
-          work_locations (nama_lokasi),
-          organization_units (nama_unit),
-          job_positions (nama_jabatan),
-          master_levels (nama_level, kode_level)
+          organization_units (name, code),
+          job_positions (title, code)
         `)
-        .order("nama_lengkap");
+        .order("nip");
 
       if (!empErr && empData && empData.length > 0) {
         PERSONALIA_EMPLOYEES_DATA = empData.map(e => ({
           ...e,
-          cabang: e.work_locations?.nama_lokasi || e.cabang || "Head Office",
-          jabatan: e.job_positions?.nama_jabatan || e.jabatan || "Staff",
-          level: e.master_levels?.nama_level || e.level || "Staff Operasional"
+          nama_lengkap: e.name || e.nama_lengkap || e.nip,
+          cabang: e.organization_units?.name || e.cabang || "Head Office",
+          jabatan: e.job_positions?.title || e.jabatan || "Staff",
+          status_aktif: !e.deleted_at ? "AKTIF" : "NONAKTIF"
         }));
         populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
         updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
         renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
         return;
-      }
-
-      // 2. Fallback ke m_employee jika employees baru belum di-seed
-      const { data: legacyData, error: legacyErr } = await supabaseClient
-        .from("m_employee")
-        .select("*")
-        .order("nama_lengkap");
-
-      if (!legacyErr && legacyData && legacyData.length > 0) {
-        PERSONALIA_EMPLOYEES_DATA = legacyData;
-        populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
-        updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
-        renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
-        return;
+      } else if (empErr) {
+        console.warn("[Personalia New DB] Query error:", empErr);
       }
     } catch (e) {
-      console.warn("[Personalia] Error loading from supabase:", e);
+      console.warn("[Personalia New DB] Exception:", e);
     }
   }
 
-  // 3. Fallback ke APP_STATE / default
-  if (APP_STATE.employees && APP_STATE.employees.length > 0) {
-    PERSONALIA_EMPLOYEES_DATA = APP_STATE.employees;
-  } else if (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0) {
-    PERSONALIA_EMPLOYEES_DATA = SETTINGS_EMPLOYEES_DATA;
-  } else {
-    PERSONALIA_EMPLOYEES_DATA = [];
-  }
-
+  // Jika tabel employees baru belum di-seed, tampilkan list kosong dengan panduan duplikasi
+  PERSONALIA_EMPLOYEES_DATA = [];
   populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
   updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
   renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
