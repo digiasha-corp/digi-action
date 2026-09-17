@@ -11,6 +11,71 @@
     html, body { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; overflow-x: hidden !important; box-sizing: border-box; }
     *, ::before, ::after { box-sizing: border-box; }
     .tap-highlight-transparent { -webkit-tap-highlight-color: transparent; }
+
+    /* Modern Executive Org Chart Tree CSS */
+    .org-tree, .org-tree ul, .org-tree li {
+      position: relative;
+      margin: 0;
+      padding: 0;
+      list-style-type: none;
+    }
+    .org-tree ul {
+      display: flex;
+      justify-content: center;
+      padding-top: 24px;
+    }
+    .org-tree li {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 8px;
+    }
+    .org-tree li::before, .org-tree li::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 50%;
+      border-top: 2px solid #cbd5e1;
+      width: 50%;
+      height: 24px;
+    }
+    .org-tree li::after {
+      right: auto;
+      left: 50%;
+      border-left: 2px solid #cbd5e1;
+    }
+    .org-tree li:only-child::after, .org-tree li:only-child::before {
+      display: none;
+    }
+    .org-tree li:only-child {
+      padding-top: 0;
+    }
+    .org-tree li:first-child::before, .org-tree li:last-child::after {
+      border: 0 none;
+    }
+    .org-tree li:last-child::before {
+      border-right: 2px solid #cbd5e1;
+      border-radius: 0 10px 0 0;
+    }
+    .org-tree li:first-child::after {
+      border-radius: 10px 0 0 0;
+    }
+    .org-tree ul ul::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      border-left: 2px solid #cbd5e1;
+      width: 0;
+      height: 24px;
+    }
+    .org-node-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .org-node-card:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 12px 24px -6px rgba(79, 70, 229, 0.2), 0 4px 6px -4px rgba(79, 70, 229, 0.1);
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased min-h-screen font-sans flex flex-col tap-highlight-transparent">
@@ -498,7 +563,292 @@
 
       <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0" id="support-modal-footer">
         <button type="button" onclick="closeSupportModal()" class="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl text-xs">Tutup</button>
+  <!-- MODAL DOSSIER 360° KARYAWAN & RIWAYAT KARIR LENGKAP (GLOBAL) -->
+  <div id="modal-employee-dossier" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <!-- Header Dossier -->
+      <div class="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-start shrink-0">
+        <div class="flex items-center space-x-3">
+          <div id="dossier-avatar-container" class="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-xl text-indigo-300 font-bold shrink-0 overflow-hidden">
+            <i class="fa-solid fa-user-tie"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center space-x-2">
+              <span id="dossier-nip-badge" class="font-mono font-bold text-xs bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-300 border border-indigo-500/30">NIP-000</span>
+              <span id="dossier-status-kerja-badge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">PKWTT</span>
+              <span id="dossier-status-aktif-badge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase">AKTIF</span>
+            </div>
+            <h4 id="dossier-nama" class="font-bold text-sm sm:text-base leading-tight mt-1 truncate">Nama Karyawan</h4>
+            <p id="dossier-jabatan-sub" class="text-[11px] text-slate-300 truncate">Jabatan • Unit Kerja</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEmployeeDossierModal()" class="text-white/70 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
+
+      <!-- Navigasi Tab Dossier -->
+      <div class="flex border-b border-slate-200 bg-slate-50 px-3 pt-2 space-x-1 text-xs font-bold overflow-x-auto shrink-0">
+        <button type="button" id="dossier-tab-btn-job" onclick="switchDossierTab('job')" class="px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs whitespace-nowrap">
+          <i class="fa-solid fa-briefcase mr-1"></i> Pekerjaan & Akun
+        </button>
+        <button type="button" id="dossier-tab-btn-personal" onclick="switchDossierTab('personal')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          <i class="fa-solid fa-id-card mr-1"></i> Data Pribadi Sipil
+        </button>
+        <button type="button" id="dossier-tab-btn-career" onclick="switchDossierTab('career')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          <i class="fa-solid fa-clock-rotate-left mr-1"></i> Transaksi Karir & Remunerasi
+        </button>
+      </div>
+
+      <!-- Content Dossier -->
+      <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
+        <!-- TAB CONTENT 1: PEKERJAAN & AKUN -->
+        <div id="dossier-content-job" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Unit Organisasi & Penempatan</span>
+              <span id="dossier-unit-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+              <span id="dossier-workloc-val" class="text-[11px] text-slate-500 block mt-0.5">Lokasi Fisik: -</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jabatan & Tingkatan Level</span>
+              <span id="dossier-jabatan-val" class="font-bold text-indigo-900 text-xs block mt-0.5">-</span>
+              <span id="dossier-level-val" class="text-[11px] text-indigo-700 block mt-0.5">Level: -</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Atasan Langsung (Supervisor)</span>
+              <span id="dossier-atasan-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Masa Kerja & Kontrak</span>
+              <span id="dossier-masakerja-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+              <span id="dossier-kontrak-val" class="text-[11px] text-slate-500 block mt-0.5">-</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+            <span class="text-[10px] text-slate-400 font-bold block uppercase">Kredensial SSO & Akun</span>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-600">Email Akun SSO:</span>
+              <span id="dossier-email-val" class="font-bold font-mono text-slate-800">-</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-600">Role Akses Digi Active:</span>
+              <span id="dossier-role-val" class="font-bold text-purple-800">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 2: DATA PRIBADI SIPIL MURNI -->
+        <div id="dossier-content-personal" class="space-y-3 hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Nomor Induk Kependudukan (NIK KTP)</span>
+              <span id="dossier-nik-val" class="font-bold font-mono text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Tempat & Tanggal Lahir</span>
+              <span id="dossier-ttl-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jenis Kelamin & Agama</span>
+              <span id="dossier-gender-agama-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Status Pernikahan & Tanggungan</span>
+              <span id="dossier-marital-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+            <span class="text-[10px] text-slate-400 font-bold block uppercase">Kontak & Alamat Domisili</span>
+            <div class="text-xs">
+              <span class="text-slate-500">No. HP / WhatsApp:</span>
+              <span id="dossier-phone-val" class="font-bold text-slate-800 ml-1">-</span>
+            </div>
+            <div class="text-xs">
+              <span class="text-slate-500">Alamat KTP:</span>
+              <p id="dossier-alamatktp-val" class="text-slate-700 mt-0.5">-</p>
+            </div>
+            <div class="text-xs">
+              <span class="text-slate-500">Alamat Domisili Saat Ini:</span>
+              <p id="dossier-alamatdom-val" class="text-slate-700 mt-0.5">-</p>
+            </div>
+          </div>
+
+          <div class="p-3 bg-rose-50/70 border border-rose-200/80 rounded-2xl space-y-1">
+            <span class="text-[10px] text-rose-700 font-bold block uppercase">Kontak Darurat (Emergency Contact)</span>
+            <div class="text-xs flex items-center justify-between">
+              <span id="dossier-emergency-name-val" class="font-bold text-rose-900">-</span>
+              <span id="dossier-emergency-phone-val" class="font-mono font-bold text-rose-800">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 3: TRANSAKSI KARIR & REMUNERASI (HISTORIS LENGKAP) -->
+        <div id="dossier-content-career" class="space-y-3 hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <h5 class="font-bold text-xs text-slate-800">Timeline Transaksi Karir & Remunerasi</h5>
+              <p class="text-[10px] text-slate-500">Rekam jejak mutasi, promosi, SK, perubahan gaji, rekening & BPJS</p>
+            </div>
+            <button type="button" onclick="openAddCareerTransactionModal()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow flex items-center space-x-1 transition">
+              <i class="fa-solid fa-plus text-xs"></i>
+              <span>Catat Transaksi Baru</span>
+            </button>
+          </div>
+
+          <div id="dossier-career-timeline-container" class="space-y-2 relative border-l-2 border-indigo-200 ml-3 pl-4 pt-1">
+            <!-- Timeline Items dirender secara dinamis oleh JavaScript -->
+            <div class="p-4 text-center text-xs text-slate-400">Belum ada riwayat transaksi tercatat.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Dossier -->
+      <div class="p-3.5 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
+        <button type="button" onclick="openEditEmployeeFullModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit Data Karyawan</span>
+        </button>
+        <button type="button" onclick="closeEmployeeDossierModal()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold rounded-xl text-xs transition">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FORM: CATAT TRANSAKSI KARIR / REMUNERASI BARU (GLOBAL) -->
+  <div id="modal-career-transaction-add" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="p-4 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-file-contract text-indigo-300"></i>
+          <div>
+            <h4 class="font-bold text-xs sm:text-sm">Catat Transaksi Karir & Remunerasi</h4>
+            <p class="text-[10px] text-indigo-200" id="tx-modal-emp-label">Karyawan: -</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCareerTransactionModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="form-career-transaction-add" onsubmit="handleSaveCareerTransaction(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+        <input type="hidden" id="tx-input-emp-id" value="" />
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Jenis Transaksi: <span class="text-rose-500">*</span></label>
+            <select id="tx-input-type" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-indigo-700">
+              <option value="PROMOTION">Promosi Jabatan / Level</option>
+              <option value="MUTATION">Mutasi Cabang / Unit</option>
+              <option value="ROTATION">Rotasi Tugas</option>
+              <option value="SALARY_ADJUSTMENT">Penyesuaian Gaji & Benefit</option>
+              <option value="STATUS_CHANGE">Perubahan Status (PKWT ke PKWTT)</option>
+              <option value="DEMOTION">Demosi</option>
+              <option value="JOIN">Pengangkatan Pertama (Join)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Efektif SK: <span class="text-rose-500">*</span></label>
+            <input type="date" id="tx-input-effective-date" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor Surat Keputusan (SK):</label>
+            <input type="text" id="tx-input-nosk" placeholder="Contoh: SK/DIR/2026/089" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">URL / Link File SK:</label>
+            <input type="url" id="tx-input-filesk" placeholder="https://..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800" />
+          </div>
+        </div>
+
+        <!-- PERUBAHAN STRUKTURAL -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Penempatan & Jabatan Baru:</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jabatan Baru:</label>
+              <select id="tx-input-new-position" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Unit Organisasi Baru:</label>
+              <select id="tx-input-new-unit" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Level Baru:</label>
+              <select id="tx-input-new-level" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Atasan Baru:</label>
+              <select id="tx-input-new-supervisor" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- PERUBAHAN REMUNERASI, GAJI, BPJS & PAJAK -->
+        <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+          <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Data Remunerasi, Payroll, BPJS & Pajak:</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Gaji Pokok Baru (Rp):</label>
+              <input type="number" id="tx-input-new-salary" placeholder="Contoh: 6500000" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-emerald-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tunjangan Tetap (Rp):</label>
+              <input type="number" id="tx-input-new-allowances" placeholder="Contoh: 1500000" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Bank Payroll:</label>
+              <input type="text" id="tx-input-bank-name" placeholder="BCA / Mandiri / BRI" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-semibold text-slate-800" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor Rekening:</label>
+              <input type="text" id="tx-input-bank-account" placeholder="Nomor Rekening" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">No. BPJS Kesehatan:</label>
+              <input type="text" id="tx-input-bpjs-kes" placeholder="00012345678" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">No. BPJS Ketenagakerjaan:</label>
+              <input type="text" id="tx-input-bpjs-tk" placeholder="19012345678" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor NPWP:</label>
+              <input type="text" id="tx-input-npwp" placeholder="00.000.000.0-000.000" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Status Pajak (PTKP):</label>
+              <select id="tx-input-tax-status" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800">
+                <option value="TK/0">TK/0 (Tidak Kawin, 0 Tanggungan)</option>
+                <option value="K/0">K/0 (Kawin, 0 Tanggungan)</option>
+                <option value="K/1">K/1 (Kawin, 1 Tanggungan)</option>
+                <option value="K/2">K/2 (Kawin, 2 Tanggungan)</option>
+                <option value="K/3">K/3 (Kawin, 3 Tanggungan)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Alasan & Catatan Pertimbangan HR:</label>
+          <textarea id="tx-input-desc" rows="2" placeholder="Tuliskan latar belakang mutasi/promosi atau dasar penyesuaian..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex space-x-2">
+          <button type="button" onclick="closeCareerTransactionModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-save-tx" class="w-2/3 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Transaksi</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -513,6 +863,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260917_v122"></script>
+  <script src="/app.js?v=20260917_v123"></script>
 </body>
 </html>

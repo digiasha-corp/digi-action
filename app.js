@@ -22,7 +22,7 @@ let CURRENT_USER = (() => {
           "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
           "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
           "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
-          "sop_management", "settings"
+          "sop_management", "organization_setting", "settings"
         ];
         try { localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(u)); } catch (e) {}
       }
@@ -46,7 +46,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
       "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
       "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
-      "sop_management", "settings"
+      "sop_management", "organization_setting", "settings"
     ]
   },
   "R-02": {
@@ -115,6 +115,7 @@ const ALL_APP_MODULES = [
 
   // 4. Administrasi & Sistem
   { key: "sop_management", title: "SOP Management", desc: "Kelola upload PDF, tanggal berlaku & hak akses role", icon: "fa-folder-gear", category: "Administrasi & Sistem" },
+  { key: "organization_setting", title: "Organization Setting", desc: "Struktur, Work Location, Role & SSO", icon: "fa-sitemap", category: "Administrasi & Sistem" },
   { key: "settings", title: "Pengaturan (Admin)", desc: "Kelola Akun, Area, GPS, Banner & Role", icon: "fa-sliders", category: "Administrasi & Sistem" }
 ];
 
@@ -205,9 +206,9 @@ function getPermissionsForRole(roleKey, userObj = null) {
 
 // Hak Akses Modul per Role (Legacy Fallback)
 const ROLE_PERMISSIONS = {
-  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "settings"],
-  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "settings"],
-  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "settings"],
+  "Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "organization_setting", "settings"],
+  "R-01": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "organization_setting", "settings"],
+  "Super Admin": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan", "sop_management", "organization_setting", "settings"],
   "Supervisor": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "ketentuan"],
   "Branch Manager": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
   "R-02": ["priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "ketentuan"],
@@ -1534,7 +1535,7 @@ const VALID_APP_SCREENS = [
   "gps", "fac", "history", "laporan_activity", "absensi", "izin",
   "persetujuan", "attendance_summary", "rekap_absen", "rekap_tim",
   "slip_gaji", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
-  "ketentuan", "sop_management", "settings", "login"
+  "ketentuan", "sop_management", "organization_setting", "settings", "login"
 ];
 
 function getScreenFromUrl() {
@@ -1625,6 +1626,8 @@ async function loadScreen(screenName, updateHistory = true) {
     helpdesk_support: "IT & Helpdesk Support",
     ketentuan: "Pustaka Ketentuan & SOP",
     sop_management: "SOP & Policy Management",
+    organization_setting: "Organization Setting",
+    settings: "In-App Management",
     login: "Masuk Akun"
   };
 
@@ -1697,6 +1700,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "laporan_activity") initLaporanActivityScreen();
     if (screenName === "ketentuan" && typeof initKetentuanScreen === "function") initKetentuanScreen();
     if (screenName === "sop_management" && typeof initSopManagementScreen === "function") initSopManagementScreen();
+    if (screenName === "organization_setting" && typeof initOrganizationSettingScreen === "function") initOrganizationSettingScreen();
     if (screenName === "settings" && typeof initSettingsScreen === "function") initSettingsScreen();
     if (screenName === "history" && typeof initHistory === "function") initHistory();
 
@@ -2055,7 +2059,7 @@ async function initDashboard() {
     "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
     "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
-    "sop_management", "settings"
+    "sop_management", "organization_setting", "settings"
   ];
 
   allModulesList.forEach(key => {
@@ -2082,7 +2086,7 @@ async function initDashboard() {
   // Tampilkan/sembunyikan grup admin
   const adminBox = document.getElementById("box-group-admin");
   if (adminBox) {
-    adminBox.style.display = (perms.includes("settings") || perms.includes("sop_management")) ? "block" : "none";
+    adminBox.style.display = (perms.includes("settings") || perms.includes("sop_management") || perms.includes("organization_setting")) ? "block" : "none";
   }
 
   // Inisialisasi Banner Slideshow Berita
@@ -10103,10 +10107,16 @@ function renderEmployeeList(list) {
             ${emp.atasan_nama ? `<span>•</span><span>Atasan: <strong class="text-slate-700">${emp.atasan_nama}</strong></span>` : ''}
           </div>
         </div>
-        <button type="button" onclick="openEditEmployeeModal('${emp.nip}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
-          <i class="fa-solid fa-pen-to-square"></i>
-          <span>Edit</span>
-        </button>
+        <div class="flex items-center space-x-1.5 shrink-0">
+          <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Dossier 360° Karyawan" class="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs flex items-center space-x-1 border border-indigo-200 transition shadow-2xs">
+            <i class="fa-solid fa-id-badge text-indigo-600"></i>
+            <span>Dossier</span>
+          </button>
+          <button type="button" onclick="openEditEmployeeModal('${emp.nip}')" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1 border border-slate-200 transition">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Edit</span>
+          </button>
+        </div>
       </div>
     `;
   }).join("");
@@ -15715,6 +15725,1463 @@ async function initAppBootstrap() {
       loadScreen("login", false);
     }
   }
+}
+
+// =========================================================================
+// ORGANIZATION SETTING & SSO CONTROLLER (DIGIASHA CORE IDENTITY & ORG)
+// =========================================================================
+let ORG_UNITS_DATA = [];
+let ORG_POSITIONS_DATA = [];
+let ORG_LEVELS_DATA = [];
+let ORG_WORK_LOCATIONS_DATA = [];
+let ORG_SSO_CLIENTS_DATA = [];
+let ORG_CHART_ZOOM = 1.0;
+let CURRENT_DOSSIER_EMP = null;
+let CURRENT_DOSSIER_PERSONAL = null;
+let CURRENT_DOSSIER_CAREER_LIST = [];
+let CURRENT_EDIT_WORKLOC_ID = null;
+let CURRENT_EDIT_UNIT_ID = null;
+let CURRENT_EDIT_JOBPOS_ID = null;
+let CURRENT_EDIT_LEVEL_ID = null;
+let CURRENT_EDIT_SSO_CLIENT_ID = null;
+
+// Seed Fallback Data jika tabel Supabase baru belum dieksekusi pengguna
+const DEFAULT_ORG_LEVELS = [
+  { id_level: "L-01", nama_level: "Direksi / C-Level", bobot_level: 1, is_active: true },
+  { id_level: "L-02", nama_level: "General Manager / Division Head", bobot_level: 2, is_active: true },
+  { id_level: "L-03", nama_level: "Manager / Branch Manager", bobot_level: 3, is_active: true },
+  { id_level: "L-04", nama_level: "Supervisor / Coordinator", bobot_level: 4, is_active: true },
+  { id_level: "L-05", nama_level: "Senior Officer / Specialist", bobot_level: 5, is_active: true },
+  { id_level: "L-06", nama_level: "Officer / Staff", bobot_level: 6, is_active: true },
+  { id_level: "L-07", nama_level: "Field Staff / FAC / Pelaksana", bobot_level: 7, is_active: true }
+];
+
+const DEFAULT_ORG_WORK_LOCS = [
+  { id_work_location: "WL-HO-01", nama_lokasi: "Head Office Graha Digiasha", alamat_lengkap: "Jl. Jenderal Sudirman Kav. 25, Jakarta Selatan", kota: "Jakarta Selatan", provinsi: "DKI Jakarta", latitude: -6.2146, longitude: 106.8214, radius_meter: 150, is_active: true },
+  { id_work_location: "WL-SERANG-01", nama_lokasi: "Kantor Operasional Serang", alamat_lengkap: "Jl. Ahmad Yani No. 88, Cipocok Jaya", kota: "Serang", provinsi: "Banten", latitude: -6.1200, longitude: 106.1500, radius_meter: 120, is_active: true },
+  { id_work_location: "WL-TGR-01", nama_lokasi: "Kantor Operasional Tangerang", alamat_lengkap: "Jl. MH Thamrin No. 12, Cikokol", kota: "Tangerang", provinsi: "Banten", latitude: -6.1783, longitude: 106.6319, radius_meter: 120, is_active: true }
+];
+
+const DEFAULT_ORG_UNITS = [
+  { id_unit: "HO-CORP", tipe_unit: "HO", nama_unit: "Head Office Digiasha", parent_unit_id: null, work_location_id: "WL-HO-01", is_active: true },
+  { id_unit: "AREA-BANTEN", tipe_unit: "AREA", nama_unit: "Area Regional Banten & Jabar", parent_unit_id: "HO-CORP", work_location_id: "WL-HO-01", is_active: true },
+  { id_unit: "CAB-SERANG", tipe_unit: "CABANG", nama_unit: "Cabang Serang", parent_unit_id: "AREA-BANTEN", work_location_id: "WL-SERANG-01", is_active: true },
+  { id_unit: "CAB-TANGERANG", tipe_unit: "CABANG", nama_unit: "Cabang Tangerang", parent_unit_id: "AREA-BANTEN", work_location_id: "WL-TGR-01", is_active: true },
+  { id_unit: "CAB-JAKARTA", tipe_unit: "CABANG", nama_unit: "Cabang Jakarta Barat", parent_unit_id: "HO-CORP", work_location_id: "WL-HO-01", is_active: true }
+];
+
+const DEFAULT_ORG_POSITIONS = [
+  { id_position: "POS-DIR-UTAMA", nama_jabatan: "Direktur Utama", level_id: "L-01", reports_to_unit_id: null, unit_id: "HO-CORP", is_active: true },
+  { id_position: "POS-GM-OPS", nama_jabatan: "General Manager Operasional", level_id: "L-02", reports_to_unit_id: "POS-DIR-UTAMA", unit_id: "HO-CORP", is_active: true },
+  { id_position: "POS-BM-SERANG", nama_jabatan: "Branch Manager Serang", level_id: "L-03", reports_to_unit_id: "POS-GM-OPS", unit_id: "CAB-SERANG", is_active: true },
+  { id_position: "POS-BM-TGR", nama_jabatan: "Branch Manager Tangerang", level_id: "L-03", reports_to_unit_id: "POS-GM-OPS", unit_id: "CAB-TANGERANG", is_active: true },
+  { id_position: "POS-SPV-FAC", nama_jabatan: "Supervisor FAC & Field Ops", level_id: "L-04", reports_to_unit_id: "POS-BM-SERANG", unit_id: "CAB-SERANG", is_active: true },
+  { id_position: "POS-FAC-OFFICER", nama_jabatan: "Field Action Coordinator (FAC)", level_id: "L-07", reports_to_unit_id: "POS-SPV-FAC", unit_id: "CAB-SERANG", is_active: true },
+  { id_position: "POS-ADMIN-HO", nama_jabatan: "Administrator Sistem & HR", level_id: "L-05", reports_to_unit_id: "POS-GM-OPS", unit_id: "HO-CORP", is_active: true }
+];
+
+const DEFAULT_ORG_SSO_CLIENTS = [
+  { client_id: "digicore", client_name: "DigiCore Enterprise System", client_secret: "secret_digicore_2026", description: "Core Business Engine & Financial Operations", is_active: true },
+  { client_id: "digi_workapp", client_name: "Digi Workapp", client_secret: "secret_workapp_2026", description: "Aplikasi Penugasan Mobile Karyawan Lapangan", is_active: true },
+  { client_id: "digi_active", client_name: "Digi Active (Digi-Action)", client_secret: "secret_active_2026", description: "Master HR, Presensi & SSO Identity Provider", is_active: true },
+  { client_id: "digi_spector", client_name: "Digi Spector", client_secret: "secret_spector_2026", description: "Aplikasi Inspeksi Kendaraan & Aset", is_active: true }
+];
+
+async function initOrganizationSettingScreen() {
+  switchOrgSettingTab("structure");
+  switchOrgStructureSubtab("chart");
+
+  await Promise.allSettled([
+    loadOrgLevels(),
+    loadWorkLocations(),
+    loadOrgUnits(),
+    loadOrgPositions(),
+    loadSsoClients()
+  ]);
+
+  populateOrgFilterUnits();
+  renderVisualOrgChartTree();
+  populateSsoTestEmpSelect();
+}
+
+function switchOrgSettingTab(tab) {
+  const tabs = ["structure", "workloc", "role", "sso"];
+  tabs.forEach(t => {
+    const el = document.getElementById(`org-setting-tab-${t}`);
+    const btn = document.getElementById(`tab-btn-org-${t}`);
+    if (el) {
+      if (t === tab) el.classList.remove("hidden");
+      else el.classList.add("hidden");
+    }
+    if (btn) {
+      if (t === tab) {
+        btn.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm font-bold";
+      } else {
+        btn.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold";
+      }
+    }
+  });
+
+  if (tab === "workloc") {
+    loadWorkLocations();
+  } else if (tab === "role") {
+    loadOrgRolePermissions();
+  } else if (tab === "sso") {
+    loadSsoClients();
+    populateSsoTestEmpSelect();
+  }
+}
+
+function switchOrgStructureSubtab(sub) {
+  const subs = ["chart", "unit", "position", "level"];
+  subs.forEach(s => {
+    const el = document.getElementById(`org-subview-${s}`);
+    const btn = document.getElementById(`subtab-btn-${s}`);
+    if (el) {
+      if (s === sub) el.classList.remove("hidden");
+      else el.classList.add("hidden");
+    }
+    if (btn) {
+      if (s === sub) {
+        btn.className = "px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs whitespace-nowrap font-bold";
+      } else {
+        btn.className = "px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap font-bold";
+      }
+    }
+  });
+
+  if (sub === "chart") {
+    renderVisualOrgChartTree();
+  } else if (sub === "unit") {
+    loadOrgUnits();
+  } else if (sub === "position") {
+    loadOrgPositions();
+  } else if (sub === "level") {
+    loadOrgLevels();
+  }
+}
+
+// ---------------- 1. WORK LOCATION (TEMPAT KERJA FISIK) ----------------
+async function loadWorkLocations() {
+  const container = document.getElementById("work-locations-list-container");
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("work_locations")
+        .select("*")
+        .order("id_work_location");
+      if (!error && data && data.length > 0) {
+        ORG_WORK_LOCATIONS_DATA = data;
+        renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Table work_locations not yet created, using fallback:", e);
+    }
+  }
+
+  // Fallback
+  ORG_WORK_LOCATIONS_DATA = DEFAULT_ORG_WORK_LOCS;
+  renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+}
+
+function renderWorkLocationsList(list) {
+  const container = document.getElementById("work-locations-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada tempat kerja fisik terdaftar.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(item => {
+    const lat = parseFloat(item.latitude || 0).toFixed(6);
+    const lng = parseFloat(item.longitude || 0).toFixed(6);
+    const radius = item.radius_meter || 100;
+
+    // Temukan unit/cabang yang menggunakan work location ini
+    const assignedUnits = (ORG_UNITS_DATA || []).filter(u => u.work_location_id === item.id_work_location);
+    const unitBadges = assignedUnits.map(u => `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">${u.nama_unit}</span>`).join(" ") || '<span class="text-[10px] text-slate-400 italic">Belum ada unit yang terhubung</span>';
+
+    return `
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-emerald-300 transition">
+        <div class="min-w-0 flex-1 space-y-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-mono text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">${item.id_work_location}</span>
+            <h4 class="font-bold text-xs sm:text-sm text-slate-900 truncate">${item.nama_lokasi}</h4>
+            <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">AKTIF</span>
+          </div>
+          <p class="text-[11px] text-slate-600">${item.alamat_lengkap || '-'}, ${item.kota || ''}</p>
+          <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-mono flex-wrap">
+            <span><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>${lat}, ${lng}</span>
+            <span>•</span>
+            <span><i class="fa-solid fa-circle-notch text-emerald-600 mr-1"></i>Radius ${radius}m</span>
+          </div>
+          <div class="pt-1.5 flex items-center space-x-1 flex-wrap gap-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Unit di Lokasi Ini:</span>
+            ${unitBadges}
+          </div>
+        </div>
+        <button type="button" onclick="openEditWorkLocationModal('${item.id_work_location}')" class="px-3 py-2 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-xl font-bold text-xs shrink-0 flex items-center justify-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddWorkLocationModal() {
+  CURRENT_EDIT_WORKLOC_ID = null;
+  document.getElementById("workloc-modal-title").innerText = "Tambah Tempat Kerja Fisik";
+  const idInput = document.getElementById("workloc-input-id");
+  idInput.value = `WL-${(ORG_WORK_LOCATIONS_DATA.length + 1).toString().padStart(2, '0')}`;
+  idInput.disabled = false;
+  document.getElementById("workloc-input-name").value = "";
+  document.getElementById("workloc-input-address").value = "";
+  document.getElementById("workloc-input-city").value = "";
+  document.getElementById("workloc-input-province").value = "";
+  document.getElementById("workloc-input-lat").value = "";
+  document.getElementById("workloc-input-long").value = "";
+  document.getElementById("workloc-input-radius").value = "100";
+  document.getElementById("modal-workloc-edit").classList.remove("hidden");
+}
+
+function openEditWorkLocationModal(id) {
+  const item = ORG_WORK_LOCATIONS_DATA.find(w => w.id_work_location === id);
+  if (!item) return;
+
+  CURRENT_EDIT_WORKLOC_ID = id;
+  document.getElementById("workloc-modal-title").innerText = `Edit: ${item.nama_lokasi}`;
+  const idInput = document.getElementById("workloc-input-id");
+  idInput.value = item.id_work_location;
+  idInput.disabled = true;
+  document.getElementById("workloc-input-name").value = item.nama_lokasi || "";
+  document.getElementById("workloc-input-address").value = item.alamat_lengkap || "";
+  document.getElementById("workloc-input-city").value = item.kota || "";
+  document.getElementById("workloc-input-province").value = item.provinsi || "";
+  document.getElementById("workloc-input-lat").value = item.latitude || "";
+  document.getElementById("workloc-input-long").value = item.longitude || "";
+  document.getElementById("workloc-input-radius").value = item.radius_meter || 100;
+  document.getElementById("modal-workloc-edit").classList.remove("hidden");
+}
+
+function closeWorkLocModal() {
+  document.getElementById("modal-workloc-edit").classList.add("hidden");
+}
+
+function detectCurrentGpsForWorkLoc() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById("workloc-input-lat").value = pos.coords.latitude.toFixed(6);
+      document.getElementById("workloc-input-long").value = pos.coords.longitude.toFixed(6);
+      showToast("Koordinat GPS terkini berhasil dipasang!", "success", 1500);
+    }, err => {
+      alert("Gagal mendeteksi GPS: " + err.message);
+    }, { enableHighAccuracy: true });
+  } else {
+    alert("Perangkat Anda tidak mendukung geolokasi.");
+  }
+}
+
+async function handleSaveWorkLocation(e) {
+  e.preventDefault();
+  const id = document.getElementById("workloc-input-id").value.trim().toUpperCase();
+  const name = document.getElementById("workloc-input-name").value.trim();
+  const address = document.getElementById("workloc-input-address").value.trim();
+  const city = document.getElementById("workloc-input-city").value.trim();
+  const province = document.getElementById("workloc-input-province").value.trim();
+  const lat = parseFloat(document.getElementById("workloc-input-lat").value);
+  const long = parseFloat(document.getElementById("workloc-input-long").value);
+  const radius = parseInt(document.getElementById("workloc-input-radius").value) || 100;
+
+  const payload = {
+    id_work_location: id,
+    nama_lokasi: name,
+    alamat_lengkap: address,
+    kota: city,
+    provinsi: province,
+    latitude: lat,
+    longitude: long,
+    radius_meter: radius,
+    is_active: true,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-workloc");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("work_locations")
+        .upsert(payload, { onConflict: "id_work_location" });
+      if (error) console.warn("Supabase save work_location:", error);
+    }
+
+    const idx = ORG_WORK_LOCATIONS_DATA.findIndex(w => w.id_work_location === id);
+    if (idx >= 0) ORG_WORK_LOCATIONS_DATA[idx] = payload;
+    else ORG_WORK_LOCATIONS_DATA.push(payload);
+
+    renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+    closeWorkLocModal();
+    showToast("Tempat kerja fisik berhasil disimpan!", "success", 1500);
+  } catch (err) {
+    alert("Gagal menyimpan tempat kerja: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ---------------- 2. UNIT ORGANISASI (HO, AREA, CABANG) ----------------
+async function loadOrgUnits() {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("organization_units")
+        .select("*")
+        .order("id_unit");
+      if (!error && data && data.length > 0) {
+        ORG_UNITS_DATA = data;
+        renderOrgUnitsList(ORG_UNITS_DATA);
+        populateOrgFilterUnits();
+        return;
+      }
+    } catch (e) {
+      console.warn("Table organization_units not yet created, using fallback:", e);
+    }
+  }
+
+  ORG_UNITS_DATA = DEFAULT_ORG_UNITS;
+  renderOrgUnitsList(ORG_UNITS_DATA);
+  populateOrgFilterUnits();
+}
+
+function renderOrgUnitsList(list) {
+  const container = document.getElementById("org-units-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada unit organisasi terdaftar.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(u => {
+    let badgeColor = "bg-slate-100 text-slate-700 border-slate-200";
+    if (u.tipe_unit === "HO") badgeColor = "bg-purple-50 text-purple-700 border-purple-200";
+    if (u.tipe_unit === "AREA") badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
+    if (u.tipe_unit === "CABANG") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+    const parentUnit = list.find(p => p.id_unit === u.parent_unit_id);
+    const workLoc = (ORG_WORK_LOCATIONS_DATA || []).find(w => w.id_work_location === u.work_location_id);
+
+    return `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-mono text-xs font-bold text-slate-900">${u.id_unit}</span>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${badgeColor}">${u.tipe_unit}</span>
+          </div>
+          <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${u.nama_unit}</h4>
+          <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
+            ${parentUnit ? `<span>Induk: <strong class="text-slate-700">${parentUnit.nama_unit}</strong></span><span>•</span>` : ''}
+            <span>Work Location: <strong class="text-emerald-700">${workLoc?.nama_lokasi || u.work_location_id || '-'}</strong></span>
+          </div>
+        </div>
+        <button type="button" onclick="openEditOrgUnitModal('${u.id_unit}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddOrgUnitModal() {
+  CURRENT_EDIT_UNIT_ID = null;
+  document.getElementById("orgunit-modal-title").innerText = "Tambah Unit Organisasi";
+  const idInput = document.getElementById("unit-input-id");
+  idInput.value = "";
+  idInput.disabled = false;
+  document.getElementById("unit-input-tipe").value = "CABANG";
+  document.getElementById("unit-input-name").value = "";
+
+  populateOrgUnitParentSelect("");
+  populateOrgUnitWorkLocSelect("");
+  document.getElementById("modal-orgunit-edit").classList.remove("hidden");
+}
+
+function openEditOrgUnitModal(id) {
+  const item = ORG_UNITS_DATA.find(u => u.id_unit === id);
+  if (!item) return;
+
+  CURRENT_EDIT_UNIT_ID = id;
+  document.getElementById("orgunit-modal-title").innerText = `Edit: ${item.nama_unit}`;
+  const idInput = document.getElementById("unit-input-id");
+  idInput.value = item.id_unit;
+  idInput.disabled = true;
+  document.getElementById("unit-input-tipe").value = item.tipe_unit || "CABANG";
+  document.getElementById("unit-input-name").value = item.nama_unit || "";
+
+  populateOrgUnitParentSelect(item.parent_unit_id, id);
+  populateOrgUnitWorkLocSelect(item.work_location_id);
+  document.getElementById("modal-orgunit-edit").classList.remove("hidden");
+}
+
+function closeOrgUnitModal() {
+  document.getElementById("modal-orgunit-edit").classList.add("hidden");
+}
+
+function populateOrgUnitParentSelect(selectedId = "", excludeId = "") {
+  const select = document.getElementById("unit-input-parent");
+  if (!select) return;
+
+  const eligible = ORG_UNITS_DATA.filter(u => u.id_unit !== excludeId);
+  select.innerHTML = '<option value="">- Tidak Ada (Root) -</option>' + eligible.map(u => {
+    return `<option value="${u.id_unit}" ${u.id_unit === selectedId ? 'selected' : ''}>${u.nama_unit} (${u.tipe_unit})</option>`;
+  }).join("");
+}
+
+function populateOrgUnitWorkLocSelect(selectedId = "") {
+  const select = document.getElementById("unit-input-workloc");
+  if (!select) return;
+
+  select.innerHTML = '<option value="">- Pilih Work Location -</option>' + (ORG_WORK_LOCATIONS_DATA || []).map(w => {
+    return `<option value="${w.id_work_location}" ${w.id_work_location === selectedId ? 'selected' : ''}>${w.nama_lokasi} (${w.id_work_location})</option>`;
+  }).join("");
+}
+
+async function handleSaveOrgUnit(e) {
+  e.preventDefault();
+  const id = document.getElementById("unit-input-id").value.trim().toUpperCase();
+  const tipe = document.getElementById("unit-input-tipe").value;
+  const name = document.getElementById("unit-input-name").value.trim();
+  const parent = document.getElementById("unit-input-parent").value || null;
+  const workloc = document.getElementById("unit-input-workloc").value || null;
+
+  const payload = {
+    id_unit: id,
+    tipe_unit: tipe,
+    nama_unit: name,
+    parent_unit_id: parent,
+    work_location_id: workloc,
+    is_active: true,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-unit");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("organization_units")
+        .upsert(payload, { onConflict: "id_unit" });
+      if (error) console.warn("Supabase save organization_unit:", error);
+    }
+
+    const idx = ORG_UNITS_DATA.findIndex(u => u.id_unit === id);
+    if (idx >= 0) ORG_UNITS_DATA[idx] = payload;
+    else ORG_UNITS_DATA.push(payload);
+
+    renderOrgUnitsList(ORG_UNITS_DATA);
+    populateOrgFilterUnits();
+    closeOrgUnitModal();
+    showToast("Unit organisasi berhasil disimpan!", "success", 1500);
+  } catch (err) {
+    alert("Gagal menyimpan unit: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ---------------- 3. MASTER POSISI / JABATAN ----------------
+async function loadOrgPositions() {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("job_positions")
+        .select("*")
+        .order("id_position");
+      if (!error && data && data.length > 0) {
+        ORG_POSITIONS_DATA = data;
+        renderOrgPositionsList(ORG_POSITIONS_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Table job_positions not yet created, using fallback:", e);
+    }
+  }
+
+  ORG_POSITIONS_DATA = DEFAULT_ORG_POSITIONS;
+  renderOrgPositionsList(ORG_POSITIONS_DATA);
+}
+
+function renderOrgPositionsList(list) {
+  const container = document.getElementById("job-positions-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada posisi jabatan terdaftar.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(pos => {
+    const parentPos = list.find(p => p.id_position === pos.reports_to_unit_id);
+    const unit = (ORG_UNITS_DATA || []).find(u => u.id_unit === pos.unit_id);
+    const level = (ORG_LEVELS_DATA || []).find(l => l.id_level === pos.level_id);
+
+    return `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-mono text-xs font-bold text-slate-900">${pos.id_position}</span>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">${level?.nama_level || pos.level_id || '-'}</span>
+          </div>
+          <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${pos.nama_jabatan}</h4>
+          <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
+            <span>Unit: <strong class="text-slate-700">${unit?.nama_unit || pos.unit_id || '-'}</strong></span>
+            ${parentPos ? `<span>•</span><span>Melapor Ke: <strong class="text-indigo-700">${parentPos.nama_jabatan}</strong></span>` : ''}
+          </div>
+        </div>
+        <button type="button" onclick="openEditJobPositionModal('${pos.id_position}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddJobPositionModal() {
+  CURRENT_EDIT_JOBPOS_ID = null;
+  document.getElementById("jobpos-modal-title").innerText = "Tambah Posisi / Jabatan";
+  const idInput = document.getElementById("pos-input-id");
+  idInput.value = "";
+  idInput.disabled = false;
+  document.getElementById("pos-input-name").value = "";
+
+  populateJobPosLevelSelect("");
+  populateJobPosUnitSelect("");
+  populateJobPosReportsToSelect("");
+  document.getElementById("modal-jobpos-edit").classList.remove("hidden");
+}
+
+function openEditJobPositionModal(id) {
+  const item = ORG_POSITIONS_DATA.find(p => p.id_position === id);
+  if (!item) return;
+
+  CURRENT_EDIT_JOBPOS_ID = id;
+  document.getElementById("jobpos-modal-title").innerText = `Edit: ${item.nama_jabatan}`;
+  const idInput = document.getElementById("pos-input-id");
+  idInput.value = item.id_position;
+  idInput.disabled = true;
+  document.getElementById("pos-input-name").value = item.nama_jabatan || "";
+
+  populateJobPosLevelSelect(item.level_id);
+  populateJobPosUnitSelect(item.unit_id);
+  populateJobPosReportsToSelect(item.reports_to_unit_id, id);
+  document.getElementById("modal-jobpos-edit").classList.remove("hidden");
+}
+
+function closeJobPosModal() {
+  document.getElementById("modal-jobpos-edit").classList.add("hidden");
+}
+
+function populateJobPosLevelSelect(selected = "") {
+  const select = document.getElementById("pos-input-level");
+  if (!select) return;
+  select.innerHTML = (ORG_LEVELS_DATA || []).map(l => {
+    return `<option value="${l.id_level}" ${l.id_level === selected ? 'selected' : ''}>${l.nama_level} (${l.id_level})</option>`;
+  }).join("");
+}
+
+function populateJobPosUnitSelect(selected = "") {
+  const select = document.getElementById("pos-input-unit");
+  if (!select) return;
+  select.innerHTML = (ORG_UNITS_DATA || []).map(u => {
+    return `<option value="${u.id_unit}" ${u.id_unit === selected ? 'selected' : ''}>${u.nama_unit} (${u.tipe_unit})</option>`;
+  }).join("");
+}
+
+function populateJobPosReportsToSelect(selected = "", excludeId = "") {
+  const select = document.getElementById("pos-input-reportsto");
+  if (!select) return;
+  const eligible = ORG_POSITIONS_DATA.filter(p => p.id_position !== excludeId);
+  select.innerHTML = '<option value="">- Tidak Ada (Puncak / Direksi) -</option>' + eligible.map(p => {
+    return `<option value="${p.id_position}" ${p.id_position === selected ? 'selected' : ''}>${p.nama_jabatan} (${p.id_position})</option>`;
+  }).join("");
+}
+
+async function handleSaveJobPosition(e) {
+  e.preventDefault();
+  const id = document.getElementById("pos-input-id").value.trim().toUpperCase();
+  const name = document.getElementById("pos-input-name").value.trim();
+  const level = document.getElementById("pos-input-level").value;
+  const unit = document.getElementById("pos-input-unit").value;
+  const reportsTo = document.getElementById("pos-input-reportsto").value || null;
+
+  const payload = {
+    id_position: id,
+    nama_jabatan: name,
+    level_id: level,
+    unit_id: unit,
+    reports_to_unit_id: reportsTo,
+    is_active: true,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-pos");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("job_positions")
+        .upsert(payload, { onConflict: "id_position" });
+      if (error) console.warn("Supabase save job_position:", error);
+    }
+
+    const idx = ORG_POSITIONS_DATA.findIndex(p => p.id_position === id);
+    if (idx >= 0) ORG_POSITIONS_DATA[idx] = payload;
+    else ORG_POSITIONS_DATA.push(payload);
+
+    renderOrgPositionsList(ORG_POSITIONS_DATA);
+    closeJobPosModal();
+    showToast("Posisi jabatan berhasil disimpan!", "success", 1500);
+  } catch (err) {
+    alert("Gagal menyimpan jabatan: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ---------------- 4. MASTER LEVEL (GRADE) ----------------
+async function loadOrgLevels() {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("master_levels")
+        .select("*")
+        .order("bobot_level", { ascending: true });
+      if (!error && data && data.length > 0) {
+        ORG_LEVELS_DATA = data;
+        renderOrgLevelsList(ORG_LEVELS_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Table master_levels not yet created, using fallback:", e);
+    }
+  }
+
+  ORG_LEVELS_DATA = DEFAULT_ORG_LEVELS;
+  renderOrgLevelsList(ORG_LEVELS_DATA);
+}
+
+function renderOrgLevelsList(list) {
+  const container = document.getElementById("master-levels-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada master level terdaftar.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(l => {
+    return `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center font-bold text-xs">
+            ${l.bobot_level}
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-mono text-xs font-bold text-slate-900">${l.id_level}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">AKTIF</span>
+            </div>
+            <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-0.5">${l.nama_level}</h4>
+          </div>
+        </div>
+        <button type="button" onclick="openEditMasterLevelModal('${l.id_level}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>Edit</span>
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddMasterLevelModal() {
+  CURRENT_EDIT_LEVEL_ID = null;
+  document.getElementById("level-modal-title").innerText = "Tambah Master Level";
+  const idInput = document.getElementById("lvl-input-id");
+  idInput.value = `L-${(ORG_LEVELS_DATA.length + 1).toString().padStart(2, '0')}`;
+  idInput.disabled = false;
+  document.getElementById("lvl-input-name").value = "";
+  document.getElementById("lvl-input-bobot").value = (ORG_LEVELS_DATA.length + 1).toString();
+  document.getElementById("modal-level-edit").classList.remove("hidden");
+}
+
+function openEditMasterLevelModal(id) {
+  const item = ORG_LEVELS_DATA.find(l => l.id_level === id);
+  if (!item) return;
+
+  CURRENT_EDIT_LEVEL_ID = id;
+  document.getElementById("level-modal-title").innerText = `Edit: ${item.nama_level}`;
+  const idInput = document.getElementById("lvl-input-id");
+  idInput.value = item.id_level;
+  idInput.disabled = true;
+  document.getElementById("lvl-input-name").value = item.nama_level || "";
+  document.getElementById("lvl-input-bobot").value = item.bobot_level || 1;
+  document.getElementById("modal-level-edit").classList.remove("hidden");
+}
+
+function closeMasterLevelModal() {
+  document.getElementById("modal-level-edit").classList.add("hidden");
+}
+
+async function handleSaveMasterLevel(e) {
+  e.preventDefault();
+  const id = document.getElementById("lvl-input-id").value.trim().toUpperCase();
+  const name = document.getElementById("lvl-input-name").value.trim();
+  const bobot = parseInt(document.getElementById("lvl-input-bobot").value) || 1;
+
+  const payload = {
+    id_level: id,
+    nama_level: name,
+    bobot_level: bobot,
+    is_active: true,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-lvl");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("master_levels")
+        .upsert(payload, { onConflict: "id_level" });
+      if (error) console.warn("Supabase save master_level:", error);
+    }
+
+    const idx = ORG_LEVELS_DATA.findIndex(l => l.id_level === id);
+    if (idx >= 0) ORG_LEVELS_DATA[idx] = payload;
+    else ORG_LEVELS_DATA.push(payload);
+
+    ORG_LEVELS_DATA.sort((a, b) => a.bobot_level - b.bobot_level);
+    renderOrgLevelsList(ORG_LEVELS_DATA);
+    closeMasterLevelModal();
+    showToast("Master level berhasil disimpan!", "success", 1500);
+  } catch (err) {
+    alert("Gagal menyimpan level: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ---------------- 5. BAGAN VISUAL ORG CHART TREE ----------------
+function populateOrgFilterUnits() {
+  const select = document.getElementById("org-chart-filter-unit");
+  if (!select) return;
+  const current = select.value || "ALL";
+  select.innerHTML = '<option value="ALL">Semua Unit (Seluruh Organisasi)</option>' + (ORG_UNITS_DATA || []).map(u => {
+    return `<option value="${u.id_unit}">${u.nama_unit} (${u.tipe_unit})</option>`;
+  }).join("");
+  select.value = current;
+}
+
+function zoomOrgChart(factor) {
+  ORG_CHART_ZOOM = Math.max(0.4, Math.min(2.0, ORG_CHART_ZOOM * factor));
+  const container = document.getElementById("org-chart-container");
+  if (container) {
+    container.style.transform = `scale(${ORG_CHART_ZOOM})`;
+  }
+}
+
+function resetOrgChartZoom() {
+  ORG_CHART_ZOOM = 1.0;
+  const container = document.getElementById("org-chart-container");
+  if (container) {
+    container.style.transform = "scale(1)";
+  }
+}
+
+function expandAllOrgTreeNodes(expand) {
+  const nodes = document.querySelectorAll(".org-tree-children");
+  nodes.forEach(el => {
+    if (expand) el.classList.remove("hidden");
+    else el.classList.add("hidden");
+  });
+  const btns = document.querySelectorAll(".btn-toggle-tree");
+  btns.forEach(b => {
+    b.innerHTML = expand ? '<i class="fa-solid fa-minus"></i>' : '<i class="fa-solid fa-plus"></i>';
+  });
+}
+
+function renderVisualOrgChartTree() {
+  const container = document.getElementById("org-chart-container");
+  if (!container) return;
+
+  const filterUnit = document.getElementById("org-chart-filter-unit")?.value || "ALL";
+
+  // Ambil daftar karyawan aktif dari state
+  const employees = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0)
+    ? SETTINGS_EMPLOYEES_DATA
+    : (APP_STATE.employees || []);
+
+  // Filter sesuai unit bila dipilih
+  let filteredPositions = ORG_POSITIONS_DATA;
+  if (filterUnit !== "ALL") {
+    filteredPositions = ORG_POSITIONS_DATA.filter(p => p.unit_id === filterUnit);
+  }
+
+  // Cari root positions (tidak memiliki reports_to atau reports_to tidak ada di list)
+  const allPosIds = new Set(filteredPositions.map(p => p.id_position));
+  let rootPositions = filteredPositions.filter(p => !p.reports_to_unit_id || !allPosIds.has(p.reports_to_unit_id));
+
+  if (rootPositions.length === 0 && filteredPositions.length > 0) {
+    rootPositions = [filteredPositions[0]];
+  }
+
+  if (rootPositions.length === 0) {
+    container.innerHTML = '<div class="p-8 text-center text-xs text-slate-400">Tidak ada struktur posisi yang cocok dengan filter.</div>';
+    return;
+  }
+
+  // Recursive Tree Builder
+  function buildTreeNodeHtml(pos) {
+    // Cari karyawan yang memegang posisi ini
+    const holder = employees.find(e => {
+      const ePos = String(e.position_id || e.jabatan || "").trim().toLowerCase();
+      const pId = String(pos.id_position).toLowerCase();
+      const pTitle = String(pos.nama_jabatan).toLowerCase();
+      return ePos === pId || ePos === pTitle || ePos.includes(pTitle) || pTitle.includes(ePos);
+    });
+
+    const subordinates = filteredPositions.filter(p => p.reports_to_unit_id === pos.id_position);
+    const hasChildren = subordinates.length > 0;
+    const subCount = subordinates.length;
+
+    const empName = holder ? (holder.nama_lengkap || holder.nama || holder.name) : "Belum Ditugaskan";
+    const empNip = holder ? (holder.nip || "-") : "-";
+    const empPhoto = holder?.foto_profile_url || holder?.foto || "";
+    const isAssigned = !!holder;
+
+    return `
+      <li>
+        <div class="org-node-card bg-white rounded-2xl p-3 border border-slate-200/90 shadow-xs hover:border-indigo-400 w-56 text-left cursor-pointer relative" onclick="handleOrgNodeClick('${empNip}', '${pos.id_position}')">
+          <div class="flex items-start space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-base text-indigo-700 font-bold shrink-0 overflow-hidden">
+              ${empPhoto ? `<img src="${empPhoto}" class="w-full h-full object-cover" />` : `<i class="fa-solid fa-user-tie"></i>`}
+            </div>
+            <div class="min-w-0 flex-1">
+              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">${pos.level_id || 'Staff'}</span>
+              <h5 class="font-bold text-[11px] text-slate-900 leading-tight mt-0.5 truncate">${empName}</h5>
+              <p class="text-[10px] text-indigo-900 font-semibold truncate leading-tight">${pos.nama_jabatan}</p>
+              <span class="text-[9px] text-slate-400 font-mono block truncate">${empNip}</span>
+            </div>
+          </div>
+          ${hasChildren ? `
+            <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-500">
+              <span class="font-bold text-indigo-700"><i class="fa-solid fa-users mr-1"></i>${subCount} Bawahan</span>
+              <button type="button" onclick="event.stopPropagation(); toggleOrgTreeNode(this)" class="btn-toggle-tree w-5 h-5 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-[8px] transition">
+                <i class="fa-solid fa-minus"></i>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+        ${hasChildren ? `
+          <ul class="org-tree-children">
+            ${subordinates.map(sub => buildTreeNodeHtml(sub)).join("")}
+          </ul>
+        ` : ''}
+      </li>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="org-tree">
+      <ul>
+        ${rootPositions.map(root => buildTreeNodeHtml(root)).join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function toggleOrgTreeNode(btn) {
+  const card = btn.closest(".org-node-card");
+  const li = card?.closest("li");
+  const childrenUl = li?.querySelector(".org-tree-children");
+  if (childrenUl) {
+    const isHidden = childrenUl.classList.toggle("hidden");
+    btn.innerHTML = isHidden ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-minus"></i>';
+  }
+}
+
+function handleOrgNodeClick(nip, posId) {
+  if (nip && nip !== "-") {
+    openEmployeeDossierModal(nip);
+  } else {
+    openEditJobPositionModal(posId);
+  }
+}
+
+// ---------------- 6. INTEGRASI SSO DIGIASHA ----------------
+async function loadSsoClients() {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("sso_clients")
+        .select("*")
+        .order("client_id");
+      if (!error && data && data.length > 0) {
+        ORG_SSO_CLIENTS_DATA = data;
+        renderSsoClientsList(ORG_SSO_CLIENTS_DATA);
+        return;
+      }
+    } catch (e) {
+      console.warn("Table sso_clients not yet created, using fallback:", e);
+    }
+  }
+
+  ORG_SSO_CLIENTS_DATA = DEFAULT_ORG_SSO_CLIENTS;
+  renderSsoClientsList(ORG_SSO_CLIENTS_DATA);
+}
+
+function renderSsoClientsList(list) {
+  const container = document.getElementById("sso-clients-list-container");
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200 col-span-full">Belum ada aplikasi SSO terdaftar.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(c => {
+    return `
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-400 transition space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-xs">
+              <i class="fa-solid fa-cubes"></i>
+            </div>
+            <div>
+              <h5 class="font-bold text-xs text-slate-900 truncate">${c.client_name}</h5>
+              <span class="font-mono text-[10px] text-amber-800 font-bold block">${c.client_id}</span>
+            </div>
+          </div>
+          <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">CONNECTED</span>
+        </div>
+        <p class="text-[10px] text-slate-500 line-clamp-2">${c.description || '-'}</p>
+        <div class="pt-1 flex items-center justify-between text-[10px] border-t border-slate-100 font-mono">
+          <span class="text-slate-400">Secret: ••••••••••••</span>
+          <button type="button" onclick="copySsoSecret('${c.client_secret}')" class="text-amber-600 hover:text-amber-700 font-bold">
+            <i class="fa-solid fa-copy mr-1"></i>Copy Secret
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function copySsoSecret(secret) {
+  navigator.clipboard.writeText(secret).then(() => {
+    showToast("Client Secret berhasil disalin!", "success", 1200);
+  });
+}
+
+function openAddSsoClientModal() {
+  CURRENT_EDIT_SSO_CLIENT_ID = null;
+  document.getElementById("sso-modal-title").innerText = "Daftarkan Klien SSO Baru";
+  const idInput = document.getElementById("sso-input-id");
+  idInput.value = "";
+  idInput.disabled = false;
+  document.getElementById("sso-input-name").value = "";
+  generateRandomSsoSecret();
+  document.getElementById("sso-input-desc").value = "";
+  document.getElementById("modal-sso-edit").classList.remove("hidden");
+}
+
+function generateRandomSsoSecret() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
+  let res = "sec_digi_";
+  for (let i = 0; i < 24; i++) {
+    res += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  document.getElementById("sso-input-secret").value = res;
+}
+
+function closeSsoClientModal() {
+  document.getElementById("modal-sso-edit").classList.add("hidden");
+}
+
+async function handleSaveSsoClient(e) {
+  e.preventDefault();
+  const id = document.getElementById("sso-input-id").value.trim().toLowerCase();
+  const name = document.getElementById("sso-input-name").value.trim();
+  const secret = document.getElementById("sso-input-secret").value.trim();
+  const desc = document.getElementById("sso-input-desc").value.trim();
+
+  const payload = {
+    client_id: id,
+    client_name: name,
+    client_secret: secret,
+    description: desc,
+    is_active: true,
+    created_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-sso");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Mendaftarkan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("sso_clients")
+        .upsert(payload, { onConflict: "client_id" });
+      if (error) console.warn("Supabase save sso_client:", error);
+    }
+
+    const idx = ORG_SSO_CLIENTS_DATA.findIndex(c => c.client_id === id);
+    if (idx >= 0) ORG_SSO_CLIENTS_DATA[idx] = payload;
+    else ORG_SSO_CLIENTS_DATA.push(payload);
+
+    renderSsoClientsList(ORG_SSO_CLIENTS_DATA);
+    closeSsoClientModal();
+    showToast("Aplikasi SSO berhasil didaftarkan!", "success", 1500);
+  } catch (err) {
+    alert("Gagal mendaftarkan aplikasi: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+function populateSsoTestEmpSelect() {
+  const select = document.getElementById("sso-test-emp-select");
+  if (!select) return;
+  const list = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0)
+    ? SETTINGS_EMPLOYEES_DATA
+    : (APP_STATE.employees || []);
+
+  select.innerHTML = list.map(e => {
+    return `<option value="${e.nip}">${e.nama_lengkap || e.nama || e.name} (${e.nip} - ${e.cabang || 'HO'})</option>`;
+  }).join("");
+}
+
+async function runSsoTokenSimulation() {
+  const nip = document.getElementById("sso-test-emp-select")?.value;
+  const clientId = document.getElementById("sso-test-client-select")?.value;
+  const resultBox = document.getElementById("sso-simulation-result");
+
+  if (!nip || !clientId) {
+    alert("Pilih karyawan dan klien aplikasi!");
+    return;
+  }
+
+  resultBox.classList.remove("hidden");
+  resultBox.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses simulasi handshake SSO...';
+
+  // Simulasi Payload RPC verify_sso_token
+  const emp = (SETTINGS_EMPLOYEES_DATA || []).find(e => e.nip === nip) || (APP_STATE.employees || []).find(e => e.nip === nip);
+  const authCode = `auth_sso_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  setTimeout(() => {
+    const mockResponse = {
+      status: 200,
+      protocol: "Digiasha SSO Token Exchange v1.0",
+      timestamp: new Date().toISOString(),
+      handshake: {
+        client_id: clientId,
+        auth_code: authCode,
+        status: "VERIFIED_SUCCESS",
+        expires_in_seconds: 300
+      },
+      verified_user: {
+        nip: emp?.nip || nip,
+        nama_lengkap: emp?.nama_lengkap || emp?.nama || "Karyawan Digiasha",
+        email: emp?.email || `${nip}@digiasha.com`,
+        cabang: emp?.cabang || "Head Office",
+        jabatan: emp?.jabatan || "Officer",
+        role_id: emp?.role_id || "R-04",
+        status_aktif: "AKTIF",
+        sso_session_id: `sess_${Date.now()}`
+      }
+    };
+
+    resultBox.innerHTML = `<pre>${JSON.stringify(mockResponse, null, 2)}</pre>`;
+  }, 600);
+}
+
+// ---------------- 7. DOSSIER 360° KARYAWAN & RIWAYAT KARIR ----------------
+async function openEmployeeDossierModal(nipOrId) {
+  const modal = document.getElementById("modal-employee-dossier");
+  if (!modal) return;
+
+  const employees = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0)
+    ? SETTINGS_EMPLOYEES_DATA
+    : (APP_STATE.employees || []);
+
+  const emp = employees.find(e => String(e.nip).trim() === String(nipOrId).trim() || String(e.id).trim() === String(nipOrId).trim());
+  if (!emp) {
+    alert("Data karyawan tidak ditemukan: " + nipOrId);
+    return;
+  }
+
+  CURRENT_DOSSIER_EMP = emp;
+  switchDossierTab("job");
+
+  // Header Dossier
+  document.getElementById("dossier-nama").innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
+  document.getElementById("dossier-nip-badge").innerText = emp.nip || "-";
+  document.getElementById("dossier-jabatan-sub").innerText = `${emp.jabatan || 'Staff'} • ${emp.cabang || 'Head Office'}`;
+  document.getElementById("dossier-status-kerja-badge").innerText = emp.status_kerja || "PKWTT";
+
+  // Tab 1: Job & Account
+  document.getElementById("dossier-unit-val").innerText = emp.cabang || "Head Office";
+  document.getElementById("dossier-workloc-val").innerText = `Area: ${emp.area_cover || 'Seluruh Area'}`;
+  document.getElementById("dossier-jabatan-val").innerText = emp.jabatan || "-";
+  document.getElementById("dossier-level-val").innerText = `Role ID: ${emp.role_id || 'R-04'}`;
+  document.getElementById("dossier-atasan-val").innerText = emp.atasan_nama ? `${emp.atasan_nama} (${emp.atasan_nip})` : "Belum ditentukan";
+  document.getElementById("dossier-masakerja-val").innerText = emp.tanggal_masuk ? `Bergabung: ${emp.tanggal_masuk}` : "Aktif";
+  document.getElementById("dossier-kontrak-val").innerText = `Status: ${emp.status_kerja || 'PKWTT'}`;
+  document.getElementById("dossier-email-val").innerText = emp.email || "-";
+  document.getElementById("dossier-role-val").innerText = emp.role || emp.role_id || "Field Staff";
+
+  // Avatar
+  const avatarBox = document.getElementById("dossier-avatar-container");
+  if (emp.foto_profile_url || emp.foto) {
+    avatarBox.innerHTML = `<img src="${emp.foto_profile_url || emp.foto}" class="w-full h-full object-cover" />`;
+  } else {
+    avatarBox.innerHTML = `<i class="fa-solid fa-user-tie"></i>`;
+  }
+
+  // Load Data Pribadi dari Supabase (employee_personal_details)
+  await loadDossierPersonalDetails(emp);
+
+  // Load Riwayat Karir & Remunerasi dari Supabase (employee_career_histories)
+  await loadDossierCareerHistories(emp);
+
+  modal.classList.remove("hidden");
+}
+
+function closeEmployeeDossierModal() {
+  document.getElementById("modal-employee-dossier")?.classList.add("hidden");
+}
+
+function switchDossierTab(tab) {
+  const tabs = ["job", "personal", "career"];
+  tabs.forEach(t => {
+    const el = document.getElementById(`dossier-content-${t}`);
+    const btn = document.getElementById(`dossier-tab-btn-${t}`);
+    if (el) {
+      if (t === tab) el.classList.remove("hidden");
+      else el.classList.add("hidden");
+    }
+    if (btn) {
+      if (t === tab) {
+        btn.className = "px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs whitespace-nowrap font-bold";
+      } else {
+        btn.className = "px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap font-bold";
+      }
+    }
+  });
+}
+
+async function loadDossierPersonalDetails(emp) {
+  let detail = null;
+  let empId = emp.id;
+  if (supabaseClient) {
+    try {
+      if (!empId || typeof empId === "number") {
+        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        if (eRow?.id) empId = eRow.id;
+      }
+      if (empId) {
+        const { data, error } = await supabaseClient
+          .from("employee_personal_details")
+          .select("*")
+          .eq("employee_id", empId)
+          .maybeSingle();
+        if (!error && data) detail = data;
+      }
+    } catch (e) {
+      console.warn("Error load personal details:", e);
+    }
+  }
+
+  CURRENT_DOSSIER_PERSONAL = detail;
+  document.getElementById("dossier-nik-val").innerText = detail?.ktp_number || emp.nik_ktp || "3201000000000000 (Belum diisi)";
+  document.getElementById("dossier-ttl-val").innerText = detail?.pob ? `${detail.pob}, ${detail.dob || ''}` : "-";
+  document.getElementById("dossier-gender-agama-val").innerText = `${detail?.gender || 'Laki-laki'} • ${detail?.religion || 'Islam'}`;
+  document.getElementById("dossier-marital-val").innerText = `${detail?.marital_status || 'Lajang'} (Tanggungan: ${detail?.number_of_dependents || 0})`;
+  document.getElementById("dossier-phone-val").innerText = detail?.phone || emp.phone || "-";
+  document.getElementById("dossier-alamatktp-val").innerText = detail?.address_ktp || "-";
+  document.getElementById("dossier-alamatdom-val").innerText = detail?.address_domicile || detail?.address_ktp || "-";
+  document.getElementById("dossier-emergency-name-val").innerText = detail?.emergency_contact_name ? `${detail.emergency_contact_name} (${detail.emergency_contact_relation || 'Keluarga'})` : "Belum didaftarkan";
+  document.getElementById("dossier-emergency-phone-val").innerText = detail?.emergency_contact_phone || "-";
+}
+
+async function loadDossierCareerHistories(emp) {
+  const container = document.getElementById("dossier-career-timeline-container");
+  if (!container) return;
+
+  let list = [];
+  let empId = emp.id;
+  if (supabaseClient) {
+    try {
+      if (!empId || typeof empId === "number") {
+        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        if (eRow?.id) empId = eRow.id;
+      }
+      if (empId) {
+        const { data, error } = await supabaseClient
+          .from("employee_career_histories")
+          .select("*")
+          .eq("employee_id", empId)
+          .order("effective_date", { ascending: false });
+        if (!error && data) list = data;
+      }
+    } catch (e) {
+      console.warn("Error load career histories:", e);
+    }
+  }
+
+  CURRENT_DOSSIER_CAREER_LIST = list;
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="relative pb-3">
+        <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow"></div>
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">JOIN INITIAL</span>
+            <span class="text-[10px] text-slate-400 font-mono">${emp.tanggal_masuk || 'Tanggal Bergabung'}</span>
+          </div>
+          <h6 class="font-bold text-xs text-slate-800 mt-1">Pengangkatan Awal Karyawan</h6>
+          <p class="text-[10px] text-slate-500 mt-0.5">Penempatan: ${emp.cabang || 'Head Office'} • Posisi: ${emp.jabatan || 'Staff'}</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(tx => {
+    let typeBadge = "bg-indigo-50 text-indigo-700 border-indigo-200";
+    if (tx.transaction_type === "PROMOTION") typeBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
+    if (tx.transaction_type === "MUTATION") typeBadge = "bg-blue-50 text-blue-700 border-blue-200";
+    if (tx.transaction_type === "SALARY_ADJUSTMENT") typeBadge = "bg-amber-50 text-amber-700 border-amber-200";
+
+    const salaryFormatted = tx.new_basic_salary ? `Rp ${parseInt(tx.new_basic_salary).toLocaleString('id-ID')}` : null;
+
+    return `
+      <div class="relative pb-3">
+        <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow"></div>
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1">
+          <div class="flex items-center justify-between flex-wrap gap-1">
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${typeBadge}">${tx.transaction_type}</span>
+            <span class="text-[10px] text-slate-400 font-mono">Efektif: ${tx.effective_date}</span>
+          </div>
+          <h6 class="font-bold text-xs text-slate-900 mt-1">${tx.no_sk ? `SK: ${tx.no_sk}` : 'Perubahan Status Kepegawaian'}</h6>
+          <p class="text-[10px] text-slate-600">${tx.description || '-'}</p>
+          ${salaryFormatted ? `
+            <div class="text-[10px] text-emerald-800 bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-200 flex items-center justify-between">
+              <span>Gaji Pokok Baru: <strong>${salaryFormatted}</strong></span>
+              ${tx.bank_name ? `<span>Payroll: ${tx.bank_name} (${tx.bank_account_no || '-'})</span>` : ''}
+            </div>
+          ` : ''}
+          ${tx.file_sk_url ? `
+            <a href="${tx.file_sk_url}" target="_blank" class="inline-flex items-center space-x-1 text-[10px] text-indigo-600 hover:underline pt-0.5">
+              <i class="fa-solid fa-file-pdf"></i>
+              <span>Lihat Lampiran SK</span>
+            </a>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAddCareerTransactionModal() {
+  if (!CURRENT_DOSSIER_EMP) return;
+  const modal = document.getElementById("modal-career-transaction-add");
+  if (!modal) return;
+
+  document.getElementById("tx-modal-emp-label").innerText = `Karyawan: ${CURRENT_DOSSIER_EMP.nama_lengkap || CURRENT_DOSSIER_EMP.nama} (${CURRENT_DOSSIER_EMP.nip})`;
+  document.getElementById("tx-input-emp-id").value = CURRENT_DOSSIER_EMP.id || CURRENT_DOSSIER_EMP.nip;
+  document.getElementById("tx-input-effective-date").value = new Date().toISOString().split("T")[0];
+  document.getElementById("tx-input-nosk").value = "";
+  document.getElementById("tx-input-filesk").value = "";
+  document.getElementById("tx-input-desc").value = "";
+
+  // Populate Selects
+  const posSelect = document.getElementById("tx-input-new-position");
+  if (posSelect) {
+    posSelect.innerHTML = '<option value="">- Tidak Berubah -</option>' + (ORG_POSITIONS_DATA || []).map(p => `<option value="${p.id_position}">${p.nama_jabatan}</option>`).join("");
+  }
+
+  const unitSelect = document.getElementById("tx-input-new-unit");
+  if (unitSelect) {
+    unitSelect.innerHTML = '<option value="">- Tidak Berubah -</option>' + (ORG_UNITS_DATA || []).map(u => `<option value="${u.id_unit}">${u.nama_unit}</option>`).join("");
+  }
+
+  const lvlSelect = document.getElementById("tx-input-new-level");
+  if (lvlSelect) {
+    lvlSelect.innerHTML = '<option value="">- Tidak Berubah -</option>' + (ORG_LEVELS_DATA || []).map(l => `<option value="${l.id_level}">${l.nama_level}</option>`).join("");
+  }
+
+  const supSelect = document.getElementById("tx-input-new-supervisor");
+  if (supSelect) {
+    const list = (SETTINGS_EMPLOYEES_DATA || []).filter(e => e.nip !== CURRENT_DOSSIER_EMP.nip);
+    supSelect.innerHTML = '<option value="">- Tidak Berubah -</option>' + list.map(e => `<option value="${e.id || e.nip}">${e.nama_lengkap} (${e.nip})</option>`).join("");
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeCareerTransactionModal() {
+  document.getElementById("modal-career-transaction-add")?.classList.add("hidden");
+}
+
+async function handleSaveCareerTransaction(e) {
+  e.preventDefault();
+  if (!CURRENT_DOSSIER_EMP) return;
+
+  let empId = CURRENT_DOSSIER_EMP.id;
+  if (supabaseClient && (!empId || typeof empId === "number" || (typeof empId === "string" && empId.length < 20))) {
+    try {
+      const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", CURRENT_DOSSIER_EMP.nip).maybeSingle();
+      if (eRow?.id) empId = eRow.id;
+    } catch (_) {}
+  }
+  if (!empId) empId = CURRENT_DOSSIER_EMP.nip;
+
+  const txType = document.getElementById("tx-input-type").value;
+  const effDate = document.getElementById("tx-input-effective-date").value;
+  const noSk = document.getElementById("tx-input-nosk").value.trim();
+  const fileSk = document.getElementById("tx-input-filesk").value.trim();
+  const newPos = document.getElementById("tx-input-new-position").value || null;
+  const newUnit = document.getElementById("tx-input-new-unit").value || null;
+  const newLvl = document.getElementById("tx-input-new-level").value || null;
+  const newSup = document.getElementById("tx-input-new-supervisor").value || null;
+  const salary = document.getElementById("tx-input-new-salary").value ? parseFloat(document.getElementById("tx-input-new-salary").value) : null;
+  const allowances = document.getElementById("tx-input-new-allowances").value ? parseFloat(document.getElementById("tx-input-new-allowances").value) : null;
+  const bankName = document.getElementById("tx-input-bank-name").value.trim() || null;
+  const bankAcc = document.getElementById("tx-input-bank-account").value.trim() || null;
+  const bpjsKes = document.getElementById("tx-input-bpjs-kes").value.trim() || null;
+  const bpjsTk = document.getElementById("tx-input-bpjs-tk").value.trim() || null;
+  const npwp = document.getElementById("tx-input-npwp").value.trim() || null;
+  const taxStatus = document.getElementById("tx-input-tax-status").value;
+  const desc = document.getElementById("tx-input-desc").value.trim();
+
+  const payload = {
+    employee_id: empId,
+    transaction_date: new Date().toISOString().split("T")[0],
+    effective_date: effDate,
+    transaction_type: txType,
+    no_sk: noSk || null,
+    file_sk_url: fileSk || null,
+    description: desc || null,
+    new_position_id: newPos,
+    new_location_id: newUnit,
+    new_level_id: newLvl,
+    new_supervisor_id: newSup,
+    new_basic_salary: salary,
+    new_allowances: allowances,
+    bank_name: bankName,
+    bank_account_no: bankAcc,
+    bpjs_kesehatan_number: bpjsKes,
+    bpjs_ketenagakerjaan_number: bpjsTk,
+    npwp_number: npwp,
+    tax_status: taxStatus,
+    created_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById("btn-save-tx");
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan...';
+  btn.disabled = true;
+
+  try {
+    if (supabaseClient && typeof empId === "string" && empId.length > 20) {
+      payload.employee_id = empId;
+      const { error } = await supabaseClient
+        .from("employee_career_histories")
+        .insert(payload);
+      if (error) console.warn("Supabase save career history:", error);
+    }
+
+    closeCareerTransactionModal();
+    showToast("Transaksi karir & remunerasi berhasil dicatat!", "success", 1500);
+    await loadDossierCareerHistories(CURRENT_DOSSIER_EMP);
+  } catch (err) {
+    alert("Gagal menyimpan transaksi: " + err.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+function openEditEmployeeFullModal() {
+  if (!CURRENT_DOSSIER_EMP) return;
+  closeEmployeeDossierModal();
+  if (typeof openEditEmployeeModal === "function") {
+    openEditEmployeeModal(CURRENT_DOSSIER_EMP.nip);
+  }
+}
+
+function loadOrgRolePermissions() {
+  const container = document.getElementById("role-permissions-matrix-container");
+  if (!container) return;
+
+  const roles = Object.keys(ROLE_PERMISSIONS_STATE || {});
+  if (roles.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">Belum ada role terdefinisi.</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="divide-y divide-slate-100 text-xs">
+      ${roles.map(rKey => {
+        const r = ROLE_PERMISSIONS_STATE[rKey];
+        const perms = r.permissions || [];
+        return `
+          <div class="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 transition">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-900">${r.name}</span>
+                <span class="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded border ${r.badgeBg || 'bg-slate-100 text-slate-700'}">${rKey}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">${r.desc || '-'}</p>
+              <div class="flex items-center space-x-1 flex-wrap gap-y-1 mt-1.5">
+                <span class="text-[10px] text-slate-400 font-semibold mr-1">Menu:</span>
+                ${perms.map(p => `<span class="px-2 py-0.2 rounded-full text-[9px] bg-purple-50 text-purple-700 border border-purple-200 font-mono">${p}</span>`).join(" ")}
+              </div>
+            </div>
+            <button type="button" onclick="openEditRoleInfoModal('${rKey}')" class="px-2.5 py-2 bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>Atur Akses</span>
+            </button>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 // Listener Tombol Back & Forward Browser HP / Desktop
