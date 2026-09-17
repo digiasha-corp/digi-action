@@ -18,147 +18,142 @@
     </div>
   </div>
 
-  <!-- NAVIGASI 4 TAB UTAMA -->
-  <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold overflow-x-auto shadow-inner">
-    <button type="button" id="tab-btn-org-structure" onclick="switchOrgSettingTab('structure')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm">
-      <i class="fa-solid fa-sitemap mr-1.5 text-indigo-600"></i> Struktur & Unit
+  <!-- NAVIGASI 1 LEVEL SEMUA TAB ORGANIZATION SETTING -->
+  <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold overflow-x-auto shadow-inner no-scrollbar">
+    <button type="button" id="tab-btn-org-unit" onclick="switchOrgSettingTab('unit')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap bg-white text-indigo-700 shadow-sm border border-slate-200/80 font-bold shrink-0">
+      <i class="fa-solid fa-building mr-1.5 text-indigo-600"></i> Unit Organisasi
     </button>
-    <button type="button" id="tab-btn-org-workloc" onclick="switchOrgSettingTab('workloc')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
+    <button type="button" id="tab-btn-org-position" onclick="switchOrgSettingTab('position')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-user-tie mr-1.5 text-slate-500"></i> Master Jabatan
+    </button>
+    <button type="button" id="tab-btn-org-level" onclick="switchOrgSettingTab('level')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-layer-group mr-1.5 text-slate-500"></i> Master Level (Grade)
+    </button>
+    <button type="button" id="tab-btn-org-chart" onclick="switchOrgSettingTab('chart')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-diagram-project mr-1.5 text-indigo-500"></i> Bagan Visual
+    </button>
+    <button type="button" id="tab-btn-org-workloc" onclick="switchOrgSettingTab('workloc')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
       <i class="fa-solid fa-building-shield mr-1.5 text-emerald-600"></i> Work Location
     </button>
-    <button type="button" id="tab-btn-org-role" onclick="switchOrgSettingTab('role')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
+    <button type="button" id="tab-btn-org-role" onclick="switchOrgSettingTab('role')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
       <i class="fa-solid fa-shield-halved mr-1.5 text-purple-600"></i> Role & Hak Akses
     </button>
-    <button type="button" id="tab-btn-org-sso" onclick="switchOrgSettingTab('sso')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
+    <button type="button" id="tab-btn-org-sso" onclick="switchOrgSettingTab('sso')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
       <i class="fa-solid fa-key mr-1.5 text-amber-600"></i> Integrasi SSO
     </button>
   </div>
 
   <!-- ========================================================================= -->
-  <!-- TAB 1: STRUKTUR ORGANISASI & UNIT                                         -->
+  <!-- TAB 1: UNIT ORGANISASI (HO, AREA, CABANG)                                 -->
   <!-- ========================================================================= -->
-  <div id="org-setting-tab-structure" class="space-y-3.5">
-    <!-- SUB-NAVIGASI STRUKTUR -->
-    <div class="flex items-center space-x-1 border-b border-slate-200 pb-2 overflow-x-auto text-[11px] font-bold">
-      <button type="button" id="subtab-btn-unit" onclick="switchOrgStructureSubtab('unit')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs whitespace-nowrap">
-        <i class="fa-solid fa-building mr-1 text-indigo-600"></i> Unit Organisasi (HO, Area, Cabang)
-      </button>
-      <button type="button" id="subtab-btn-position" onclick="switchOrgStructureSubtab('position')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
-        <i class="fa-solid fa-user-tie mr-1 text-slate-500"></i> Master Jabatan & Reporting
-      </button>
-      <button type="button" id="subtab-btn-level" onclick="switchOrgStructureSubtab('level')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
-        <i class="fa-solid fa-layer-group mr-1 text-slate-500"></i> Master Level (Grade)
-      </button>
-      <button type="button" id="subtab-btn-chart" onclick="switchOrgStructureSubtab('chart')" class="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap">
-        <i class="fa-solid fa-diagram-project mr-1 text-slate-500"></i> Bagan Visual (Preview)
-      </button>
-      <button type="button" onclick="loadScreen('personalia')" class="ml-auto px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 whitespace-nowrap flex items-center gap-1.5 transition">
-        <i class="fa-solid fa-users-viewfinder text-indigo-600"></i> Buka Bagan di Menu Karyawan <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-indigo-400"></i>
+  <div id="org-setting-tab-unit" class="space-y-3">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h4 class="text-xs font-bold text-slate-800">Daftar Unit Organisasi</h4>
+        <p class="text-[10px] text-slate-500">Pusat kelola Head Office, Area Regional & Cabang</p>
+      </div>
+      <button type="button" onclick="openAddOrgUnitModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Unit</span>
       </button>
     </div>
 
-    <!-- SUB-VIEW 1: BAGAN VISUAL ORG CHART TREE -->
-    <div id="org-subview-chart" class="space-y-3 hidden">
-      <!-- Toolbar Kontrol Org Chart -->
-      <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
-        <div class="flex items-center space-x-2 flex-wrap gap-y-1">
-          <label class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-            <i class="fa-solid fa-filter text-indigo-600"></i> Fokus Unit:
-          </label>
-          <select id="org-chart-filter-unit" onchange="renderVisualOrgChartTree()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-600">
-            <option value="ALL">Semua Unit (Seluruh Organisasi)</option>
-          </select>
-        </div>
-
-        <div class="flex items-center space-x-1.5">
-          <button type="button" onclick="zoomOrgChart(1.15)" title="Perbesar Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
-            <i class="fa-solid fa-magnifying-glass-plus"></i>
-          </button>
-          <button type="button" onclick="zoomOrgChart(0.85)" title="Perkecil Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
-            <i class="fa-solid fa-magnifying-glass-minus"></i>
-          </button>
-          <button type="button" onclick="resetOrgChartZoom()" title="Reset Tampilan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
-            <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
-          <button type="button" onclick="expandAllOrgTreeNodes(true)" class="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold border border-indigo-200 transition">
-            Buka Semua Cabang
-          </button>
-        </div>
+    <div id="org-units-list-container" class="space-y-2">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat data unit organisasi...
       </div>
+    </div>
+  </div>
 
-      <!-- Canvas Area Bagan Pohon Org Chart -->
-      <div id="org-chart-viewport" class="bg-slate-50/70 border border-slate-200 rounded-3xl p-4 sm:p-6 overflow-auto min-h-[480px] max-h-[70vh] relative shadow-inner">
-        <div id="org-chart-container" class="org-tree-root flex justify-center transition-transform duration-200 origin-top">
-          <!-- Tree Nodes dirender secara dinamis oleh JavaScript -->
-          <div class="p-8 text-center text-xs text-slate-400">
-            <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-2 block"></i> Memuat Bagan Struktur Organisasi...
-          </div>
-        </div>
+  <!-- ========================================================================= -->
+  <!-- TAB 2: MASTER JABATAN & REPORTING LINE                                    -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-position" class="space-y-3 hidden">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h4 class="text-xs font-bold text-slate-800">Master Posisi / Jabatan</h4>
+        <p class="text-[10px] text-slate-500">Atur hierarki pelaporan langsung & koordinasi jabatan</p>
       </div>
-      <p class="text-[10px] text-slate-400 text-center italic">
-        <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> Klik pada kartu jabatan/karyawan untuk melihat Detail Personalia & Riwayat Karir.
-      </p>
+      <button type="button" onclick="openAddJobPositionModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Jabatan</span>
+      </button>
     </div>
 
-    <!-- SUB-VIEW 2: UNIT ORGANISASI (HO, AREA, CABANG) -->
-    <div id="org-subview-unit" class="space-y-3">
-      <div class="flex items-center justify-between gap-2">
-        <div>
-          <h4 class="text-xs font-bold text-slate-800">Daftar Unit Organisasi</h4>
-          <p class="text-[10px] text-slate-500">Pusat kelola Head Office, Area Regional & Cabang</p>
-        </div>
-        <button type="button" onclick="openAddOrgUnitModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
-          <i class="fa-solid fa-plus text-xs"></i>
-          <span>Tambah Unit</span>
+    <div id="job-positions-list-container" class="space-y-2">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat master posisi jabatan...
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 3: MASTER LEVEL (GRADE)                                               -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-level" class="space-y-3 hidden">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h4 class="text-xs font-bold text-slate-800">Master Tingkatan Level (Grade)</h4>
+        <p class="text-[10px] text-slate-500">Standarisasi bobot tingkatan kepegawaian (Bobot 1 = Tertinggi)</p>
+      </div>
+      <button type="button" onclick="openAddMasterLevelModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Level</span>
+      </button>
+    </div>
+
+    <div id="master-levels-list-container" class="space-y-2">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat master level...
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 4: BAGAN VISUAL STRUKTUR ORGANISASI                                   -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-chart" class="space-y-3 hidden">
+    <!-- Toolbar Kontrol Org Chart -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+        <label class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+          <i class="fa-solid fa-filter text-indigo-600"></i> Fokus Unit:
+        </label>
+        <select id="org-chart-filter-unit" onchange="renderVisualOrgChartTree()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-600">
+          <option value="ALL">Semua Unit (Seluruh Organisasi)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center space-x-1.5">
+        <button type="button" onclick="zoomOrgChart(1.15)" title="Perbesar Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-magnifying-glass-plus"></i>
+        </button>
+        <button type="button" onclick="zoomOrgChart(0.85)" title="Perkecil Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-magnifying-glass-minus"></i>
+        </button>
+        <button type="button" onclick="resetOrgChartZoom()" title="Reset Tampilan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+        <button type="button" onclick="expandAllOrgTreeNodes(true)" class="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold border border-indigo-200 transition">
+          Buka Semua Cabang
+        </button>
+        <button type="button" onclick="loadScreen('personalia')" class="px-2.5 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 text-[10px] font-bold border border-purple-200 transition flex items-center gap-1">
+          <i class="fa-solid fa-users-viewfinder"></i> Menu Karyawan
         </button>
       </div>
+    </div>
 
-      <div id="org-units-list-container" class="space-y-2">
+    <!-- Canvas Area Bagan Pohon Org Chart -->
+    <div id="org-chart-viewport" class="bg-slate-50/70 border border-slate-200 rounded-3xl p-4 sm:p-6 overflow-auto min-h-[480px] max-h-[70vh] relative shadow-inner">
+      <div id="org-chart-container" class="org-tree-root flex justify-center transition-transform duration-200 origin-top">
         <div class="p-8 text-center text-xs text-slate-400">
-          <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat data unit organisasi...
+          <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-2 block"></i> Memuat Bagan Struktur Organisasi...
         </div>
       </div>
     </div>
-
-    <!-- SUB-VIEW 3: MASTER JABATAN & REPORTING LINE -->
-    <div id="org-subview-position" class="space-y-3 hidden">
-      <div class="flex items-center justify-between gap-2">
-        <div>
-          <h4 class="text-xs font-bold text-slate-800">Master Posisi / Jabatan</h4>
-          <p class="text-[10px] text-slate-500">Atur hierarki pelaporan langsung & koordinasi jabatan</p>
-        </div>
-        <button type="button" onclick="openAddJobPositionModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
-          <i class="fa-solid fa-plus text-xs"></i>
-          <span>Tambah Jabatan</span>
-        </button>
-      </div>
-
-      <div id="job-positions-list-container" class="space-y-2">
-        <div class="p-8 text-center text-xs text-slate-400">
-          <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat master posisi jabatan...
-        </div>
-      </div>
-    </div>
-
-    <!-- SUB-VIEW 4: MASTER LEVEL (GRADE) -->
-    <div id="org-subview-level" class="space-y-3 hidden">
-      <div class="flex items-center justify-between gap-2">
-        <div>
-          <h4 class="text-xs font-bold text-slate-800">Master Tingkatan Level (Grade)</h4>
-          <p class="text-[10px] text-slate-500">Standarisasi bobot tingkatan kepegawaian (Bobot 1 = Tertinggi)</p>
-        </div>
-        <button type="button" onclick="openAddMasterLevelModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
-          <i class="fa-solid fa-plus text-xs"></i>
-          <span>Tambah Level</span>
-        </button>
-      </div>
-
-      <div id="master-levels-list-container" class="space-y-2">
-        <div class="p-8 text-center text-xs text-slate-400">
-          <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat master level...
-        </div>
-      </div>
-    </div>
+    <p class="text-[10px] text-slate-400 text-center italic">
+      <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> Klik pada kartu jabatan/karyawan untuk melihat Detail Personalia & Riwayat Karir.
+    </p>
   </div>
 
   <!-- ========================================================================= -->

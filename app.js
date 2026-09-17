@@ -15881,8 +15881,7 @@ const DEFAULT_ORG_SSO_CLIENTS = [
 ];
 
 async function initOrganizationSettingScreen() {
-  switchOrgSettingTab("structure");
-  switchOrgStructureSubtab("chart");
+  switchOrgSettingTab("unit");
 
   await Promise.allSettled([
     loadOrgLevels(),
@@ -15899,7 +15898,7 @@ async function initOrganizationSettingScreen() {
 }
 
 function switchOrgSettingTab(tab) {
-  const tabs = ["structure", "workloc", "role", "sso"];
+  const tabs = ["unit", "position", "level", "chart", "workloc", "role", "sso"];
   tabs.forEach(t => {
     const el = document.getElementById(`org-setting-tab-${t}`);
     const btn = document.getElementById(`tab-btn-org-${t}`);
@@ -15909,14 +15908,22 @@ function switchOrgSettingTab(tab) {
     }
     if (btn) {
       if (t === tab) {
-        btn.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm font-bold";
+        btn.className = "py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap bg-white text-indigo-700 shadow-sm border border-slate-200/80 font-bold shrink-0";
       } else {
-        btn.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold";
+        btn.className = "py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0";
       }
     }
   });
 
-  if (tab === "workloc") {
+  if (tab === "unit") {
+    loadOrgUnits();
+  } else if (tab === "position") {
+    loadOrgPositions();
+  } else if (tab === "level") {
+    loadOrgLevels();
+  } else if (tab === "chart") {
+    renderVisualOrgChartTree();
+  } else if (tab === "workloc") {
     loadWorkLocations();
   } else if (tab === "role") {
     loadOrgRolePermissions();
@@ -15927,32 +15934,7 @@ function switchOrgSettingTab(tab) {
 }
 
 function switchOrgStructureSubtab(sub) {
-  const subs = ["chart", "unit", "position", "level"];
-  subs.forEach(s => {
-    const el = document.getElementById(`org-subview-${s}`);
-    const btn = document.getElementById(`subtab-btn-${s}`);
-    if (el) {
-      if (s === sub) el.classList.remove("hidden");
-      else el.classList.add("hidden");
-    }
-    if (btn) {
-      if (s === sub) {
-        btn.className = "px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs whitespace-nowrap font-bold";
-      } else {
-        btn.className = "px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 whitespace-nowrap font-bold";
-      }
-    }
-  });
-
-  if (sub === "chart") {
-    renderVisualOrgChartTree();
-  } else if (sub === "unit") {
-    loadOrgUnits();
-  } else if (sub === "position") {
-    loadOrgPositions();
-  } else if (sub === "level") {
-    loadOrgLevels();
-  }
+  switchOrgSettingTab(sub);
 }
 
 // ---------------- 0. HELPER DATABASE CORE HR DUAL-TARGET (hr_* BASE TABLE & VIEW) ----------------
