@@ -15941,6 +15941,8 @@ function switchOrgStructureSubtab(sub) {
 async function upsertOrgCoreTable(baseName, payload, conflictCol) {
   if (!supabaseClient) return { success: false, error: "No Supabase client" };
   
+  let primaryError = null;
+
   // 1. Prioritaskan tabel fisik berprefix hr_* karena BASE TABLE mendukung penuh ON CONFLICT di PostgreSQL
   try {
     const { data, error } = await supabaseClient
@@ -15950,8 +15952,10 @@ async function upsertOrgCoreTable(baseName, payload, conflictCol) {
       console.log(`[Org Core HR] Berhasil simpan ke hr_${baseName}:`, payload[conflictCol]);
       return { success: true, data };
     }
+    primaryError = error;
     console.warn(`[Org Core HR] hr_${baseName} upsert returned:`, error);
   } catch (e) {
+    primaryError = e;
     console.warn(`[Org Core HR] Exception hr_${baseName}:`, e);
   }
 
@@ -15965,9 +15969,9 @@ async function upsertOrgCoreTable(baseName, payload, conflictCol) {
       return { success: true, data };
     }
     console.error(`[Org Core HR] Gagal simpan ke ${baseName}:`, error);
-    throw error;
+    throw (error || primaryError);
   } catch (e) {
-    throw e;
+    throw (e || primaryError);
   }
 }
 
@@ -16029,9 +16033,36 @@ async function updateOrgCoreTableActiveStatus(baseName, filterCol, filterVal, is
 // ---------------- 1. WORK LOCATION (TEMPAT KERJA FISIK) ----------------
 async function loadWorkLocations() {
   const container = document.getElementById("work-locations-list-container");
-  const data = await loadOrgCoreTable("work_locations", "id_work_location");
-  if (data !== null) {
-    ORG_WORK_LOCATIONS_DATA = data;
+  let data = await loadOrgCoreTable("work_locations", "id_work_location");
+  
+  // Jika tabel hr_work_locations kosong atau null, coba ambil dari m_work_location sebagai referensi
+  if (!data || data.length === 0) {
+    if (supabaseClient) {
+      try {
+        const { data: legacyLocs } = await supabaseClient.from("m_work_location").select("*");
+        if (legacyLocs && legacyLocs.length > 0) {
+          data = legacyLocs.map(l => ({
+            id_work_location: l.location_id || l.id_work_location,
+            nama_lokasi: l.name || l.nama_lokasi || l.location_id,
+            alamat_lengkap: l.address || l.alamat_lengkap || "-",
+            kota: l.kota || "-",
+            provinsi: l.provinsi || "-",
+            latitude: parseFloat(l.lat || l.latitude || 0),
+            longitude: parseFloat(l.long || l.longitude || 0),
+            radius_meter: parseInt(l.max_radius_meter || l.radius_meter || 100),
+            is_active: l.is_active !== false
+          }));
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (data !== null && data.length > 0) {
+    ORG_WORK_LOCATIONS_DATA = data.map(w => ({
+      ...w,
+      id_work_location: w.id_work_location || w.location_id,
+      nama_lokasi: w.nama_lokasi || w.name || w.id_work_location || w.location_id
+    }));
     renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
     return;
   }
@@ -16266,6 +16297,10 @@ async function handleSaveWorkLocation(e) {
 
 // ---------------- 2. UNIT ORGANISASI (HO, AREA, CABANG) ----------------
 async function loadOrgUnits() {
+  if (!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) {
+    await loadWorkLocations();
+  }
+
   const data = await loadOrgCoreTable("organization_units", "id_unit");
   if (data !== null) {
     ORG_UNITS_DATA = data;
@@ -16295,7 +16330,10 @@ function renderOrgUnitsList(list) {
     if (u.tipe_unit === "CABANG") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
 
     const parentUnit = list.find(p => p.id_unit === u.parent_unit_id);
-    const workLoc = (ORG_WORK_LOCATIONS_DATA || []).find(w => w.id_work_location === u.work_location_id);
+    const workLoc = (ORG_WORK_LOCATIONS_DATA || []).find(w => 
+      (w.id_work_location && w.id_work_location === u.work_location_id) ||
+      (w.location_id && w.location_id === u.work_location_id)
+    );
     const isActive = u.is_active !== false;
 
     return `
@@ -16309,7 +16347,7 @@ function renderOrgUnitsList(list) {
           <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${u.nama_unit}</h4>
           <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
             ${parentUnit ? `<span>Induk: <strong class="text-slate-700">${parentUnit.nama_unit}</strong></span><span>•</span>` : ''}
-            <span>Work Location: <strong class="text-emerald-700">${workLoc?.nama_lokasi || u.work_location_id || '-'}</strong></span>
+            <span>Work Location: <strong class="text-emerald-700">${workLoc?.nama_lokasi || workLoc?.name || u.work_location_id || '-'}</strong></span>
           </div>
         </div>
         <button type="button" onclick="openEditOrgUnitModal('${u.id_unit}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
@@ -16321,7 +16359,7 @@ function renderOrgUnitsList(list) {
   }).join("");
 }
 
-function openAddOrgUnitModal() {
+async function openAddOrgUnitModal() {
   CURRENT_EDIT_UNIT_ID = null;
   document.getElementById("orgunit-modal-title").innerText = "Tambah Unit Organisasi";
   const idInput = document.getElementById("unit-input-id");
@@ -16332,12 +16370,16 @@ function openAddOrgUnitModal() {
   if (document.getElementById("unit-input-status")) document.getElementById("unit-input-status").value = "true";
   document.getElementById("btn-delete-unit")?.classList.add("hidden");
 
+  if (!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) {
+    await loadWorkLocations();
+  }
+
   populateOrgUnitParentSelect("");
   populateOrgUnitWorkLocSelect("");
   document.getElementById("modal-orgunit-edit").classList.remove("hidden");
 }
 
-function openEditOrgUnitModal(id) {
+async function openEditOrgUnitModal(id) {
   const item = ORG_UNITS_DATA.find(u => u.id_unit === id);
   if (!item) return;
 
@@ -16350,6 +16392,10 @@ function openEditOrgUnitModal(id) {
   document.getElementById("unit-input-name").value = item.nama_unit || "";
   if (document.getElementById("unit-input-status")) document.getElementById("unit-input-status").value = (item.is_active !== false) ? "true" : "false";
   document.getElementById("btn-delete-unit")?.classList.remove("hidden");
+
+  if (!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) {
+    await loadWorkLocations();
+  }
 
   populateOrgUnitParentSelect(item.parent_unit_id, id);
   populateOrgUnitWorkLocSelect(item.work_location_id);
@@ -16391,30 +16437,30 @@ async function handleDeleteOrgUnit(id) {
       }
     }
 
-    // 3. Cek karyawan di unit ini (hr_employees.location_id)
+    // 3. Cek karyawan aktif yang bertugas di unit ini (location_id)
     let employees = [];
     if (supabaseClient) {
       try {
-        const { data: empData } = await supabaseClient.from("hr_employees").select("id, nip, name").eq("location_id", id);
-        if (empData && empData.length > 0) employees = empData;
+        const { data: eData } = await supabaseClient.from("hr_employees").select("nip, name").eq("location_id", id).is("deleted_at", null);
+        if (eData && eData.length > 0) employees = eData;
       } catch (e) {
         try {
-          const { data: empData } = await supabaseClient.from("employees").select("id, nip, name").eq("location_id", id);
-          if (empData && empData.length > 0) employees = empData;
+          const { data: eData } = await supabaseClient.from("employees").select("nip, name").eq("location_id", id).is("deleted_at", null);
+          if (eData && eData.length > 0) employees = eData;
         } catch (err) {}
       }
     }
 
-    const isUsed = childUnits.length > 0 || positions.length > 0 || employees.length > 0;
+    const hasUsage = (childUnits.length > 0) || (positions.length > 0) || (employees.length > 0);
 
-    if (isUsed) {
-      // KONDISI 1: DIGUNAKAN DI TABEL LAIN -> UBAH JADI NONAKTIF (SOFT DELETE)
-      let reasons = [];
+    if (hasUsage) {
+      // KONDISI 1: SEDANG DIGUNAKAN -> HANYA SOFT DELETE / NONAKTIFKAN
+      const reasons = [];
       if (childUnits.length > 0) {
-        reasons.push(`${childUnits.length} Sub-Unit Bawahan (${childUnits.slice(0, 3).map(u => u.nama_unit || u.id_unit).join(", ")})`);
+        reasons.push(`${childUnits.length} Sub-Unit (${childUnits.slice(0, 3).map(c => c.nama_unit || c.id_unit).join(", ")})`);
       }
       if (positions.length > 0) {
-        reasons.push(`${positions.length} Posisi Jabatan (${positions.slice(0, 3).map(p => p.nama_jabatan || p.id_position).join(", ")})`);
+        reasons.push(`${positions.length} Jabatan (${positions.slice(0, 3).map(p => p.nama_jabatan || p.id_position).join(", ")})`);
       }
       if (employees.length > 0) {
         reasons.push(`${employees.length} Karyawan (${employees.slice(0, 3).map(e => e.name || e.nip).join(", ")})`);
@@ -16475,9 +16521,12 @@ function populateOrgUnitWorkLocSelect(selectedId = "") {
   const select = document.getElementById("unit-input-workloc");
   if (!select) return;
 
-  select.innerHTML = '<option value="">- Pilih Work Location -</option>' + (ORG_WORK_LOCATIONS_DATA || []).map(w => {
+  select.innerHTML = '<option value="">- Tidak Ada / Belum Ditentukan -</option>' + (ORG_WORK_LOCATIONS_DATA || []).map(w => {
+    const idLoc = w.id_work_location || w.location_id;
+    const nameLoc = w.nama_lokasi || w.name || idLoc;
     const nonaktifTag = w.is_active === false ? ' [NONAKTIF]' : '';
-    return `<option value="${w.id_work_location}" ${w.id_work_location === selectedId ? 'selected' : ''}>${w.nama_lokasi} (${w.id_work_location})${nonaktifTag}</option>`;
+    const isSelected = (idLoc === selectedId || w.location_id === selectedId);
+    return `<option value="${idLoc}" ${isSelected ? 'selected' : ''}>${nameLoc} (${idLoc})${nonaktifTag}</option>`;
   }).join("");
 }
 
@@ -16487,8 +16536,39 @@ async function handleSaveOrgUnit(e) {
   const tipe = document.getElementById("unit-input-tipe").value;
   const name = document.getElementById("unit-input-name").value.trim();
   const parent = document.getElementById("unit-input-parent").value || null;
-  const workloc = document.getElementById("unit-input-workloc").value || null;
+  let workloc = document.getElementById("unit-input-workloc").value || null;
   const isActive = document.getElementById("unit-input-status") ? (document.getElementById("unit-input-status").value !== "false") : true;
+
+  // Pastikan jika nilai string kosong atau "null" diubah menjadi null murni
+  if (!workloc || workloc === "" || workloc === "null" || workloc === "undefined") {
+    workloc = null;
+  }
+
+  // Jika workloc dipilih, pastikan record tempat kerja tersebut sudah ada di tabel hr_work_locations
+  // demi mencegah pelanggaran Foreign Key Constraint PostgreSQL
+  if (workloc && supabaseClient) {
+    try {
+      const matchLoc = (ORG_WORK_LOCATIONS_DATA || []).find(w => (w.id_work_location === workloc || w.location_id === workloc));
+      if (matchLoc) {
+        // Upsert sinkronisasi ke hr_work_locations jika belum tersimpan
+        const locPayload = {
+          id_work_location: workloc,
+          nama_lokasi: matchLoc.nama_lokasi || matchLoc.name || workloc,
+          alamat_lengkap: matchLoc.alamat_lengkap || matchLoc.address || "-",
+          kota: matchLoc.kota || "-",
+          provinsi: matchLoc.provinsi || "-",
+          latitude: parseFloat(matchLoc.latitude || matchLoc.lat || 0),
+          longitude: parseFloat(matchLoc.longitude || matchLoc.long || 0),
+          radius_meter: parseInt(matchLoc.radius_meter || matchLoc.max_radius_meter || 100),
+          is_active: matchLoc.is_active !== false,
+          updated_at: new Date().toISOString()
+        };
+        await supabaseClient.from("hr_work_locations").upsert(locPayload, { onConflict: "id_work_location" });
+      }
+    } catch (locSyncErr) {
+      console.warn("[Org Unit] Sinkronisasi referensi work location warning:", locSyncErr);
+    }
+  }
 
   const payload = {
     id_unit: id,
@@ -16517,7 +16597,12 @@ async function handleSaveOrgUnit(e) {
     closeOrgUnitModal();
     showToast("Unit organisasi berhasil disimpan ke database!", "success", 1500);
   } catch (err) {
-    alert("Gagal menyimpan unit: " + err.message);
+    console.error("[Org Unit] Gagal simpan:", err);
+    let errorMsg = err.message || JSON.stringify(err);
+    if (errorMsg.includes("foreign key") || errorMsg.includes("violates foreign key constraint")) {
+      errorMsg = `Gagal menyimpan: Tempat kerja (${workloc}) belum terdaftar atau terhapus di master Work Location. Silakan daftarkan lokasi fisik terlebih dahulu pada tab "Work Location".`;
+    }
+    alert("Gagal menyimpan unit: " + errorMsg);
   } finally {
     btn.innerHTML = origText;
     btn.disabled = false;
