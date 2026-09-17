@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260917_v121";
+const APP_BUILD_VERSION = "20260917_v122";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -11816,20 +11816,19 @@ async function loadActivityHistory(forceRefresh = false) {
   }
 
   try {
-    const isSuper = CURRENT_USER?.role === "SUPER_ADMIN" || CURRENT_USER?.role === "SUPERVISOR" || CURRENT_USER?.role === "DIREKSI" || CURRENT_USER?.role === "SUPERADMIN";
     const userNip = CURRENT_USER?.nip || null;
 
-    // 1. Query Visit Mitra
+    // 1. Query Visit Mitra (Murni Self-Review Aktivitas Pribadi)
     let qVisit = supabaseClient.from("tr_laporan_visit").select("*").order("created_at", { ascending: false }).limit(100);
-    if (!isSuper && userNip) qVisit = qVisit.eq("nip", userNip);
+    if (userNip) qVisit = qVisit.eq("nip", userNip);
 
     // 2. Query Calon Mitra
     let qOnb = supabaseClient.from("tr_onboarding_log").select("*").order("created_at", { ascending: false }).limit(100);
-    if (!isSuper && userNip) qOnb = qOnb.eq("nip", userNip);
+    if (userNip) qOnb = qOnb.eq("nip", userNip);
 
     // 3. Query GPS Maintenance
     let qGps = supabaseClient.from("tr_gps_maintenance").select("*").order("created_at", { ascending: false }).limit(100);
-    if (!isSuper && userNip) qGps = qGps.eq("nip", userNip);
+    if (userNip) qGps = qGps.eq("nip", userNip);
 
     const [resVisit, resOnb, resGps] = await Promise.all([qVisit, qOnb, qGps]);
 
@@ -12011,7 +12010,8 @@ function parseCatatanUnit(str) {
     infoList: [],
     infoLainnya: "",
     ovdPlan: "",
-    komitmen: "Tidak Ada"
+    komitmen: "Tidak Ada",
+    tglKomitmen: ""
   };
   if (!str) return result;
   
@@ -12042,11 +12042,44 @@ function parseCatatanUnit(str) {
       if (val !== "-") result.ovdPlan = val;
     } else if (p.startsWith("Komitmen:")) {
       const val = p.replace("Komitmen:", "").trim();
-      if (val && val !== "-") result.komitmen = val;
+      if (val && val !== "-") {
+        const tglMatch = val.match(/\(Tgl:\s*([^\)]+)\)/i);
+        if (tglMatch) {
+          result.tglKomitmen = tglMatch[1].trim();
+          result.komitmen = val.replace(/\(Tgl:[^\)]+\)/i, "").trim();
+        } else {
+          result.komitmen = val;
+        }
+      }
+    } else if (p.startsWith("Tgl Komitmen:")) {
+      const val = p.replace("Tgl Komitmen:", "").trim();
+      if (val && val !== "-") result.tglKomitmen = val;
     }
   });
 
   return result;
+}
+
+function toggleHistUnitAccordion(checkId) {
+  const body = document.getElementById(`hist-unit-body-${checkId}`);
+  const chevron = document.getElementById(`hist-unit-chevron-${checkId}`);
+  if (!body) return;
+  
+  const isHidden = body.classList.contains("hidden");
+  if (isHidden) {
+    body.classList.remove("hidden");
+    if (chevron) chevron.classList.add("rotate-180");
+    // Scroll mulus ke elemen kartu unit agar langsung terlihat detail inputan sebelumnya
+    setTimeout(() => {
+      const card = body.closest(".hist-unit-card");
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 80);
+  } else {
+    body.classList.add("hidden");
+    if (chevron) chevron.classList.remove("rotate-180");
+  }
 }
 
 function toggleHistUnitAda(val, checkId) {
@@ -12060,6 +12093,19 @@ function toggleHistUnitAda(val, checkId) {
   }
 }
 
+function onHistIndikasiPresetChange(val, checkId) {
+  const boxCustom = document.getElementById(`box-hist-indikasi-custom-${checkId}`);
+  const inputCustom = document.getElementById(`input-hist-indikasi-custom-${checkId}`);
+  if (boxCustom) {
+    if (val === "Lainnya") {
+      boxCustom.classList.remove("hidden");
+      if (inputCustom) inputCustom.focus();
+    } else {
+      boxCustom.classList.add("hidden");
+    }
+  }
+}
+
 function toggleHistUnitLainnya(chk, checkId) {
   const boxLainnya = document.getElementById(`box-hist-info-lainnya-${checkId}`);
   if (boxLainnya) {
@@ -12067,6 +12113,63 @@ function toggleHistUnitLainnya(chk, checkId) {
       boxLainnya.classList.remove("hidden");
     } else {
       boxLainnya.classList.add("hidden");
+    }
+  }
+}
+
+function toggleHistLokasiChange(val) {
+  const boxCustom = document.getElementById("box-hist-lokasi-custom");
+  const inputCustom = document.getElementById("input-hist-lokasi-custom");
+  if (boxCustom) {
+    if (val === "Lainnya") {
+      boxCustom.classList.remove("hidden");
+      if (inputCustom) inputCustom.focus();
+    } else {
+      boxCustom.classList.add("hidden");
+    }
+  }
+}
+
+function toggleHistBertemuChange(val) {
+  const boxCustom = document.getElementById("box-hist-bertemu-custom");
+  const inputCustom = document.getElementById("input-hist-bertemu-custom");
+  const boxReason = document.getElementById("box-hist-bertemu-reason");
+  
+  if (boxCustom) {
+    if (val === "Lainnya") {
+      boxCustom.classList.remove("hidden");
+      if (inputCustom) inputCustom.focus();
+    } else {
+      boxCustom.classList.add("hidden");
+    }
+  }
+
+  if (boxReason) {
+    if (val === "Tidak Bertemu") {
+      boxReason.classList.remove("hidden");
+    } else {
+      boxReason.classList.add("hidden");
+    }
+  }
+}
+
+function toggleHistNoInfo(checked) {
+  const inputStock = document.getElementById("edit-visit-stock");
+  const inputSales = document.getElementById("edit-visit-sales");
+  const boxInputs = document.getElementById("box-hist-showroom-inputs");
+  if (inputStock && inputSales) {
+    if (checked) {
+      inputStock.disabled = true;
+      inputSales.disabled = true;
+      inputStock.value = "-";
+      inputSales.value = "-";
+      if (boxInputs) boxInputs.classList.add("opacity-50", "pointer-events-none");
+    } else {
+      inputStock.disabled = false;
+      inputSales.disabled = false;
+      if (inputStock.value === "-") inputStock.value = "0";
+      if (inputSales.value === "-") inputSales.value = "0";
+      if (boxInputs) boxInputs.classList.remove("opacity-50", "pointer-events-none");
     }
   }
 }
@@ -12198,15 +12301,46 @@ async function openActivityDetailModal(type, id) {
     }
 
     const raw = item.raw || {};
+
+    // Evaluasi Lokasi Kunjungan
+    const lokasiVal = raw.lokasi || "Showroom";
+    const LOKASI_PRESETS = ["Showroom", "Rumah Owner", "Janjian Diluar"];
+    const isPresetLokasi = LOKASI_PRESETS.includes(lokasiVal);
+    const isCustomLokasi = !isPresetLokasi && lokasiVal !== "";
+
+    // Evaluasi Pihak yang Ditemui
+    const bertemuVal = raw.bertemu_owner || "Owner";
+    const BERTEMU_PRESETS = ["Owner", "Pekerja", "Penanggung Jawab", "Tidak Bertemu"];
+    const isPresetBertemu = BERTEMU_PRESETS.includes(bertemuVal);
+    const isCustomBertemu = !isPresetBertemu && bertemuVal !== "";
+
+    // Evaluasi Segmen 2 (Tidak Ada Informasi)
+    const isNoInfo = (raw.stock === "-" || raw.sales === "-" || raw.stock === null || (raw.stock === 0 && raw.sales === 0 && String(raw.catatan_visit || '').includes('Tidak Ada Informasi')));
+    const stockDisplay = isNoInfo ? "-" : (raw.stock !== undefined && raw.stock !== null ? raw.stock : "0");
+    const salesDisplay = isNoInfo ? "-" : (raw.sales !== undefined && raw.sales !== null ? raw.sales : "0");
+
     let unitsHtml = "";
     if (checkedUnits.length > 0) {
+      const INDIKASI_PRESETS = [
+        "Showroom Lain",
+        "Gudang",
+        "Dealer Lain",
+        "Dibawa Karyawan",
+        "Dibawa Rekanan",
+        "Unit Dipembeli"
+      ];
+
       unitsHtml = `
-        <div class="mt-3 pt-3 border-t border-slate-200 space-y-2.5">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-slate-800 block">Checklist Unit yang Dikunjungi (${checkedUnits.length} Unit):</span>
-            <span class="text-[10px] text-slate-400">Status, checklist & plan</span>
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+            <div class="flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">3</span>
+              <h5 class="text-xs font-bold text-slate-800 uppercase">Pemeriksaan Unit Fasilitas (${checkedUnits.length} Unit)</h5>
+            </div>
+            <span class="text-[9px] text-slate-400 font-semibold">Klik unit untuk buka detail</span>
           </div>
-          <div class="space-y-3">
+
+          <div class="space-y-2">
             ${checkedUnits.map((u, idx) => {
               const parsed = parseCatatanUnit(u.catatan_unit);
               const checkId = u.check_id || u.id;
@@ -12215,78 +12349,141 @@ async function openActivityDetailModal(type, id) {
               const gpsMatchVal = (u.kondisi_unit === "Tidak Sesuai" || u.kondisi_unit === "Tidak") ? "Tidak Sesuai" : "Ya, Sesuai";
               const hasLainnya = parsed.infoList.includes("Lainnya") || (parsed.infoLainnya && parsed.infoLainnya.trim() !== "");
 
+              // Deteksi apakah unit Overdue
+              let isOvd = false;
+              const matchedDealer = MASTER_DEALER_PRIORITY_DATA.find(d => 
+                d.dealer_name === item.title || 
+                (item.raw && d.dealer_id === item.raw.dealer_id)
+              );
+              if (matchedDealer && matchedDealer.units) {
+                const matchedUnit = matchedDealer.units.find(mu => 
+                  (u.no_fasilitas && mu.no_fasilitas === u.no_fasilitas) || 
+                  (u.nopol && mu.nopol === u.nopol)
+                );
+                if (matchedUnit) {
+                  isOvd = !!(matchedUnit.is_ovd || matchedUnit.ovd_days > 0 || (matchedUnit.aging_ovd && matchedUnit.aging_ovd > 0));
+                }
+              }
+              if (!isOvd && (parsed.ovdPlan || (parsed.komitmen && parsed.komitmen !== "Tidak Ada" && parsed.komitmen !== "-") || parsed.tglKomitmen)) {
+                isOvd = true;
+              }
+
+              const isPresetIndikasi = INDIKASI_PRESETS.includes(parsed.indikasi);
+              const isCustomIndikasi = parsed.indikasi && !isPresetIndikasi;
+
               return `
-                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5 hist-unit-card" data-check-id="${checkId}">
-                  <!-- Unit Header -->
-                  <div class="flex justify-between items-start">
-                    <div class="min-w-0">
-                      <span class="font-bold text-xs text-slate-900 block leading-tight">${idx + 1}. ${u.nopol || 'Unit'} - ${u.unit_desc || ''}</span>
-                      <span class="text-[10px] text-slate-400 font-mono">${u.no_fasilitas || '-'}</span>
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden hist-unit-card transition" data-check-id="${checkId}" data-is-ovd="${isOvd}">
+                  <!-- Accordion Header (Clickable) -->
+                  <div onclick="toggleHistUnitAccordion('${checkId}')" class="p-3 bg-slate-50/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between gap-2 transition select-none">
+                    <div class="flex items-center space-x-2.5 min-w-0">
+                      <div class="w-7 h-7 rounded-xl ${isOvd ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'} flex items-center justify-center text-xs font-bold shrink-0">
+                        ${idx + 1}
+                      </div>
+                      <div class="min-w-0">
+                        <div class="flex items-center space-x-1.5 flex-wrap">
+                          <span class="font-bold text-xs text-slate-900 leading-tight">${u.nopol || 'Unit'}</span>
+                          <span class="text-[9px] px-1.5 py-0.2 rounded font-extrabold ${isOvd ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}">
+                            ${isOvd ? 'OVERDUE' : 'LANCAR'}
+                          </span>
+                          <span class="text-[9px] px-1.5 py-0.2 rounded font-bold ${isAda ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}">
+                            ${isAda ? 'Terlihat' : 'Tidak Terlihat'}
+                          </span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 truncate mt-0.5">${u.unit_desc || ''} ${u.no_fasilitas ? '• ' + u.no_fasilitas : ''}</div>
+                      </div>
                     </div>
-                    ${u.foto_unit_url ? `
-                      <a href="${u.foto_unit_url}" target="_blank" class="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 bg-slate-200 shrink-0 block hover:opacity-80 transition" title="Lihat Foto Fisik Unit">
-                        <img src="${u.foto_unit_url}" alt="Foto Unit" class="w-full h-full object-cover" />
-                      </a>
-                    ` : ''}
-                  </div>
-
-                  <!-- 1. Status Keberadaan Unit -->
-                  <div class="space-y-1">
-                    <label class="block text-[10px] font-bold text-slate-600">Apakah Unit Terlihat di Lokasi?</label>
-                    <select ${isReadOnly ? 'disabled' : ''} onchange="toggleHistUnitAda(this.value, '${checkId}')" class="hist-unit-ada w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                      <option value="Ya, Terlihat" ${statusVal === 'Ya, Terlihat' ? 'selected' : ''}>Ya, Terlihat</option>
-                      <option value="Tidak Terlihat" ${statusVal === 'Tidak Terlihat' ? 'selected' : ''}>Tidak Terlihat</option>
-                    </select>
-                  </div>
-
-                  <!-- Indikasi Keberadaan (Tampil jika Tidak Terlihat) -->
-                  <div id="box-hist-indikasi-${checkId}" class="${statusVal === 'Tidak Terlihat' ? '' : 'hidden'} p-2 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
-                    <label class="block text-[10px] font-bold text-amber-900">Indikasi Keberadaan Unit:</label>
-                    <input type="text" ${isReadOnly ? 'disabled' : ''} value="${parsed.indikasi}" placeholder="Contoh: Unit dipinjam owner / test drive" class="hist-unit-indikasi w-full bg-white border border-amber-300 rounded-lg p-1.5 text-xs text-slate-800" />
-                  </div>
-
-                  <!-- 2. Titik GPS Sesuai Lokasi Visit? -->
-                  <div class="space-y-1">
-                    <label class="block text-[10px] font-bold text-slate-600">Titik GPS Sesuai Lokasi Visit?</label>
-                    <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-gps-match w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                      <option value="Ya, Sesuai" ${gpsMatchVal === 'Ya, Sesuai' ? 'selected' : ''}>Ya, Sesuai</option>
-                      <option value="Tidak Sesuai" ${gpsMatchVal === 'Tidak Sesuai' ? 'selected' : ''}>Tidak Sesuai</option>
-                    </select>
-                  </div>
-
-                  <!-- 3. Info Status Unit (Multi Checkbox + Lainnya Free Text) -->
-                  <div class="space-y-1.5">
-                    <label class="block text-[10px] font-bold text-slate-600">Info Status Unit (Bisa Pilih >1):</label>
-                    <div class="grid grid-cols-2 gap-1.5 bg-white p-2.5 rounded-xl border border-slate-200 text-[11px]">
-                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Perpanjang" ${parsed.infoList.includes('Plan Perpanjang') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Perpanjang</span></label>
-                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Pelunasan" ${parsed.infoList.includes('Plan Pelunasan') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Pelunasan</span></label>
-                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Ada Calon Pembeli" ${parsed.infoList.includes('Ada Calon Pembeli') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Ada Calon Pembeli</span></label>
-                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Proses Kredit" ${parsed.infoList.includes('Proses Kredit') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Proses Kredit</span></label>
-                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Cash Tempo" ${parsed.infoList.includes('Unit Cash Tempo') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Unit Cash Tempo</span></label>
-                      <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Milik Orang Lain" ${parsed.infoList.includes('Unit Milik Orang Lain') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Milik Orang Lain</span></label>
-                      <label class="flex items-center space-x-1.5 col-span-2"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Lainnya" ${hasLainnya ? 'checked' : ''} onchange="toggleHistUnitLainnya(this, '${checkId}')" class="hist-unit-info-chk hist-unit-info-lainnya-chk rounded text-slate-900" /> <span class="font-semibold text-slate-800">Lainnya (Free Text)</span></label>
-                    </div>
-                    <div id="box-hist-info-lainnya-${checkId}" class="${hasLainnya ? '' : 'hidden'} mt-1.5">
-                      <input type="text" ${isReadOnly ? 'disabled' : ''} value="${parsed.infoLainnya}" placeholder="Sebutkan info status unit lainnya..." class="hist-unit-info-lainnya w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400" />
+                    <div class="flex items-center space-x-2 shrink-0">
+                      ${u.foto_unit_url ? `
+                        <a href="${u.foto_unit_url}" target="_blank" onclick="event.stopPropagation()" class="w-8 h-8 rounded-lg overflow-hidden border border-slate-300 bg-slate-200 shrink-0 block hover:opacity-80 transition" title="Lihat Foto Fisik Unit">
+                          <img src="${u.foto_unit_url}" alt="Foto Unit" class="w-full h-full object-cover" />
+                        </a>
+                      ` : ''}
+                      <button type="button" class="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 transition">
+                        <i id="hist-unit-chevron-${checkId}" class="fa-solid fa-chevron-down text-xs transition-transform duration-200"></i>
+                      </button>
                     </div>
                   </div>
 
-                  <!-- 4. Plan Penyelesaian Overdue & Komitmen -->
-                  <div class="space-y-2 pt-1 border-t border-slate-200">
-                    <div class="p-2.5 bg-red-50/60 rounded-xl border border-red-200 space-y-1">
-                      <label class="block font-bold text-red-900 text-[10px]">Plan Penyelesaian Overdue (Free Text):</label>
-                      <textarea ${isReadOnly ? 'disabled' : ''} rows="2" placeholder="Rencana penanganan pelunasan unit..." class="hist-unit-ovd-plan w-full bg-white border border-red-300 rounded-lg p-2 text-xs text-slate-800 focus:ring-2 focus:ring-red-500">${parsed.ovdPlan}</textarea>
-                    </div>
-
+                  <!-- Accordion Body (Detail Inputan, Hidden by Default) -->
+                  <div id="hist-unit-body-${checkId}" class="hidden p-3.5 space-y-3 bg-white border-t border-slate-100">
+                    <!-- 1. Status Keberadaan Unit -->
                     <div>
-                      <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Komitmen Pembayaran:</label>
-                      <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-komitmen w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                        <option value="Tidak Ada" ${parsed.komitmen === 'Tidak Ada' ? 'selected' : ''}>Tidak Ada Komitmen</option>
-                        <option value="Sudah Bayar" ${parsed.komitmen === 'Sudah Bayar' ? 'selected' : ''}>Sudah Bayar</option>
-                        <option value="Bayar" ${parsed.komitmen === 'Bayar' ? 'selected' : ''}>Bayar</option>
-                        <option value="Serahkan Unit" ${parsed.komitmen === 'Serahkan Unit' ? 'selected' : ''}>Serahkan Unit</option>
+                      <label class="block text-[10px] font-bold text-slate-600 mb-1">Apakah Unit Terlihat di Lokasi?</label>
+                      <select ${isReadOnly ? 'disabled' : ''} onchange="toggleHistUnitAda(this.value, '${checkId}')" class="hist-unit-ada w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                        <option value="Ya, Terlihat" ${statusVal === 'Ya, Terlihat' ? 'selected' : ''}>Ya, Terlihat</option>
+                        <option value="Tidak Terlihat" ${statusVal === 'Tidak Terlihat' ? 'selected' : ''}>Tidak Terlihat</option>
                       </select>
                     </div>
+
+                    <!-- Indikasi Keberadaan (Tampil jika Tidak Terlihat) -->
+                    <div id="box-hist-indikasi-${checkId}" class="${statusVal === 'Tidak Terlihat' ? '' : 'hidden'} p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                      <label class="block text-[10px] font-bold text-amber-950">Indikasi Keberadaan Unit:</label>
+                      <select ${isReadOnly ? 'disabled' : ''} onchange="onHistIndikasiPresetChange(this.value, '${checkId}')" class="hist-unit-indikasi-select w-full bg-white border border-amber-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500">
+                        <option value="">-- Pilih Indikasi Keberadaan --</option>
+                        ${INDIKASI_PRESETS.map(preset => `
+                          <option value="${preset}" ${parsed.indikasi === preset ? 'selected' : ''}>${preset}</option>
+                        `).join('')}
+                        <option value="Lainnya" ${isCustomIndikasi ? 'selected' : ''}>Lainnya (Ketik Bebas)</option>
+                      </select>
+                      <div id="box-hist-indikasi-custom-${checkId}" class="${isCustomIndikasi ? '' : 'hidden'}">
+                        <input type="text" id="input-hist-indikasi-custom-${checkId}" ${isReadOnly ? 'disabled' : ''} value="${isCustomIndikasi ? parsed.indikasi : ''}" placeholder="Ketik indikasi keberadaan unit..." class="hist-unit-indikasi-custom w-full bg-white border border-amber-300 rounded-xl p-2 text-xs text-slate-800 font-semibold placeholder-slate-400" />
+                      </div>
+                    </div>
+
+                    <!-- 2. Titik GPS Sesuai Lokasi Visit? -->
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-600 mb-1">Titik GPS Sesuai Lokasi Visit?</label>
+                      <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-gps-match w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                        <option value="Ya, Sesuai" ${gpsMatchVal === 'Ya, Sesuai' ? 'selected' : ''}>Ya, Sesuai</option>
+                        <option value="Tidak Sesuai" ${gpsMatchVal === 'Tidak Sesuai' ? 'selected' : ''}>Tidak Sesuai</option>
+                      </select>
+                    </div>
+
+                    <!-- 3. Info Status Unit (Multi Checkbox + Lainnya Free Text) -->
+                    <div class="space-y-1.5">
+                      <label class="block text-[10px] font-bold text-slate-600">Info Status Unit (Bisa Pilih > 1):</label>
+                      <div class="grid grid-cols-2 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px]">
+                        <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Perpanjang" ${parsed.infoList.includes('Plan Perpanjang') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Perpanjang</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Pelunasan" ${parsed.infoList.includes('Plan Pelunasan') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Pelunasan</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Ada Calon Pembeli" ${parsed.infoList.includes('Ada Calon Pembeli') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Ada Calon Pembeli</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Proses Kredit" ${parsed.infoList.includes('Proses Kredit') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Proses Kredit</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Cash Tempo" ${parsed.infoList.includes('Unit Cash Tempo') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Unit Cash Tempo</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Milik Orang Lain" ${parsed.infoList.includes('Unit Milik Orang Lain') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Milik Orang Lain</span></label>
+                        <label class="flex items-center space-x-1.5 col-span-2"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Lainnya" ${hasLainnya ? 'checked' : ''} onchange="toggleHistUnitLainnya(this, '${checkId}')" class="hist-unit-info-chk hist-unit-info-lainnya-chk rounded text-slate-900" /> <span class="font-semibold text-slate-800">Lainnya (Free Text)</span></label>
+                      </div>
+                      <div id="box-hist-info-lainnya-${checkId}" class="${hasLainnya ? '' : 'hidden'} mt-1.5">
+                        <input type="text" ${isReadOnly ? 'disabled' : ''} value="${parsed.infoLainnya}" placeholder="Sebutkan info status unit lainnya..." class="hist-unit-info-lainnya w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400" />
+                      </div>
+                    </div>
+
+                    <!-- 4. Plan Penyelesaian Overdue & Komitmen (HANYA MUNCUL JIKA isOvd === true) -->
+                    ${isOvd ? `
+                      <div class="space-y-2 pt-2 border-t border-rose-100 bg-rose-50/50 p-2.5 rounded-xl border border-rose-200/80">
+                        <div class="flex items-center space-x-1.5 text-rose-900 font-bold text-xs">
+                          <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
+                          <span>Penanganan Unit Overdue</span>
+                        </div>
+                        <div>
+                          <label class="block font-bold text-rose-950 text-[10px] mb-1">Plan Penyelesaian Overdue (Free Text):</label>
+                          <textarea ${isReadOnly ? 'disabled' : ''} rows="2" placeholder="Rencana penanganan pelunasan unit..." class="hist-unit-ovd-plan w-full bg-white border border-rose-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-rose-500">${parsed.ovdPlan || ''}</textarea>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label class="block text-[10px] font-bold text-slate-700 mb-1">Komitmen Pembayaran:</label>
+                            <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-komitmen w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                              <option value="Tidak Ada" ${parsed.komitmen === 'Tidak Ada' || !parsed.komitmen ? 'selected' : ''}>Tidak Ada Komitmen</option>
+                              <option value="Sudah Bayar" ${parsed.komitmen === 'Sudah Bayar' ? 'selected' : ''}>Sudah Bayar</option>
+                              <option value="Bayar" ${parsed.komitmen === 'Bayar' ? 'selected' : ''}>Bayar</option>
+                              <option value="Serahkan Unit" ${parsed.komitmen === 'Serahkan Unit' ? 'selected' : ''}>Serahkan Unit</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label class="block text-[10px] font-bold text-slate-700 mb-1">Tanggal Komitmen:</label>
+                            <input type="date" ${isReadOnly ? 'disabled' : ''} value="${parsed.tglKomitmen || ''}" class="hist-unit-tgl-komitmen w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800" />
+                          </div>
+                        </div>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
               `;
@@ -12297,59 +12494,114 @@ async function openActivityDetailModal(type, id) {
     }
 
     fieldsContainer.innerHTML = `
-      <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Bertemu Owner:</label>
-            <select id="edit-visit-bertemu" ${disabledAttr}>
-              <option value="Ya" ${raw.bertemu_owner === 'Ya' ? 'selected' : ''}>Ya</option>
-              <option value="Tidak" ${raw.bertemu_owner === 'Tidak' ? 'selected' : ''}>Tidak</option>
-            </select>
+      <div class="space-y-3.5">
+        <!-- 1. Lokasi & Pihak yang Ditemui -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="flex items-center space-x-1.5 border-b border-slate-200/60 pb-1.5">
+            <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">1</span>
+            <h5 class="text-xs font-bold text-slate-800 uppercase">Lokasi & Pihak yang Ditemui</h5>
           </div>
-          <div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Lokasi Kunjungan -->
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Lokasi Kunjungan:</label>
+              <select id="edit-visit-lokasi-select" onchange="toggleHistLokasiChange(this.value)" ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                <option value="Showroom" ${lokasiVal === 'Showroom' ? 'selected' : ''}>Showroom</option>
+                <option value="Rumah Owner" ${lokasiVal === 'Rumah Owner' ? 'selected' : ''}>Rumah Owner</option>
+                <option value="Janjian Diluar" ${lokasiVal === 'Janjian Diluar' ? 'selected' : ''}>Janjian Diluar</option>
+                <option value="Lainnya" ${isCustomLokasi ? 'selected' : ''}>Lainnya (Ketik Lokasi)</option>
+              </select>
+              <div id="box-hist-lokasi-custom" class="${isCustomLokasi ? '' : 'hidden'} mt-1.5">
+                <input type="text" id="input-hist-lokasi-custom" value="${isCustomLokasi ? lokasiVal : ''}" placeholder="Ketik lokasi khusus..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400 font-semibold" />
+              </div>
+            </div>
+
+            <!-- Pihak yang Ditemui -->
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Pihak yang Ditemui:</label>
+              <select id="edit-visit-bertemu-select" onchange="toggleHistBertemuChange(this.value)" ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
+                <option value="Owner" ${bertemuVal === 'Owner' ? 'selected' : ''}>Owner</option>
+                <option value="Pekerja" ${bertemuVal === 'Pekerja' ? 'selected' : ''}>Pekerja</option>
+                <option value="Penanggung Jawab" ${bertemuVal === 'Penanggung Jawab' ? 'selected' : ''}>Penanggung Jawab</option>
+                <option value="Tidak Bertemu" ${bertemuVal === 'Tidak Bertemu' ? 'selected' : ''}>Tidak Bertemu</option>
+                <option value="Lainnya" ${isCustomBertemu ? 'selected' : ''}>Lainnya (Ketik Pihak)</option>
+              </select>
+              <div id="box-hist-bertemu-custom" class="${isCustomBertemu ? '' : 'hidden'} mt-1.5">
+                <input type="text" id="input-hist-bertemu-custom" value="${isCustomBertemu ? bertemuVal : ''}" placeholder="Ketik pihak yang ditemui..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400 font-semibold" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Alasan Tidak Bertemu (Jika Tidak Bertemu) -->
+          <div id="box-hist-bertemu-reason" class="${bertemuVal === 'Tidak Bertemu' ? '' : 'hidden'}">
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Alasan Tidak Bertemu:</label>
-            <input type="text" id="edit-visit-reason" value="${raw.owner_reason || ''}" placeholder="Jika tidak bertemu" ${disabledAttr} />
+            <input type="text" id="edit-visit-reason" value="${raw.owner_reason || ''}" placeholder="Contoh: Showroom tutup / owner sedang keluar kota" ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800" />
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Total Stok Unit:</label>
-            <input type="number" id="edit-visit-stock" value="${raw.stock || 0}" ${disabledAttr} />
+        <!-- 2. Kondisi Showroom & Wawancara (Segmen 2) -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+            <div class="flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">2</span>
+              <h5 class="text-xs font-bold text-slate-800 uppercase">Kondisi Showroom & Wawancara</h5>
+            </div>
+            <label class="inline-flex items-center space-x-1.5 cursor-pointer select-none">
+              <input type="checkbox" id="edit-visit-toggle-no-info" onchange="toggleHistNoInfo(this.checked)" ${isNoInfo ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="rounded text-slate-900" />
+              <span class="text-[10px] font-bold text-slate-600">Tidak Ada Informasi</span>
+            </label>
           </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Total Sales Bulanan:</label>
-            <input type="number" id="edit-visit-sales" value="${raw.sales || 0}" ${disabledAttr} />
+
+          <div id="box-hist-showroom-inputs" class="grid grid-cols-2 gap-2 ${isNoInfo ? 'opacity-50 pointer-events-none' : ''}">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Jumlah Stok Unit (Showroom):</label>
+              <input type="text" id="edit-visit-stock" value="${stockDisplay}" ${isNoInfo || isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Penjualan Bulan Ini:</label>
+              <input type="text" id="edit-visit-sales" value="${salesDisplay}" ${isNoInfo || isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800" />
+            </div>
           </div>
         </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Kunjungan:</label>
-          <textarea id="edit-visit-notes" rows="3" placeholder="Catatan hasil kunjungan mitra..." ${disabledAttr}>${raw.catatan_visit || ''}</textarea>
-        </div>
-
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Tindak Lanjut Concern Prioritas:</label>
-          <textarea id="edit-visit-concern" rows="2" placeholder="Tindak lanjut concern yang ditugaskan..." ${disabledAttr}>${raw.tindak_lanjut_concern || ''}</textarea>
-        </div>
-
-        <div class="grid grid-cols-1 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-          <span class="text-[10px] font-bold text-slate-500 uppercase">Isu / Feedback Lapangan</span>
-          <div>
-            <label class="block text-[10px] text-slate-600 mb-0.5">Isu Digiasha:</label>
-            <input type="text" id="edit-visit-issue-digi" value="${raw.issue_digi || ''}" placeholder="Isu sistem/layanan Digiasha" ${disabledAttr} />
-          </div>
-          <div>
-            <label class="block text-[10px] text-slate-600 mb-0.5">Isu Internal Mitra:</label>
-            <input type="text" id="edit-visit-issue-internal" value="${raw.issue_internal || ''}" placeholder="Isu internal mitra" ${disabledAttr} />
-          </div>
-          <div>
-            <label class="block text-[10px] text-slate-600 mb-0.5">Isu Kompetitor:</label>
-            <input type="text" id="edit-visit-issue-komp" value="${raw.issue_komp || ''}" placeholder="Aktivitas kompetitor" ${disabledAttr} />
-          </div>
-        </div>
-
+        <!-- 3. Checklist Unit Fasilitas (Accordion Collapsible) -->
         ${unitsHtml}
+
+        <!-- 4. Catatan Kunjungan & Tindak Lanjut -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="flex items-center space-x-1.5 border-b border-slate-200/60 pb-1.5">
+            <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">4</span>
+            <h5 class="text-xs font-bold text-slate-800 uppercase">Catatan & Masukan Kunjungan</h5>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Kunjungan Lapangan:</label>
+            <textarea id="edit-visit-notes" rows="3" placeholder="Catatan lengkap hasil kunjungan..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800">${raw.catatan_visit || ''}</textarea>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Tindak Lanjut Concern Prioritas:</label>
+            <textarea id="edit-visit-concern" rows="2" placeholder="Tindak lanjut instruksi supervisor / concern unit..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800">${raw.tindak_lanjut_concern || ''}</textarea>
+          </div>
+
+          <!-- Isu & Feedback -->
+          <div class="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2">
+            <span class="text-[10px] font-bold text-slate-500 uppercase block">Isu & Feedback Lapangan</span>
+            <div>
+              <label class="block text-[10px] text-slate-600 mb-0.5">Isu Layanan Digiasha:</label>
+              <input type="text" id="edit-visit-issue-digi" value="${raw.issue_digi || ''}" placeholder="Kendala/masukan sistem & layanan Digiasha" ${isReadOnly ? 'disabled' : ''} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-600 mb-0.5">Isu Internal Mitra:</label>
+              <input type="text" id="edit-visit-issue-internal" value="${raw.issue_internal || ''}" placeholder="Kondisi internal bisnis/keuangan mitra" ${isReadOnly ? 'disabled' : ''} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-600 mb-0.5">Aktivitas Kompetitor:</label>
+              <input type="text" id="edit-visit-issue-komp" value="${raw.issue_komp || ''}" placeholder="Pergerakan atau promo kompetitor" ${isReadOnly ? 'disabled' : ''} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800" />
+            </div>
+          </div>
+        </div>
       </div>
     `;
   } else if (type === "ONBOARDING") {
@@ -12559,19 +12811,34 @@ async function handleSaveEditActivity(e) {
 
   try {
     if (type === "VISIT") {
-      const bertemuOwner = document.getElementById("edit-visit-bertemu")?.value || "Ya";
-      const ownerReason = document.getElementById("edit-visit-reason")?.value || "";
-      const stock = parseInt(document.getElementById("edit-visit-stock")?.value) || 0;
-      const sales = parseInt(document.getElementById("edit-visit-sales")?.value) || 0;
+      // 1. Lokasi Kunjungan
+      const lokasiSelect = document.getElementById("edit-visit-lokasi-select")?.value || "Showroom";
+      const customLokasi = document.getElementById("input-hist-lokasi-custom")?.value?.trim() || "";
+      const finalLokasi = (lokasiSelect === "Lainnya" && customLokasi) ? customLokasi : lokasiSelect;
+
+      // 2. Pihak yang Ditemui
+      const bertemuSelect = document.getElementById("edit-visit-bertemu-select")?.value || "Owner";
+      const customBertemu = document.getElementById("input-hist-bertemu-custom")?.value?.trim() || "";
+      const finalBertemu = (bertemuSelect === "Lainnya" && customBertemu) ? customBertemu : bertemuSelect;
+      const ownerReason = document.getElementById("edit-visit-reason")?.value?.trim() || (finalBertemu.toLowerCase().includes("tidak bertemu") ? "Tidak Bertemu" : "-");
+
+      // 3. Segmen 2 (Stok & Sales)
+      const isNoInfo = document.getElementById("edit-visit-toggle-no-info")?.checked || false;
+      const rawStock = document.getElementById("edit-visit-stock")?.value;
+      const rawSales = document.getElementById("edit-visit-sales")?.value;
+      const stock = isNoInfo ? 0 : (parseInt(rawStock) || 0);
+      const sales = isNoInfo ? 0 : (parseInt(rawSales) || 0);
+
       const notes = document.getElementById("edit-visit-notes")?.value || "";
       const concern = document.getElementById("edit-visit-concern")?.value || "";
       const issueDigi = document.getElementById("edit-visit-issue-digi")?.value || "";
       const issueInternal = document.getElementById("edit-visit-issue-internal")?.value || "";
       const issueKomp = document.getElementById("edit-visit-issue-komp")?.value || "";
 
-      // 1. Update tr_laporan_visit
+      // 1. Update tr_laporan_visit (created_at DILARANG diubah demi audit!)
       const { error: visitErr } = await supabaseClient.from("tr_laporan_visit").update({
-        bertemu_owner: bertemuOwner,
+        lokasi: finalLokasi,
+        bertemu_owner: finalBertemu,
         owner_reason: ownerReason,
         stock: stock,
         sales: sales,
@@ -12584,7 +12851,7 @@ async function handleSaveEditActivity(e) {
 
       if (visitErr) throw visitErr;
 
-      // 2. Update tr_visit_unit_check child items
+      // 2. Update tr_visit_unit_check child items (created_at DILARANG diubah demi audit!)
       const unitCards = document.querySelectorAll(".hist-unit-card");
 
       for (let i = 0; i < unitCards.length; i++) {
@@ -12592,8 +12859,17 @@ async function handleSaveEditActivity(e) {
         const checkId = card.getAttribute("data-check-id");
         if (!checkId) continue;
 
+        const isOvd = card.getAttribute("data-is-ovd") === "true";
         const uAda = card.querySelector(".hist-unit-ada")?.value || "Ya, Terlihat";
-        const uIndikasi = card.querySelector(".hist-unit-indikasi")?.value || "";
+        
+        // Indikasi Keberadaan
+        let finalIndikasi = "-";
+        if (uAda === "Tidak Terlihat") {
+          const indikasiSelect = card.querySelector(".hist-unit-indikasi-select")?.value || "";
+          const indikasiCustom = card.querySelector(".hist-unit-indikasi-custom")?.value?.trim() || "";
+          finalIndikasi = (indikasiSelect === "Lainnya" && indikasiCustom) ? indikasiCustom : (indikasiSelect || "-");
+        }
+
         const uGpsMatch = card.querySelector(".hist-unit-gps-match")?.value || "Ya, Sesuai";
         
         const chkElems = card.querySelectorAll(".hist-unit-info-chk:checked");
@@ -12609,16 +12885,38 @@ async function handleSaveEditActivity(e) {
           }
         });
 
-        const uOvdPlan = card.querySelector(".hist-unit-ovd-plan")?.value?.trim() || "";
-        const uKomitmen = card.querySelector(".hist-unit-komitmen")?.value || "Tidak Ada";
+        let constructedNotes = `Indikasi: ${finalIndikasi}; Info: ${finalInfoList.length > 0 ? finalInfoList.join(', ') : '-'}`;
 
-        const constructedNotes = `Indikasi: ${uIndikasi || '-'}; Info: ${finalInfoList.length > 0 ? finalInfoList.join(', ') : '-'}; Plan: ${uOvdPlan || '-'}; Komitmen: ${uKomitmen}`;
+        if (isOvd) {
+          const uOvdPlan = card.querySelector(".hist-unit-ovd-plan")?.value?.trim() || "";
+          const uKomitmen = card.querySelector(".hist-unit-komitmen")?.value || "Tidak Ada";
+          const uTglKomitmen = card.querySelector(".hist-unit-tgl-komitmen")?.value || "";
+          constructedNotes += `; Plan: ${uOvdPlan || '-'}; Komitmen: ${uKomitmen}${uTglKomitmen ? ' (Tgl: ' + uTglKomitmen + ')' : ''}`;
+        } else {
+          constructedNotes += `; Plan: -; Komitmen: Tidak Ada`;
+        }
 
         await supabaseClient.from("tr_visit_unit_check").update({
           status_keberadaan: uAda,
           kondisi_unit: uGpsMatch,
           catatan_unit: constructedNotes
         }).eq("check_id", checkId);
+      }
+
+      // Update item di cached history lokal
+      item.subtitle = `Lokasi: ${finalLokasi} • Bertemu: ${finalBertemu}`;
+      item.notes = notes || concern || "-";
+      if (item.raw) {
+        item.raw.lokasi = finalLokasi;
+        item.raw.bertemu_owner = finalBertemu;
+        item.raw.owner_reason = ownerReason;
+        item.raw.stock = stock;
+        item.raw.sales = sales;
+        item.raw.catatan_visit = notes;
+        item.raw.tindak_lanjut_concern = concern;
+        item.raw.issue_digi = issueDigi;
+        item.raw.issue_internal = issueInternal;
+        item.raw.issue_komp = issueKomp;
       }
 
     } else if (type === "ONBOARDING") {
