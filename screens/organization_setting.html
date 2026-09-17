@@ -341,8 +341,11 @@
         <input type="number" min="20" max="1000" id="workloc-input-radius" value="100" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800" />
       </div>
       <div class="pt-3 border-t border-slate-200 flex space-x-2">
-        <button type="button" onclick="closeWorkLocModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
-        <button type="submit" id="btn-save-workloc" class="w-2/3 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Lokasi</button>
+        <button type="button" id="btn-delete-workloc" onclick="handleDeleteWorkLocation(CURRENT_EDIT_WORKLOC_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeWorkLocModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-workloc" class="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Lokasi</button>
       </div>
     </form>
   </div>
@@ -391,8 +394,11 @@
         <span class="text-[10px] text-slate-400 mt-0.5 block">Menentukan titik geofence presensi untuk staf pada unit ini</span>
       </div>
       <div class="pt-3 border-t border-slate-200 flex space-x-2">
-        <button type="button" onclick="closeOrgUnitModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
-        <button type="submit" id="btn-save-unit" class="w-2/3 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Unit</button>
+        <button type="button" id="btn-delete-unit" onclick="handleDeleteOrgUnit(CURRENT_EDIT_UNIT_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeOrgUnitModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-unit" class="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Unit</button>
       </div>
     </form>
   </div>
@@ -441,8 +447,11 @@
         </select>
       </div>
       <div class="pt-3 border-t border-slate-200 flex space-x-2">
-        <button type="button" onclick="closeJobPosModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
-        <button type="submit" id="btn-save-pos" class="w-2/3 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Jabatan</button>
+        <button type="button" id="btn-delete-pos" onclick="handleDeleteJobPosition(CURRENT_EDIT_JOBPOS_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeJobPosModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-pos" class="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Jabatan</button>
       </div>
     </form>
   </div>

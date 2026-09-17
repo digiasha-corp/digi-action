@@ -15893,15 +15893,21 @@ async function upsertOrgCoreTable(baseName, payload, conflictCol) {
 }
 
 async function loadOrgCoreTable(baseName, orderCol = "created_at", ascending = true) {
-  if (!supabaseClient) return [];
+  if (!supabaseClient) return null;
   // 1. Coba baca dari tabel fisik hr_*
   try {
     const { data, error } = await supabaseClient
       .from("hr_" + baseName)
       .select("*")
       .order(orderCol, { ascending });
-    if (!error && data && data.length > 0) return data;
-  } catch (e) {}
+    if (!error && Array.isArray(data)) {
+      console.log(`[Org Core HR] Data hr_${baseName} dimuat dari Supabase:`, data.length, "baris");
+      return data;
+    }
+    if (error) console.warn(`[Org Core HR] Query hr_${baseName} returned:`, error);
+  } catch (e) {
+    console.warn(`[Org Core HR] Query hr_${baseName} exception:`, e);
+  }
 
   // 2. Coba baca dari view / nama tabel biasa
   try {
@@ -15909,23 +15915,37 @@ async function loadOrgCoreTable(baseName, orderCol = "created_at", ascending = t
       .from(baseName)
       .select("*")
       .order(orderCol, { ascending });
-    if (!error && data && data.length > 0) return data;
+    if (!error && Array.isArray(data)) {
+      console.log(`[Org Core HR] Data ${baseName} dimuat dari Supabase:`, data.length, "baris");
+      return data;
+    }
   } catch (e) {}
 
-  return [];
+  return null;
+}
+
+async function deleteOrgCoreTable(baseName, filterCol, filterVal) {
+  if (!supabaseClient) return { success: false };
+  try {
+    await supabaseClient.from("hr_" + baseName).delete().eq(filterCol, filterVal);
+  } catch (e) {}
+  try {
+    await supabaseClient.from(baseName).delete().eq(filterCol, filterVal);
+  } catch (e) {}
+  return { success: true };
 }
 
 // ---------------- 1. WORK LOCATION (TEMPAT KERJA FISIK) ----------------
 async function loadWorkLocations() {
   const container = document.getElementById("work-locations-list-container");
   const data = await loadOrgCoreTable("work_locations", "id_work_location");
-  if (data && data.length > 0) {
+  if (data !== null) {
     ORG_WORK_LOCATIONS_DATA = data;
     renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
     return;
   }
 
-  // Fallback default jika tabel belum ada isinya
+  // Fallback default HANYA jika Supabase client offline / tidak terhubung
   ORG_WORK_LOCATIONS_DATA = DEFAULT_ORG_WORK_LOCS;
   renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
 }
@@ -15935,7 +15955,7 @@ function renderWorkLocationsList(list) {
   if (!container) return;
 
   if (!list || list.length === 0) {
-    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada tempat kerja fisik terdaftar.</div>';
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada tempat kerja fisik terdaftar. Silakan klik tombol "+ Tambah Tempat Kerja" di atas.</div>';
     return;
   }
 
@@ -15989,6 +16009,7 @@ function openAddWorkLocationModal() {
   document.getElementById("workloc-input-lat").value = "";
   document.getElementById("workloc-input-long").value = "";
   document.getElementById("workloc-input-radius").value = "100";
+  document.getElementById("btn-delete-workloc")?.classList.add("hidden");
   document.getElementById("modal-workloc-edit").classList.remove("hidden");
 }
 
@@ -16008,11 +16029,32 @@ function openEditWorkLocationModal(id) {
   document.getElementById("workloc-input-lat").value = item.latitude || "";
   document.getElementById("workloc-input-long").value = item.longitude || "";
   document.getElementById("workloc-input-radius").value = item.radius_meter || 100;
+  document.getElementById("btn-delete-workloc")?.classList.remove("hidden");
   document.getElementById("modal-workloc-edit").classList.remove("hidden");
 }
 
 function closeWorkLocModal() {
   document.getElementById("modal-workloc-edit").classList.add("hidden");
+}
+
+async function handleDeleteWorkLocation(id) {
+  if (!id) return;
+  if (!confirm(`Hapus tempat kerja fisik "${id}"? Lokasi ini akan dihapus permanen dari database.`)) return;
+
+  const btn = document.getElementById("btn-delete-workloc");
+  if (btn) btn.disabled = true;
+
+  try {
+    await deleteOrgCoreTable("work_locations", "id_work_location", id);
+    ORG_WORK_LOCATIONS_DATA = ORG_WORK_LOCATIONS_DATA.filter(w => w.id_work_location !== id);
+    renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
+    closeWorkLocModal();
+    showToast(`Tempat kerja "${id}" berhasil dihapus dari database!`, "success", 1500);
+  } catch (e) {
+    alert("Gagal menghapus: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function detectCurrentGpsForWorkLoc() {
@@ -16079,7 +16121,7 @@ async function handleSaveWorkLocation(e) {
 // ---------------- 2. UNIT ORGANISASI (HO, AREA, CABANG) ----------------
 async function loadOrgUnits() {
   const data = await loadOrgCoreTable("organization_units", "id_unit");
-  if (data && data.length > 0) {
+  if (data !== null) {
     ORG_UNITS_DATA = data;
     renderOrgUnitsList(ORG_UNITS_DATA);
     populateOrgFilterUnits();
@@ -16096,7 +16138,7 @@ function renderOrgUnitsList(list) {
   if (!container) return;
 
   if (!list || list.length === 0) {
-    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada unit organisasi terdaftar.</div>';
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada unit organisasi terdaftar. Silakan klik tombol "+ Tambah Unit Organisasi".</div>';
     return;
   }
 
@@ -16139,6 +16181,7 @@ function openAddOrgUnitModal() {
   idInput.disabled = false;
   document.getElementById("unit-input-tipe").value = "CABANG";
   document.getElementById("unit-input-name").value = "";
+  document.getElementById("btn-delete-unit")?.classList.add("hidden");
 
   populateOrgUnitParentSelect("");
   populateOrgUnitWorkLocSelect("");
@@ -16156,6 +16199,7 @@ function openEditOrgUnitModal(id) {
   idInput.disabled = true;
   document.getElementById("unit-input-tipe").value = item.tipe_unit || "CABANG";
   document.getElementById("unit-input-name").value = item.nama_unit || "";
+  document.getElementById("btn-delete-unit")?.classList.remove("hidden");
 
   populateOrgUnitParentSelect(item.parent_unit_id, id);
   populateOrgUnitWorkLocSelect(item.work_location_id);
@@ -16164,6 +16208,27 @@ function openEditOrgUnitModal(id) {
 
 function closeOrgUnitModal() {
   document.getElementById("modal-orgunit-edit").classList.add("hidden");
+}
+
+async function handleDeleteOrgUnit(id) {
+  if (!id) return;
+  if (!confirm(`Hapus unit organisasi "${id}"? Unit ini akan dihapus permanen dari database.`)) return;
+
+  const btn = document.getElementById("btn-delete-unit");
+  if (btn) btn.disabled = true;
+
+  try {
+    await deleteOrgCoreTable("organization_units", "id_unit", id);
+    ORG_UNITS_DATA = ORG_UNITS_DATA.filter(u => u.id_unit !== id);
+    renderOrgUnitsList(ORG_UNITS_DATA);
+    populateOrgFilterUnits();
+    closeOrgUnitModal();
+    showToast(`Unit organisasi "${id}" berhasil dihapus dari database!`, "success", 1500);
+  } catch (e) {
+    alert("Gagal menghapus: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function populateOrgUnitParentSelect(selectedId = "", excludeId = "") {
@@ -16230,7 +16295,7 @@ async function handleSaveOrgUnit(e) {
 // ---------------- 3. MASTER POSISI / JABATAN ----------------
 async function loadOrgPositions() {
   const data = await loadOrgCoreTable("job_positions", "id_position");
-  if (data && data.length > 0) {
+  if (data !== null) {
     ORG_POSITIONS_DATA = data;
     renderOrgPositionsList(ORG_POSITIONS_DATA);
     return;
@@ -16245,7 +16310,7 @@ function renderOrgPositionsList(list) {
   if (!container) return;
 
   if (!list || list.length === 0) {
-    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada posisi jabatan terdaftar.</div>';
+    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">Belum ada posisi jabatan terdaftar. Silakan klik tombol "+ Tambah Posisi / Jabatan".</div>';
     return;
   }
 
@@ -16283,6 +16348,7 @@ function openAddJobPositionModal() {
   idInput.value = "";
   idInput.disabled = false;
   document.getElementById("pos-input-name").value = "";
+  document.getElementById("btn-delete-pos")?.classList.add("hidden");
 
   populateJobPosLevelSelect("");
   populateJobPosUnitSelect("");
@@ -16300,6 +16366,7 @@ function openEditJobPositionModal(id) {
   idInput.value = item.id_position;
   idInput.disabled = true;
   document.getElementById("pos-input-name").value = item.nama_jabatan || "";
+  document.getElementById("btn-delete-pos")?.classList.remove("hidden");
 
   populateJobPosLevelSelect(item.level_id);
   populateJobPosUnitSelect(item.unit_id);
@@ -16309,6 +16376,26 @@ function openEditJobPositionModal(id) {
 
 function closeJobPosModal() {
   document.getElementById("modal-jobpos-edit").classList.add("hidden");
+}
+
+async function handleDeleteJobPosition(id) {
+  if (!id) return;
+  if (!confirm(`Hapus posisi jabatan "${id}"? Jabatan ini akan dihapus permanen dari database.`)) return;
+
+  const btn = document.getElementById("btn-delete-pos");
+  if (btn) btn.disabled = true;
+
+  try {
+    await deleteOrgCoreTable("job_positions", "id_position", id);
+    ORG_POSITIONS_DATA = ORG_POSITIONS_DATA.filter(p => p.id_position !== id);
+    renderOrgPositionsList(ORG_POSITIONS_DATA);
+    closeJobPosModal();
+    showToast(`Posisi jabatan "${id}" berhasil dihapus dari database!`, "success", 1500);
+  } catch (e) {
+    alert("Gagal menghapus: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function populateJobPosLevelSelect(selected = "") {
@@ -16380,7 +16467,7 @@ async function handleSaveJobPosition(e) {
 // ---------------- 4. MASTER LEVEL (GRADE) ----------------
 async function loadOrgLevels() {
   const data = await loadOrgCoreTable("master_levels", "bobot_level");
-  if (data && data.length > 0) {
+  if (data !== null) {
     ORG_LEVELS_DATA = data;
     renderOrgLevelsList(ORG_LEVELS_DATA);
     return;
