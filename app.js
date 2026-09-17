@@ -16349,29 +16349,17 @@ function renderOrgUnitsList(list) {
     if (u.tipe_unit === "AREA") badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
     if (u.tipe_unit === "CABANG") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
 
-    const parentUnit = list.find(p => p.id_unit === u.parent_unit_id);
-    const workLoc = (ORG_WORK_LOCATIONS_DATA || []).find(w => 
-      (w.id_work_location && w.id_work_location === u.work_location_id) ||
-      (w.location_id && w.location_id === u.work_location_id)
-    );
     const isActive = u.is_active !== false;
 
     return `
-      <div class="bg-white p-3.5 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center space-x-2">
-            <span class="font-mono text-xs font-bold text-slate-900">${u.id_unit}</span>
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${badgeColor}">${u.tipe_unit}</span>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span>
-          </div>
-          <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${u.nama_unit}</h4>
-          <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
-            ${parentUnit ? `<span>Induk: <strong class="text-slate-700">${parentUnit.nama_unit}</strong></span><span>•</span>` : ''}
-            <span>Work Location: <strong class="text-emerald-700">${workLoc?.nama_lokasi || workLoc?.name || u.work_location_id || '-'}</strong></span>
-          </div>
+      <div class="bg-white px-3.5 py-2.5 rounded-xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
+        <div class="min-w-0 flex-1 flex items-center space-x-2.5">
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${badgeColor}">${u.tipe_unit || 'UNIT'}</span>
+          <h4 class="font-bold text-xs sm:text-sm text-slate-800 truncate">${u.nama_unit}</h4>
+          ${!isActive ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-300 shrink-0">NONAKTIF</span>' : ''}
         </div>
-        <button type="button" onclick="openEditOrgUnitModal('${u.id_unit}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
-          <i class="fa-solid fa-pen-to-square"></i>
+        <button type="button" onclick="openEditOrgUnitModal('${u.id_unit}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-lg font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
+          <i class="fa-solid fa-pen-to-square text-[11px]"></i>
           <span>Edit</span>
         </button>
       </div>
