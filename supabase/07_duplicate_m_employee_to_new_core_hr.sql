@@ -17,35 +17,35 @@ DROP TRIGGER IF EXISTS trg_sync_employees_to_legacy ON public.hr_employees;
 DROP FUNCTION IF EXISTS public.sync_employees_to_legacy_m_employee();
 
 
--- 2. PASTIKAN MASTER JABATAN & UNIT LENGKAP UNTUK MEMETAKAN DATA LAMA
--- Sinkronkan nama unit dari cabang m_employee jika belum ada di organization_units
-INSERT INTO public.organization_units (id_unit, name, code, type, level, is_active)
+-- 2. PASTIKAN MASTER UNIT TERISI DARI CABANG m_employee
+INSERT INTO public.organization_units (id_unit, tipe_unit, nama_unit, parent_unit_id, is_active)
 SELECT 
-    'UNIT_' || UPPER(REPLACE(REPLACE(cabang, ' ', '_'), '-', '_')),
-    cabang,
-    'CAB_' || UPPER(SUBSTRING(REPLACE(cabang, ' ', ''), 1, 6)),
+    'UNIT-' || UPPER(REPLACE(REPLACE(TRIM(cabang), ' ', '-'), '/', '-')),
     'CABANG',
-    3,
+    TRIM(cabang),
+    'HO-CORP',
     TRUE
 FROM public.m_employee
-WHERE cabang IS NOT NULL AND cabang <> ''
-ON CONFLICT (id_unit) DO NOTHING;
+WHERE cabang IS NOT NULL AND TRIM(cabang) <> ''
+ON CONFLICT (id_unit) DO UPDATE SET
+    nama_unit = EXCLUDED.nama_unit;
 
--- Sinkronkan nama jabatan dari m_employee jika belum ada di job_positions
-INSERT INTO public.job_positions (id_position, title, code, unit_id, level_id, is_active)
+
+-- 3. PASTIKAN MASTER JABATAN TERISI DARI JABATAN m_employee
+INSERT INTO public.job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
 SELECT 
-    'POS_' || UPPER(REPLACE(REPLACE(jabatan, ' ', '_'), '/', '_')),
-    jabatan,
-    'JAB_' || UPPER(SUBSTRING(REPLACE(jabatan, ' ', ''), 1, 6)),
-    'HO_MAIN',
-    'LVL_STAFF',
+    'POS-' || UPPER(REPLACE(REPLACE(REPLACE(TRIM(jabatan), ' ', '-'), '/', '-'), '&', 'AND')),
+    TRIM(jabatan),
+    'L-04',
+    'HO-CORP',
     TRUE
 FROM public.m_employee
-WHERE jabatan IS NOT NULL AND jabatan <> ''
-ON CONFLICT (id_position) DO NOTHING;
+WHERE jabatan IS NOT NULL AND TRIM(jabatan) <> ''
+ON CONFLICT (id_position) DO UPDATE SET
+    nama_jabatan = EXCLUDED.nama_jabatan;
 
 
--- 3. DUPLIKASI DATA KARYAWAN DARI m_employee KE employees (hr_employees)
+-- 4. DUPLIKASI DATA KARYAWAN DARI m_employee KE employees
 INSERT INTO public.employees (
     id,
     nip,
@@ -66,12 +66,12 @@ SELECT
     COALESCE(m.nama_lengkap, m.nip),
     COALESCE(m.email, LOWER(m.nip) || '@digiasha.com'),
     COALESCE(
-        (SELECT id_unit FROM public.organization_units WHERE LOWER(name) = LOWER(m.cabang) LIMIT 1),
-        'HO_MAIN'
+        (SELECT id_unit FROM public.organization_units WHERE LOWER(nama_unit) = LOWER(TRIM(m.cabang)) LIMIT 1),
+        'HO-CORP'
     ),
     COALESCE(
-        (SELECT id_position FROM public.job_positions WHERE LOWER(title) = LOWER(m.jabatan) LIMIT 1),
-        'POS_STAFF_FAC'
+        (SELECT id_position FROM public.job_positions WHERE LOWER(nama_jabatan) = LOWER(TRIM(m.jabatan)) LIMIT 1),
+        'POS-SPV-FAC'
     ),
     COALESCE(m.role_id, 'R-04'),
     'PKWTT',
@@ -89,15 +89,15 @@ ON CONFLICT (nip) DO UPDATE SET
     updated_at = NOW();
 
 
--- 4. SAMBUNGKAN ATASAN LANGSUNG (SUPERVISOR) BERDASARKAN atasan_nip
+-- 5. SAMBUNGKAN ATASAN LANGSUNG (SUPERVISOR) BERDASARKAN atasan_nip
 UPDATE public.employees e
 SET supervisor_id = atasan.id
 FROM public.m_employee m
 JOIN public.employees atasan ON atasan.nip = m.atasan_nip
-WHERE e.nip = m.nip AND m.atasan_nip IS NOT NULL;
+WHERE e.nip = m.nip AND m.atasan_nip IS NOT NULL AND m.atasan_nip <> '';
 
 
--- 5. DUPLIKASI DATA AWAL KE TABEL IDENTITAS SIPIL (employee_personal_details)
+-- 6. BUAT BARIS DATA PRIBADI SIPIL AWAL DI employee_personal_details
 INSERT INTO public.employee_personal_details (
     id,
     employee_id,
@@ -111,26 +111,20 @@ INSERT INTO public.employee_personal_details (
     address_ktp,
     address_domicile,
     phone,
-    emergency_contact_name,
-    emergency_contact_phone,
-    emergency_contact_relation,
     created_at,
     updated_at
 )
 SELECT 
     gen_random_uuid(),
     e.id,
-    NULL,                     -- NIK KTP siap diisi
-    NULL,                     -- Tempat Lahir siap diisi
-    NULL,                     -- Tanggal Lahir siap diisi
-    'Laki-laki',              -- Default Gender
-    'Islam',                  -- Default Agama
-    'Lajang',                 -- Default Status Pernikahan
-    0,                        -- Tanggungan
-    NULL,                     -- Alamat KTP siap diisi
-    NULL,                     -- Alamat Domisili siap diisi
-    NULL,                     -- No HP
-    NULL,                     -- Kontak Darurat
+    NULL,
+    NULL,
+    NULL,
+    'Laki-laki',
+    'Islam',
+    'Lajang',
+    0,
+    NULL,
     NULL,
     NULL,
     NOW(),
@@ -139,7 +133,7 @@ FROM public.employees e
 ON CONFLICT (employee_id) DO NOTHING;
 
 
--- 6. BUAT TRANSAKSI AWAL KEPEGAWAIAN (employee_career_histories)
+-- 7. BUAT TRANSAKSI AWAL KEPEGAWAIAN (employee_career_histories)
 INSERT INTO public.employee_career_histories (
     id,
     employee_id,
@@ -173,22 +167,24 @@ SELECT
     e.position_id,
     e.location_id,
     e.status_kerja,
-    NULL,                     -- Gaji Pokok siap diinput
-    NULL,                     -- Tunjangan siap diinput
-    'BCA',                    -- Default Bank Payroll
-    NULL,                     -- Nomor Rekening siap diinput
-    e.name,                   -- Atas Nama Rekening
-    NULL,                     -- BPJS Kesehatan
-    NULL,                     -- BPJS Ketenagakerjaan
-    NULL,                     -- NPWP
-    'TK/0',                   -- Status Pajak Awal
+    NULL,
+    NULL,
+    'BCA',
+    NULL,
+    e.name,
+    NULL,
+    NULL,
+    NULL,
+    'TK/0',
     NOW()
 FROM public.employees e
 WHERE NOT EXISTS (
     SELECT 1 FROM public.employee_career_histories ech WHERE ech.employee_id = e.id
 );
 
--- Berikan izin akses penuh ke tabel baru
+-- Hak akses penuh
 GRANT ALL ON TABLE public.employees TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.employee_personal_details TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.employee_career_histories TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.organization_units TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.job_positions TO anon, authenticated, service_role;

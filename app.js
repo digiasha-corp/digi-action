@@ -17472,8 +17472,8 @@ async function loadPersonaliaEmployees() {
         .from("employees")
         .select(`
           *,
-          organization_units (name, code),
-          job_positions (title, code)
+          organization_units (nama_unit),
+          job_positions (nama_jabatan)
         `)
         .order("nip");
 
@@ -17481,8 +17481,8 @@ async function loadPersonaliaEmployees() {
         PERSONALIA_EMPLOYEES_DATA = empData.map(e => ({
           ...e,
           nama_lengkap: e.name || e.nama_lengkap || e.nip,
-          cabang: e.organization_units?.name || e.cabang || "Head Office",
-          jabatan: e.job_positions?.title || e.jabatan || "Staff",
+          cabang: e.organization_units?.nama_unit || e.cabang || "Head Office",
+          jabatan: e.job_positions?.nama_jabatan || e.jabatan || "Staff",
           status_aktif: !e.deleted_at ? "AKTIF" : "NONAKTIF"
         }));
         populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
