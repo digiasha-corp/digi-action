@@ -16830,11 +16830,45 @@ async function openEmployeeDossierModal(nipOrId) {
   const modal = document.getElementById("modal-employee-dossier");
   if (!modal) return;
 
-  const employees = (SETTINGS_EMPLOYEES_DATA && SETTINGS_EMPLOYEES_DATA.length > 0)
-    ? SETTINGS_EMPLOYEES_DATA
-    : (APP_STATE.employees || []);
+  let emp = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip).trim() === String(nipOrId).trim() || String(e.id).trim() === String(nipOrId).trim()) ||
+            (SETTINGS_EMPLOYEES_DATA || []).find(e => String(e.nip).trim() === String(nipOrId).trim() || String(e.id).trim() === String(nipOrId).trim()) ||
+            (APP_STATE.employees || []).find(e => String(e.nip).trim() === String(nipOrId).trim() || String(e.id).trim() === String(nipOrId).trim());
 
-  const emp = employees.find(e => String(e.nip).trim() === String(nipOrId).trim() || String(e.id).trim() === String(nipOrId).trim());
+  if (!emp && supabaseClient) {
+    try {
+      // 1. Coba cari di hr_employees / employees
+      const { data: eRow } = await supabaseClient
+        .from("employees")
+        .select(`
+          *,
+          work_locations (name, code),
+          organization_units (name, code),
+          job_positions (title, code),
+          master_levels (name, grade_code)
+        `)
+        .or(`nip.eq.${nipOrId},id.eq.${nipOrId}`)
+        .maybeSingle();
+
+      if (eRow) {
+        emp = {
+          ...eRow,
+          cabang: eRow.work_locations?.name || eRow.cabang || "Head Office",
+          jabatan: eRow.job_positions?.title || eRow.jabatan || "Staff"
+        };
+      } else {
+        // 2. Fallback cari di m_employee
+        const { data: mRow } = await supabaseClient
+          .from("m_employee")
+          .select("*")
+          .eq("nip", nipOrId)
+          .maybeSingle();
+        if (mRow) emp = mRow;
+      }
+    } catch (e) {
+      console.warn("Fallback query employee error:", e);
+    }
+  }
+
   if (!emp) {
     alert("Data karyawan tidak ditemukan: " + nipOrId);
     return;
