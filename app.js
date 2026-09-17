@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260916_v118";
+const APP_BUILD_VERSION = "20260917_v119";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -7693,8 +7693,8 @@ async function handleFormSubmit(e) {
     let issueInternal = "-";
     let issueKomp = "-";
 
-    // Validasi Segmen 2 hanya jika di Showroom dan TIDAK mencentang "Tidak Ada Informasi"
-    if (!isNoShowroomInfo && isShowroom) {
+    // Validasi Segmen 2 sepenuhnya tergantung kepada toggle Tidak Ada Informasi
+    if (!isNoShowroomInfo) {
       const rawStock = document.getElementById("input-stock-unit")?.value?.trim();
       const rawSales = document.getElementById("input-sales-unit")?.value?.trim();
 
@@ -7716,20 +7716,13 @@ async function handleFormSubmit(e) {
       issueDigi = document.getElementById("input-issue-digiasha")?.value?.trim() || "-";
       issueInternal = document.getElementById("input-issue-internal")?.value?.trim() || "-";
       issueKomp = document.getElementById("input-issue-kompetitor")?.value?.trim() || "-";
-    } else if (!isNoShowroomInfo && !isShowroom) {
-      // Jika lokasi bukan di Showroom (misal Rumah Owner / Janjian Diluar), isi data jika ada tapi jangan paksa wajib
-      stock = document.getElementById("input-stock-unit")?.value?.trim() || "-";
-      sales = document.getElementById("input-sales-unit")?.value?.trim() || "-";
-      issueDigi = document.getElementById("input-issue-digiasha")?.value?.trim() || "-";
-      issueInternal = document.getElementById("input-issue-internal")?.value?.trim() || "-";
-      issueKomp = document.getElementById("input-issue-kompetitor")?.value?.trim() || "-";
     }
 
     const catatanVisit = document.getElementById("input-catatan-visit")?.value?.trim() || "-";
 
     let waText = `*LAPORAN HASIL KUNJUNGAN MITRA*\n------------------------------------\n*Mitra:* ${dealerName}\n*Lokasi:* ${lokasi}\n*Bertemu:* ${bertemu}\n`;
 
-    if (!isNoShowroomInfo && isShowroom) {
+    if (!isNoShowroomInfo) {
       waText += `*Stock Unit Showroom:* ${stock} Unit\n*Penjualan Bulan Ini:* ${sales} Unit\n\n`;
     } else {
       waText += `*Kondisi Showroom:* (Tidak Ada Informasi)\n\n`;
@@ -7746,7 +7739,7 @@ async function handleFormSubmit(e) {
       waText += `\n`;
     }
 
-    if (!isNoShowroomInfo && isShowroom) {
+    if (!isNoShowroomInfo) {
       waText += `*CATATAN & ISSUE:*\n• Digiasha: ${issueDigi}\n• Internal Dealer: ${issueInternal}\n• Kompetitor: ${issueKomp}\n`;
     }
 
