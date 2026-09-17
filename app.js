@@ -16343,7 +16343,17 @@ function renderOrgUnitsList(list) {
     return;
   }
 
-  container.innerHTML = list.map(u => {
+  // Urutan hierarki: HO (Pusat) -> AREA (Regional) -> CABANG (Unit Lapangan/Outlet)
+  const typePriority = { "HO": 1, "AREA": 2, "CABANG": 3 };
+
+  const sortedList = [...list].sort((a, b) => {
+    const prioA = typePriority[a.tipe_unit] || 99;
+    const prioB = typePriority[b.tipe_unit] || 99;
+    if (prioA !== prioB) return prioA - prioB;
+    return (a.nama_unit || "").localeCompare(b.nama_unit || "");
+  });
+
+  container.innerHTML = sortedList.map(u => {
     let badgeColor = "bg-slate-100 text-slate-700 border-slate-200";
     if (u.tipe_unit === "HO") badgeColor = "bg-purple-50 text-purple-700 border-purple-200";
     if (u.tipe_unit === "AREA") badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
