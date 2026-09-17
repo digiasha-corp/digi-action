@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260917_v119";
+const APP_BUILD_VERSION = "20260917_v120";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -6587,6 +6587,13 @@ function populateVisitDealerOptions() {
     getPreciseLocation();
   }
 
+  // Reset state foto fisik kunjungan
+  CURRENT_SHOWROOM_PHOTO_BASE64 = null;
+  const triggerVisitPhoto = document.getElementById("trigger-visit-photo");
+  const previewVisitPhoto = document.getElementById("preview-photo-card");
+  if (triggerVisitPhoto) triggerVisitPhoto.classList.remove("hidden");
+  if (previewVisitPhoto) previewVisitPhoto.classList.add("hidden");
+
   // Setup click outside listener to auto-close dropdown
   if (!window._dealerSearchClickAttached) {
     window._dealerSearchClickAttached = true;
@@ -7378,12 +7385,15 @@ function openUnitModal(index) {
 
   TEMP_MODAL_PHOTO_BASE64 = u.foto_unit || null;
   const imgUnitPreview = document.getElementById("img-modal-unit-photo");
+  const triggerModalPhoto = document.getElementById("trigger-modal-unit-photo");
   if (TEMP_MODAL_PHOTO_BASE64) {
     if (imgUnitPreview) imgUnitPreview.src = TEMP_MODAL_PHOTO_BASE64;
     document.getElementById("modal-unit-photo-preview").classList.remove("hidden");
+    if (triggerModalPhoto) triggerModalPhoto.classList.add("hidden");
   } else {
     if (imgUnitPreview) imgUnitPreview.src = "";
     document.getElementById("modal-unit-photo-preview").classList.add("hidden");
+    if (triggerModalPhoto) triggerModalPhoto.classList.remove("hidden");
   }
 
   // Setup input indikasi (default blank jika tidak ada data)
@@ -7487,6 +7497,8 @@ async function handleModalUnitPhotoSelected(input) {
     if (imgUnitPreview) imgUnitPreview.src = compressed;
     const previewBox = document.getElementById("modal-unit-photo-preview");
     if (previewBox) previewBox.classList.remove("hidden");
+    const triggerBox = document.getElementById("trigger-modal-unit-photo");
+    if (triggerBox) triggerBox.classList.add("hidden");
   }
 }
 
@@ -7496,6 +7508,8 @@ function removeModalUnitPhoto() {
   const imgUnitPreview = document.getElementById("img-modal-unit-photo");
   if (imgUnitPreview) imgUnitPreview.src = "";
   document.getElementById("modal-unit-photo-preview").classList.add("hidden");
+  const triggerBox = document.getElementById("trigger-modal-unit-photo");
+  if (triggerBox) triggerBox.classList.remove("hidden");
 }
 
 function onModalKomitmenChange(val) {
@@ -7594,7 +7608,10 @@ async function handleShowroomPhotoSelected(input) {
     CURRENT_SHOWROOM_PHOTO_BASE64 = compressed;
     const imgPreview = document.getElementById("img-visit-showroom-preview");
     if (imgPreview) imgPreview.src = compressed;
-    document.getElementById("preview-photo-card").classList.remove("hidden");
+    const previewCard = document.getElementById("preview-photo-card");
+    if (previewCard) previewCard.classList.remove("hidden");
+    const triggerBox = document.getElementById("trigger-visit-photo");
+    if (triggerBox) triggerBox.classList.add("hidden");
   }
 }
 
@@ -7603,7 +7620,10 @@ function removePhoto() {
   CURRENT_SHOWROOM_PHOTO_BASE64 = null;
   const imgPreview = document.getElementById("img-visit-showroom-preview");
   if (imgPreview) imgPreview.src = "";
-  document.getElementById("preview-photo-card").classList.add("hidden");
+  const previewCard = document.getElementById("preview-photo-card");
+  if (previewCard) previewCard.classList.add("hidden");
+  const triggerBox = document.getElementById("trigger-visit-photo");
+  if (triggerBox) triggerBox.classList.remove("hidden");
 }
 
 async function handleFormSubmit(e) {

@@ -221,7 +221,7 @@
         </div>
         <div id="modal-box-foto-unit" class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
           <label class="block font-bold text-slate-800 text-[11px]">Foto Fisik Kendaraan <span class="text-red-500">* (Kamera)</span></label>
-          <div onclick="triggerCameraInput('file-modal-unit-photo')" class="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center cursor-pointer hover:bg-white transition bg-white">
+          <div id="trigger-modal-unit-photo" onclick="triggerCameraInput('file-modal-unit-photo')" class="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center cursor-pointer hover:bg-white transition bg-white">
             <i class="fa-solid fa-camera text-xl text-slate-400 mb-1"></i>
             <p class="text-[11px] text-slate-700 font-semibold">Ambil Foto Fisik Kendaraan</p>
             <input type="file" id="file-modal-unit-photo" accept="image/*" capture="environment" class="hidden" onchange="handleModalUnitPhotoSelected(this)" />
@@ -513,6 +513,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260917_v119"></script>
+  <script src="/app.js?v=20260917_v120"></script>
 </body>
 </html>

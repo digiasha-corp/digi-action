@@ -214,7 +214,7 @@
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Foto Fisik Kunjungan <span class="text-red-500">* (Kamera)</span></label>
-        <div onclick="triggerCameraInput('file-visit-photo')" class="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
+        <div id="trigger-visit-photo" onclick="triggerCameraInput('file-visit-photo')" class="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
           <i class="fa-solid fa-camera text-2xl text-slate-400 mb-1"></i>
           <p class="text-xs text-slate-700 font-semibold">Buka Kamera & Ambil Foto</p>
           <input type="file" id="file-visit-photo" accept="image/*" capture="environment" class="hidden" onchange="handleShowroomPhotoSelected(this)" />
