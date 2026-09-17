@@ -16295,7 +16295,6 @@ async function handleSaveWorkLocation(e) {
   }
 }
 
-// ---------------- 2. UNIT ORGANISASI (HO, AREA, CABANG) ----------------
 async function loadOrgUnits() {
   if (!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) {
     await loadWorkLocations();
@@ -16303,7 +16302,28 @@ async function loadOrgUnits() {
 
   const data = await loadOrgCoreTable("organization_units", "id_unit");
   if (data !== null) {
-    ORG_UNITS_DATA = data;
+    // Deduplikasi otomatis jika ada data ganda case-insensitive (misal "Area 01" vs "AREA 01")
+    const unitMap = new Map();
+    data.forEach(item => {
+      const key = (item.id_unit || "").trim().toUpperCase();
+      if (!unitMap.has(key)) {
+        unitMap.set(key, item);
+      } else {
+        const existing = unitMap.get(key);
+        // Prioritaskan yang memiliki work_location_id terisi atau data yang lebih baru
+        if ((!existing.work_location_id && item.work_location_id) || (item.updated_at && (!existing.updated_at || item.updated_at > existing.updated_at))) {
+          // Bersihkan record lama/usang yang duplikat jika berbeda casing
+          if (existing.id_unit !== item.id_unit) {
+            deleteOrgCoreTable("organization_units", "id_unit", existing.id_unit).catch(() => {});
+          }
+          unitMap.set(key, item);
+        } else if (existing.id_unit !== item.id_unit) {
+          deleteOrgCoreTable("organization_units", "id_unit", item.id_unit).catch(() => {});
+        }
+      }
+    });
+
+    ORG_UNITS_DATA = Array.from(unitMap.values());
     renderOrgUnitsList(ORG_UNITS_DATA);
     populateOrgFilterUnits();
     return;
@@ -16380,10 +16400,10 @@ async function openAddOrgUnitModal() {
 }
 
 async function openEditOrgUnitModal(id) {
-  const item = ORG_UNITS_DATA.find(u => u.id_unit === id);
+  const item = ORG_UNITS_DATA.find(u => u.id_unit === id || u.id_unit?.toUpperCase() === id?.toUpperCase());
   if (!item) return;
 
-  CURRENT_EDIT_UNIT_ID = id;
+  CURRENT_EDIT_UNIT_ID = item.id_unit;
   document.getElementById("orgunit-modal-title").innerText = `Edit: ${item.nama_unit}`;
   const idInput = document.getElementById("unit-input-id");
   idInput.value = item.id_unit;
@@ -16397,7 +16417,7 @@ async function openEditOrgUnitModal(id) {
     await loadWorkLocations();
   }
 
-  populateOrgUnitParentSelect(item.parent_unit_id, id);
+  populateOrgUnitParentSelect(item.parent_unit_id, item.id_unit);
   populateOrgUnitWorkLocSelect(item.work_location_id);
   document.getElementById("modal-orgunit-edit").classList.remove("hidden");
 }
@@ -16532,7 +16552,9 @@ function populateOrgUnitWorkLocSelect(selectedId = "") {
 
 async function handleSaveOrgUnit(e) {
   e.preventDefault();
-  const id = document.getElementById("unit-input-id").value.trim().toUpperCase();
+  // Jika sedang mode edit, gunakan ID asli (CURRENT_EDIT_UNIT_ID) agar tidak terjadi mismatch casing di PostgreSQL
+  const rawIdInput = document.getElementById("unit-input-id").value.trim();
+  const id = CURRENT_EDIT_UNIT_ID ? CURRENT_EDIT_UNIT_ID : rawIdInput.toUpperCase();
   const tipe = document.getElementById("unit-input-tipe").value;
   const name = document.getElementById("unit-input-name").value.trim();
   const parent = document.getElementById("unit-input-parent").value || null;
@@ -16588,9 +16610,28 @@ async function handleSaveOrgUnit(e) {
   try {
     await upsertOrgCoreTable("organization_units", payload, "id_unit");
 
-    const idx = ORG_UNITS_DATA.findIndex(u => u.id_unit === id);
-    if (idx >= 0) ORG_UNITS_DATA[idx] = payload;
-    else ORG_UNITS_DATA.push(payload);
+    // Jika ada duplikasi casing sebelumnya di database (misal "Area 01" vs "AREA 01"), bersihkan yang lama jika berbeda
+    if (CURRENT_EDIT_UNIT_ID && CURRENT_EDIT_UNIT_ID.toUpperCase() !== CURRENT_EDIT_UNIT_ID) {
+      // jika id lama memiliki huruf kecil dan sudah tersimpan versi UPPERCASE, hapus versi duplikat
+      deleteOrgCoreTable("organization_units", "id_unit", CURRENT_EDIT_UNIT_ID.toUpperCase()).catch(() => {});
+    }
+
+    // Update state ORG_UNITS_DATA secara case-insensitive
+    const idx = ORG_UNITS_DATA.findIndex(u => 
+      u.id_unit === id || 
+      (CURRENT_EDIT_UNIT_ID && u.id_unit === CURRENT_EDIT_UNIT_ID) ||
+      (u.id_unit && u.id_unit.trim().toUpperCase() === id.toUpperCase())
+    );
+    if (idx >= 0) {
+      ORG_UNITS_DATA[idx] = payload;
+    } else {
+      ORG_UNITS_DATA.push(payload);
+    }
+
+    // Bersihkan bila ada elemen ganda di array lokal
+    const uniqueMap = new Map();
+    ORG_UNITS_DATA.forEach(u => uniqueMap.set((u.id_unit || "").trim().toUpperCase(), u));
+    ORG_UNITS_DATA = Array.from(uniqueMap.values());
 
     renderOrgUnitsList(ORG_UNITS_DATA);
     populateOrgFilterUnits();
