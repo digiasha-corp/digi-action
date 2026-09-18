@@ -19787,7 +19787,10 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
   if (retCont) retCont.innerHTML = "";
   if (notRetCont) notRetCont.innerHTML = "";
 
-  // 6. Reset summary box & subforms
+  // 6. Reset Dokumen & Tab Viewer
+  resetTxDocForm();
+
+  // 7. Reset summary box & subforms
   document.getElementById("tx-emp-selected-summary")?.classList.add("hidden");
   toggleTxSubforms();
 
@@ -20138,6 +20141,9 @@ async function onTxEmployeeSelected(empId) {
 
     // Auto-populate data pribadi (pre-filled) ke subform biodata
     await populateTxPersonalData(emp);
+
+    // Auto-load dokumen berkas terunggah sebelumnya ke tab dokumen
+    await loadTxEmployeeExistingDocs(emp);
   }
 
   toggleTxSubforms();
@@ -20235,6 +20241,433 @@ function addTxInventoryRow(type) {
     <button type="button" onclick="this.closest('.tx-inv-item-row').remove()" class="w-6 h-6 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-[10px] shrink-0" title="Hapus"><i class="fa-solid fa-xmark"></i></button>
   `;
   container.appendChild(row);
+}
+
+// =========================================================================
+// CONTROLLER: UPLOAD DOKUMEN & TAB LIHAT FILE TERUPLOAD (TRANSAKSI SDM)
+// =========================================================================
+let CURRENT_TX_DOCS = {};
+
+function switchTxDocTab(tab) {
+  const uploadBtn = document.getElementById("tab-tx-doc-upload-btn");
+  const viewBtn = document.getElementById("tab-tx-doc-view-btn");
+  const uploadContent = document.getElementById("tab-tx-doc-upload-content");
+  const viewContent = document.getElementById("tab-tx-doc-view-content");
+
+  if (tab === "upload") {
+    if (uploadContent) uploadContent.classList.remove("hidden");
+    if (viewContent) viewContent.classList.add("hidden");
+    if (uploadBtn) {
+      uploadBtn.className = "flex-1 py-2 px-3 rounded-xl bg-white text-indigo-700 shadow-xs border border-slate-200 flex items-center justify-center space-x-1.5 transition";
+    }
+    if (viewBtn) {
+      viewBtn.className = "flex-1 py-2 px-3 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white/60 flex items-center justify-center space-x-1.5 transition";
+    }
+  } else {
+    if (uploadContent) uploadContent.classList.add("hidden");
+    if (viewContent) viewContent.classList.remove("hidden");
+    if (viewBtn) {
+      viewBtn.className = "flex-1 py-2 px-3 rounded-xl bg-white text-indigo-700 shadow-xs border border-slate-200 flex items-center justify-center space-x-1.5 transition";
+    }
+    if (uploadBtn) {
+      uploadBtn.className = "flex-1 py-2 px-3 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white/60 flex items-center justify-center space-x-1.5 transition";
+    }
+    renderTxUploadedDocsView();
+  }
+}
+
+async function handleTxFileSelected(key, input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+
+  // Batas 10 MB
+  if (file.size > 10 * 1024 * 1024) {
+    alert("Ukuran berkas melebihi batas maksimal 10 MB!");
+    input.value = "";
+    return;
+  }
+
+  const emptyArea = document.getElementById(`tx-doc-empty-area-${key}`);
+  const loadingArea = document.getElementById(`tx-doc-loading-${key}`);
+  const filledArea = document.getElementById(`tx-doc-filled-area-${key}`);
+  const statusBadge = document.getElementById(`tx-doc-status-${key}`);
+  const hiddenInput = document.getElementById(`tx-doc-${key}`);
+  const nameEl = document.getElementById(`tx-doc-name-${key}`);
+
+  if (emptyArea) emptyArea.classList.add("hidden");
+  if (filledArea) filledArea.classList.add("hidden");
+  if (loadingArea) loadingArea.classList.remove("hidden");
+  if (statusBadge) {
+    statusBadge.innerText = "Mengunggah...";
+    statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800";
+  }
+
+  try {
+    let finalUrl = "";
+    const empIdentifier = CURRENT_TX_SELECTED_EMP?.nip || CURRENT_TX_SELECTED_EMP?.id || "EMP";
+
+    // 1. Coba upload ke Supabase Storage (digiasha-media)
+    if (supabaseClient) {
+      try {
+        const ext = file.name.split('.').pop() || (file.type.includes("pdf") ? "pdf" : "jpg");
+        const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').substring(0, 14);
+        const random = Math.floor(Math.random() * 10000);
+        const filePath = `employee_docs/${empIdentifier}/${key.toUpperCase()}-${timestamp}-${random}.${ext}`;
+
+        const bucketName = CONFIG.MEDIA_BUCKET || "digiasha-media";
+        const { error: upErr } = await supabaseClient.storage
+          .from(bucketName)
+          .upload(filePath, file, {
+            contentType: file.type || (ext === "pdf" ? "application/pdf" : "image/jpeg"),
+            upsert: true
+          });
+
+        if (!upErr) {
+          const { data: pubData } = supabaseClient.storage.from(bucketName).getPublicUrl(filePath);
+          if (pubData && pubData.publicUrl) {
+            finalUrl = pubData.publicUrl;
+          }
+        } else {
+          console.warn("[Upload Storage Warning]:", upErr);
+        }
+      } catch (storageErr) {
+        console.warn("[Upload Storage Exception]:", storageErr);
+      }
+    }
+
+    // 2. Jika Supabase Storage belum aktif / offline, fallback ke Base64 data URL
+    if (!finalUrl) {
+      if (file.type && file.type.startsWith("image/")) {
+        finalUrl = await compressImage(file, 1600, 0.85);
+      } else {
+        finalUrl = await readFileAsBase64(file);
+      }
+    }
+
+    // 3. Simpan state berkas
+    CURRENT_TX_DOCS[key] = {
+      name: file.name,
+      size: file.size,
+      type: file.type || (file.name.endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
+      url: finalUrl,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (hiddenInput) hiddenInput.value = finalUrl;
+    if (nameEl) nameEl.innerText = file.name;
+
+    if (loadingArea) loadingArea.classList.add("hidden");
+    if (filledArea) filledArea.classList.remove("hidden");
+    if (statusBadge) {
+      statusBadge.innerText = "✓ Terunggah";
+      statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800";
+    }
+
+    updateTxUploadedCountBadge();
+    showToast(`Berkas ${file.name} berhasil diunggah!`, "success", 2000);
+  } catch (err) {
+    console.error("[handleTxFileSelected] Error:", err);
+    if (loadingArea) loadingArea.classList.add("hidden");
+    if (emptyArea) emptyArea.classList.remove("hidden");
+    if (statusBadge) {
+      statusBadge.innerText = "Gagal";
+      statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800";
+    }
+    alert("Gagal mengunggah berkas: " + err.message);
+  }
+}
+
+function removeTxDoc(key) {
+  delete CURRENT_TX_DOCS[key];
+
+  const hiddenInput = document.getElementById(`tx-doc-${key}`);
+  const fileInput = document.getElementById(`tx-file-input-${key}`);
+  const urlInput = document.getElementById(`tx-doc-url-input-${key}`);
+  const emptyArea = document.getElementById(`tx-doc-empty-area-${key}`);
+  const filledArea = document.getElementById(`tx-doc-filled-area-${key}`);
+  const statusBadge = document.getElementById(`tx-doc-status-${key}`);
+
+  if (hiddenInput) hiddenInput.value = "";
+  if (fileInput) fileInput.value = "";
+  if (urlInput) urlInput.value = "";
+  if (filledArea) filledArea.classList.add("hidden");
+  if (emptyArea) emptyArea.classList.remove("hidden");
+  if (statusBadge) {
+    statusBadge.innerText = "Belum ada";
+    statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600";
+  }
+
+  updateTxUploadedCountBadge();
+  const viewContent = document.getElementById("tab-tx-doc-view-content");
+  if (viewContent && !viewContent.classList.contains("hidden")) {
+    renderTxUploadedDocsView();
+  }
+}
+
+function toggleTxDocUrlInput(key) {
+  const box = document.getElementById(`tx-doc-url-box-${key}`);
+  if (box) box.classList.toggle("hidden");
+}
+
+function handleTxDocUrlChanged(key, url) {
+  const val = (url || "").trim();
+  if (!val) {
+    removeTxDoc(key);
+    return;
+  }
+
+  const fileName = val.split("/").pop() || `${key.toUpperCase()}_LINK`;
+  CURRENT_TX_DOCS[key] = {
+    name: fileName,
+    size: null,
+    type: val.includes(".pdf") ? "application/pdf" : "image/jpeg",
+    url: val,
+    updatedAt: new Date().toISOString()
+  };
+
+  const hiddenInput = document.getElementById(`tx-doc-${key}`);
+  const emptyArea = document.getElementById(`tx-doc-empty-area-${key}`);
+  const filledArea = document.getElementById(`tx-doc-filled-area-${key}`);
+  const statusBadge = document.getElementById(`tx-doc-status-${key}`);
+  const nameEl = document.getElementById(`tx-doc-name-${key}`);
+
+  if (hiddenInput) hiddenInput.value = val;
+  if (nameEl) nameEl.innerText = fileName;
+  if (emptyArea) emptyArea.classList.add("hidden");
+  if (filledArea) filledArea.classList.remove("hidden");
+  if (statusBadge) {
+    statusBadge.innerText = "✓ Terhubung";
+    statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800";
+  }
+
+  updateTxUploadedCountBadge();
+}
+
+function setTxDocValue(key, url, defaultName = "Dokumen") {
+  if (!url) return;
+  const fileName = url.startsWith("data:") ? `${defaultName}.pdf` : (url.split("/").pop() || defaultName);
+  CURRENT_TX_DOCS[key] = {
+    name: fileName,
+    url: url,
+    size: null,
+    type: url.includes(".pdf") ? "application/pdf" : "image/jpeg",
+    updatedAt: new Date().toISOString()
+  };
+
+  const hiddenInput = document.getElementById(`tx-doc-${key}`);
+  const emptyArea = document.getElementById(`tx-doc-empty-area-${key}`);
+  const filledArea = document.getElementById(`tx-doc-filled-area-${key}`);
+  const statusBadge = document.getElementById(`tx-doc-status-${key}`);
+  const nameEl = document.getElementById(`tx-doc-name-${key}`);
+
+  if (hiddenInput) hiddenInput.value = url;
+  if (nameEl) nameEl.innerText = fileName;
+  if (emptyArea) emptyArea.classList.add("hidden");
+  if (filledArea) filledArea.classList.remove("hidden");
+  if (statusBadge) {
+    statusBadge.innerText = "✓ Terunggah";
+    statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800";
+  }
+
+  updateTxUploadedCountBadge();
+}
+
+function resetTxDocForm() {
+  CURRENT_TX_DOCS = {};
+  const keys = ["cv", "ktp", "kk", "npwp", "kontrak"];
+  keys.forEach(k => removeTxDoc(k));
+  switchTxDocTab("upload");
+  updateTxUploadedCountBadge();
+}
+
+function updateTxUploadedCountBadge() {
+  const badge = document.getElementById("tx-doc-uploaded-count-badge");
+  if (!badge) return;
+  const count = Object.keys(CURRENT_TX_DOCS).filter(k => Boolean(CURRENT_TX_DOCS[k]?.url)).length;
+  badge.innerText = count;
+  badge.className = count > 0 
+    ? "ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-700"
+    : "ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700";
+}
+
+function renderTxUploadedDocsView() {
+  const container = document.getElementById("tx-doc-view-list");
+  if (!container) return;
+
+  const keys = [
+    { key: "cv", label: "Berkas CV (Curriculum Vitae)", icon: "fa-solid fa-file-pdf", color: "text-red-600", bg: "bg-red-50" },
+    { key: "ktp", label: "Scan KTP Karyawan", icon: "fa-solid fa-id-card", color: "text-blue-600", bg: "bg-blue-50" },
+    { key: "kk", label: "Scan Kartu Keluarga (KK)", icon: "fa-solid fa-users-rectangle", color: "text-emerald-600", bg: "bg-emerald-50" },
+    { key: "npwp", label: "Scan NPWP Karyawan", icon: "fa-solid fa-receipt", color: "text-amber-600", bg: "bg-amber-50" },
+    { key: "kontrak", label: "Dokumen Kontrak Kerja / SK", icon: "fa-solid fa-file-signature", color: "text-purple-600", bg: "bg-purple-50" }
+  ];
+
+  const uploadedItems = [];
+  keys.forEach(item => {
+    const docObj = CURRENT_TX_DOCS[item.key];
+    const val = docObj?.url || document.getElementById(`tx-doc-${item.key}`)?.value?.trim();
+    if (val) {
+      uploadedItems.push({
+        ...item,
+        url: val,
+        name: docObj?.name || (val.startsWith("data:") ? `${item.label}.pdf` : val.split("/").pop()) || `${item.key}_dokumen`,
+        isPdf: val.startsWith("data:application/pdf") || val.toLowerCase().includes(".pdf")
+      });
+    }
+  });
+
+  updateTxUploadedCountBadge();
+
+  if (uploadedItems.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-3">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-xl mx-auto border border-indigo-100 shadow-2xs">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <div>
+          <h5 class="font-bold text-xs sm:text-sm text-slate-800">Belum Ada Berkas Terunggah</h5>
+          <p class="text-[11px] text-slate-400 max-w-sm mx-auto mt-0.5">
+            Silakan beralih ke tab <strong>Upload Dokumen</strong> untuk memilih atau mengunggah berkas CV, KTP, KK, NPWP, atau Kontrak/SK.
+          </p>
+        </div>
+        <button type="button" onclick="switchTxDocTab('upload')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm active:scale-95">
+          <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
+          <span>Beralih ke Tab Upload Dokumen</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `<div class="grid grid-cols-1 gap-2.5">`;
+  uploadedItems.forEach(item => {
+    html += `
+      <div class="p-3 bg-white border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-2xs hover:border-indigo-300 transition">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center ${item.color} text-lg shrink-0 border border-slate-100">
+            <i class="${item.icon}"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-slate-800">${item.label}</span>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">✓ Siap Dilampirkan</span>
+            </div>
+            <p class="text-[11px] text-slate-400 truncate max-w-md font-mono mt-0.5">${item.name}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="previewTxDoc('${item.key}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs border border-indigo-200 flex items-center gap-1.5 transition active:scale-95 shadow-2xs">
+            <i class="fa-solid fa-eye text-[11px]"></i><span>Buka / Lihat</span>
+          </button>
+          <a href="${item.url}" target="_blank" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition" title="Buka Tab Baru">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+          <button type="button" onclick="removeTxDoc('${item.key}')" class="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs border border-rose-200 transition" title="Hapus Berkas">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function previewTxDoc(key) {
+  const doc = CURRENT_TX_DOCS[key];
+  const url = doc?.url || document.getElementById(`tx-doc-${key}`)?.value || document.getElementById(`tx-doc-url-input-${key}`)?.value;
+  if (!url) {
+    alert("Belum ada berkas untuk dipratinjau!");
+    return;
+  }
+  const titleMap = {
+    cv: "Berkas CV / Resume",
+    ktp: "Scan KTP Karyawan",
+    kk: "Scan Kartu Keluarga (KK)",
+    npwp: "Scan NPWP Karyawan",
+    kontrak: "Dokumen Kontrak Kerja / SK"
+  };
+  openTxDocPreview(url, titleMap[key] || "Dokumen Persyaratan", doc?.name);
+}
+
+function openTxDocPreview(url, title = "Preview Dokumen", filename = "") {
+  const modal = document.getElementById("modal-tx-doc-preview");
+  if (!modal) return;
+
+  const titleEl = document.getElementById("doc-preview-modal-title");
+  const subEl = document.getElementById("doc-preview-modal-sub");
+  const bodyEl = document.getElementById("doc-preview-modal-body");
+  const extBtn = document.getElementById("doc-preview-open-ext-btn");
+
+  if (titleEl) titleEl.innerText = title;
+  if (subEl) subEl.innerText = filename || (url.length > 50 ? url.substring(0, 50) + "..." : url);
+  if (extBtn) extBtn.href = url;
+
+  const isPdf = url.startsWith("data:application/pdf") || url.toLowerCase().includes(".pdf");
+
+  if (bodyEl) {
+    if (isPdf) {
+      bodyEl.innerHTML = `
+        <div class="w-full h-[72vh] flex flex-col">
+          <iframe src="${url}" class="w-full flex-1 rounded-2xl border border-slate-300 shadow-sm bg-white" title="Dokumen PDF"></iframe>
+          <div class="mt-2 text-center text-xs text-slate-500">
+            Jika tampilan PDF kosong di peramban Anda, <a href="${url}" target="_blank" class="text-indigo-600 font-bold underline">klik di sini untuk membuka terpisah</a>.
+          </div>
+        </div>
+      `;
+    } else {
+      bodyEl.innerHTML = `
+        <div class="max-h-[75vh] flex items-center justify-center p-2">
+          <img src="${url}" alt="${title}" class="max-w-full max-h-[72vh] object-contain rounded-2xl shadow-lg border border-slate-200" />
+        </div>
+      `;
+    }
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeTxDocPreviewModal() {
+  document.getElementById("modal-tx-doc-preview")?.classList.add("hidden");
+  const bodyEl = document.getElementById("doc-preview-modal-body");
+  if (bodyEl) bodyEl.innerHTML = "";
+}
+
+async function loadTxEmployeeExistingDocs(emp) {
+  if (!emp) return;
+  resetTxDocForm();
+
+  // 1. Cek properti langsung dari object emp
+  if (emp.doc_cv_url || emp.cv_url) setTxDocValue("cv", emp.doc_cv_url || emp.cv_url, "CV Karyawan");
+  if (emp.doc_ktp_url || emp.ktp_url) setTxDocValue("ktp", emp.doc_ktp_url || emp.ktp_url, "KTP Karyawan");
+  if (emp.doc_kk_url || emp.kk_url) setTxDocValue("kk", emp.doc_kk_url || emp.kk_url, "KK Karyawan");
+  if (emp.doc_npwp_url || emp.npwp_url) setTxDocValue("npwp", emp.doc_npwp_url || emp.npwp_url, "NPWP Karyawan");
+  if (emp.doc_kontrak_url || emp.kontrak_url) setTxDocValue("kontrak", emp.doc_kontrak_url || emp.kontrak_url, "Kontrak Kerja / SK");
+
+  // 2. Query transaksi terakhir atau data personal details di Supabase
+  if (supabaseClient && emp.id) {
+    try {
+      const { data: tx } = await supabaseClient
+        .from("hr_employee_transactions")
+        .select("doc_cv_url, doc_ktp_url, doc_kk_url, doc_npwp_url, doc_kontrak_url")
+        .eq("employee_id", emp.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (tx) {
+        if (tx.doc_cv_url && !CURRENT_TX_DOCS["cv"]) setTxDocValue("cv", tx.doc_cv_url, "CV Karyawan (Riwayat)");
+        if (tx.doc_ktp_url && !CURRENT_TX_DOCS["ktp"]) setTxDocValue("ktp", tx.doc_ktp_url, "KTP Karyawan (Riwayat)");
+        if (tx.doc_kk_url && !CURRENT_TX_DOCS["kk"]) setTxDocValue("kk", tx.doc_kk_url, "KK Karyawan (Riwayat)");
+        if (tx.doc_npwp_url && !CURRENT_TX_DOCS["npwp"]) setTxDocValue("npwp", tx.doc_npwp_url, "NPWP Karyawan (Riwayat)");
+        if (tx.doc_kontrak_url && !CURRENT_TX_DOCS["kontrak"]) setTxDocValue("kontrak", tx.doc_kontrak_url, "Kontrak / SK (Riwayat)");
+      }
+    } catch (e) {
+      console.warn("[loadTxEmployeeExistingDocs] warning:", e);
+    }
+  }
+
+  updateTxUploadedCountBadge();
 }
 
 async function handleSubmitEmployeeTransaction(event) {
