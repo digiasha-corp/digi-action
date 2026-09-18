@@ -16720,7 +16720,6 @@ function openAddJobPositionModal() {
   document.getElementById("btn-delete-pos")?.classList.add("hidden");
 
   populateJobPosLevelSelect("");
-  populateJobPosUnitSelect("");
   populateJobPosReportsToSelect("");
   document.getElementById("modal-jobpos-edit").classList.remove("hidden");
 }
@@ -16739,8 +16738,7 @@ function openEditJobPositionModal(id) {
   document.getElementById("btn-delete-pos")?.classList.remove("hidden");
 
   populateJobPosLevelSelect(item.level_id);
-  populateJobPosUnitSelect(item.unit_id);
-  populateJobPosReportsToSelect(item.reports_to_unit_id, id);
+  populateJobPosReportsToSelect(item.reports_to_unit_id, id, item.coordination_to_unit_id);
   document.getElementById("modal-jobpos-edit").classList.remove("hidden");
 }
 
@@ -16850,14 +16848,24 @@ function populateJobPosUnitSelect(selected = "") {
   }).join("");
 }
 
-function populateJobPosReportsToSelect(selected = "", excludeId = "") {
+function populateJobPosReportsToSelect(selected = "", excludeId = "", selectedCoord = "") {
   const select = document.getElementById("pos-input-reportsto");
-  if (!select) return;
+  const coordSelect = document.getElementById("pos-input-coord");
   const eligible = ORG_POSITIONS_DATA.filter(p => p.id_position !== excludeId);
-  select.innerHTML = '<option value="">- Tidak Ada (Puncak / Direksi) -</option>' + eligible.map(p => {
-    const nonaktifTag = p.is_active === false ? ' [NONAKTIF]' : '';
-    return `<option value="${p.id_position}" ${p.id_position === selected ? 'selected' : ''}>${p.nama_jabatan} (${p.id_position})${nonaktifTag}</option>`;
-  }).join("");
+
+  if (select) {
+    select.innerHTML = '<option value="">- Tidak Ada (Puncak / Direksi) -</option>' + eligible.map(p => {
+      const nonaktifTag = p.is_active === false ? ' [NONAKTIF]' : '';
+      return `<option value="${p.id_position}" ${p.id_position === selected ? 'selected' : ''}>${p.nama_jabatan} (${p.id_position})${nonaktifTag}</option>`;
+    }).join("");
+  }
+
+  if (coordSelect) {
+    coordSelect.innerHTML = '<option value="">- Tidak Ada Koordinasi -</option>' + eligible.map(p => {
+      const nonaktifTag = p.is_active === false ? ' [NONAKTIF]' : '';
+      return `<option value="${p.id_position}" ${p.id_position === selectedCoord ? 'selected' : ''}>${p.nama_jabatan} (${p.id_position})${nonaktifTag}</option>`;
+    }).join("");
+  }
 }
 
 async function handleSaveJobPosition(e) {
@@ -16865,16 +16873,17 @@ async function handleSaveJobPosition(e) {
   const id = document.getElementById("pos-input-id").value.trim().toUpperCase();
   const name = document.getElementById("pos-input-name").value.trim();
   const level = document.getElementById("pos-input-level").value;
-  const unit = document.getElementById("pos-input-unit").value;
-  const reportsTo = document.getElementById("pos-input-reportsto").value || null;
+  const reportsTo = document.getElementById("pos-input-reportsto")?.value || null;
+  const coord = document.getElementById("pos-input-coord")?.value || null;
   const isActive = document.getElementById("pos-input-status") ? (document.getElementById("pos-input-status").value !== "false") : true;
 
   const payload = {
     id_position: id,
     nama_jabatan: name,
     level_id: level,
-    unit_id: unit,
+    unit_id: null,
     reports_to_unit_id: reportsTo,
+    coordination_to_unit_id: coord,
     is_active: isActive,
     updated_at: new Date().toISOString()
   };
