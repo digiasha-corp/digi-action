@@ -16709,19 +16709,6 @@ function renderOrgPositionsList(list) {
   }).join("");
 }
 
-function filterOrgPositions(query = "") {
-  const q = (query || "").trim().toLowerCase();
-  if (!q) {
-    renderOrgPositionsList(ORG_POSITIONS_DATA);
-    return;
-  }
-  const filtered = (ORG_POSITIONS_DATA || []).filter(p => 
-    (p.nama_jabatan || "").toLowerCase().includes(q) ||
-    (p.id_position || "").toLowerCase().includes(q)
-  );
-  renderOrgPositionsList(filtered);
-}
-
 function openAddJobPositionModal() {
   CURRENT_EDIT_JOBPOS_ID = null;
   document.getElementById("jobpos-modal-title").innerText = "Tambah Posisi / Jabatan";
