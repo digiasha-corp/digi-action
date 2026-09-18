@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260917_v122";
+const APP_BUILD_VERSION = "20260919_v149";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -1722,7 +1722,62 @@ async function loadScreen(screenName, updateHistory = true) {
 
     window.scrollTo(0, 0);
   } catch (err) {
-    container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-xs">Error memuat layar: ${err.message}</div>`;
+    console.error(`[loadScreen] Error loading screen ${screenName}:`, err);
+    if (screenName === "login") {
+      container.innerHTML = `
+        <div class="flex flex-col justify-center items-center w-full min-h-[80vh] px-2 py-6">
+          <div class="w-full max-w-sm bg-white rounded-2xl shadow-md p-5 sm:p-6 border border-slate-200">
+            <div class="text-center mb-5">
+              <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-900 text-white text-xl mb-2 shadow-sm">
+                <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+              </div>
+              <h1 class="text-lg font-bold text-slate-900 leading-tight">DIGI ACTION</h1>
+              <p class="text-[11px] text-slate-500 mt-0.5">Operational & Daily Activity Workspace</p>
+            </div>
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-3.5">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Email / NIP</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 text-sm">
+                    <i class="fa-solid fa-user"></i>
+                  </span>
+                  <input type="text" id="login-email" required placeholder="Masukkan Email atau NIP"
+                         class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Kata Sandi</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 text-sm">
+                    <i class="fa-solid fa-lock"></i>
+                  </span>
+                  <input type="password" id="login-pass" required placeholder="Masukkan kata sandi"
+                         class="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white" />
+                  <button type="button" onclick="togglePasswordVisibility('login-pass', this)" title="Lihat/Sembunyikan Sandi" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-700 text-sm transition">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+              <button type="submit" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs sm:text-sm shadow transition flex items-center justify-center space-x-2">
+                <span>Masuk ke Aplikasi</span>
+                <i class="fa-solid fa-arrow-right text-xs"></i>
+              </button>
+            </form>
+          </div>
+        </div>`;
+    } else {
+      container.innerHTML = `
+        <div class="p-6 bg-white rounded-2xl border border-red-200 text-center space-y-3 my-6 shadow-sm">
+          <div class="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-lg">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <h4 class="font-bold text-sm text-slate-800">Gagal Memuat Layar</h4>
+          <p class="text-xs text-slate-500">${err.message}</p>
+          <button type="button" onclick="loadScreen('dashboard')" class="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition">
+            Kembali ke Dashboard
+          </button>
+        </div>`;
+    }
   }
 }
 
@@ -18304,9 +18359,6 @@ async function handleSavePositionPermissions() {
 }
 
 // ---------------- 7. DETAIL PERSONALIA KARYAWAN (DOSSIER 4 TAB) ----------------
-let CURRENT_DOSSIER_EMP = null;
-let CURRENT_DOSSIER_PERSONAL = null;
-let CURRENT_DOSSIER_CAREER_LIST = [];
 let CURRENT_DOSSIER_TX_LIST = [];
 
 async function openEmployeeDossierModal(nipOrId) {
@@ -19376,7 +19428,6 @@ function openAddPersonaliaEmployeeModal() {
 // =========================================================================
 // CONTROLLER: BAGAN ORGANISASI VISUAL (ORG CHART TREE)
 // =========================================================================
-let ORG_CHART_ZOOM = 1;
 
 function populateOrgFilterUnits() {
   const sel = document.getElementById("org-chart-filter-unit");
