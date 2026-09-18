@@ -20196,77 +20196,59 @@ async function handleSubmitEmployeeTransaction(event) {
       effective_date: effDate,
       status: initialStatus,
       current_stage: 1,
-
-      // a. Penerimaan
-      is_new_hire: isPenerimaan,
-      new_hire_work_location_id: document.getElementById("tx-penerimaan-workloc")?.value || null,
-      new_hire_unit_id: document.getElementById("tx-penerimaan-unit")?.value || null,
-      new_hire_position_id: document.getElementById("tx-penerimaan-position")?.value || null,
-      new_hire_join_date: document.getElementById("tx-penerimaan-joindate")?.value || effDate,
-      new_hire_employment_status: document.getElementById("tx-penerimaan-status")?.value || "PKWT",
-
-      // b. Pengangkatan Tetap
-      is_permanent_appointment: isTetap,
-      permanent_contract_no: document.getElementById("tx-tetap-contractno")?.value.trim() || null,
-      permanent_contract_start_date: document.getElementById("tx-tetap-contractstart")?.value || effDate,
-      permanent_contract_end_date: end50Str,
-
-      // c & d. Kontrak / Perpanjangan
-      is_contract_appointment: isKontrak,
-      is_contract_extension: isPerpanjang,
-      contract_no: document.getElementById("tx-kontrak-contractno")?.value.trim() || document.getElementById("tx-penerimaan-contractno")?.value.trim() || null,
-      contract_start_date: document.getElementById("tx-kontrak-contractstart")?.value || document.getElementById("tx-penerimaan-contractstart")?.value || null,
-      contract_end_date: document.getElementById("tx-kontrak-contractend")?.value || document.getElementById("tx-penerimaan-contractend")?.value || null,
-
-      // e. Rotasi
-      is_rotation: isRotasi,
-      previous_position_id: emp.position_id || null,
-      new_rotation_position_id: document.getElementById("tx-rotasi-new-pos")?.value || null,
-
-      // f. Promosi
-      is_promotion: isPromosi,
-      previous_level_id: emp.level_id || null,
-      new_promotion_level_id: document.getElementById("tx-promosi-new-lvl")?.value || null,
-      new_promotion_position_id: document.getElementById("tx-promosi-new-pos")?.value || null,
-
-      // g. Demosi
-      is_demotion: isDemosi,
-      new_demotion_level_id: document.getElementById("tx-demosi-new-lvl")?.value || null,
-      new_demotion_position_id: document.getElementById("tx-demosi-new-pos")?.value || null,
-
-      // h. Mutasi
-      is_mutation: isMutasi,
-      previous_work_location_id: emp.work_location_id || null,
-      new_mutation_work_location_id: document.getElementById("tx-mutasi-new-loc")?.value || null,
-      previous_unit_id: emp.unit_id || null,
-      new_mutation_unit_id: document.getElementById("tx-mutasi-new-unit")?.value || null,
-
-      // i. Penyesuaian Benefit
-      is_benefit_adjustment: isBenefit,
-      previous_basic_salary: parseFloat(emp.basic_salary || 0),
-      new_basic_salary: parseRupiah(document.getElementById("tx-new-salary")?.value),
-      new_allowance_jabatan: parseRupiah(document.getElementById("tx-new-allow-jabatan")?.value),
-      new_allowance_transport: parseRupiah(document.getElementById("tx-new-allow-transport")?.value),
-      new_allowance_komunikasi: parseRupiah(document.getElementById("tx-new-allow-komunikasi")?.value),
-      new_allowance_tempat_tinggal: parseRupiah(document.getElementById("tx-new-allow-tempattinggal")?.value),
-      new_allowance_penempatan: parseRupiah(document.getElementById("tx-new-allow-penempatan")?.value),
-      new_allowance_kemahalan: parseRupiah(document.getElementById("tx-new-allow-kemahalan")?.value),
-
-      // j, k, l. Exit
-      is_resignation: isResign,
-      is_phk: isPhk,
-      is_pension: isPensiun,
-      severance_amount: parseRupiah(document.getElementById("tx-exit-uangpisah")?.value),
-      exit_interview_form_no: document.getElementById("tx-exit-formno")?.value.trim() || null,
-      exit_notes: document.getElementById("tx-exit-notes")?.value.trim() || null,
-      inventory_returned: invReturned,
-      inventory_not_returned: invNotReturned,
-
-      // Dokumen
-      document_urls: docUrls,
-      created_by_user_id: CURRENT_USER?.id || null,
+      created_by_nip: CURRENT_USER?.nip || null,
       created_at: now,
-      updated_at: now
+      updated_at: now,
+
+      // a. Penerimaan & Kontrak
+      work_location_id: isPenerimaan ? (document.getElementById("tx-penerimaan-workloc")?.value || null) : (isMutasi ? (document.getElementById("tx-mutasi-new-loc")?.value || null) : (emp.work_location_id || null)),
+      unit_id: isPenerimaan ? (document.getElementById("tx-penerimaan-unit")?.value || null) : (isMutasi ? (document.getElementById("tx-mutasi-new-unit")?.value || null) : (emp.unit_id || null)),
+      position_id: isPenerimaan ? (document.getElementById("tx-penerimaan-position")?.value || null) : (isRotasi ? (document.getElementById("tx-rotasi-new-pos")?.value || null) : (isPromosi ? (document.getElementById("tx-promosi-new-pos")?.value || null) : (isDemosi ? (document.getElementById("tx-demosi-new-pos")?.value || null) : (emp.position_id || null)))),
+      join_date: isPenerimaan ? (document.getElementById("tx-penerimaan-joindate")?.value || effDate) : (emp.tanggal_masuk || null),
+      employment_status: isTetap ? "PKWTT" : (isKontrak || isPerpanjang || isPenerimaan ? (document.getElementById("tx-penerimaan-status")?.value || "PKWT") : (emp.status_kerja || "PKWT")),
+      contract_no: isTetap ? (document.getElementById("tx-tetap-contractno")?.value.trim() || null) : (isKontrak ? (document.getElementById("tx-kontrak-contractno")?.value.trim() || null) : (document.getElementById("tx-penerimaan-contractno")?.value.trim() || null)),
+      contract_start_date: isTetap ? (document.getElementById("tx-tetap-contractstart")?.value || effDate) : (isKontrak ? (document.getElementById("tx-kontrak-contractstart")?.value || effDate) : (document.getElementById("tx-penerimaan-contractstart")?.value || null)),
+      contract_end_date: isTetap ? end50Str : (isKontrak ? (document.getElementById("tx-kontrak-contractend")?.value || null) : (document.getElementById("tx-penerimaan-contractend")?.value || null)),
+
+      // Pergerakan Posisi (Rotasi, Promosi, Demosi, Mutasi)
+      prev_position_id: emp.position_id || null,
+      new_position_id: isRotasi ? (document.getElementById("tx-rotasi-new-pos")?.value || null) : (isPromosi ? (document.getElementById("tx-promosi-new-pos")?.value || null) : (isDemosi ? (document.getElementById("tx-demosi-new-pos")?.value || null) : null)),
+      prev_level_id: emp.level_id || null,
+      new_level_id: isPromosi ? (document.getElementById("tx-promosi-new-lvl")?.value || null) : (isDemosi ? (document.getElementById("tx-demosi-new-lvl")?.value || null) : null),
+      prev_location_id: emp.work_location_id || null,
+      new_location_id: isMutasi ? (document.getElementById("tx-mutasi-new-loc")?.value || null) : null,
+      prev_unit_id: emp.unit_id || null,
+      new_unit_id: isMutasi ? (document.getElementById("tx-mutasi-new-unit")?.value || null) : null,
+
+      // Penyesuaian Benefit & Remunerasi
+      prev_basic_salary: parseFloat(emp.basic_salary || 0),
+      new_basic_salary: isBenefit ? parseRupiah(document.getElementById("tx-new-salary")?.value) : parseFloat(emp.basic_salary || 0),
+      prev_allowance_jabatan: parseFloat(emp.allowance_jabatan || 0),
+      new_allowance_jabatan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-jabatan")?.value) : parseFloat(emp.allowance_jabatan || 0),
+      prev_allowance_transport: parseFloat(emp.allowance_transport || 0),
+      new_allowance_transport: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-transport")?.value) : parseFloat(emp.allowance_transport || 0),
+      prev_allowance_komunikasi: parseFloat(emp.allowance_komunikasi || 0),
+      new_allowance_komunikasi: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-komunikasi")?.value) : parseFloat(emp.allowance_komunikasi || 0),
+      prev_allowance_tempat_tinggal: parseFloat(emp.allowance_tempat_tinggal || 0),
+      new_allowance_tempat_tinggal: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-tempattinggal")?.value) : parseFloat(emp.allowance_tempat_tinggal || 0),
+      prev_allowance_penempatan: parseFloat(emp.allowance_penempatan || 0),
+      new_allowance_penempatan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-penempatan")?.value) : parseFloat(emp.allowance_penempatan || 0),
+      prev_allowance_kemahalan: parseFloat(emp.allowance_kemahalan || 0),
+      new_allowance_kemahalan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-kemahalan")?.value) : parseFloat(emp.allowance_kemahalan || 0),
+
+      // Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
+      uang_pisah: (isResign || isPhk || isPensiun) ? parseRupiah(document.getElementById("tx-exit-uangpisah")?.value) : 0,
+      uang_pisah_notes: (isResign || isPhk || isPensiun) ? (document.getElementById("tx-exit-notes")?.value.trim() || null) : null,
+      exit_interview_no: (isResign || isPhk || isPensiun) ? (document.getElementById("tx-exit-formno")?.value.trim() || null) : null,
+      inventory_returned: invReturned.join(", ") || null,
+      inventory_not_returned: invNotReturned.join(", ") || null,
+
+      // Lampiran Berkas / Dokumen
+      doc_cv_url: docUrls.cv,
+      doc_ktp_url: docUrls.ktp,
+      doc_kk_url: docUrls.kk,
+      doc_npwp_url: docUrls.npwp,
+      doc_kontrak_url: docUrls.kontrak
     };
 
     if (supabaseClient) {
@@ -20304,11 +20286,14 @@ async function handleSubmitEmployeeTransaction(event) {
           .from("employees")
           .update({
             nip: finalNip,
-            unit_id: txPayload.new_hire_unit_id,
-            position_id: txPayload.new_hire_position_id,
-            work_location_id: txPayload.new_hire_work_location_id,
-            status_kerja: txPayload.new_hire_employment_status,
-            tanggal_masuk: txPayload.new_hire_join_date,
+            unit_id: txPayload.unit_id,
+            position_id: txPayload.position_id,
+            work_location_id: txPayload.work_location_id,
+            status_kerja: txPayload.employment_status,
+            tanggal_masuk: txPayload.join_date,
+            contract_no: txPayload.contract_no,
+            contract_start_date: txPayload.contract_start_date,
+            contract_end_date: txPayload.contract_end_date,
             status_aktif: "AKTIF",
             is_active: true,
             updated_at: now
@@ -20383,23 +20368,23 @@ async function openElectronicAgreementModal(txId) {
   let changeItemsHtml = `<div class="font-bold text-indigo-950 mb-1">Jenis Transaksi: <span class="text-indigo-700">${types.join(", ")}</span></div>`;
   changeItemsHtml += `<div class="text-[11px] text-slate-600 mb-2">Tanggal Efektif Berlaku: <strong>${tx.effective_date}</strong></div>`;
 
-  if (tx.is_rotation || tx.is_promotion || tx.is_demotion) {
+  if (tx.new_position_id) {
     changeItemsHtml += `
       <div class="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs mb-1">
         <span>Jabatan Baru:</span>
-        <strong class="text-indigo-900">${tx.new_rotation_position_id || tx.new_promotion_position_id || tx.new_demotion_position_id || 'Jabatan Baru'}</strong>
+        <strong class="text-indigo-900">${tx.new_position_id}</strong>
       </div>
     `;
   }
-  if (tx.is_mutation) {
+  if (tx.new_unit_id || tx.new_location_id) {
     changeItemsHtml += `
       <div class="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs mb-1">
         <span>Penempatan / Unit Baru:</span>
-        <strong class="text-indigo-900">${tx.new_mutation_unit_id || tx.new_mutation_work_location_id || 'Unit Baru'}</strong>
+        <strong class="text-indigo-900">${[tx.new_location_id, tx.new_unit_id].filter(Boolean).join(" - ")}</strong>
       </div>
     `;
   }
-  if (tx.is_benefit_adjustment && tx.new_basic_salary) {
+  if (tx.new_basic_salary && parseFloat(tx.new_basic_salary) > 0) {
     changeItemsHtml += `
       <div class="p-2 bg-white rounded-xl border border-emerald-100 flex items-center justify-between text-xs mb-1">
         <span>Penyesuaian Gaji Pokok:</span>
@@ -20455,12 +20440,13 @@ async function confirmElectronicAgreement() {
         .insert({
           transaction_id: txId,
           employee_id: tx.employee_id,
-          nip: tx.nip || CURRENT_USER?.nip,
-          signed_at: now,
+          employee_nip: tx.nip || CURRENT_USER?.nip || "",
+          is_agreed: true,
+          agreed_at: now,
           ip_address: ipAddress,
-          device_info: deviceInfo,
-          statement_text: statementText,
-          is_agreed: true
+          user_agent: deviceInfo,
+          agreement_statement: statementText,
+          created_at: now
         });
 
       // 2. Update status transaksi menjadi IN_REVIEW & aktifkan Staging 1
@@ -20664,70 +20650,64 @@ async function applyApprovedTransactionToEmployee(tx) {
     const empId = tx.employee_id;
     const now = new Date().toISOString();
     const updatePayload = { updated_at: now };
+    const types = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || ""];
 
     // A. Penerimaan Karyawan (New Hire)
-    if (tx.is_new_hire) {
-      updatePayload.unit_id = tx.new_hire_unit_id;
-      updatePayload.position_id = tx.new_hire_position_id;
-      updatePayload.work_location_id = tx.new_hire_work_location_id;
-      updatePayload.status_kerja = tx.new_hire_employment_status || "PKWT";
+    if (types.includes("Penerimaan Karyawan") || tx.is_new_hire) {
+      if (tx.unit_id) updatePayload.unit_id = tx.unit_id;
+      if (tx.position_id) updatePayload.position_id = tx.position_id;
+      if (tx.work_location_id) updatePayload.work_location_id = tx.work_location_id;
+      updatePayload.status_kerja = tx.employment_status || "PKWT";
       updatePayload.status_aktif = "AKTIF";
       updatePayload.is_active = true;
-      updatePayload.tanggal_masuk = tx.new_hire_join_date;
-      if (tx.permanent_contract_no) updatePayload.contract_no = tx.permanent_contract_no;
+      if (tx.join_date) updatePayload.tanggal_masuk = tx.join_date;
       if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
+      if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
       if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
     }
 
     // B. Pengangkatan Tetap (PKWTT)
-    if (tx.is_permanent_appointment) {
+    if (types.includes("Tetap (PKWTT)") || tx.is_permanent_appointment) {
       updatePayload.status_kerja = "PKWTT";
-      if (tx.permanent_contract_no) updatePayload.contract_no = tx.permanent_contract_no;
-      if (tx.permanent_contract_start_date) updatePayload.contract_start_date = tx.permanent_contract_start_date;
-      if (tx.permanent_contract_end_date) updatePayload.contract_end_date = tx.permanent_contract_end_date;
+      if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
+      if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
+      if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
     }
 
     // C/D. Pengangkatan / Perpanjang Kontrak (PKWT)
-    if (tx.is_contract_appointment || tx.is_contract_extension) {
+    if (types.includes("Pengangkatan Kontrak") || types.includes("Perpanjang Kontrak") || tx.is_contract_appointment || tx.is_contract_extension) {
       updatePayload.status_kerja = "PKWT";
       if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
       if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
       if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
     }
 
-    // E. Rotasi
-    if (tx.is_rotation && tx.new_rotation_position_id) {
-      updatePayload.position_id = tx.new_rotation_position_id;
+    // E/F/G. Rotasi, Promosi, Demosi
+    if (tx.new_position_id) {
+      updatePayload.position_id = tx.new_position_id;
     }
-
-    // F. Promosi
-    if (tx.is_promotion) {
-      if (tx.new_promotion_position_id) updatePayload.position_id = tx.new_promotion_position_id;
-      if (tx.new_promotion_level_id) updatePayload.level_id = tx.new_promotion_level_id;
-    }
-
-    // G. Demosi
-    if (tx.is_demotion) {
-      if (tx.new_demotion_position_id) updatePayload.position_id = tx.new_demotion_position_id;
-      if (tx.new_demotion_level_id) updatePayload.level_id = tx.new_demotion_level_id;
+    if (tx.new_level_id) {
+      updatePayload.level_id = tx.new_level_id;
     }
 
     // H. Mutasi
-    if (tx.is_mutation) {
-      if (tx.new_mutation_work_location_id) updatePayload.work_location_id = tx.new_mutation_work_location_id;
-      if (tx.new_mutation_unit_id) updatePayload.unit_id = tx.new_mutation_unit_id;
+    if (tx.new_location_id) {
+      updatePayload.work_location_id = tx.new_location_id;
+    }
+    if (tx.new_unit_id) {
+      updatePayload.unit_id = tx.new_unit_id;
     }
 
     // I. Penyesuaian Benefit
-    if (tx.is_benefit_adjustment && tx.new_basic_salary) {
+    if (tx.new_basic_salary && parseFloat(tx.new_basic_salary) > 0) {
       updatePayload.basic_salary = parseFloat(tx.new_basic_salary);
     }
 
     // J/K/L. Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
-    if (tx.is_resignation || tx.is_phk || tx.is_pension) {
+    if (types.some(t => ["Resign", "PHK", "Pensiun"].includes(t)) || tx.is_resignation || tx.is_phk || tx.is_pension) {
       updatePayload.status_aktif = "NONAKTIF";
       updatePayload.is_active = false;
-      updatePayload.deleted_at = tx.effective_date ? new Date(tx.effective_date).toISOString() : now;
+      updatePayload.tanggal_keluar = tx.effective_date || new Date().toISOString().split("T")[0];
     }
 
     await supabaseClient
@@ -20736,7 +20716,7 @@ async function applyApprovedTransactionToEmployee(tx) {
       .eq("id", empId);
 
     // Buat riwayat jejak di employee_career_histories
-    const typesStr = Array.isArray(tx.transaction_types) ? tx.transaction_types.join(", ") : (tx.transaction_types || "Transaksi");
+    const typesStr = types.join(", ");
     await supabaseClient
       .from("employee_career_histories")
       .insert({
@@ -20744,10 +20724,10 @@ async function applyApprovedTransactionToEmployee(tx) {
         transaction_date: tx.effective_date || new Date().toISOString().split("T")[0],
         effective_date: tx.effective_date,
         transaction_type: typesStr,
-        no_sk: tx.permanent_contract_no || tx.contract_no || ("SK/" + tx.id.slice(0, 8)),
+        no_sk: tx.contract_no || ("SK/" + tx.id.slice(0, 8)),
         description: `Transaksi disetujui: ${typesStr}`,
         new_basic_salary: tx.new_basic_salary ? parseFloat(tx.new_basic_salary) : null,
-        new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0)),
+        new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0) + parseFloat(tx.new_allowance_komunikasi || 0) + parseFloat(tx.new_allowance_tempat_tinggal || 0) + parseFloat(tx.new_allowance_penempatan || 0) + parseFloat(tx.new_allowance_kemahalan || 0)),
         created_at: now
       });
 

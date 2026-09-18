@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.hr_employee_transactions (
     transaction_types TEXT[] NOT NULL DEFAULT '{}',
     effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
     status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL', -- 'DRAFT', 'PENDING_AGREEMENT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'APPLIED'
+    current_stage INT NOT NULL DEFAULT 1,
     created_by_nip TEXT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -104,10 +105,12 @@ CREATE TABLE IF NOT EXISTS public.hr_transaction_staging_approvals (
     transaction_id UUID NOT NULL,
     stage_order INT NOT NULL DEFAULT 1,
     approver_nip TEXT NOT NULL,
+    approver_role TEXT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'APPROVED', 'REJECTED'
     approved_at TIMESTAMPTZ NULL,
     notes TEXT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT fk_staging_tx FOREIGN KEY (transaction_id) REFERENCES public.hr_employee_transactions(id) ON DELETE CASCADE
 );
 
@@ -120,6 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_staging_approver_nip ON public.hr_transaction_sta
 CREATE TABLE IF NOT EXISTS public.hr_transaction_agreements (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     transaction_id UUID NOT NULL,
+    employee_id UUID NULL,
     employee_nip TEXT NOT NULL,
     is_agreed BOOLEAN NOT NULL DEFAULT FALSE,
     agreed_at TIMESTAMPTZ NULL,
