@@ -590,158 +590,270 @@
         <button type="button" onclick="closeEmployeeDossierModal()" class="text-white/70 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
-      <!-- Navigasi Tab Dossier -->
+      <!-- Navigasi 4 Tab Dossier -->
       <div class="flex border-b border-slate-200 bg-slate-50 px-3 pt-2 space-x-1 text-xs font-bold overflow-x-auto shrink-0">
-        <button type="button" id="dossier-tab-btn-job" onclick="switchDossierTab('job')" class="px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs whitespace-nowrap">
-          <i class="fa-solid fa-briefcase mr-1"></i> Pekerjaan & Akun
+        <button type="button" id="dossier-tab-btn-personal" onclick="switchDossierTab('personal')" class="px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs whitespace-nowrap">
+          <i class="fa-solid fa-id-card mr-1"></i> 1. Data Pribadi Sipil
         </button>
-        <button type="button" id="dossier-tab-btn-personal" onclick="switchDossierTab('personal')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
-          <i class="fa-solid fa-id-card mr-1"></i> Data Pribadi Sipil
+        <button type="button" id="dossier-tab-btn-job" onclick="switchDossierTab('job')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          <i class="fa-solid fa-briefcase mr-1"></i> 2. Kepegawaian
         </button>
-        <button type="button" id="dossier-tab-btn-career" onclick="switchDossierTab('career')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
-          <i class="fa-solid fa-clock-rotate-left mr-1"></i> Transaksi Karir & Remunerasi
+        <button type="button" id="dossier-tab-btn-payroll" onclick="switchDossierTab('payroll')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          <i class="fa-solid fa-money-bill-wave mr-1"></i> 3. Rincian Payroll
+        </button>
+        <button type="button" id="dossier-tab-btn-history" onclick="switchDossierTab('history')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          <i class="fa-solid fa-clock-rotate-left mr-1"></i> 4. History Transaksi
         </button>
       </div>
 
       <!-- Content Dossier -->
       <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
-        <!-- TAB CONTENT 1: PEKERJAAN & AKUN -->
-        <div id="dossier-content-job" class="space-y-3">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Unit Organisasi & Penempatan</span>
-              <span id="dossier-unit-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
-              <span id="dossier-workloc-val" class="text-[11px] text-slate-500 block mt-0.5">Lokasi Fisik: -</span>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jabatan & Tingkatan Level</span>
-              <span id="dossier-jabatan-val" class="font-bold text-indigo-900 text-xs block mt-0.5">-</span>
-              <span id="dossier-level-val" class="text-[11px] text-indigo-700 block mt-0.5">Level: -</span>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Atasan Langsung (Supervisor)</span>
-              <span id="dossier-atasan-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Masa Kerja & Kontrak</span>
-              <span id="dossier-masakerja-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
-              <span id="dossier-kontrak-val" class="text-[11px] text-slate-500 block mt-0.5">-</span>
-            </div>
-          </div>
-
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-            <span class="text-[10px] text-slate-400 font-bold block uppercase">Kredensial SSO & Akun</span>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-600">Email Akun SSO:</span>
-              <span id="dossier-email-val" class="font-bold font-mono text-slate-800">-</span>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-600">Role Akses Digi Active:</span>
-              <span id="dossier-role-val" class="font-bold text-purple-800">-</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB CONTENT 2: DATA PRIBADI SIPIL MURNI -->
-        <div id="dossier-content-personal" class="space-y-3 hidden">
+        <!-- TAB CONTENT 1: DATA PRIBADI SIPIL MURNI -->
+        <div id="dossier-content-personal" class="space-y-3">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
               <span class="text-[10px] text-slate-400 font-bold block uppercase">Nomor Induk Kependudukan (NIK KTP)</span>
               <span id="dossier-nik-val" class="font-bold font-mono text-slate-900 text-xs block mt-0.5">-</span>
             </div>
             <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Nama Lengkap (Sipil)</span>
+              <span id="dossier-pribadi-nama-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
               <span class="text-[10px] text-slate-400 font-bold block uppercase">Tempat & Tanggal Lahir</span>
               <span id="dossier-ttl-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
             </div>
             <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jenis Kelamin & Agama</span>
-              <span id="dossier-gender-agama-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jenis Kelamin</span>
+              <span id="dossier-gender-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
             </div>
             <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Status Pernikahan & Tanggungan</span>
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Status Pernikahan</span>
               <span id="dossier-marital-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Nama Istri / Suami (Pasangan)</span>
+              <span id="dossier-spouse-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
             </div>
           </div>
 
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+          <!-- Data Anak (JSONB) -->
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Data Anak (Tanggungan)</span>
+              <span id="dossier-children-count-val" class="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full">0 Anak</span>
+            </div>
+            <div id="dossier-children-list-container" class="flex flex-wrap gap-1.5 pt-0.5">
+              <span class="text-slate-400 italic text-[11px]">- Tidak ada data anak -</span>
+            </div>
+          </div>
+
+          <!-- Kontak & Alamat -->
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
             <span class="text-[10px] text-slate-400 font-bold block uppercase">Kontak & Alamat Domisili</span>
-            <div class="text-xs">
-              <span class="text-slate-500">No. HP / WhatsApp:</span>
-              <span id="dossier-phone-val" class="font-bold text-slate-800 ml-1">-</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <span class="text-slate-500">Nomor HP:</span>
+                <span id="dossier-phone-val" class="font-bold text-slate-800 ml-1">-</span>
+              </div>
+              <div>
+                <span class="text-slate-500">Nomor WhatsApp:</span>
+                <span id="dossier-wa-val" class="font-bold text-slate-800 ml-1">-</span>
+              </div>
             </div>
             <div class="text-xs">
-              <span class="text-slate-500">Alamat KTP:</span>
-              <p id="dossier-alamatktp-val" class="text-slate-700 mt-0.5">-</p>
+              <span class="text-slate-500">Alamat Sesuai KTP:</span>
+              <p id="dossier-alamatktp-val" class="text-slate-700 mt-0.5 font-medium">-</p>
             </div>
             <div class="text-xs">
               <span class="text-slate-500">Alamat Domisili Saat Ini:</span>
-              <p id="dossier-alamatdom-val" class="text-slate-700 mt-0.5">-</p>
+              <p id="dossier-alamatdom-val" class="text-slate-700 mt-0.5 font-medium">-</p>
+            </div>
+            <div class="text-xs">
+              <span class="text-slate-500">Geotagging Domisili (Koordinat Manual):</span>
+              <span id="dossier-geotag-val" class="font-mono text-indigo-700 font-bold ml-1">-</span>
             </div>
           </div>
 
-          <div class="p-3 bg-rose-50/70 border border-rose-200/80 rounded-2xl space-y-1">
-            <span class="text-[10px] text-rose-700 font-bold block uppercase">Kontak Darurat (Emergency Contact)</span>
-            <div class="text-xs flex items-center justify-between">
-              <span id="dossier-emergency-name-val" class="font-bold text-rose-900">-</span>
-              <span id="dossier-emergency-phone-val" class="font-mono font-bold text-rose-800">-</span>
+          <!-- Kontak Darurat & Pendidikan -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 bg-rose-50/70 border border-rose-200/80 rounded-2xl space-y-1">
+              <span class="text-[10px] text-rose-700 font-bold block uppercase">Kontak Darurat (Emergency Contact)</span>
+              <div class="text-xs">
+                <div class="flex items-center justify-between">
+                  <span id="dossier-emergency-name-val" class="font-bold text-rose-900">-</span>
+                  <span id="dossier-emergency-phone-val" class="font-mono font-bold text-rose-800">-</span>
+                </div>
+                <span id="dossier-emergency-rel-val" class="text-[10px] text-rose-600 block mt-0.5">-</span>
+              </div>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Pendidikan Terakhir</span>
+              <div class="text-xs">
+                <span id="dossier-education-val" class="font-bold text-slate-900 block">-</span>
+                <span id="dossier-major-val" class="text-[10px] text-slate-500 block mt-0.5">Jurusan: -</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
+            <span class="text-slate-500 font-bold uppercase text-[10px]">Email Akun Login:</span>
+            <span id="dossier-email-val" class="font-bold font-mono text-slate-800">-</span>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 2: KEPEGAWAIAN (STATUS AKTIF TERKINI) -->
+        <div id="dossier-content-job" class="space-y-3 hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Nomor Induk Pegawai (NIP)</span>
+              <span id="dossier-nip-val" class="font-bold font-mono text-indigo-900 text-sm block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Status Kepegawaian</span>
+              <span id="dossier-statuskerja-val" class="font-bold text-emerald-800 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Penempatan (Work Location)</span>
+              <span id="dossier-penempatan-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Unit Kerja</span>
+              <span id="dossier-unit-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jabatan</span>
+              <span id="dossier-jabatan-val" class="font-bold text-indigo-900 text-xs block mt-0.5">-</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">Level (Grade)</span>
+              <span id="dossier-level-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-1">
+            <span class="text-[10px] text-indigo-700 font-bold block uppercase">Atasan Langsung (Garis Pelaporan)</span>
+            <div class="flex items-center justify-between text-xs">
+              <span id="dossier-atasan-val" class="font-bold text-indigo-950">-</span>
+              <span id="dossier-atasan-sub-val" class="text-[10px] text-indigo-700 font-medium">Hierarki Terhitung Otomatis</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+            <span class="text-[10px] text-slate-400 font-bold block uppercase">Perjanjian Kerja & Kontrak</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <span class="text-slate-500">Tanggal Bergabung:</span>
+                <span id="dossier-tglgabung-val" class="font-bold text-slate-800 ml-1">-</span>
+              </div>
+              <div>
+                <span class="text-slate-500">No. Perjanjian Kerja:</span>
+                <span id="dossier-nokontrak-val" class="font-mono font-bold text-slate-800 ml-1">-</span>
+              </div>
+              <div>
+                <span class="text-slate-500">Tanggal Perjanjian Kerja:</span>
+                <span id="dossier-tglkontrak-val" class="font-bold text-slate-800 ml-1">-</span>
+              </div>
+              <div>
+                <span class="text-slate-500">Tanggal Berakhir Kontrak:</span>
+                <span id="dossier-tglselesaikontrak-val" class="font-bold text-rose-700 ml-1">-</span>
+              </div>
+              <div class="col-span-1 sm:col-span-2 pt-1 border-t border-slate-200">
+                <span class="text-slate-500">Tanggal Resign / Nonaktif:</span>
+                <span id="dossier-tglresign-val" class="font-bold text-slate-800 ml-1">-</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- TAB CONTENT 3: TRANSAKSI KARIR & REMUNERASI (HISTORIS LENGKAP) -->
-        <div id="dossier-content-career" class="space-y-3 hidden">
-          <!-- RINGKASAN STATUS PAYROLL & REMUNERASI AKTIF -->
-          <div class="bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm space-y-2.5">
+        <!-- TAB CONTENT 3: RINCIAN PAYROLL & BENEFIT -->
+        <div id="dossier-content-payroll" class="space-y-3 hidden">
+          <div class="bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm space-y-3">
             <div class="flex items-center justify-between border-b border-emerald-500/20 pb-2">
               <div class="flex items-center space-x-2">
                 <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
                   <i class="fa-solid fa-money-bill-wave"></i>
                 </div>
                 <div>
-                  <h5 class="font-bold text-xs text-white">Status Payroll & Remunerasi Terkini</h5>
-                  <span class="text-[10px] text-emerald-300">Gaji Pokok, Rekening Payroll & Jaminan Sosial</span>
+                  <h5 class="font-bold text-xs text-white">Status Remunerasi & Benefit Terkini</h5>
+                  <span class="text-[10px] text-emerald-300">Gaji Pokok & 6 Komponen Tunjangan Aktif</span>
                 </div>
               </div>
-              <span id="dossier-remun-sk-badge" class="font-mono text-[9px] bg-white/10 px-2 py-0.5 rounded border border-white/15 text-emerald-200">SK: -</span>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-emerald-300 font-bold uppercase block">Gaji Pokok (Basic Salary)</span>
+                <span id="dossier-gajipokok-val" class="font-black text-sm sm:text-base text-emerald-400 block mt-0.5">Rp 0</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[9px] text-slate-400 block">Total Tunjangan:</span>
+                <span id="dossier-total-tunjangan-val" class="font-bold text-xs text-teal-300">Rp 0</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
               <div class="bg-white/5 p-2 rounded-xl border border-white/10">
-                <span class="text-[9px] text-emerald-300 font-bold uppercase block">Gaji Pokok</span>
-                <span id="dossier-remun-gaji-val" class="font-bold text-xs sm:text-sm text-emerald-400 block mt-0.5">Rp -</span>
-                <span id="dossier-remun-tunjangan-val" class="text-[9px] text-slate-300 block">Tunjangan: -</span>
+                <span class="text-[9px] text-slate-300 font-bold block">Tunj. Jabatan</span>
+                <span id="dossier-tunj-jabatan-val" class="font-bold text-xs text-white block mt-0.5">Rp 0</span>
               </div>
               <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-slate-300 font-bold block">Tunj. Transport</span>
+                <span id="dossier-tunj-transport-val" class="font-bold text-xs text-white block mt-0.5">Rp 0</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-slate-300 font-bold block">Tunj. Komunikasi</span>
+                <span id="dossier-tunj-komunikasi-val" class="font-bold text-xs text-white block mt-0.5">Rp 0</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-slate-300 font-bold block">Tunj. Tempat Tinggal</span>
+                <span id="dossier-tunj-tempattinggal-val" class="font-bold text-xs text-white block mt-0.5">Rp 0</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-slate-300 font-bold block">Tunj. Penempatan</span>
+                <span id="dossier-tunj-penempatan-val" class="font-bold text-xs text-white block mt-0.5">Rp 0</span>
+              </div>
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
+                <span class="text-[9px] text-slate-300 font-bold block">Tunj. Kemahalan</span>
+                <span id="dossier-tunj-kemahalan-val" class="font-bold text-xs text-white block mt-0.5">Rp 0</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs pt-1 border-t border-white/10">
+              <div class="bg-white/5 p-2 rounded-xl border border-white/10">
                 <span class="text-[9px] text-emerald-300 font-bold uppercase block">Bank & Rekening</span>
-                <span id="dossier-remun-bank-val" class="font-bold text-xs text-white block mt-0.5">-</span>
-                <span id="dossier-remun-rekening-val" class="font-mono text-[10px] text-slate-300 block">-</span>
+                <span id="dossier-bank-val" class="font-bold text-xs text-white block mt-0.5">-</span>
+                <span id="dossier-rekening-val" class="font-mono text-[10px] text-slate-300 block">-</span>
               </div>
               <div class="bg-white/5 p-2 rounded-xl border border-white/10">
                 <span class="text-[9px] text-emerald-300 font-bold uppercase block">BPJS Kes / TK</span>
-                <span id="dossier-remun-bpjskes-val" class="font-mono text-[10px] text-slate-200 block mt-0.5">Kes: -</span>
-                <span id="dossier-remun-bpjstk-val" class="font-mono text-[10px] text-slate-200 block">TK: -</span>
+                <span id="dossier-bpjskes-val" class="font-mono text-[10px] text-slate-200 block mt-0.5">Kes: -</span>
+                <span id="dossier-bpjstk-val" class="font-mono text-[10px] text-slate-200 block">TK: -</span>
               </div>
               <div class="bg-white/5 p-2 rounded-xl border border-white/10">
                 <span class="text-[9px] text-emerald-300 font-bold uppercase block">Pajak (NPWP & PTKP)</span>
-                <span id="dossier-remun-npwp-val" class="font-mono text-[10px] text-slate-200 block mt-0.5">NPWP: -</span>
-                <span id="dossier-remun-ptkp-val" class="font-bold text-[10px] text-emerald-300 block">PTKP: -</span>
+                <span id="dossier-npwp-val" class="font-mono text-[10px] text-slate-200 block mt-0.5">NPWP: -</span>
+                <span id="dossier-ptkp-val" class="font-bold text-[10px] text-emerald-300 block">PTKP: -</span>
               </div>
             </div>
           </div>
+        </div>
 
-          <div class="flex items-center justify-between pt-1">
+        <!-- TAB CONTENT 4: HISTORY TRANSAKSI KARYAWAN -->
+        <div id="dossier-content-history" class="space-y-3 hidden">
+          <div class="flex items-center justify-between">
             <div>
-              <h5 class="font-bold text-xs text-slate-800">Timeline Transaksi Karir & Remunerasi</h5>
-              <p class="text-[10px] text-slate-500">Rekam jejak mutasi, promosi, SK, perubahan gaji, rekening & BPJS</p>
+              <h5 class="font-bold text-xs text-slate-800">Riwayat Pengajuan Transaksi Karyawan</h5>
+              <p class="text-[10px] text-slate-500">Penerimaan, Mutasi, Promosi, Penyesuaian Benefit, hingga Resign</p>
             </div>
-            <button type="button" onclick="openAddCareerTransactionModal()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow flex items-center space-x-1 transition">
+            <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip)" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow flex items-center space-x-1 transition">
               <i class="fa-solid fa-plus text-xs"></i>
-              <span>Catat Transaksi Baru</span>
+              <span>Buat Transaksi</span>
             </button>
           </div>
 
-          <div id="dossier-career-timeline-container" class="space-y-2 relative border-l-2 border-indigo-200 ml-3 pl-4 pt-1">
-            <!-- Timeline Items dirender secara dinamis oleh JavaScript -->
+          <div id="dossier-tx-history-container" class="space-y-2 relative border-l-2 border-indigo-200 ml-3 pl-4 pt-1">
             <div class="p-4 text-center text-xs text-slate-400">Belum ada riwayat transaksi tercatat.</div>
           </div>
         </div>
@@ -749,9 +861,9 @@
 
       <!-- Footer Dossier -->
       <div class="p-3.5 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
-        <button type="button" onclick="openEditEmployeeFullModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
-          <i class="fa-solid fa-pen-to-square"></i>
-          <span>Edit Data Karyawan & Payroll</span>
+        <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip)" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-bolt text-xs text-amber-300"></i>
+          <span>⚡ Buat Transaksi Karyawan</span>
         </button>
         <button type="button" onclick="closeEmployeeDossierModal()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold rounded-xl text-xs transition">
           Tutup
@@ -960,139 +1072,673 @@
     </div>
   </div>
 
-  <!-- MODAL FORM: CATAT TRANSAKSI KARIR / REMUNERASI BARU (GLOBAL) -->
-  <div id="modal-career-transaction-add" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
-    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-      <div class="p-4 bg-indigo-900 text-white flex justify-between items-center shrink-0">
-        <div class="flex items-center space-x-2">
-          <i class="fa-solid fa-file-contract text-indigo-300"></i>
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: INPUT DATA CALON KARYAWAN (DATA PRIBADI SIPIL & JSONB)          -->
+  <!-- ========================================================================= -->
+  <div id="modal-candidate-input" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="p-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-user-plus"></i>
+          </div>
           <div>
-            <h4 class="font-bold text-xs sm:text-sm">Catat Transaksi Karir & Remunerasi</h4>
-            <p class="text-[10px] text-indigo-200" id="tx-modal-emp-label">Karyawan: -</p>
+            <h4 class="font-bold text-xs sm:text-sm">Input Data Calon Karyawan</h4>
+            <p class="text-[10px] text-emerald-300">Formulir Rekrutmen & Berkas Data Pribadi Sipil</p>
           </div>
         </div>
-        <button type="button" onclick="closeCareerTransactionModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+        <button type="button" onclick="closeCandidateInputModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
-      <form id="form-career-transaction-add" onsubmit="handleSaveCareerTransaction(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
-        <input type="hidden" id="tx-input-emp-id" value="" />
+      <form id="form-candidate-input" onsubmit="handleSaveCandidate(event)" class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-3.5 text-xs">
+        <div class="p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl">
+          <span class="text-[10px] font-bold text-emerald-800 uppercase block mb-1"><i class="fa-solid fa-circle-info mr-1"></i> Identitas Pokok Calon Pegawai</span>
+          <p class="text-[11px] text-emerald-700 leading-relaxed">Calon karyawan yang diinput di sini berstatus <strong>Calon Karyawan (Belum NIP)</strong>. NIP resmi dan penempatan kerja akan otomatis dibuat saat transaksi <em>Penerimaan Karyawan</em> diajukan.</p>
+        </div>
 
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Jenis Transaksi: <span class="text-rose-500">*</span></label>
-            <select id="tx-input-type" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-indigo-700">
-              <option value="PROMOTION">Promosi Jabatan / Level</option>
-              <option value="MUTATION">Mutasi Cabang / Unit</option>
-              <option value="ROTATION">Rotasi Tugas</option>
-              <option value="SALARY_ADJUSTMENT">Penyesuaian Gaji & Benefit</option>
-              <option value="STATUS_CHANGE">Perubahan Status (PKWT ke PKWTT)</option>
-              <option value="DEMOTION">Demosi</option>
-              <option value="JOIN">Pengangkatan Pertama (Join)</option>
+            <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap (Wajib Huruf Besar): <span class="text-rose-500">*</span></label>
+            <input type="text" id="cand-input-nama" required placeholder="CONTOH: AHMAD FAUZI RIDWAN" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z\s\.\,\']/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold uppercase text-slate-900 focus:bg-white focus:border-indigo-600 outline-none" />
+            <span class="text-[9px] text-slate-400 mt-0.5 block">Hanya huruf besar (tidak boleh ada angka)</span>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">NIK KTP (16 Digit): <span class="text-rose-500">*</span></label>
+            <input type="text" id="cand-input-nik" required maxlength="16" placeholder="3201xxxxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tempat Lahir:</label>
+            <input type="text" id="cand-input-pob" placeholder="Contoh: Jakarta" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-indigo-600 outline-none" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir: <span class="text-rose-500">*</span></label>
+            <input type="date" id="cand-input-dob" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin: <span class="text-rose-500">*</span></label>
+            <select id="cand-input-gender" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+              <option value="Laki-laki">Laki-laki</option>
+              <option value="Perempuan">Perempuan</option>
             </select>
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Tanggal Efektif SK: <span class="text-rose-500">*</span></label>
-            <input type="date" id="tx-input-effective-date" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" />
+            <label class="block font-semibold text-slate-700 mb-1">Status Pernikahan: <span class="text-rose-500">*</span></label>
+            <select id="cand-input-marital" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+              <option value="Belum Kawin">Belum Kawin</option>
+              <option value="Kawin">Kawin</option>
+              <option value="Cerai Hidup">Cerai Hidup</option>
+              <option value="Cerai Mati">Cerai Mati</option>
+            </select>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
+        <!-- Data Keluarga & Anak (JSONB) -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+          <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Data Keluarga & Anak (JSONB)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nama Istri / Suami (Pasangan):</label>
+              <input type="text" id="cand-input-spouse" placeholder="Nama pasangan jika sudah menikah" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-slate-900 outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jumlah Anak:</label>
+              <input type="number" id="cand-input-children-count" min="0" value="0" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 outline-none" />
+            </div>
+          </div>
+
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Nomor Surat Keputusan (SK):</label>
-            <input type="text" id="tx-input-nosk" placeholder="Contoh: SK/DIR/2026/089" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" />
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="font-semibold text-slate-700 text-xs">Daftar Nama Anak:</label>
+              <button type="button" onclick="addCandidateChildRow()" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-[10px] border border-indigo-200 flex items-center space-x-1">
+                <i class="fa-solid fa-plus text-[9px]"></i><span>Tambah Anak</span>
+              </button>
+            </div>
+            <div id="cand-children-container" class="space-y-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Alamat & Geotagging Manual (JSONB) -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+          <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Alamat & Geotagging Domisili (JSONB)</span>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Alamat Sesuai KTP:</label>
+            <textarea id="cand-input-alamat-ktp" rows="2" placeholder="Nama jalan, RT/RW, Kelurahan, Kecamatan, Kota" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-900 outline-none"></textarea>
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">URL / Link File SK:</label>
-            <input type="url" id="tx-input-filesk" placeholder="https://..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800" />
-          </div>
-        </div>
-
-        <!-- PERUBAHAN STRUKTURAL -->
-        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Penempatan & Jabatan Baru:</span>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">Jabatan Baru:</label>
-              <select id="tx-input-new-position" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">Unit Organisasi Baru:</label>
-              <select id="tx-input-new-unit" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
-            </div>
+            <label class="block font-semibold text-slate-700 mb-1">Alamat Domisili Saat Ini:</label>
+            <textarea id="cand-input-alamat-dom" rows="2" placeholder="Alamat tinggal saat ini (kos/kontrak/rumah)" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-900 outline-none"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">Level Baru:</label>
-              <select id="tx-input-new-level" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
+              <label class="block font-semibold text-slate-700 mb-1">Latitude Domisili:</label>
+              <input type="text" id="cand-input-lat" placeholder="-6.2088" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-900 outline-none" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">Atasan Baru:</label>
-              <select id="tx-input-new-supervisor" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800"></select>
+              <label class="block font-semibold text-slate-700 mb-1">Longitude Domisili:</label>
+              <input type="text" id="cand-input-lng" placeholder="106.8456" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-900 outline-none" />
             </div>
           </div>
         </div>
 
-        <!-- PERUBAHAN REMUNERASI, GAJI, BPJS & PAJAK -->
-        <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
-          <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Data Remunerasi, Payroll, BPJS & Pajak:</span>
-          <div class="grid grid-cols-2 gap-2">
+        <!-- Kontak & Kontak Darurat -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor HP:</label>
+            <input type="tel" id="cand-input-phone" placeholder="08xxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 outline-none" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor WhatsApp:</label>
+            <input type="tel" id="cand-input-wa" placeholder="08xxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 outline-none" />
+          </div>
+        </div>
+
+        <div class="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+          <span class="text-[10px] font-bold text-rose-800 uppercase block"><i class="fa-solid fa-truck-medical mr-1"></i> Kontak Darurat (JSONB)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">Gaji Pokok Baru (Rp):</label>
-              <input type="number" id="tx-input-new-salary" placeholder="Contoh: 6500000" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-emerald-900" />
+              <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">Nama Kontak:</label>
+              <input type="text" id="cand-input-emerg-name" placeholder="Nama Saudara/Istri" class="w-full bg-white border border-rose-200 rounded-xl p-2 text-slate-900 outline-none" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">Tunjangan Tetap (Rp):</label>
-              <input type="number" id="tx-input-new-allowances" placeholder="Contoh: 1500000" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
+              <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">Hubungan:</label>
+              <input type="text" id="cand-input-emerg-rel" placeholder="Istri / Orang Tua" class="w-full bg-white border border-rose-200 rounded-xl p-2 text-slate-900 outline-none" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">No HP Darurat:</label>
+              <input type="tel" id="cand-input-emerg-phone" placeholder="08xxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-white border border-rose-200 rounded-xl p-2 font-mono text-slate-900 outline-none" />
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">Bank Payroll:</label>
-              <input type="text" id="tx-input-bank-name" placeholder="BCA / Mandiri / BRI" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-semibold text-slate-800" />
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">Nomor Rekening:</label>
-              <input type="text" id="tx-input-bank-account" placeholder="Nomor Rekening" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
-            </div>
+        </div>
+
+        <!-- Pendidikan & Email Akun -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir:</label>
+            <select id="cand-input-education" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+              <option value="SMA">SMA</option>
+              <option value="SMK">SMK</option>
+              <option value="Diploma">Diploma (D3)</option>
+              <option value="S1" selected>Strata 1 (S1)</option>
+              <option value="S2">Strata 2 (S2)</option>
+              <option value="S3">Strata 3 (S3)</option>
+              <option value="SMP">SMP</option>
+              <option value="SD">SD</option>
+            </select>
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">No. BPJS Kesehatan:</label>
-              <input type="text" id="tx-input-bpjs-kes" placeholder="00012345678" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">No. BPJS Ketenagakerjaan:</label>
-              <input type="text" id="tx-input-bpjs-tk" placeholder="19012345678" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">Nomor NPWP:</label>
-              <input type="text" id="tx-input-npwp" placeholder="00.000.000.0-000.000" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-800" />
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">Status Pajak (PTKP):</label>
-              <select id="tx-input-tax-status" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-800">
-                <option value="TK/0">TK/0 (Tidak Kawin, 0 Tanggungan)</option>
-                <option value="K/0">K/0 (Kawin, 0 Tanggungan)</option>
-                <option value="K/1">K/1 (Kawin, 1 Tanggungan)</option>
-                <option value="K/2">K/2 (Kawin, 2 Tanggungan)</option>
-                <option value="K/3">K/3 (Kawin, 3 Tanggungan)</option>
-              </select>
-            </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Jurusan Pendidikan:</label>
+            <input type="text" id="cand-input-major" placeholder="Contoh: Manajemen / Teknik Informatika" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 outline-none" />
           </div>
         </div>
 
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Alasan & Catatan Pertimbangan HR:</label>
-          <textarea id="tx-input-desc" rows="2" placeholder="Tuliskan latar belakang mutasi/promosi atau dasar penyesuaian..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800"></textarea>
+          <label class="block font-semibold text-slate-700 mb-1">Email Akun Login: <span class="text-rose-500">*</span></label>
+          <input type="email" id="cand-input-email" required placeholder="nama.karyawan@email.com" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 outline-none" />
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex justify-end space-x-2">
+          <button type="button" onclick="closeCandidateInputModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-save-candidate" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Simpan Data Calon Karyawan</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: PENGAJUAN TRANSAKSI KEPEGAWAIAN DINAMIS (12 JENIS TRANSAKSI)    -->
+  <!-- ========================================================================= -->
+  <div id="modal-employee-transaction" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+      <div class="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs sm:text-sm">Pengajuan Transaksi Kepegawaian</h4>
+            <p class="text-[10px] text-slate-300" id="tx-modal-subtitle">Pilih Karyawan & Tentukan Jenis Transaksi</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEmployeeTransactionModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="form-employee-transaction" onsubmit="handleSubmitEmployeeTransaction(event)" class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
+        <!-- 1. PENCARIAN & PEMILIHAN KARYAWAN -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-800 text-xs">1. Pilih Karyawan / Calon Pegawai: <span class="text-rose-500">*</span></label>
+            <span id="tx-emp-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">Pilih Karyawan</span>
+          </div>
+          <select id="tx-select-emp" required onchange="onTxEmployeeSelected(this.value)" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 outline-none">
+            <option value="">-- Pilih Calon Karyawan atau Pegawai Aktif --</option>
+          </select>
+          <div id="tx-emp-selected-summary" class="hidden p-2.5 bg-white border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
+            <div>
+              <span class="font-bold text-slate-900 block" id="tx-sum-name">-</span>
+              <span class="text-[11px] text-slate-500" id="tx-sum-pos-branch">-</span>
+            </div>
+            <span class="font-mono text-xs font-bold text-indigo-700" id="tx-sum-nip">-</span>
+          </div>
+        </div>
+
+        <!-- 2. TANGGAL BERLAKU TRANSAKSI -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+          <label class="block font-bold text-slate-800 mb-1">2. Tanggal Berlaku (*Effective Date*): <span class="text-rose-500">*</span></label>
+          <input type="date" id="tx-effective-date" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 outline-none" />
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Data kepegawaian otomatis ter-update tepat pada tanggal berlaku setelah persetujuan selesai.</span>
+        </div>
+
+        <!-- 3. PILIHAN JENIS TRANSAKSI (TICKMARK MULTIPLE) -->
+        <div class="p-3 bg-indigo-50/50 border border-indigo-200 rounded-2xl space-y-2">
+          <label class="block font-bold text-indigo-950 text-xs">3. Jenis Transaksi (Dapat Dicentang Lebih Dari Satu): <span class="text-rose-500">*</span></label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1" id="tx-tickmarks-container">
+            <label id="lbl-tx-penerimaan" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-penerimaan" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-bold text-slate-800 text-[11px]">a. Penerimaan Karyawan</span>
+            </label>
+            <label id="lbl-tx-tetap" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-tetap" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">b. Pengangkatan Tetap (PKWTT)</span>
+            </label>
+            <label id="lbl-tx-kontrak" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-kontrak" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">c. Pengangkatan Kontrak (PKWT)</span>
+            </label>
+            <label id="lbl-tx-perpanjang" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-perpanjang" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">d. Perpanjang Kontrak</span>
+            </label>
+            <label id="lbl-tx-rotasi" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-rotasi" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">e. Rotasi Jabatan</span>
+            </label>
+            <label id="lbl-tx-promosi" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-promosi" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">f. Promosi Jabatan</span>
+            </label>
+            <label id="lbl-tx-demosi" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-demosi" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">g. Demosi Jabatan</span>
+            </label>
+            <label id="lbl-tx-mutasi" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-mutasi" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">h. Mutasi Lokasi/Unit</span>
+            </label>
+            <label id="lbl-tx-benefit" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-indigo-400 transition">
+              <input type="checkbox" id="chk-tx-benefit" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-semibold text-slate-800 text-[11px]">i. Penyesuaian Benefit</span>
+            </label>
+            <label id="lbl-tx-resign" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-rose-400 transition">
+              <input type="checkbox" id="chk-tx-resign" onchange="toggleTxSubforms()" class="w-4 h-4 text-rose-600 rounded" />
+              <span class="font-semibold text-rose-800 text-[11px]">j. Pengunduran Diri (Resign)</span>
+            </label>
+            <label id="lbl-tx-phk" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-rose-400 transition">
+              <input type="checkbox" id="chk-tx-phk" onchange="toggleTxSubforms()" class="w-4 h-4 text-rose-600 rounded" />
+              <span class="font-semibold text-rose-800 text-[11px]">k. PHK (Pemutusan Kerja)</span>
+            </label>
+            <label id="lbl-tx-pensiun" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-rose-400 transition">
+              <input type="checkbox" id="chk-tx-pensiun" onchange="toggleTxSubforms()" class="w-4 h-4 text-rose-600 rounded" />
+              <span class="font-semibold text-rose-800 text-[11px]">l. Pensiun</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 4. SUB-FORM DINAMIS SESUAI TICKMARK -->
+        <!-- SUBFORM A: PENERIMAAN KARYAWAN -->
+        <div id="subform-penerimaan" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-3">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1"><i class="fa-solid fa-user-check mr-1 text-indigo-600"></i> Detail Penerimaan Karyawan Baru (New Hire)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Penempatan (Work Location): <span class="text-rose-500">*</span></label>
+              <select id="tx-penerimaan-workloc" onchange="populateTxUnitsByLocation(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-semibold text-slate-800"></select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Unit Kerja: <span class="text-rose-500">*</span></label>
+              <select id="tx-penerimaan-unit" onchange="populateTxPositionsByUnit(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-semibold text-slate-800"></select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jabatan: <span class="text-rose-500">*</span></label>
+              <select id="tx-penerimaan-position" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-semibold text-slate-800"></select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tanggal Bergabung: <span class="text-rose-500">*</span></label>
+              <input type="date" id="tx-penerimaan-joindate" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-slate-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Status Kepegawaian: <span class="text-rose-500">*</span></label>
+              <select id="tx-penerimaan-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-slate-800">
+                <option value="Mitra Lepas">Mitra Lepas</option>
+                <option value="Magang">Magang</option>
+                <option value="Probation">Probation</option>
+                <option value="PKWT" selected>PKWT (Kontrak)</option>
+                <option value="PKWTT">PKWTT (Tetap)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">No. Perjanjian Kerja:</label>
+              <input type="text" id="tx-penerimaan-contractno" placeholder="PK/DIR/..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tgl Perjanjian Kerja:</label>
+              <input type="date" id="tx-penerimaan-contractstart" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tgl Berakhir Kontrak:</label>
+              <input type="date" id="tx-penerimaan-contractend" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-900" />
+            </div>
+          </div>
+          <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-[11px] text-indigo-900 flex items-center space-x-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-indigo-600 text-sm"></i>
+            <span>NIP format <strong>MMYYXXXX</strong> akan otomatis di-generate dan diberikan kepada calon karyawan ini saat pengajuan transaksi disimpan.</span>
+          </div>
+        </div>
+
+        <!-- SUBFORM B: PENGANGKATAN KARYAWAN TETAP -->
+        <div id="subform-tetap" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-2.5">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1">b. Pengangkatan Karyawan Tetap (PKWTT)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">No. Perjanjian Kerja (SK Tetap): <span class="text-rose-500">*</span></label>
+              <input type="text" id="tx-tetap-contractno" placeholder="SK/PKWTT/..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tanggal Perjanjian Kerja: <span class="text-rose-500">*</span></label>
+              <input type="date" id="tx-tetap-contractstart" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-slate-900" />
+            </div>
+          </div>
+          <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 space-y-0.5">
+            <span class="font-bold block"><i class="fa-solid fa-calculator mr-1"></i> Perhitungan Otomatis Sistem:</span>
+            <span>• Status Kepegawaian di-update menjadi: <strong>PKWTT</strong></span><br>
+            <span>• Tanggal Berakhir Perjanjian Kerja dihitung otomatis ke <strong>Ulang Tahun ke-50</strong>: <strong id="tx-tetap-calc-end">-</strong></span>
+          </div>
+        </div>
+
+        <!-- SUBFORM C & D: PENGANGKATAN KONTRAK & PERPANJANG KONTRAK -->
+        <div id="subform-kontrak" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-2.5">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1" id="tx-kontrak-title">c/d. Pengangkatan / Perpanjangan Kontrak (PKWT)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">No. Perjanjian Kerja: <span class="text-rose-500">*</span></label>
+              <input type="text" id="tx-kontrak-contractno" placeholder="PK/PKWT/..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tgl Perjanjian Kerja: <span class="text-rose-500">*</span></label>
+              <input type="date" id="tx-kontrak-contractstart" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-slate-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tgl Berakhir Kontrak: <span class="text-rose-500">*</span></label>
+              <input type="date" id="tx-kontrak-contractend" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-slate-900" />
+            </div>
+          </div>
+          <div class="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+            <span>• Status Kepegawaian otomatis di-update menjadi: <strong>PKWT</strong></span>
+          </div>
+        </div>
+
+        <!-- SUBFORM E: ROTASI -->
+        <div id="subform-rotasi" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-2.5">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1">e. Rotasi (Pindah Jabatan Setara Level Sama)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Jabatan Sebelumnya (Aktif):</label>
+              <input type="text" id="tx-rotasi-prev-pos" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jabatan Berikutnya (Level Sama): <span class="text-rose-500">*</span></label>
+              <select id="tx-rotasi-new-pos" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBFORM F: PROMOSI -->
+        <div id="subform-promosi" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-2.5">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1">f. Promosi (Kenaikan Level / Golongan)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Level Sebelumnya:</label>
+              <input type="text" id="tx-promosi-prev-lvl" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Level Berikutnya (Tingkat Lebih Tinggi): <span class="text-rose-500">*</span></label>
+              <select id="tx-promosi-new-lvl" onchange="populateTxPromosiPositions(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Jabatan Sebelumnya:</label>
+              <input type="text" id="tx-promosi-prev-pos" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jabatan Baru: <span class="text-rose-500">*</span></label>
+              <select id="tx-promosi-new-pos" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBFORM G: DEMOSI -->
+        <div id="subform-demosi" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-2.5">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1">g. Demosi (Penurunan Level / Golongan)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Level Sebelumnya:</label>
+              <input type="text" id="tx-demosi-prev-lvl" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Level Berikutnya (Tingkat Lebih Rendah): <span class="text-rose-500">*</span></label>
+              <select id="tx-demosi-new-lvl" onchange="populateTxDemosiPositions(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Jabatan Sebelumnya:</label>
+              <input type="text" id="tx-demosi-prev-pos" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jabatan Baru: <span class="text-rose-500">*</span></label>
+              <select id="tx-demosi-new-pos" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBFORM H: MUTASI -->
+        <div id="subform-mutasi" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-2.5">
+          <span class="text-xs font-bold text-indigo-900 block border-b border-slate-200 pb-1">h. Mutasi (Perpindahan Lokasi Kerja / Unit Kerja)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Penempatan Sebelumnya:</label>
+              <input type="text" id="tx-mutasi-prev-loc" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Penempatan Berikutnya: <span class="text-rose-500">*</span></label>
+              <select id="tx-mutasi-new-loc" onchange="populateTxMutasiUnits(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-500 mb-1">Unit Kerja Sebelumnya:</label>
+              <input type="text" id="tx-mutasi-prev-unit" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-bold text-slate-700" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Unit Kerja Berikutnya: <span class="text-rose-500">*</span></label>
+              <select id="tx-mutasi-new-unit" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-indigo-900"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBFORM I: PENYESUAIAN BENEFIT -->
+        <div id="subform-benefit" class="hidden p-3.5 bg-white border-2 border-emerald-200 rounded-2xl space-y-3">
+          <span class="text-xs font-bold text-emerald-900 block border-b border-slate-200 pb-1"><i class="fa-solid fa-money-bill-wave mr-1 text-emerald-600"></i> i. Penyesuaian Remunerasi & Benefit (Format #,##0)</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <!-- Kolom Kiri: Sebelumnya -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <span class="text-[10px] font-bold text-slate-500 uppercase block">Benefit Sebelumnya (Aktif)</span>
+              <div>
+                <span class="text-slate-500 text-[10px]">Gaji Pokok:</span>
+                <span id="tx-prev-salary-display" class="font-bold font-mono text-slate-800 block text-xs">Rp 0</span>
+              </div>
+              <div class="grid grid-cols-2 gap-1 text-[11px]">
+                <div><span class="text-slate-500 text-[10px]">Tunj. Jabatan:</span><span id="tx-prev-allow-jabatan" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Transport:</span><span id="tx-prev-allow-transport" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Komunikasi:</span><span id="tx-prev-allow-komunikasi" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Tempat Tinggal:</span><span id="tx-prev-allow-tempattinggal" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Penempatan:</span><span id="tx-prev-allow-penempatan" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Kemahalan:</span><span id="tx-prev-allow-kemahalan" class="font-mono block">Rp 0</span></div>
+              </div>
+            </div>
+
+            <!-- Kolom Kanan: Perubahan Baru -->
+            <div class="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-2">
+              <span class="text-[10px] font-bold text-emerald-800 uppercase block">Benefit Perubahan Baru (Rp)</span>
+              <div>
+                <label class="block text-[10px] font-semibold text-emerald-900 mb-0.5">Gaji Pokok Baru: <span class="text-rose-500">*</span></label>
+                <input type="text" id="tx-new-salary" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-emerald-300 rounded-lg p-1.5 font-mono font-bold text-emerald-900 outline-none text-xs" />
+              </div>
+              <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Jabatan:</label>
+                  <input type="text" id="tx-new-allow-jabatan" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Transport:</label>
+                  <input type="text" id="tx-new-allow-transport" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Komunikasi:</label>
+                  <input type="text" id="tx-new-allow-komunikasi" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Tempat Tinggal:</label>
+                  <input type="text" id="tx-new-allow-tempattinggal" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Penempatan:</label>
+                  <input type="text" id="tx-new-allow-penempatan" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Kemahalan:</label>
+                  <input type="text" id="tx-new-allow-kemahalan" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBFORM J/K/L: RESIGN, PHK, PENSIUN -->
+        <div id="subform-exit" class="hidden p-3.5 bg-rose-50/50 border-2 border-rose-200 rounded-2xl space-y-3">
+          <span class="text-xs font-bold text-rose-900 block border-b border-rose-200 pb-1" id="tx-exit-title">j/k/l. Pengakhiran Hubungan Kerja</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Uang Pisah / Pesangon (Rp):</label>
+              <input type="text" id="tx-exit-uangpisah" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-rose-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor Form Exit Interview:</label>
+              <input type="text" id="tx-exit-formno" placeholder="Contoh: EXT-2026-001" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-900" />
+            </div>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Catatan Uang Pisah / Keterangan Tambahan:</label>
+            <textarea id="tx-exit-notes" rows="2" placeholder="Catatan kesepakatan uang pisah atau alasan pemutusan..." class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-900 outline-none"></textarea>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-emerald-800 text-[11px]"><i class="fa-solid fa-check mr-1"></i> Inventaris SUDAH Dikembalikan:</span>
+                <button type="button" onclick="addTxInventoryRow('returned')" class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold border border-emerald-200">+ Tambah</button>
+              </div>
+              <div id="tx-inv-returned-container" class="space-y-1"></div>
+            </div>
+            <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-800 text-[11px]"><i class="fa-solid fa-xmark mr-1"></i> Inventaris BELUM Dikembalikan:</span>
+                <button type="button" onclick="addTxInventoryRow('not_returned')" class="px-2 py-0.5 bg-rose-50 text-rose-700 rounded text-[10px] font-bold border border-rose-200">+ Tambah</button>
+              </div>
+              <div id="tx-inv-notreturned-container" class="space-y-1"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. UPLOAD DOKUMEN SESUAI TRANSAKSI -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <span class="text-xs font-bold text-slate-800 block">4. Upload Dokumen Persyaratan:</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs" id="tx-docs-container">
+            <div id="tx-doc-cv-wrap">
+              <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Berkas CV (PDF/Link):</label>
+              <input type="text" id="tx-doc-cv" placeholder="https://... atau upload" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800" />
+            </div>
+            <div id="tx-doc-ktp-wrap">
+              <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Scan KTP (PDF/Gambar):</label>
+              <input type="text" id="tx-doc-ktp" placeholder="https://... atau upload" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800" />
+            </div>
+            <div id="tx-doc-kk-wrap">
+              <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Scan Kartu Keluarga (KK):</label>
+              <input type="text" id="tx-doc-kk" placeholder="https://... atau upload" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800" />
+            </div>
+            <div id="tx-doc-npwp-wrap">
+              <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Scan NPWP:</label>
+              <input type="text" id="tx-doc-npwp" placeholder="https://... atau upload" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800" />
+            </div>
+            <div id="tx-doc-kontrak-wrap" class="col-span-1 sm:col-span-2">
+              <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Dokumen Kontrak Kerja / SK (PDF):</label>
+              <input type="text" id="tx-doc-kontrak" placeholder="https://... atau upload" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. STAGING APPROVAL BERTINGKAT -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800">5. Rantai Persetujuan (*Staging Approval*):</span>
+            <button type="button" onclick="addTxStagingStage()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-[10px] border border-indigo-200 flex items-center space-x-1">
+              <i class="fa-solid fa-plus text-[9px]"></i><span>Tambah Staging</span>
+            </button>
+          </div>
+          <div id="tx-staging-container" class="space-y-2">
+            <!-- Staging Row 1 Default -->
+            <div class="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2" id="tx-stage-row-1">
+              <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
+              <div class="flex-1 min-w-0">
+                <select id="tx-stage-approver-1" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
+                  <option value="">-- Pilih Approver Staging 1 --</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex justify-end space-x-2">
+          <button type="button" onclick="closeEmployeeTransactionModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-submit-tx" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Ajukan Transaksi Karyawan</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3: PERSETUJUAN ELEKTRONIK TRANSAKSI KEPEGAWAIAN (AUDIT TRAIL HUKUM) -->
+  <!-- ========================================================================= -->
+  <div id="modal-electronic-agreement" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="p-4 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-signature"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs sm:text-sm">Persetujuan Elektronik Perubahan Karir</h4>
+            <p class="text-[10px] text-purple-300">Pernyataan & Kesepakatan Resmi Karyawan Ybs</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeElectronicAgreementModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-3.5 text-xs">
+        <input type="hidden" id="agree-tx-id" value="" />
+        
+        <div class="p-3 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-2">
+          <span class="text-[10px] font-bold text-purple-900 uppercase block">Ringkasan Pengajuan Perubahan Karir:</span>
+          <div id="agree-summary-container" class="space-y-1.5 text-slate-800">
+            <!-- Di-render dinamis lewat JS -->
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-slate-700 leading-relaxed">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Pernyataan Hukum Persetujuan (*Legal Statement*):</span>
+          <p id="agree-legal-text" class="text-xs font-medium text-slate-900 bg-white p-3 rounded-xl border border-slate-200 italic">
+            "Dengan ini saya menyatakan telah membaca, memahami, dan menyetujui seluruh perubahan data kepegawaian (Rotasi / Promosi / Demosi / Mutasi / Penyesuaian Benefit) sebagaimana tercantum di atas, untuk diberlakukan terhitung mulai Tanggal Berlaku (Effective Date) yang telah ditetapkan perusahaan."
+          </p>
+          <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-1">
+            <div>Waktu Persetujuan: <strong class="text-slate-800" id="agree-meta-time">-</strong></div>
+            <div>Akun Karyawan: <strong class="text-slate-800" id="agree-meta-nip">-</strong></div>
+            <div>Alamat IP: <strong class="text-slate-800 font-mono" id="agree-meta-ip">-</strong></div>
+            <div>Perangkat: <strong class="text-slate-800" id="agree-meta-device">-</strong></div>
+          </div>
         </div>
 
         <div class="pt-3 border-t border-slate-200 flex space-x-2">
-          <button type="button" onclick="closeCareerTransactionModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
-          <button type="submit" id="btn-save-tx" class="w-2/3 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Transaksi</button>
+          <button type="button" onclick="closeElectronicAgreementModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Tutup / Tinjau Nanti</button>
+          <button type="button" onclick="confirmElectronicAgreement()" id="btn-confirm-agree" class="w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition">
+            <i class="fa-solid fa-check-double text-xs"></i>
+            <span>Saya Setuju & Konfirmasi</span>
+          </button>
         </div>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -1107,6 +1753,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260918_v146"></script>
+  <script src="/app.js?v=20260919_v147"></script>
 </body>
 </html>

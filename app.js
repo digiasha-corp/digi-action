@@ -3538,7 +3538,77 @@ async function fetchApprovalList() {
       }
     }
 
-    APPROVALS_CACHE = approvals || [];
+    // 3. Muat Transaksi Kepegawaian (hr_employee_transactions & staging approvals)
+    let careerTxApprovals = [];
+    if (supabaseClient) {
+      try {
+        const cleanNip = String(CURRENT_USER?.nip || "").trim();
+        const userId = CURRENT_USER?.id || cleanNip;
+
+        const { data: txList, error: txErr } = await supabaseClient
+          .from("hr_employee_transactions")
+          .select(`
+            *,
+            hr_transaction_staging_approvals (*)
+          `)
+          .order("created_at", { ascending: false });
+
+        if (!txErr && txList && txList.length > 0) {
+          txList.forEach(tx => {
+            const stagings = (tx.hr_transaction_staging_approvals || []).sort((a, b) => a.stage_order - b.stage_order);
+            const currentStageObj = stagings.find(s => s.stage_order === (tx.current_stage || 1));
+            
+            const isMySubmission = String(tx.nip || "").trim() === cleanNip || (tx.employee_id && String(tx.employee_id).trim() === String(userId).trim());
+            const isApproverForCurrentStage = currentStageObj && (
+              String(currentStageObj.approver_nip || "").trim() === cleanNip ||
+              String(currentStageObj.approver_user_id || "").trim() === String(userId).trim()
+            );
+
+            // Transaksi dimasukkan jika pengajuan milik user sendiri, ATAU user adalah approver stage saat ini
+            if (isMySubmission || isApproverForCurrentStage) {
+              const typesArr = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || "Transaksi"];
+              const typesStr = typesArr.join(", ");
+              
+              let mappedStatus = "PENDING";
+              if (tx.status === "APPROVED") mappedStatus = "APPROVED";
+              else if (tx.status === "REJECTED") mappedStatus = "REJECTED";
+              else if (tx.status === "CANCELLED") mappedStatus = "CANCELLED";
+
+              // Cari nama karyawan jika tersedia di master
+              const empMatch = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(tx.nip) || String(e.id) === String(tx.employee_id));
+              const empName = empMatch?.nama_lengkap || empMatch?.nama || tx.nip || "Karyawan";
+              const empCabang = empMatch?.cabang || "Head Office";
+
+              careerTxApprovals.push({
+                is_career_transaction: true,
+                izin_id: "TX-" + tx.id,
+                tx_id: tx.id,
+                stage_id: currentStageObj?.id,
+                current_stage_order: tx.current_stage || 1,
+                nama: empName,
+                nip: tx.nip,
+                cabang: empCabang,
+                jenis_izin: `Karir: ${typesStr}`,
+                status_approval: mappedStatus,
+                raw_tx_status: tx.status,
+                tgl_mulai: tx.effective_date,
+                tgl_selesai: tx.effective_date,
+                effective_date: tx.effective_date,
+                timestamp: tx.created_at,
+                catatan: tx.exit_notes || (typesArr.includes("Tetap (PKWTT)") ? `Pengangkatan Tetap (SK: ${tx.permanent_contract_no || '-'})` : `Pengajuan transaksi kepegawaian berlaku efektif: ${tx.effective_date}`),
+                pic_approval_nip: currentStageObj?.approver_nip || (tx.status === "PENDING_AGREEMENT" ? tx.nip : ""),
+                pic_approval_nama: currentStageObj?.approver_role || (tx.status === "PENDING_AGREEMENT" ? "PIC Ybs (Menunggu TTD)" : "Approver Staging"),
+                tx_data: tx
+              });
+            }
+          });
+        }
+      } catch (errTx) {
+        console.warn("[Approval Hub] Query hr_employee_transactions error:", errTx);
+      }
+    }
+
+    APPROVALS_CACHE = (approvals || []).concat(careerTxApprovals);
     updateApprovalBadgeCounts();
     renderApprovalList();
 
@@ -3600,7 +3670,7 @@ function updateApprovalBadgeCounts() {
     return isForMe && isNotMe && isPending;
   }).length;
 
-  // 2. Pengajuan milik user ini sendiri yang masih pending menunggu atasan
+  // 2. Pengajuan milik user ini sendiri yang masih pending menunggu atasan atau persetujuan elektronik
   const myPendingCount = APPROVALS_CACHE.filter(a => {
     const isMe = String(a.nip || "").trim() === cleanNip;
     const isPending = String(a.status_approval || "").toUpperCase() === "PENDING";
@@ -3705,7 +3775,7 @@ function renderApprovalList() {
 
   if (list.length === 0) {
     const emptyMsg = ACTIVE_APPROVAL_SCOPE === "MY"
-      ? "Anda belum memiliki riwayat pengajuan izin pada filter ini"
+      ? "Anda belum memiliki riwayat pengajuan izin / transaksi pada filter ini"
       : "Tidak ada permohonan persetujuan tim pada filter ini";
     container.innerHTML = `
       <div class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400 space-y-1.5">
@@ -3736,8 +3806,13 @@ function renderApprovalList() {
     let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
     let statusLabel = "Menunggu Respon";
     if (isPending) {
-      badgeStyle = "bg-amber-100 text-amber-800 border-amber-200";
-      statusLabel = "Menunggu Respon";
+      if (a.is_career_transaction && a.raw_tx_status === "PENDING_AGREEMENT") {
+        badgeStyle = "bg-purple-100 text-purple-800 border-purple-200";
+        statusLabel = "Menunggu TTD Anda";
+      } else {
+        badgeStyle = "bg-amber-100 text-amber-800 border-amber-200";
+        statusLabel = "Menunggu Respon";
+      }
     } else if (isApproved) {
       badgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-200";
       statusLabel = "Disetujui";
@@ -3749,7 +3824,14 @@ function renderApprovalList() {
       statusLabel = "Dibatalkan";
     }
 
-    const catConfig = categoryBadges[a.jenis_izin] || { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: "fa-file" };
+    let catConfig = categoryBadges[a.jenis_izin];
+    if (!catConfig) {
+      if (a.is_career_transaction) {
+        catConfig = { bg: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: "fa-bolt text-amber-500" };
+      } else {
+        catConfig = { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: "fa-file" };
+      }
+    }
 
     const periodeText = (a.tgl_mulai && a.tgl_selesai && a.tgl_mulai !== a.tgl_selesai)
       ? `${a.tgl_mulai} s/d ${a.tgl_selesai}`
@@ -3766,9 +3848,71 @@ function renderApprovalList() {
     ` : '';
 
     let actionSection = '';
-    if (isOwnSubmission) {
-      // PENGAJUAN SAYA: Hanya bisa melihat status dan tombol BATALKAN jika masih PENDING!
-      // MUTLAK TIDAK BISA APPROVE / REJECT DIRI SENDIRI
+    if (a.is_career_transaction) {
+      // KHUSUS TRANSAKSI KEPEGAWAIAN
+      if (isOwnSubmission) {
+        if (a.raw_tx_status === "PENDING_AGREEMENT") {
+          actionSection = `
+            <div class="mt-2.5 p-3 bg-purple-50 border border-purple-200 rounded-2xl space-y-2">
+              <div class="flex items-center space-x-2 text-purple-950 font-bold text-xs">
+                <i class="fa-solid fa-signature text-purple-600 text-sm"></i>
+                <span>Persetujuan Elektronik Karyawan Diperlukan</span>
+              </div>
+              <p class="text-[11px] text-purple-800 leading-relaxed">
+                Perubahan data kepegawaian (Rotasi / Promosi / Demosi / Mutasi / Benefit) membutuhkan pernyataan resmi dari Anda sebelum diteruskan ke Staging Approver.
+              </p>
+              <button type="button" onclick="openElectronicAgreementModal('${a.tx_id}')" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition active:scale-95">
+                <i class="fa-solid fa-signature"></i>
+                <span>Tanda Tangani Kesepakatan Elektronik</span>
+              </button>
+            </div>
+          `;
+        } else if (isPending) {
+          actionSection = `
+            <div class="mt-2.5 p-2.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[10px] text-indigo-950 flex items-center justify-between">
+              <span><i class="fa-solid fa-clock mr-1 text-indigo-600"></i>Menunggu Approver Staging ${a.current_stage_order}:</span>
+              <strong class="text-indigo-900">${a.pic_approval_nama || 'Approver'} (${a.pic_approval_nip || '-'})</strong>
+            </div>
+          `;
+        } else if (isApproved) {
+          actionSection = `
+            <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-emerald-700 flex items-center justify-between font-medium">
+              <span><i class="fa-solid fa-circle-check mr-1"></i>Transaksi Disetujui Penuh & Diberlakukan Efektif: <strong>${a.effective_date}</strong></span>
+            </div>
+          `;
+        } else if (isRejected) {
+          actionSection = `
+            <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-rose-700 flex items-center justify-between font-medium">
+              <span><i class="fa-solid fa-circle-xmark mr-1"></i>Transaksi Ditolak pada Staging Approver</span>
+            </div>
+          `;
+        }
+      } else {
+        // PERLU PERSETUJUAN TIM: Approver berhak Setujui / Tolak Staging
+        if (isPending) {
+          actionSection = `
+            <div class="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 mt-2.5">
+              <button type="button" onclick="openProcessTransactionApprovalModal('${a.tx_id}', '${a.stage_id}', 'REJECTED')" class="py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center space-x-1 transition active:scale-95">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Tolak Transaksi</span>
+              </button>
+              <button type="button" onclick="openProcessTransactionApprovalModal('${a.tx_id}', '${a.stage_id}', 'APPROVED')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center justify-center space-x-1 transition active:scale-95">
+                <i class="fa-solid fa-check"></i>
+                <span>Setujui Staging ${a.current_stage_order}</span>
+              </button>
+            </div>
+          `;
+        } else {
+          actionSection = `
+            <div class="pt-2 border-t border-slate-100 mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+              <span>Status Staging: <strong class="text-slate-600">${a.status_approval}</strong></span>
+              <span>${a.timestamp ? a.timestamp.slice(0, 16) : ''}</span>
+            </div>
+          `;
+        }
+      }
+    } else if (isOwnSubmission) {
+      // PENGAJUAN SAYA (IZIN BIASA)
       if (isPending) {
         actionSection = `
           <div class="mt-2.5 pt-2.5 border-t border-slate-100 space-y-2">
@@ -3810,7 +3954,7 @@ function renderApprovalList() {
         `;
       }
     } else {
-      // PENGAJUAN TIM / BAWAHAN: Approver berhak Setujui / Tolak
+      // PENGAJUAN TIM / BAWAHAN (IZIN BIASA)
       if (isPending) {
         actionSection = `
           <div class="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 mt-2.5">
@@ -3861,7 +4005,7 @@ function renderApprovalList() {
         </div>
 
         <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-700">
-          <span class="text-[9px] text-slate-400 font-bold block uppercase mb-0.5">Keterangan / Alasan:</span>
+          <span class="text-[9px] text-slate-400 font-bold block uppercase mb-0.5">Keterangan / Rincian:</span>
           <p class="font-medium whitespace-pre-line leading-relaxed">${a.catatan || '-'}</p>
         </div>
 
@@ -4019,6 +4163,25 @@ async function executeApprovalAction() {
   if (btnConfirm) {
     btnConfirm.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Memproses...';
     btnConfirm.disabled = true;
+  }
+
+  // Delegasi jika ini transaksi kepegawaian
+  if (PENDING_APPROVAL_ACTION_PAYLOAD.is_career_transaction) {
+    try {
+      await executeTransactionApproval(
+        PENDING_APPROVAL_ACTION_PAYLOAD.tx_id,
+        PENDING_APPROVAL_ACTION_PAYLOAD.stage_id,
+        PENDING_APPROVAL_ACTION_PAYLOAD.status,
+        inputNotes
+      );
+    } finally {
+      if (btnConfirm) {
+        btnConfirm.innerHTML = originalText;
+        btnConfirm.disabled = false;
+      }
+      closeProcessApprovalModal();
+    }
+    return;
   }
 
   try {
@@ -18140,7 +18303,12 @@ async function handleSavePositionPermissions() {
   }
 }
 
-// ---------------- 7. DETAIL PERSONALIA KARYAWAN & RIWAYAT KARIR ----------------
+// ---------------- 7. DETAIL PERSONALIA KARYAWAN (DOSSIER 4 TAB) ----------------
+let CURRENT_DOSSIER_EMP = null;
+let CURRENT_DOSSIER_PERSONAL = null;
+let CURRENT_DOSSIER_CAREER_LIST = [];
+let CURRENT_DOSSIER_TX_LIST = [];
+
 async function openEmployeeDossierModal(nipOrId) {
   const modal = document.getElementById("modal-employee-dossier");
   if (!modal) return;
@@ -18178,7 +18346,7 @@ async function openEmployeeDossierModal(nipOrId) {
         if (mRow) emp = mRow;
       }
     } catch (e) {
-      console.warn("Fallback query employee error:", e);
+      console.warn("[Dossier] Query employee error:", e);
     }
   }
 
@@ -18189,7 +18357,6 @@ async function openEmployeeDossierModal(nipOrId) {
 
   CURRENT_DOSSIER_EMP = emp;
   modal.classList.remove("hidden");
-  switchDossierTab("job");
 
   // Header Detail Personalia
   try {
@@ -18204,29 +18371,11 @@ async function openEmployeeDossierModal(nipOrId) {
     const elAktif = document.getElementById("dossier-status-aktif-badge");
     if (elAktif) {
       const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
-      elAktif.innerText = isAktif ? "AKTIF" : "NONAKTIF";
-      elAktif.className = isAktif ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase" : "text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase";
+      elAktif.innerText = isAktif ? "AKTIF" : (emp.status_kerja === "CALON" ? "CALON" : "NONAKTIF");
+      elAktif.className = isAktif 
+        ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase" 
+        : (emp.status_kerja === "CALON" ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white uppercase" : "text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase");
     }
-
-    // Tab 1: Job & Account
-    const elUnit = document.getElementById("dossier-unit-val");
-    if (elUnit) elUnit.innerText = emp.cabang || "Head Office";
-    const elLoc = document.getElementById("dossier-workloc-val");
-    if (elLoc) elLoc.innerText = `Area: ${emp.area_cover || 'Seluruh Area'}`;
-    const elJabatan = document.getElementById("dossier-jabatan-val");
-    if (elJabatan) elJabatan.innerText = emp.jabatan || "-";
-    const elLevel = document.getElementById("dossier-level-val");
-    if (elLevel) elLevel.innerText = `Role ID: ${emp.role_id || 'R-04'}`;
-    const elAtasan = document.getElementById("dossier-atasan-val");
-    if (elAtasan) elAtasan.innerText = emp.atasan_nama ? `${emp.atasan_nama} (${emp.atasan_nip || ''})` : "Belum ditentukan";
-    const elMasa = document.getElementById("dossier-masakerja-val");
-    if (elMasa) elMasa.innerText = emp.tanggal_masuk ? `Bergabung: ${emp.tanggal_masuk}` : "Aktif";
-    const elKontrak = document.getElementById("dossier-kontrak-val");
-    if (elKontrak) elKontrak.innerText = `Status: ${emp.status_kerja || 'PKWTT'}`;
-    const elEmail = document.getElementById("dossier-email-val");
-    if (elEmail) elEmail.innerText = emp.email || "-";
-    const elRole = document.getElementById("dossier-role-val");
-    if (elRole) elRole.innerText = emp.role || emp.role_id || "Field Staff";
 
     // Avatar
     const avatarBox = document.getElementById("dossier-avatar-container");
@@ -18238,20 +18387,20 @@ async function openEmployeeDossierModal(nipOrId) {
       }
     }
   } catch (errDOM) {
-    console.warn("Error setting dossier DOM:", errDOM);
+    console.warn("[Dossier] Error setting header DOM:", errDOM);
   }
 
-  // Load Data Pribadi & Riwayat Karir dari Supabase
+  // Default buka Tab 1: Data Pribadi Sipil
+  switchDossierTab("personal");
+
+  // Load Data di 4 Tab
   try {
     await loadDossierPersonalDetails(emp);
-  } catch (errP) {
-    console.warn("Error loading personal details:", errP);
-  }
-
-  try {
-    await loadDossierCareerHistories(emp);
-  } catch (errC) {
-    console.warn("Error loading career histories:", errC);
+    loadDossierJobDetails(emp);
+    await loadDossierPayrollDetails(emp);
+    await loadDossierTransactionsHistory(emp);
+  } catch (errLoad) {
+    console.warn("[Dossier] Error loading dossier tabs:", errLoad);
   }
 }
 
@@ -18260,7 +18409,7 @@ function closeEmployeeDossierModal() {
 }
 
 function switchDossierTab(tab) {
-  const tabs = ["job", "personal", "career"];
+  const tabs = ["personal", "job", "payroll", "history"];
   tabs.forEach(t => {
     const el = document.getElementById(`dossier-content-${t}`);
     const btn = document.getElementById(`dossier-tab-btn-${t}`);
@@ -18278,9 +18427,11 @@ function switchDossierTab(tab) {
   });
 }
 
+// TAB 1: DATA PRIBADI SIPIL & JSONB
 async function loadDossierPersonalDetails(emp) {
   let detail = null;
   let empId = emp.id;
+
   if (supabaseClient) {
     try {
       if (!empId || typeof empId === "number") {
@@ -18288,36 +18439,183 @@ async function loadDossierPersonalDetails(emp) {
         if (eRow?.id) empId = eRow.id;
       }
       if (empId) {
-        const { data, error } = await supabaseClient
-          .from("employee_personal_details")
+        // Coba query dari hr_employee_personal_details / employee_personal_details
+        let { data, error } = await supabaseClient
+          .from("hr_employee_personal_details")
           .select("*")
           .eq("employee_id", empId)
           .maybeSingle();
-        if (!error && data) detail = data;
+
+        if (error || !data) {
+          const resFallback = await supabaseClient
+            .from("employee_personal_details")
+            .select("*")
+            .eq("employee_id", empId)
+            .maybeSingle();
+          if (!resFallback.error && resFallback.data) data = resFallback.data;
+        }
+        if (data) detail = data;
       }
     } catch (e) {
-      console.warn("Error load personal details:", e);
+      console.warn("[Dossier] Error load personal details:", e);
     }
   }
 
   CURRENT_DOSSIER_PERSONAL = detail;
-  document.getElementById("dossier-nik-val").innerText = detail?.ktp_number || emp.nik_ktp || "3201000000000000 (Belum diisi)";
-  document.getElementById("dossier-ttl-val").innerText = detail?.pob ? `${detail.pob}, ${detail.dob || ''}` : "-";
-  document.getElementById("dossier-gender-agama-val").innerText = `${detail?.gender || 'Laki-laki'} • ${detail?.religion || 'Islam'}`;
-  document.getElementById("dossier-marital-val").innerText = `${detail?.marital_status || 'Lajang'} (Tanggungan: ${detail?.number_of_dependents || 0})`;
-  document.getElementById("dossier-phone-val").innerText = detail?.phone || emp.phone || "-";
-  document.getElementById("dossier-alamatktp-val").innerText = detail?.address_ktp || "-";
-  document.getElementById("dossier-alamatdom-val").innerText = detail?.address_domicile || detail?.address_ktp || "-";
-  document.getElementById("dossier-emergency-name-val").innerText = detail?.emergency_contact_name ? `${detail.emergency_contact_name} (${detail.emergency_contact_relation || 'Keluarga'})` : "Belum didaftarkan";
-  document.getElementById("dossier-emergency-phone-val").innerText = detail?.emergency_contact_phone || "-";
+  const jsonb = detail?.personal_details || {};
+
+  // NIK & Identitas Pokok
+  const nikVal = detail?.ktp_number || detail?.nik || jsonb.nik_ktp || emp.nik_ktp || "-";
+  const elNik = document.getElementById("dossier-nik-val");
+  if (elNik) elNik.innerText = nikVal;
+
+  const elPribadiNama = document.getElementById("dossier-pribadi-nama-val");
+  if (elPribadiNama) elPribadiNama.innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
+
+  const pob = detail?.pob || detail?.tempat_lahir || jsonb.tempat_lahir || "-";
+  const dob = detail?.dob || detail?.tanggal_lahir || emp.dob || "-";
+  const elTtl = document.getElementById("dossier-ttl-val");
+  if (elTtl) elTtl.innerText = (pob !== "-" || dob !== "-") ? `${pob}, ${dob}` : "-";
+
+  const elGender = document.getElementById("dossier-gender-val");
+  if (elGender) elGender.innerText = detail?.gender || detail?.jenis_kelamin || emp.gender || "Laki-laki";
+
+  const elMarital = document.getElementById("dossier-marital-val");
+  if (elMarital) elMarital.innerText = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "Belum Kawin";
+
+  // Pasangan & Anak
+  const spouse = jsonb.spouse_name || detail?.spouse_name || "-";
+  const elSpouse = document.getElementById("dossier-spouse-val");
+  if (elSpouse) elSpouse.innerText = spouse;
+
+  const childrenCount = jsonb.children_count ?? (Array.isArray(jsonb.children) ? jsonb.children.length : (detail?.number_of_dependents || 0));
+  const elChildrenCount = document.getElementById("dossier-children-count-val");
+  if (elChildrenCount) elChildrenCount.innerText = `${childrenCount} Anak`;
+
+  const childrenContainer = document.getElementById("dossier-children-list-container");
+  if (childrenContainer) {
+    const childList = Array.isArray(jsonb.children) ? jsonb.children.filter(Boolean) : [];
+    if (childList.length > 0) {
+      childrenContainer.innerHTML = childList.map((c, i) => `
+        <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-semibold text-slate-800 text-[11px] shadow-2xs">
+          ${i + 1}. ${c}
+        </span>
+      `).join("");
+    } else {
+      childrenContainer.innerHTML = '<span class="text-slate-400 italic text-[11px]">- Tidak ada data anak terdaftar -</span>';
+    }
+  }
+
+  // Kontak & Alamat
+  const phone = detail?.phone || jsonb.no_hp || emp.phone || "-";
+  const elPhone = document.getElementById("dossier-phone-val");
+  if (elPhone) elPhone.innerText = phone;
+
+  const wa = jsonb.no_wa || detail?.phone || emp.phone || "-";
+  const elWa = document.getElementById("dossier-wa-val");
+  if (elWa) elWa.innerText = wa;
+
+  const alamatKtp = detail?.address_ktp || detail?.alamat_ktp || jsonb.alamat_ktp || "-";
+  const elAlamatKtp = document.getElementById("dossier-alamatktp-val");
+  if (elAlamatKtp) elAlamatKtp.innerText = alamatKtp;
+
+  const alamatDom = detail?.address_domicile || detail?.alamat_domisili || jsonb.alamat_domisili || alamatKtp;
+  const elAlamatDom = document.getElementById("dossier-alamatdom-val");
+  if (elAlamatDom) elAlamatDom.innerText = alamatDom;
+
+  // Geotagging Koordinat Manual
+  const geoLat = jsonb.geo_domisili?.latitude || jsonb.geo_domisili?.lat || jsonb.latitude || "";
+  const geoLng = jsonb.geo_domisili?.longitude || jsonb.geo_domisili?.lng || jsonb.longitude || "";
+  const elGeotag = document.getElementById("dossier-geotag-val");
+  if (elGeotag) {
+    if (geoLat && geoLng) {
+      elGeotag.innerHTML = `<a href="https://maps.google.com/?q=${geoLat},${geoLng}" target="_blank" class="text-indigo-600 hover:underline"><i class="fa-solid fa-location-dot mr-1 text-rose-500"></i>${geoLat}, ${geoLng}</a>`;
+    } else {
+      elGeotag.innerText = "Koordinat belum diset";
+    }
+  }
+
+  // Kontak Darurat
+  const emergName = jsonb.kontak_darurat?.nama || detail?.emergency_contact_name || "-";
+  const emergRel = jsonb.kontak_darurat?.hubungan || detail?.emergency_contact_relation || "-";
+  const emergPhone = jsonb.kontak_darurat?.no_hp || detail?.emergency_contact_phone || "-";
+  const elEmergName = document.getElementById("dossier-emergency-name-val");
+  const elEmergRel = document.getElementById("dossier-emergency-rel-val");
+  const elEmergPhone = document.getElementById("dossier-emergency-phone-val");
+  if (elEmergName) elEmergName.innerText = emergName;
+  if (elEmergRel) elEmergRel.innerText = `Hubungan: ${emergRel}`;
+  if (elEmergPhone) elEmergPhone.innerText = emergPhone;
+
+  // Pendidikan & Email
+  const edu = jsonb.pendidikan_terakhir || detail?.education || "S1";
+  const major = jsonb.jurusan || detail?.major || "-";
+  const elEdu = document.getElementById("dossier-education-val");
+  const elMajor = document.getElementById("dossier-major-val");
+  if (elEdu) elEdu.innerText = edu;
+  if (elMajor) elMajor.innerText = `Jurusan: ${major}`;
+
+  const elEmail = document.getElementById("dossier-email-val");
+  if (elEmail) elEmail.innerText = emp.email || "-";
 }
 
-async function loadDossierCareerHistories(emp) {
-  const container = document.getElementById("dossier-career-timeline-container");
-  if (!container) return;
+// TAB 2: KEPEGAWAIAN (STATUS AKTIF TERKINI)
+function loadDossierJobDetails(emp) {
+  const elNip = document.getElementById("dossier-nip-val");
+  if (elNip) elNip.innerText = emp.nip || "-";
 
-  let list = [];
+  const elStatusKerja = document.getElementById("dossier-statuskerja-val");
+  if (elStatusKerja) elStatusKerja.innerText = emp.status_kerja || "PKWTT";
+
+  const elLoc = document.getElementById("dossier-penempatan-val");
+  if (elLoc) elLoc.innerText = emp.work_location_name || emp.area_cover || "Head Office";
+
+  const elUnit = document.getElementById("dossier-unit-val");
+  if (elUnit) elUnit.innerText = emp.cabang || emp.unit_name || "Head Office";
+
+  const elJabatan = document.getElementById("dossier-jabatan-val");
+  if (elJabatan) elJabatan.innerText = emp.jabatan || "Staff";
+
+  const elLevel = document.getElementById("dossier-level-val");
+  if (elLevel) elLevel.innerText = emp.level_name || emp.role_id || "Staff";
+
+  const elAtasan = document.getElementById("dossier-atasan-val");
+  if (elAtasan) elAtasan.innerText = emp.atasan_nama ? `${emp.atasan_nama} (${emp.atasan_nip || ''})` : "Pimpinan Tertinggi / Tanpa Atasan Langsung";
+
+  const elTglGabung = document.getElementById("dossier-tglgabung-val");
+  if (elTglGabung) elTglGabung.innerText = emp.tanggal_masuk || emp.join_date || "-";
+
+  const elNoKontrak = document.getElementById("dossier-nokontrak-val");
+  if (elNoKontrak) elNoKontrak.innerText = emp.contract_no || emp.no_sk || "-";
+
+  const elTglKontrak = document.getElementById("dossier-tglkontrak-val");
+  if (elTglKontrak) elTglKontrak.innerText = emp.contract_start_date || emp.tanggal_masuk || "-";
+
+  const elTglSelesai = document.getElementById("dossier-tglselesaikontrak-val");
+  if (elTglSelesai) {
+    if (emp.status_kerja === "PKWTT") {
+      const dob = emp.dob || CURRENT_DOSSIER_PERSONAL?.dob || CURRENT_DOSSIER_PERSONAL?.tanggal_lahir;
+      if (dob) {
+        const d = new Date(dob);
+        elTglSelesai.innerText = `${d.getFullYear() + 50}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} (Ulang Tahun ke-50)`;
+      } else {
+        elTglSelesai.innerText = "Ulang Tahun ke-50 (PKWTT Permanen)";
+      }
+    } else {
+      elTglSelesai.innerText = emp.contract_end_date || "-";
+    }
+  }
+
+  const elTglResign = document.getElementById("dossier-tglresign-val");
+  if (elTglResign) {
+    elTglResign.innerText = emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja");
+  }
+}
+
+// TAB 3: RINCIAN PAYROLL (GAJI POKOK + 6 TUNJANGAN)
+async function loadDossierPayrollDetails(emp) {
+  let txSalary = null;
   let empId = emp.id;
+
   if (supabaseClient) {
     try {
       if (!empId || typeof empId === "number") {
@@ -18325,74 +18623,131 @@ async function loadDossierCareerHistories(emp) {
         if (eRow?.id) empId = eRow.id;
       }
       if (empId) {
-        const { data, error } = await supabaseClient
-          .from("employee_career_histories")
+        // Cari transaksi terakhir yang memiliki gaji pokok
+        const { data: txList } = await supabaseClient
+          .from("hr_employee_transactions")
           .select("*")
           .eq("employee_id", empId)
+          .eq("status", "APPROVED")
           .order("effective_date", { ascending: false });
-        if (!error && data) list = data;
+
+        if (txList && txList.length > 0) {
+          txSalary = txList.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || txList[0];
+        }
+
+        // Fallback ke employee_career_histories
+        if (!txSalary) {
+          const { data: cList } = await supabaseClient
+            .from("employee_career_histories")
+            .select("*")
+            .eq("employee_id", empId)
+            .order("effective_date", { ascending: false });
+          if (cList && cList.length > 0) {
+            txSalary = cList.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || cList[0];
+          }
+        }
       }
     } catch (e) {
-      console.warn("Error load career histories:", e);
+      console.warn("[Dossier] Error query payroll transaction:", e);
     }
   }
 
-  CURRENT_DOSSIER_CAREER_LIST = list;
+  const basicSalary = parseFloat(txSalary?.new_basic_salary || emp.basic_salary || emp.gaji_pokok || 0);
+  const allowJabatan = parseFloat(txSalary?.new_allowance_jabatan || 0);
+  const allowTransport = parseFloat(txSalary?.new_allowance_transport || 0);
+  const allowKomunikasi = parseFloat(txSalary?.new_allowance_komunikasi || 0);
+  const allowTempatTinggal = parseFloat(txSalary?.new_allowance_tempat_tinggal || 0);
+  const allowPenempatan = parseFloat(txSalary?.new_allowance_penempatan || 0);
+  const allowKemahalan = parseFloat(txSalary?.new_allowance_kemahalan || 0);
+  const totalAllowances = allowJabatan + allowTransport + allowKomunikasi + allowTempatTinggal + allowPenempatan + allowKemahalan;
 
-  // 1. POPULATE KARTU STATUS PAYROLL & REMUNERASI AKTIF
-  try {
-    const latestTx = list.find(t => (t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || t.bank_name || t.bank_account_no) || list[0];
-    const elRemunSk = document.getElementById("dossier-remun-sk-badge");
-    const elRemunGaji = document.getElementById("dossier-remun-gaji-val");
-    const elRemunTunjangan = document.getElementById("dossier-remun-tunjangan-val");
-    const elRemunBank = document.getElementById("dossier-remun-bank-val");
-    const elRemunRek = document.getElementById("dossier-remun-rekening-val");
-    const elRemunBpjsKes = document.getElementById("dossier-remun-bpjskes-val");
-    const elRemunBpjsTk = document.getElementById("dossier-remun-bpjstk-val");
-    const elRemunNpwp = document.getElementById("dossier-remun-npwp-val");
-    const elRemunPtkp = document.getElementById("dossier-remun-ptkp-val");
+  const elGaji = document.getElementById("dossier-gajipokok-val");
+  if (elGaji) elGaji.innerText = basicSalary > 0 ? `Rp ${basicSalary.toLocaleString('id-ID')}` : "Rp 0 (Belum Diset)";
 
-    if (latestTx && (latestTx.new_basic_salary || latestTx.bank_name || latestTx.bank_account_no)) {
-      if (elRemunSk) elRemunSk.innerText = latestTx.no_sk ? `SK: ${latestTx.no_sk}` : "SK: Pengangkatan";
-      if (elRemunGaji) {
-        elRemunGaji.innerText = latestTx.new_basic_salary ? `Rp ${parseInt(latestTx.new_basic_salary).toLocaleString('id-ID')}` : "Rp -";
-      }
-      if (elRemunTunjangan) {
-        elRemunTunjangan.innerText = latestTx.new_allowances ? `Tunjangan: Rp ${parseInt(latestTx.new_allowances).toLocaleString('id-ID')}` : "Tunjangan: -";
-      }
-      if (elRemunBank) elRemunBank.innerText = latestTx.bank_name || "-";
-      if (elRemunRek) {
-        const no = latestTx.bank_account_no || "-";
-        const holder = latestTx.bank_account_holder ? `(a/n ${latestTx.bank_account_holder})` : "";
-        elRemunRek.innerText = `${no} ${holder}`.trim();
-      }
-      if (elRemunBpjsKes) elRemunBpjsKes.innerText = `Kes: ${latestTx.bpjs_kesehatan_number || '-'}`;
-      if (elRemunBpjsTk) elRemunBpjsTk.innerText = `TK: ${latestTx.bpjs_ketenagakerjaan_number || '-'}`;
-      if (elRemunNpwp) elRemunNpwp.innerText = `NPWP: ${latestTx.npwp_number || '-'}`;
-      if (elRemunPtkp) elRemunPtkp.innerText = `PTKP: ${latestTx.tax_status || 'TK/0'}`;
-    } else {
-      if (elRemunSk) elRemunSk.innerText = "SK: Belum Diinput";
-      if (elRemunGaji) elRemunGaji.innerText = "Rp - (Belum Diisi)";
-      if (elRemunTunjangan) elRemunTunjangan.innerText = "Tunjangan: -";
-      if (elRemunBank) elRemunBank.innerText = "Belum Diisi";
-      if (elRemunRek) elRemunRek.innerText = "Klik 'Edit Data Karyawan & Payroll'";
-      if (elRemunBpjsKes) elRemunBpjsKes.innerText = "Kes: -";
-      if (elRemunBpjsTk) elRemunBpjsTk.innerText = "TK: -";
-      if (elRemunNpwp) elRemunNpwp.innerText = "NPWP: -";
-      if (elRemunPtkp) elRemunPtkp.innerText = "PTKP: TK/0";
-    }
-  } catch (errRemun) {
-    console.warn("Error populating active remuneration card:", errRemun);
+  const elTotAllow = document.getElementById("dossier-total-tunjangan-val");
+  if (elTotAllow) elTotAllow.innerText = `Rp ${totalAllowances.toLocaleString('id-ID')}`;
+
+  const elTunjJabatan = document.getElementById("dossier-tunj-jabatan-val");
+  if (elTunjJabatan) elTunjJabatan.innerText = `Rp ${allowJabatan.toLocaleString('id-ID')}`;
+
+  const elTunjTransport = document.getElementById("dossier-tunj-transport-val");
+  if (elTunjTransport) elTunjTransport.innerText = `Rp ${allowTransport.toLocaleString('id-ID')}`;
+
+  const elTunjKomunikasi = document.getElementById("dossier-tunj-komunikasi-val");
+  if (elTunjKomunikasi) elTunjKomunikasi.innerText = `Rp ${allowKomunikasi.toLocaleString('id-ID')}`;
+
+  const elTunjTempatTinggal = document.getElementById("dossier-tunj-tempattinggal-val");
+  if (elTunjTempatTinggal) elTunjTempatTinggal.innerText = `Rp ${allowTempatTinggal.toLocaleString('id-ID')}`;
+
+  const elTunjPenempatan = document.getElementById("dossier-tunj-penempatan-val");
+  if (elTunjPenempatan) elTunjPenempatan.innerText = `Rp ${allowPenempatan.toLocaleString('id-ID')}`;
+
+  const elTunjKemahalan = document.getElementById("dossier-tunj-kemahalan-val");
+  if (elTunjKemahalan) elTunjKemahalan.innerText = `Rp ${allowKemahalan.toLocaleString('id-ID')}`;
+
+  // Bank, BPJS & Pajak
+  const elBank = document.getElementById("dossier-bank-val");
+  if (elBank) elBank.innerText = txSalary?.bank_name || emp.bank_name || "BCA";
+
+  const elRek = document.getElementById("dossier-rekening-val");
+  if (elRek) {
+    const noRek = txSalary?.bank_account_no || emp.bank_account_no || "-";
+    const an = txSalary?.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+    elRek.innerText = `${noRek} ${an ? `(a/n ${an})` : ''}`.trim();
   }
 
-  if (list.length === 0) {
+  const elBpjsKes = document.getElementById("dossier-bpjskes-val");
+  if (elBpjsKes) elBpjsKes.innerText = `Kes: ${txSalary?.bpjs_kesehatan_number || emp.bpjs_kesehatan_number || '-'}`;
+
+  const elBpjsTk = document.getElementById("dossier-bpjstk-val");
+  if (elBpjsTk) elBpjsTk.innerText = `TK: ${txSalary?.bpjs_ketenagakerjaan_number || emp.bpjs_ketenagakerjaan_number || '-'}`;
+
+  const elNpwp = document.getElementById("dossier-npwp-val");
+  if (elNpwp) elNpwp.innerText = `NPWP: ${txSalary?.npwp_number || emp.npwp_number || '-'}`;
+
+  const elPtkp = document.getElementById("dossier-ptkp-val");
+  if (elPtkp) elPtkp.innerText = `PTKP: ${txSalary?.tax_status || emp.tax_status || 'TK/0'}`;
+}
+
+// TAB 4: HISTORY TRANSAKSI KARYAWAN
+async function loadDossierTransactionsHistory(emp) {
+  const container = document.getElementById("dossier-tx-history-container");
+  if (!container) return;
+
+  let transactions = [];
+  let empId = emp.id;
+
+  if (supabaseClient) {
+    try {
+      if (!empId || typeof empId === "number") {
+        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        if (eRow?.id) empId = eRow.id;
+      }
+      if (empId) {
+        // Query riwayat transaksi dari hr_employee_transactions
+        const { data, error } = await supabaseClient
+          .from("hr_employee_transactions")
+          .select("*")
+          .or(`employee_id.eq.${empId},nip.eq.${emp.nip}`)
+          .order("effective_date", { ascending: false });
+
+        if (!error && data) transactions = data;
+      }
+    } catch (e) {
+      console.warn("[Dossier] Query transactions history error:", e);
+    }
+  }
+
+  CURRENT_DOSSIER_TX_LIST = transactions;
+
+  if (transactions.length === 0) {
     container.innerHTML = `
       <div class="relative pb-3">
-        <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow"></div>
+        <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white shadow"></div>
         <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
           <div class="flex items-center justify-between">
             <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">JOIN INITIAL</span>
-            <span class="text-[10px] text-slate-400 font-mono">${emp.tanggal_masuk || 'Tanggal Bergabung'}</span>
+            <span class="text-[10px] text-slate-400 font-mono">${emp.tanggal_masuk || 'Awal Bergabung'}</span>
           </div>
           <h6 class="font-bold text-xs text-slate-800 mt-1">Pengangkatan Awal Karyawan</h6>
           <p class="text-[10px] text-slate-500 mt-0.5">Penempatan: ${emp.cabang || 'Head Office'} • Posisi: ${emp.jabatan || 'Staff'}</p>
@@ -18402,35 +18757,35 @@ async function loadDossierCareerHistories(emp) {
     return;
   }
 
-  container.innerHTML = list.map(tx => {
-    let typeBadge = "bg-indigo-50 text-indigo-700 border-indigo-200";
-    if (tx.transaction_type === "PROMOTION") typeBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
-    if (tx.transaction_type === "MUTATION") typeBadge = "bg-blue-50 text-blue-700 border-blue-200";
-    if (tx.transaction_type === "SALARY_ADJUSTMENT") typeBadge = "bg-amber-50 text-amber-700 border-amber-200";
+  container.innerHTML = transactions.map(tx => {
+    const types = Array.isArray(tx.transaction_types) ? tx.transaction_types.join(", ") : (tx.transaction_types || "Transaksi");
+    const st = String(tx.status || "").toUpperCase();
+    let stBadge = "bg-slate-100 text-slate-700 border-slate-200";
+    if (st === "APPROVED") stBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
+    else if (st === "IN_REVIEW" || st === "PENDING_APPROVAL") stBadge = "bg-indigo-50 text-indigo-700 border-indigo-200";
+    else if (st === "PENDING_AGREEMENT") stBadge = "bg-purple-50 text-purple-700 border-purple-200";
+    else if (st === "REJECTED") stBadge = "bg-rose-50 text-rose-700 border-rose-200";
 
-    const salaryFormatted = tx.new_basic_salary ? `Rp ${parseInt(tx.new_basic_salary).toLocaleString('id-ID')}` : null;
+    const salaryChange = tx.new_basic_salary ? `Rp ${parseFloat(tx.new_basic_salary).toLocaleString('id-ID')}` : null;
 
     return `
       <div class="relative pb-3">
         <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow"></div>
-        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1">
+        <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
           <div class="flex items-center justify-between flex-wrap gap-1">
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${typeBadge}">${tx.transaction_type}</span>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${stBadge} uppercase">${st}</span>
             <span class="text-[10px] text-slate-400 font-mono">Efektif: ${tx.effective_date}</span>
           </div>
-          <h6 class="font-bold text-xs text-slate-900 mt-1">${tx.no_sk ? `SK: ${tx.no_sk}` : 'Perubahan Status Kepegawaian'}</h6>
-          <p class="text-[10px] text-slate-600">${tx.description || '-'}</p>
-          ${salaryFormatted ? `
-            <div class="text-[10px] text-emerald-800 bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-200 flex items-center justify-between">
-              <span>Gaji Pokok Baru: <strong>${salaryFormatted}</strong></span>
-              ${tx.bank_name ? `<span>Payroll: ${tx.bank_name} (${tx.bank_account_no || '-'})</span>` : ''}
+          <h6 class="font-bold text-xs text-slate-900 mt-1">${types}</h6>
+          ${tx.permanent_contract_no ? `<p class="text-[10px] text-slate-600 font-mono">No. SK/Kontrak: <strong>${tx.permanent_contract_no}</strong></p>` : ''}
+          ${tx.contract_no ? `<p class="text-[10px] text-slate-600 font-mono">No. Kontrak: <strong>${tx.contract_no}</strong></p>` : ''}
+          ${salaryChange ? `<p class="text-[10px] text-emerald-700 font-bold">Gaji Pokok: ${salaryChange}</p>` : ''}
+          ${tx.exit_notes ? `<p class="text-[10px] text-slate-500 italic mt-0.5">"${tx.exit_notes}"</p>` : ''}
+          ${tx.status === "PENDING_AGREEMENT" ? `
+            <div class="mt-1.5 p-2 bg-purple-50 border border-purple-200 rounded-xl text-[10px] text-purple-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-signature mr-1"></i>Menunggu Tanda Tangan Elektronik PIC ybs</span>
+              <button type="button" onclick="openElectronicAgreementModal('${tx.id}')" class="px-2 py-0.5 bg-purple-600 text-white rounded font-bold text-[9px]">Tanda Tangani</button>
             </div>
-          ` : ''}
-          ${tx.file_sk_url ? `
-            <a href="${tx.file_sk_url}" target="_blank" class="inline-flex items-center space-x-1 text-[10px] text-indigo-600 hover:underline pt-0.5">
-              <i class="fa-solid fa-file-pdf"></i>
-              <span>Lihat Lampiran SK</span>
-            </a>
           ` : ''}
         </div>
       </div>
@@ -19011,22 +19366,1393 @@ function renderPersonaliaEmployees(list) {
 }
 
 function openAddCareerTransactionModalFor(nip) {
-  const emp = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(nip)) ||
-              (SETTINGS_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(nip)) ||
-              (APP_STATE.employees || []).find(e => String(e.nip) === String(nip));
-  if (!emp) {
-    alert("Karyawan tidak ditemukan: " + nip);
-    return;
-  }
-  CURRENT_DOSSIER_EMP = emp;
-  openAddCareerTransactionModal();
+  openEmployeeTransactionModal(nip);
 }
 
 function openAddPersonaliaEmployeeModal() {
-  if (typeof openAddEmployeeModal === "function") {
-    openAddEmployeeModal();
+  openCandidateInputModal();
+}
+
+// =========================================================================
+// CONTROLLER: BAGAN ORGANISASI VISUAL (ORG CHART TREE)
+// =========================================================================
+let ORG_CHART_ZOOM = 1;
+
+function populateOrgFilterUnits() {
+  const sel = document.getElementById("org-chart-filter-unit");
+  if (!sel) return;
+  const current = sel.value;
+  const units = (ORG_UNITS_DATA || []).map(u => ({ id: u.id_unit, name: u.nama_unit }));
+  sel.innerHTML = '<option value="ALL">Semua Unit (Seluruh Organisasi)</option>' +
+    units.map(u => `<option value="${u.id}">${u.name}</option>`).join("");
+  if (units.some(u => u.id === current)) sel.value = current;
+}
+
+function zoomOrgChart(delta) {
+  ORG_CHART_ZOOM = Math.max(0.35, Math.min(2.5, (ORG_CHART_ZOOM * delta)));
+  const container = document.getElementById("org-chart-container");
+  if (container) container.style.transform = `scale(${ORG_CHART_ZOOM})`;
+}
+
+function resetOrgChartZoom() {
+  ORG_CHART_ZOOM = 1;
+  const container = document.getElementById("org-chart-container");
+  if (container) container.style.transform = "scale(1)";
+}
+
+function expandAllOrgTreeNodes(open) {
+  document.querySelectorAll(".org-node-children").forEach(el => {
+    if (open) el.classList.remove("hidden");
+    else el.classList.add("hidden");
+  });
+}
+
+function renderVisualOrgChartTree() {
+  const container = document.getElementById("org-chart-container");
+  if (!container) return;
+  const filterUnit = document.getElementById("org-chart-filter-unit")?.value || "ALL";
+
+  let list = PERSONALIA_EMPLOYEES_DATA || [];
+  if (filterUnit !== "ALL") {
+    list = list.filter(e => e.unit_id === filterUnit || e.cabang === filterUnit);
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-sitemap text-3xl text-slate-300 mb-2 block"></i>
+        Tidak ada struktur bagan karyawan pada filter unit ini.
+      </div>
+    `;
+    return;
+  }
+
+  const roots = list.filter(e => !e.atasan_nip || e.atasan_nip === e.nip || !list.some(p => p.nip === e.atasan_nip));
+
+  function renderOrgNode(emp) {
+    const subordinates = list.filter(e => e.atasan_nip === emp.nip && e.nip !== emp.nip);
+    const hasSubs = subordinates.length > 0;
+    const avatarHtml = (emp.foto_profile_url || emp.foto)
+      ? `<img src="${emp.foto_profile_url || emp.foto}" class="w-full h-full object-cover" />`
+      : `<i class="fa-solid fa-user-tie"></i>`;
+
+    return `
+      <div class="flex flex-col items-center m-2">
+        <div onclick="openEmployeeDossierModal('${emp.nip}')" class="cursor-pointer bg-white hover:border-indigo-400 hover:shadow-md transition p-3 rounded-2xl border border-slate-200 shadow-xs w-52 text-center text-xs space-y-1 group">
+          <div class="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 mx-auto flex items-center justify-center text-indigo-600 font-bold overflow-hidden">
+            ${avatarHtml}
+          </div>
+          <span class="font-bold text-slate-900 block truncate group-hover:text-indigo-700 transition" title="${emp.nama_lengkap || emp.nama}">${emp.nama_lengkap || emp.nama}</span>
+          <span class="font-semibold text-indigo-600 block text-[10px] truncate">${emp.jabatan || 'Staff'}</span>
+          <div class="flex items-center justify-center space-x-1 text-[9px] text-slate-400">
+            <span class="font-mono bg-slate-100 px-1.5 py-0.2 rounded">${emp.nip}</span>
+            <span>•</span>
+            <span class="truncate">${emp.cabang || 'HO'}</span>
+          </div>
+        </div>
+        ${hasSubs ? `
+          <div class="w-0.5 h-4 bg-indigo-300"></div>
+          <div class="org-node-children flex flex-wrap justify-center border-t-2 border-indigo-200 pt-3 relative">
+            ${subordinates.map(sub => renderOrgNode(sub)).join("")}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="flex flex-wrap justify-center gap-4">
+      ${(roots.length > 0 ? roots : list.slice(0, 10)).map(r => renderOrgNode(r)).join("")}
+    </div>
+  `;
+}
+
+// =========================================================================
+// CONTROLLER: MODAL 1 - INPUT DATA CALON KARYAWAN (DATA PRIBADI SIPIL & JSONB)
+// =========================================================================
+function openCandidateInputModal() {
+  const modal = document.getElementById("modal-candidate-input");
+  if (!modal) return;
+  document.getElementById("form-candidate-input")?.reset();
+  const childrenContainer = document.getElementById("cand-children-container");
+  if (childrenContainer) childrenContainer.innerHTML = "";
+  modal.classList.remove("hidden");
+}
+
+function closeCandidateInputModal() {
+  document.getElementById("modal-candidate-input")?.classList.add("hidden");
+}
+
+function addCandidateChildRow() {
+  const container = document.getElementById("cand-children-container");
+  if (!container) return;
+  const count = container.children.length + 1;
+  const row = document.createElement("div");
+  row.className = "flex items-center space-x-2 cand-child-row";
+  row.innerHTML = `
+    <span class="text-[10px] font-bold text-slate-500 w-14 shrink-0">Anak ${count}:</span>
+    <input type="text" placeholder="Nama Lengkap Anak" class="cand-child-name flex-1 bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 outline-none" />
+    <button type="button" onclick="this.closest('.cand-child-row').remove(); updateCandidateChildrenCount();" class="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs shrink-0" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>
+  `;
+  container.appendChild(row);
+  updateCandidateChildrenCount();
+}
+
+function updateCandidateChildrenCount() {
+  const container = document.getElementById("cand-children-container");
+  const countInput = document.getElementById("cand-input-children-count");
+  if (container && countInput) {
+    countInput.value = container.querySelectorAll(".cand-child-row").length;
+  }
+}
+
+async function handleSaveCandidate(event) {
+  event.preventDefault();
+
+  const nama = String(document.getElementById("cand-input-nama")?.value || "").trim().toUpperCase();
+  const nik = String(document.getElementById("cand-input-nik")?.value || "").trim();
+  const pob = String(document.getElementById("cand-input-pob")?.value || "").trim();
+  const dob = document.getElementById("cand-input-dob")?.value;
+  const gender = document.getElementById("cand-input-gender")?.value || "Laki-laki";
+  const marital = document.getElementById("cand-input-marital")?.value || "Belum Kawin";
+  const spouse = String(document.getElementById("cand-input-spouse")?.value || "").trim();
+  const childrenCount = parseInt(document.getElementById("cand-input-children-count")?.value) || 0;
+
+  const childInputs = document.querySelectorAll(".cand-child-name");
+  const children = Array.from(childInputs).map(inp => inp.value.trim()).filter(Boolean);
+
+  const alamatKtp = String(document.getElementById("cand-input-alamat-ktp")?.value || "").trim();
+  const alamatDom = String(document.getElementById("cand-input-alamat-dom")?.value || "").trim();
+  const lat = String(document.getElementById("cand-input-lat")?.value || "").trim();
+  const lng = String(document.getElementById("cand-input-lng")?.value || "").trim();
+
+  const phone = String(document.getElementById("cand-input-phone")?.value || "").trim();
+  const wa = String(document.getElementById("cand-input-wa")?.value || "").trim();
+
+  const emergName = String(document.getElementById("cand-input-emerg-name")?.value || "").trim();
+  const emergRel = String(document.getElementById("cand-input-emerg-rel")?.value || "").trim();
+  const emergPhone = String(document.getElementById("cand-input-emerg-phone")?.value || "").trim();
+
+  const education = document.getElementById("cand-input-education")?.value || "S1";
+  const major = String(document.getElementById("cand-input-major")?.value || "").trim();
+  const email = String(document.getElementById("cand-input-email")?.value || "").trim();
+
+  // Validasi
+  if (!nama || /[^A-Z\s\.\,\']/.test(nama)) {
+    alert("Nama lengkap wajib huruf besar dan tidak boleh mengandung angka!");
+    return;
+  }
+  if (!nik || nik.length !== 16 || !/^\d{16}$/.test(nik)) {
+    alert("NIK KTP harus tepat 16 digit angka!");
+    return;
+  }
+  if (!dob) {
+    alert("Tanggal lahir wajib diisi!");
+    return;
+  }
+  if (!email) {
+    alert("Email akun login wajib diisi!");
+    return;
+  }
+
+  const btn = document.getElementById("btn-save-candidate");
+  const origText = btn ? btn.innerHTML : "Simpan";
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan Data Calon...';
+    btn.disabled = true;
+  }
+
+  try {
+    const tempNip = `CAND-${Date.now().toString().slice(-6)}`;
+    const now = new Date().toISOString();
+
+    const personalDetailsJsonb = {
+      nik_ktp: nik,
+      tempat_lahir: pob || null,
+      alamat_ktp: alamatKtp || null,
+      alamat_domisili: alamatDom || null,
+      geo_domisili: {
+        latitude: lat || null,
+        longitude: lng || null
+      },
+      spouse_name: spouse || null,
+      children_count: childrenCount,
+      children: children,
+      no_hp: phone || null,
+      no_wa: wa || null,
+      kontak_darurat: {
+        nama: emergName || null,
+        hubungan: emergRel || null,
+        no_hp: emergPhone || null
+      },
+      pendidikan_terakhir: education,
+      jurusan: major || null
+    };
+
+    let newEmpId = null;
+
+    if (supabaseClient) {
+      // 1. Simpan akun calon karyawan ke employees / hr_employees
+      const empPayload = {
+        nip: tempNip,
+        name: nama,
+        email: email,
+        dob: dob,
+        gender: gender,
+        marital_status: marital,
+        status_kerja: "CALON",
+        status_aktif: "CALON",
+        is_active: false,
+        created_at: now,
+        updated_at: now
+      };
+
+      const { data: createdEmp, error: empErr } = await supabaseClient
+        .from("employees")
+        .insert([empPayload])
+        .select("id")
+        .single();
+
+      if (empErr) {
+        throw new Error("Gagal menyimpan akun calon karyawan: " + empErr.message);
+      }
+
+      newEmpId = createdEmp.id;
+
+      // 2. Simpan data pribadi sipil ke hr_employee_personal_details
+      const personalPayload = {
+        employee_id: newEmpId,
+        ktp_number: nik,
+        phone: phone || null,
+        pob: pob || null,
+        dob: dob,
+        gender: gender,
+        marital_status: marital,
+        number_of_dependents: childrenCount,
+        address_ktp: alamatKtp || null,
+        address_domicile: alamatDom || null,
+        emergency_contact_name: emergName || null,
+        emergency_contact_relation: emergRel || null,
+        emergency_contact_phone: emergPhone || null,
+        personal_details: personalDetailsJsonb,
+        updated_at: now
+      };
+
+      await supabaseClient
+        .from("hr_employee_personal_details")
+        .upsert([personalPayload], { onConflict: "employee_id" });
+    }
+
+    closeCandidateInputModal();
+    showToast(`Data calon karyawan "${nama}" berhasil disimpan! NIP resmi akan dibuat saat Penerimaan Karyawan diajukan.`, "success", 3000);
+
+    if (typeof loadPersonaliaEmployees === "function") {
+      await loadPersonaliaEmployees();
+    }
+  } catch (err) {
+    console.error("[Candidate Input] Error:", err);
+    alert("Gagal menyimpan calon karyawan: " + err.message);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  }
+}
+
+// =========================================================================
+// CONTROLLER: MODAL 2 - PENGAJUAN TRANSAKSI KEPEGAWAIAN DINAMIS (12 JENIS)
+// =========================================================================
+let CURRENT_TX_SELECTED_EMP = null;
+
+function formatRupiahInput(input) {
+  let val = String(input.value || "").replace(/\D/g, "");
+  if (!val) {
+    input.value = "";
+    return;
+  }
+  input.value = parseInt(val, 10).toLocaleString("id-ID");
+}
+
+function parseRupiah(val) {
+  if (!val) return 0;
+  if (typeof val === "number") return val;
+  const cleaned = String(val).replace(/\D/g, "");
+  return cleaned ? parseInt(cleaned, 10) : 0;
+}
+
+function generateNewEmployeeNIP() {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const prefix = `${mm}${yy}`;
+
+  const allEmps = (PERSONALIA_EMPLOYEES_DATA || []).concat(APP_STATE.employees || []);
+  const matching = allEmps.filter(e => String(e.nip || "").startsWith(prefix));
+  let maxSeq = 0;
+  matching.forEach(e => {
+    const seqPart = parseInt(String(e.nip).slice(4), 10);
+    if (!isNaN(seqPart) && seqPart > maxSeq) maxSeq = seqPart;
+  });
+  const nextSeq = String(maxSeq + 1).padStart(4, '0');
+  return `${prefix}${nextSeq}`;
+}
+
+async function openEmployeeTransactionModal(empNipOrId) {
+  const modal = document.getElementById("modal-employee-transaction");
+  if (!modal) return;
+
+  document.getElementById("form-employee-transaction")?.reset();
+
+  // 1. Set default effective date = hari ini
+  const effInput = document.getElementById("tx-effective-date");
+  if (effInput) effInput.value = new Date().toISOString().split("T")[0];
+
+  // 2. Populate Dropdown Karyawan (Pegawai Aktif & Calon Karyawan)
+  const empSelect = document.getElementById("tx-select-emp");
+  if (empSelect) {
+    const list = PERSONALIA_EMPLOYEES_DATA && PERSONALIA_EMPLOYEES_DATA.length > 0
+      ? PERSONALIA_EMPLOYEES_DATA
+      : (APP_STATE.employees || []);
+
+    let optionsHtml = '<option value="">-- Pilih Calon Karyawan atau Pegawai Aktif --</option>';
+    list.forEach(emp => {
+      const isCalon = emp.status_kerja === "CALON" || String(emp.nip).startsWith("CAND-");
+      const tag = isCalon ? "[CALON KARYAWAN]" : `[${emp.nip}]`;
+      optionsHtml += `<option value="${emp.id || emp.nip}">${tag} ${emp.nama_lengkap || emp.nama} (${emp.jabatan || 'Staff'})</option>`;
+    });
+    empSelect.innerHTML = optionsHtml;
+  }
+
+  // 3. Populate Work Locations & Units & Positions & Levels
+  populateTxMasterDropdowns();
+
+  // 4. Reset Staging Approvals ke 1 Stage
+  resetTxStagingApprovals();
+
+  // 5. Reset Inventory Rows
+  const retCont = document.getElementById("tx-inv-returned-container");
+  const notRetCont = document.getElementById("tx-inv-notreturned-container");
+  if (retCont) retCont.innerHTML = "";
+  if (notRetCont) notRetCont.innerHTML = "";
+
+  // 6. Reset summary box & subforms
+  document.getElementById("tx-emp-selected-summary")?.classList.add("hidden");
+  toggleTxSubforms();
+
+  modal.classList.remove("hidden");
+
+  // Jika parameter empNipOrId dikirim, pilih otomatis
+  if (empNipOrId && empSelect) {
+    const matched = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(empNipOrId) || String(e.id) === String(empNipOrId));
+    if (matched) {
+      empSelect.value = matched.id || matched.nip;
+      onTxEmployeeSelected(empSelect.value);
+    }
+  }
+}
+
+function closeEmployeeTransactionModal() {
+  document.getElementById("modal-employee-transaction")?.classList.add("hidden");
+  CURRENT_TX_SELECTED_EMP = null;
+}
+
+function populateTxMasterDropdowns() {
+  // Work Locations
+  const locs = Array.from(new Set([
+    ...(APP_STATE.locations || []).map(l => l.name || l),
+    ...(ORG_UNITS_DATA || []).map(u => u.work_location_id).filter(Boolean)
+  ])).sort();
+
+  const locSelects = ["tx-penerimaan-workloc", "tx-mutasi-new-loc"];
+  locSelects.forEach(sId => {
+    const el = document.getElementById(sId);
+    if (el) {
+      el.innerHTML = '<option value="">-- Pilih Lokasi Kerja --</option>' +
+        locs.map(loc => `<option value="${loc}">${loc}</option>`).join("");
+    }
+  });
+
+  // Units
+  const units = (ORG_UNITS_DATA || []).map(u => ({ id: u.id_unit, name: u.nama_unit }));
+  const unitSelects = ["tx-penerimaan-unit", "tx-mutasi-new-unit"];
+  unitSelects.forEach(sId => {
+    const el = document.getElementById(sId);
+    if (el) {
+      el.innerHTML = '<option value="">-- Pilih Unit Kerja --</option>' +
+        units.map(u => `<option value="${u.id}">${u.name}</option>`).join("");
+    }
+  });
+
+  // Positions
+  const posList = (ORG_POSITIONS_DATA || []).map(p => ({ id: p.id_position, name: p.nama_jabatan, level_id: p.level_id }));
+  const posSelects = ["tx-penerimaan-position", "tx-rotasi-new-pos", "tx-promosi-new-pos", "tx-demosi-new-pos"];
+  posSelects.forEach(sId => {
+    const el = document.getElementById(sId);
+    if (el) {
+      el.innerHTML = '<option value="">-- Pilih Jabatan --</option>' +
+        posList.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+    }
+  });
+
+  // Levels
+  const lvlList = (ORG_LEVELS_DATA || []).map(l => ({ id: l.id_level, name: l.nama_level, rank: l.urutan_level || l.rank || 0 }));
+  const lvlSelects = ["tx-promosi-new-lvl", "tx-demosi-new-lvl"];
+  lvlSelects.forEach(sId => {
+    const el = document.getElementById(sId);
+    if (el) {
+      el.innerHTML = '<option value="">-- Pilih Level Baru --</option>' +
+        lvlList.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+    }
+  });
+}
+
+function resetTxStagingApprovals() {
+  const container = document.getElementById("tx-staging-container");
+  if (!container) return;
+
+  const approverOptions = getApproverOptionsHtml();
+  container.innerHTML = `
+    <div class="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2 tx-staging-row" id="tx-stage-row-1">
+      <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
+      <div class="flex-1 min-w-0">
+        <select id="tx-stage-approver-1" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
+          <option value="">-- Pilih Approver Staging 1 --</option>
+          ${approverOptions}
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+function getApproverOptionsHtml() {
+  const emps = (PERSONALIA_EMPLOYEES_DATA || []).concat(APP_STATE.employees || []);
+  const uniqueMap = new Map();
+  emps.forEach(e => {
+    if (e.nip && !String(e.nip).startsWith("CAND-")) {
+      uniqueMap.set(e.nip, `${e.nama_lengkap || e.nama} (${e.jabatan || 'Staff'} • ${e.nip})`);
+    }
+  });
+
+  let html = "";
+  uniqueMap.forEach((label, nip) => {
+    html += `<option value="${nip}">${label}</option>`;
+  });
+  return html;
+}
+
+function addTxStagingStage() {
+  const container = document.getElementById("tx-staging-container");
+  if (!container) return;
+
+  const currentCount = container.querySelectorAll(".tx-staging-row").length;
+  const nextOrder = currentCount + 1;
+  const approverOptions = getApproverOptionsHtml();
+
+  const row = document.createElement("div");
+  row.className = "p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2 tx-staging-row";
+  row.id = `tx-stage-row-${nextOrder}`;
+  row.innerHTML = `
+    <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">${nextOrder}</span>
+    <div class="flex-1 min-w-0">
+      <select id="tx-stage-approver-${nextOrder}" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
+        <option value="">-- Pilih Approver Staging ${nextOrder} --</option>
+        ${approverOptions}
+      </select>
+    </div>
+    <button type="button" onclick="this.closest('.tx-staging-row').remove(); reorderTxStaging();" class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs" title="Hapus Stage"><i class="fa-solid fa-trash-can"></i></button>
+  `;
+  container.appendChild(row);
+}
+
+function reorderTxStaging() {
+  const rows = document.querySelectorAll(".tx-staging-row");
+  rows.forEach((row, i) => {
+    const order = i + 1;
+    row.id = `tx-stage-row-${order}`;
+    const badge = row.querySelector("span");
+    if (badge) badge.innerText = order;
+    const select = row.querySelector("select");
+    if (select) select.id = `tx-stage-approver-${order}`;
+  });
+}
+
+function onTxEmployeeSelected(empId) {
+  if (!empId) {
+    CURRENT_TX_SELECTED_EMP = null;
+    document.getElementById("tx-emp-selected-summary")?.classList.add("hidden");
+    return;
+  }
+
+  const emp = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.id) === String(empId) || String(e.nip) === String(empId)) ||
+              (APP_STATE.employees || []).find(e => String(e.id) === String(empId) || String(e.nip) === String(empId));
+
+  if (!emp) return;
+  CURRENT_TX_SELECTED_EMP = emp;
+
+  const isCalon = emp.status_kerja === "CALON" || String(emp.nip).startsWith("CAND-");
+
+  // Summary box
+  const sumBox = document.getElementById("tx-emp-selected-summary");
+  if (sumBox) {
+    sumBox.classList.remove("hidden");
+    document.getElementById("tx-sum-name").innerText = emp.nama_lengkap || emp.nama || "-";
+    document.getElementById("tx-sum-pos-branch").innerText = `${emp.jabatan || 'Staff'} • ${emp.cabang || 'Head Office'}`;
+    document.getElementById("tx-sum-nip").innerText = emp.nip;
+  }
+
+  const badge = document.getElementById("tx-emp-status-badge");
+  if (badge) {
+    badge.innerText = isCalon ? "CALON KARYAWAN" : (emp.status_kerja || "PEGAWAI AKTIF");
+    badge.className = isCalon ? "text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800" : "text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800";
+  }
+
+  // Aturan Tickmark: Jika Calon Karyawan -> Hanya bisa dicentang Penerimaan Karyawan!
+  const chkPenerimaan = document.getElementById("chk-tx-penerimaan");
+  const allOtherCheckboxes = [
+    "chk-tx-tetap", "chk-tx-kontrak", "chk-tx-perpanjang", "chk-tx-rotasi",
+    "chk-tx-promosi", "chk-tx-demosi", "chk-tx-mutasi", "chk-tx-benefit",
+    "chk-tx-resign", "chk-tx-phk", "chk-tx-pensiun"
+  ];
+
+  if (isCalon) {
+    if (chkPenerimaan) {
+      chkPenerimaan.checked = true;
+      chkPenerimaan.disabled = false;
+    }
+    allOtherCheckboxes.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.checked = false;
+        el.disabled = true;
+      }
+    });
   } else {
-    alert("Formulir penambahan karyawan baru siap dibuka.");
+    // Pegawai Aktif -> Penerimaan Karyawan dinonaktifkan
+    if (chkPenerimaan) {
+      chkPenerimaan.checked = false;
+      chkPenerimaan.disabled = true;
+    }
+    allOtherCheckboxes.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
+    });
+
+    // Auto-calculate Ulang Tahun ke-50 untuk Pengangkatan Tetap (PKWTT)
+    const dobStr = emp.dob || emp.tanggal_lahir;
+    const calcEndEl = document.getElementById("tx-tetap-calc-end");
+    if (dobStr && calcEndEl) {
+      const dob = new Date(dobStr);
+      const endYear = dob.getFullYear() + 50;
+      const endMonth = String(dob.getMonth() + 1).padStart(2, '0');
+      const endDay = String(dob.getDate()).padStart(2, '0');
+      calcEndEl.innerText = `${endYear}-${endMonth}-${endDay} (Tepat Ulang Tahun ke-50)`;
+    } else if (calcEndEl) {
+      calcEndEl.innerText = "Ulang Tahun ke-50 (Menunggu DOB)";
+    }
+
+    // Auto-populate data sebelumnya ke subform rotasi, promosi, demosi, mutasi, benefit
+    const prevPosRotasi = document.getElementById("tx-rotasi-prev-pos");
+    if (prevPosRotasi) prevPosRotasi.value = emp.jabatan || "Staff";
+
+    const prevPosPromosi = document.getElementById("tx-promosi-prev-pos");
+    if (prevPosPromosi) prevPosPromosi.value = emp.jabatan || "Staff";
+
+    const prevLvlPromosi = document.getElementById("tx-promosi-prev-lvl");
+    if (prevLvlPromosi) prevLvlPromosi.value = emp.level_name || emp.role_id || "Level 1";
+
+    const prevPosDemosi = document.getElementById("tx-demosi-prev-pos");
+    if (prevPosDemosi) prevPosDemosi.value = emp.jabatan || "Staff";
+
+    const prevLvlDemosi = document.getElementById("tx-demosi-prev-lvl");
+    if (prevLvlDemosi) prevLvlDemosi.value = emp.level_name || emp.role_id || "Level 1";
+
+    const prevLocMutasi = document.getElementById("tx-mutasi-prev-loc");
+    if (prevLocMutasi) prevLocMutasi.value = emp.work_location_name || emp.area_cover || "Head Office";
+
+    const prevUnitMutasi = document.getElementById("tx-mutasi-prev-unit");
+    if (prevUnitMutasi) prevUnitMutasi.value = emp.cabang || "Head Office";
+
+    // Benefit sebelumnya
+    const bSalary = parseFloat(emp.basic_salary || emp.gaji_pokok || 0);
+    const dispSal = document.getElementById("tx-prev-salary-display");
+    if (dispSal) dispSal.innerText = `Rp ${bSalary.toLocaleString('id-ID')}`;
+  }
+
+  toggleTxSubforms();
+}
+
+function toggleTxSubforms() {
+  const isPenerimaan = document.getElementById("chk-tx-penerimaan")?.checked;
+  const isTetap = document.getElementById("chk-tx-tetap")?.checked;
+  const isKontrak = document.getElementById("chk-tx-kontrak")?.checked || document.getElementById("chk-tx-perpanjang")?.checked;
+  const isRotasi = document.getElementById("chk-tx-rotasi")?.checked;
+  const isPromosi = document.getElementById("chk-tx-promosi")?.checked;
+  const isDemosi = document.getElementById("chk-tx-demosi")?.checked;
+  const isMutasi = document.getElementById("chk-tx-mutasi")?.checked;
+  const isBenefit = document.getElementById("chk-tx-benefit")?.checked;
+  const isExit = document.getElementById("chk-tx-resign")?.checked || document.getElementById("chk-tx-phk")?.checked || document.getElementById("chk-tx-pensiun")?.checked;
+
+  toggleElement("subform-penerimaan", isPenerimaan);
+  toggleElement("subform-tetap", isTetap);
+  toggleElement("subform-kontrak", isKontrak);
+  toggleElement("subform-rotasi", isRotasi);
+  toggleElement("subform-promosi", isPromosi);
+  toggleElement("subform-demosi", isDemosi);
+  toggleElement("subform-mutasi", isMutasi);
+  toggleElement("subform-benefit", isBenefit);
+  toggleElement("subform-exit", isExit);
+
+  // Update exit title
+  const exitTitle = document.getElementById("tx-exit-title");
+  if (exitTitle) {
+    if (document.getElementById("chk-tx-resign")?.checked) exitTitle.innerText = "j. Pengunduran Diri (Resign)";
+    else if (document.getElementById("chk-tx-phk")?.checked) exitTitle.innerText = "k. Pemutusan Hubungan Kerja (PHK)";
+    else if (document.getElementById("chk-tx-pensiun")?.checked) exitTitle.innerText = "l. Pensiun Karyawan";
+  }
+}
+
+function toggleElement(id, show) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (show) el.classList.remove("hidden");
+  else el.classList.add("hidden");
+}
+
+function populateTxUnitsByLocation(locId) {
+  const sel = document.getElementById("tx-penerimaan-unit");
+  if (!sel) return;
+  const filtered = (ORG_UNITS_DATA || []).filter(u => !locId || u.work_location_id === locId);
+  sel.innerHTML = '<option value="">-- Pilih Unit Kerja --</option>' +
+    filtered.map(u => `<option value="${u.id_unit}">${u.nama_unit}</option>`).join("");
+}
+
+function populateTxPositionsByUnit(unitId) {
+  const sel = document.getElementById("tx-penerimaan-position");
+  if (!sel) return;
+  const filtered = (ORG_POSITIONS_DATA || []).filter(p => !unitId || p.unit_id === unitId || !p.unit_id);
+  sel.innerHTML = '<option value="">-- Pilih Jabatan --</option>' +
+    (filtered.length > 0 ? filtered : ORG_POSITIONS_DATA || []).map(p => `<option value="${p.id_position}">${p.nama_jabatan}</option>`).join("");
+}
+
+function populateTxPromosiPositions(levelId) {
+  const sel = document.getElementById("tx-promosi-new-pos");
+  if (!sel) return;
+  const filtered = (ORG_POSITIONS_DATA || []).filter(p => !levelId || p.level_id === levelId);
+  sel.innerHTML = '<option value="">-- Pilih Jabatan Baru --</option>' +
+    (filtered.length > 0 ? filtered : ORG_POSITIONS_DATA || []).map(p => `<option value="${p.id_position}">${p.nama_jabatan}</option>`).join("");
+}
+
+function populateTxDemosiPositions(levelId) {
+  const sel = document.getElementById("tx-demosi-new-pos");
+  if (!sel) return;
+  const filtered = (ORG_POSITIONS_DATA || []).filter(p => !levelId || p.level_id === levelId);
+  sel.innerHTML = '<option value="">-- Pilih Jabatan Baru --</option>' +
+    (filtered.length > 0 ? filtered : ORG_POSITIONS_DATA || []).map(p => `<option value="${p.id_position}">${p.nama_jabatan}</option>`).join("");
+}
+
+function populateTxMutasiUnits(locId) {
+  const sel = document.getElementById("tx-mutasi-new-unit");
+  if (!sel) return;
+  const filtered = (ORG_UNITS_DATA || []).filter(u => !locId || u.work_location_id === locId);
+  sel.innerHTML = '<option value="">-- Pilih Unit Baru --</option>' +
+    filtered.map(u => `<option value="${u.id_unit}">${u.nama_unit}</option>`).join("");
+}
+
+function addTxInventoryRow(type) {
+  const container = type === "returned" 
+    ? document.getElementById("tx-inv-returned-container") 
+    : document.getElementById("tx-inv-notreturned-container");
+  if (!container) return;
+
+  const row = document.createElement("div");
+  row.className = "flex items-center space-x-1.5 tx-inv-item-row";
+  row.innerHTML = `
+    <input type="text" placeholder="Nama inventaris (laptop, seragam, dll)" class="flex-1 bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-slate-800 outline-none" />
+    <button type="button" onclick="this.closest('.tx-inv-item-row').remove()" class="w-6 h-6 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-[10px] shrink-0" title="Hapus"><i class="fa-solid fa-xmark"></i></button>
+  `;
+  container.appendChild(row);
+}
+
+async function handleSubmitEmployeeTransaction(event) {
+  event.preventDefault();
+
+  if (!CURRENT_TX_SELECTED_EMP) {
+    alert("Silakan pilih calon karyawan atau pegawai aktif terlebih dahulu!");
+    return;
+  }
+
+  const emp = CURRENT_TX_SELECTED_EMP;
+  const effDate = document.getElementById("tx-effective-date")?.value;
+  if (!effDate) {
+    alert("Tanggal berlaku (effective date) wajib diisi!");
+    return;
+  }
+
+  // Cek centang transaksi
+  const isPenerimaan = document.getElementById("chk-tx-penerimaan")?.checked;
+  const isTetap = document.getElementById("chk-tx-tetap")?.checked;
+  const isKontrak = document.getElementById("chk-tx-kontrak")?.checked;
+  const isPerpanjang = document.getElementById("chk-tx-perpanjang")?.checked;
+  const isRotasi = document.getElementById("chk-tx-rotasi")?.checked;
+  const isPromosi = document.getElementById("chk-tx-promosi")?.checked;
+  const isDemosi = document.getElementById("chk-tx-demosi")?.checked;
+  const isMutasi = document.getElementById("chk-tx-mutasi")?.checked;
+  const isBenefit = document.getElementById("chk-tx-benefit")?.checked;
+  const isResign = document.getElementById("chk-tx-resign")?.checked;
+  const isPhk = document.getElementById("chk-tx-phk")?.checked;
+  const isPensiun = document.getElementById("chk-tx-pensiun")?.checked;
+
+  const selectedTypes = [];
+  if (isPenerimaan) selectedTypes.push("Penerimaan Karyawan");
+  if (isTetap) selectedTypes.push("Tetap (PKWTT)");
+  if (isKontrak) selectedTypes.push("Pengangkatan Kontrak");
+  if (isPerpanjang) selectedTypes.push("Perpanjang Kontrak");
+  if (isRotasi) selectedTypes.push("Rotasi");
+  if (isPromosi) selectedTypes.push("Promosi");
+  if (isDemosi) selectedTypes.push("Demosi");
+  if (isMutasi) selectedTypes.push("Mutasi");
+  if (isBenefit) selectedTypes.push("Penyesuaian Benefit");
+  if (isResign) selectedTypes.push("Resign");
+  if (isPhk) selectedTypes.push("PHK");
+  if (isPensiun) selectedTypes.push("Pensiun");
+
+  if (selectedTypes.length === 0) {
+    alert("Pilih minimal satu jenis transaksi!");
+    return;
+  }
+
+  // Kumpulkan Rantai Persetujuan (Staging Approvals)
+  const stagingRows = document.querySelectorAll(".tx-staging-row");
+  const stagingList = [];
+  stagingRows.forEach((row, i) => {
+    const sel = row.querySelector("select");
+    const approverVal = sel?.value;
+    if (approverVal) {
+      stagingList.push({
+        stage_order: i + 1,
+        approver_nip: approverVal,
+        approver_role: `Approver Staging ${i + 1}`
+      });
+    }
+  });
+
+  if (stagingList.length === 0) {
+    alert("Tentukan minimal satu approver pada Staging Approval!");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-tx");
+  const origText = btn ? btn.innerHTML : "Ajukan Transaksi";
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan Transaksi...';
+    btn.disabled = true;
+  }
+
+  try {
+    const now = new Date().toISOString();
+    let finalNip = emp.nip;
+
+    // TRIGGER GENERATE NIP: Jika transaksi adalah Penerimaan Karyawan
+    if (isPenerimaan) {
+      finalNip = generateNewEmployeeNIP();
+    }
+
+    // Hitung tanggal ulang tahun ke-50 jika Tetap (PKWTT)
+    let end50Str = null;
+    if (isTetap) {
+      const dobStr = emp.dob || emp.tanggal_lahir;
+      if (dobStr) {
+        const dob = new Date(dobStr);
+        end50Str = `${dob.getFullYear() + 50}-${String(dob.getMonth() + 1).padStart(2, '0')}-${String(dob.getDate()).padStart(2, '0')}`;
+      }
+    }
+
+    // Kumpulkan Inventaris
+    const retInputs = document.querySelectorAll("#tx-inv-returned-container input");
+    const notRetInputs = document.querySelectorAll("#tx-inv-notreturned-container input");
+    const invReturned = Array.from(retInputs).map(inp => inp.value.trim()).filter(Boolean);
+    const invNotReturned = Array.from(notRetInputs).map(inp => inp.value.trim()).filter(Boolean);
+
+    // Kumpulkan Dokumen
+    const docUrls = {
+      cv: document.getElementById("tx-doc-cv")?.value.trim() || null,
+      ktp: document.getElementById("tx-doc-ktp")?.value.trim() || null,
+      kk: document.getElementById("tx-doc-kk")?.value.trim() || null,
+      npwp: document.getElementById("tx-doc-npwp")?.value.trim() || null,
+      kontrak: document.getElementById("tx-doc-kontrak")?.value.trim() || null
+    };
+
+    // Tentukan Status Awal:
+    // Jika Rotasi, Promosi, Demosi, Mutasi, atau Penyesuaian Benefit dicentang -> PENDING_AGREEMENT (PIC ybs wajib TTD digital lebih dahulu)
+    const needsAgreement = isRotasi || isPromosi || isDemosi || isMutasi || isBenefit;
+    const initialStatus = needsAgreement ? "PENDING_AGREEMENT" : "IN_REVIEW";
+
+    // 100% Relational payload ke hr_employee_transactions
+    const txPayload = {
+      employee_id: emp.id,
+      nip: finalNip,
+      transaction_types: selectedTypes,
+      effective_date: effDate,
+      status: initialStatus,
+      current_stage: 1,
+
+      // a. Penerimaan
+      is_new_hire: isPenerimaan,
+      new_hire_work_location_id: document.getElementById("tx-penerimaan-workloc")?.value || null,
+      new_hire_unit_id: document.getElementById("tx-penerimaan-unit")?.value || null,
+      new_hire_position_id: document.getElementById("tx-penerimaan-position")?.value || null,
+      new_hire_join_date: document.getElementById("tx-penerimaan-joindate")?.value || effDate,
+      new_hire_employment_status: document.getElementById("tx-penerimaan-status")?.value || "PKWT",
+
+      // b. Pengangkatan Tetap
+      is_permanent_appointment: isTetap,
+      permanent_contract_no: document.getElementById("tx-tetap-contractno")?.value.trim() || null,
+      permanent_contract_start_date: document.getElementById("tx-tetap-contractstart")?.value || effDate,
+      permanent_contract_end_date: end50Str,
+
+      // c & d. Kontrak / Perpanjangan
+      is_contract_appointment: isKontrak,
+      is_contract_extension: isPerpanjang,
+      contract_no: document.getElementById("tx-kontrak-contractno")?.value.trim() || document.getElementById("tx-penerimaan-contractno")?.value.trim() || null,
+      contract_start_date: document.getElementById("tx-kontrak-contractstart")?.value || document.getElementById("tx-penerimaan-contractstart")?.value || null,
+      contract_end_date: document.getElementById("tx-kontrak-contractend")?.value || document.getElementById("tx-penerimaan-contractend")?.value || null,
+
+      // e. Rotasi
+      is_rotation: isRotasi,
+      previous_position_id: emp.position_id || null,
+      new_rotation_position_id: document.getElementById("tx-rotasi-new-pos")?.value || null,
+
+      // f. Promosi
+      is_promotion: isPromosi,
+      previous_level_id: emp.level_id || null,
+      new_promotion_level_id: document.getElementById("tx-promosi-new-lvl")?.value || null,
+      new_promotion_position_id: document.getElementById("tx-promosi-new-pos")?.value || null,
+
+      // g. Demosi
+      is_demotion: isDemosi,
+      new_demotion_level_id: document.getElementById("tx-demosi-new-lvl")?.value || null,
+      new_demotion_position_id: document.getElementById("tx-demosi-new-pos")?.value || null,
+
+      // h. Mutasi
+      is_mutation: isMutasi,
+      previous_work_location_id: emp.work_location_id || null,
+      new_mutation_work_location_id: document.getElementById("tx-mutasi-new-loc")?.value || null,
+      previous_unit_id: emp.unit_id || null,
+      new_mutation_unit_id: document.getElementById("tx-mutasi-new-unit")?.value || null,
+
+      // i. Penyesuaian Benefit
+      is_benefit_adjustment: isBenefit,
+      previous_basic_salary: parseFloat(emp.basic_salary || 0),
+      new_basic_salary: parseRupiah(document.getElementById("tx-new-salary")?.value),
+      new_allowance_jabatan: parseRupiah(document.getElementById("tx-new-allow-jabatan")?.value),
+      new_allowance_transport: parseRupiah(document.getElementById("tx-new-allow-transport")?.value),
+      new_allowance_komunikasi: parseRupiah(document.getElementById("tx-new-allow-komunikasi")?.value),
+      new_allowance_tempat_tinggal: parseRupiah(document.getElementById("tx-new-allow-tempattinggal")?.value),
+      new_allowance_penempatan: parseRupiah(document.getElementById("tx-new-allow-penempatan")?.value),
+      new_allowance_kemahalan: parseRupiah(document.getElementById("tx-new-allow-kemahalan")?.value),
+
+      // j, k, l. Exit
+      is_resignation: isResign,
+      is_phk: isPhk,
+      is_pension: isPensiun,
+      severance_amount: parseRupiah(document.getElementById("tx-exit-uangpisah")?.value),
+      exit_interview_form_no: document.getElementById("tx-exit-formno")?.value.trim() || null,
+      exit_notes: document.getElementById("tx-exit-notes")?.value.trim() || null,
+      inventory_returned: invReturned,
+      inventory_not_returned: invNotReturned,
+
+      // Dokumen
+      document_urls: docUrls,
+      created_by_user_id: CURRENT_USER?.id || null,
+      created_at: now,
+      updated_at: now
+    };
+
+    if (supabaseClient) {
+      // 1. Insert ke hr_employee_transactions
+      const { data: createdTx, error: txInsertErr } = await supabaseClient
+        .from("hr_employee_transactions")
+        .insert([txPayload])
+        .select("id")
+        .single();
+
+      if (txInsertErr) {
+        throw new Error("Gagal menyimpan transaksi kepegawaian: " + txInsertErr.message);
+      }
+
+      const txId = createdTx.id;
+
+      // 2. Insert Rantai Persetujuan ke hr_transaction_staging_approvals
+      const stagingInserts = stagingList.map(s => ({
+        transaction_id: txId,
+        stage_order: s.stage_order,
+        approver_role: s.approver_role,
+        approver_nip: s.approver_nip,
+        status: needsAgreement ? "WAITING_AGREEMENT" : (s.stage_order === 1 ? "PENDING" : "WAITING"),
+        created_at: now,
+        updated_at: now
+      }));
+
+      await supabaseClient
+        .from("hr_transaction_staging_approvals")
+        .insert(stagingInserts);
+
+      // 3. Jika Penerimaan Karyawan: Update langsung akun calon karyawan dengan NIP resmi baru
+      if (isPenerimaan) {
+        await supabaseClient
+          .from("employees")
+          .update({
+            nip: finalNip,
+            unit_id: txPayload.new_hire_unit_id,
+            position_id: txPayload.new_hire_position_id,
+            work_location_id: txPayload.new_hire_work_location_id,
+            status_kerja: txPayload.new_hire_employment_status,
+            tanggal_masuk: txPayload.new_hire_join_date,
+            status_aktif: "AKTIF",
+            is_active: true,
+            updated_at: now
+          })
+          .eq("id", emp.id);
+      }
+    }
+
+    closeEmployeeTransactionModal();
+
+    let successMsg = `Transaksi [${selectedTypes.join(", ")}] berhasil diajukan!`;
+    if (isPenerimaan) {
+      successMsg += ` NIP resmi ${finalNip} telah diterbitkan untuk ${emp.nama_lengkap || emp.nama}.`;
+    }
+    if (needsAgreement) {
+      successMsg += ` Menunggu tanda tangan persetujuan elektronik karyawan di menu Persetujuan.`;
+    } else {
+      successMsg += ` Diteruskan ke Approver Staging 1.`;
+    }
+
+    showToast(successMsg, "success", 3500);
+
+    if (typeof loadPersonaliaEmployees === "function") {
+      await loadPersonaliaEmployees();
+    }
+    if (typeof fetchApprovalList === "function") {
+      await fetchApprovalList();
+    }
+  } catch (err) {
+    console.error("[Submit Transaction] Error:", err);
+    alert("Gagal mengajukan transaksi: " + err.message);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  }
+}
+
+// =========================================================================
+// CONTROLLER: MODAL 3 - PERSETUJUAN ELEKTRONIK TRANSAKSI KEPEGAWAIAN
+// =========================================================================
+let CURRENT_AGREEMENT_TX = null;
+
+async function openElectronicAgreementModal(txId) {
+  const modal = document.getElementById("modal-electronic-agreement");
+  if (!modal) return;
+
+  let tx = (APPROVALS_CACHE || []).find(a => a.tx_id === txId)?.tx_data;
+  if (!tx && supabaseClient) {
+    try {
+      const { data } = await supabaseClient
+        .from("hr_employee_transactions")
+        .select("*")
+        .eq("id", txId)
+        .maybeSingle();
+      if (data) tx = data;
+    } catch (_) {}
+  }
+
+  if (!tx) {
+    alert("Data transaksi tidak ditemukan: " + txId);
+    return;
+  }
+
+  CURRENT_AGREEMENT_TX = tx;
+  document.getElementById("agree-tx-id").value = tx.id;
+
+  const summaryContainer = document.getElementById("agree-summary-container");
+  const types = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || "Perubahan Karir"];
+
+  let changeItemsHtml = `<div class="font-bold text-indigo-950 mb-1">Jenis Transaksi: <span class="text-indigo-700">${types.join(", ")}</span></div>`;
+  changeItemsHtml += `<div class="text-[11px] text-slate-600 mb-2">Tanggal Efektif Berlaku: <strong>${tx.effective_date}</strong></div>`;
+
+  if (tx.is_rotation || tx.is_promotion || tx.is_demotion) {
+    changeItemsHtml += `
+      <div class="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs mb-1">
+        <span>Jabatan Baru:</span>
+        <strong class="text-indigo-900">${tx.new_rotation_position_id || tx.new_promotion_position_id || tx.new_demotion_position_id || 'Jabatan Baru'}</strong>
+      </div>
+    `;
+  }
+  if (tx.is_mutation) {
+    changeItemsHtml += `
+      <div class="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs mb-1">
+        <span>Penempatan / Unit Baru:</span>
+        <strong class="text-indigo-900">${tx.new_mutation_unit_id || tx.new_mutation_work_location_id || 'Unit Baru'}</strong>
+      </div>
+    `;
+  }
+  if (tx.is_benefit_adjustment && tx.new_basic_salary) {
+    changeItemsHtml += `
+      <div class="p-2 bg-white rounded-xl border border-emerald-100 flex items-center justify-between text-xs mb-1">
+        <span>Penyesuaian Gaji Pokok:</span>
+        <strong class="text-emerald-700 font-mono">Rp ${parseFloat(tx.new_basic_salary).toLocaleString('id-ID')}</strong>
+      </div>
+    `;
+  }
+  if (summaryContainer) summaryContainer.innerHTML = changeItemsHtml;
+
+  // Metadata Audit Trail
+  const nowStr = new Date().toLocaleString("id-ID", { dateStyle: "full", timeStyle: "medium" });
+  document.getElementById("agree-meta-time").innerText = nowStr;
+  document.getElementById("agree-meta-nip").innerText = `${CURRENT_USER?.nama || 'Karyawan'} (${CURRENT_USER?.nip || tx.nip})`;
+  document.getElementById("agree-meta-device").innerText = navigator.userAgent.slice(0, 38) + "...";
+
+  const ipEl = document.getElementById("agree-meta-ip");
+  if (ipEl) ipEl.innerText = "Memuat IP...";
+  fetch("https://api.ipify.org?format=json")
+    .then(r => r.json())
+    .then(data => { if (ipEl) ipEl.innerText = data.ip || "127.0.0.1 (Client)"; })
+    .catch(() => { if (ipEl) ipEl.innerText = "127.0.0.1 (Local Intranet)"; });
+
+  modal.classList.remove("hidden");
+}
+
+function closeElectronicAgreementModal() {
+  document.getElementById("modal-electronic-agreement")?.classList.add("hidden");
+  CURRENT_AGREEMENT_TX = null;
+}
+
+async function confirmElectronicAgreement() {
+  if (!CURRENT_AGREEMENT_TX) return;
+  const tx = CURRENT_AGREEMENT_TX;
+  const txId = tx.id;
+  const btn = document.getElementById("btn-confirm-agree");
+  const origText = btn ? btn.innerHTML : "Setuju";
+
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menyimpan Tanda Tangan...';
+    btn.disabled = true;
+  }
+
+  try {
+    const ipAddress = document.getElementById("agree-meta-ip")?.innerText || "Client IP";
+    const deviceInfo = navigator.userAgent;
+    const statementText = document.getElementById("agree-legal-text")?.innerText || "Dengan ini saya menyatakan setuju.";
+    const now = new Date().toISOString();
+
+    if (supabaseClient) {
+      // 1. Simpan bukti tanda tangan ke hr_transaction_agreements
+      await supabaseClient
+        .from("hr_transaction_agreements")
+        .insert({
+          transaction_id: txId,
+          employee_id: tx.employee_id,
+          nip: tx.nip || CURRENT_USER?.nip,
+          signed_at: now,
+          ip_address: ipAddress,
+          device_info: deviceInfo,
+          statement_text: statementText,
+          is_agreed: true
+        });
+
+      // 2. Update status transaksi menjadi IN_REVIEW & aktifkan Staging 1
+      await supabaseClient
+        .from("hr_employee_transactions")
+        .update({
+          status: "IN_REVIEW",
+          current_stage: 1,
+          updated_at: now
+        })
+        .eq("id", txId);
+
+      // 3. Update status staging 1 menjadi PENDING
+      await supabaseClient
+        .from("hr_transaction_staging_approvals")
+        .update({
+          status: "PENDING",
+          updated_at: now
+        })
+        .eq("transaction_id", txId)
+        .eq("stage_order", 1);
+    }
+
+    closeElectronicAgreementModal();
+    showToast("Persetujuan elektronik berhasil ditandatangani! Berkas diteruskan ke Approver Staging 1.", "success", 2500);
+    await fetchApprovalList();
+  } catch (err) {
+    console.error("[Electronic Agreement] Error:", err);
+    alert("Gagal memproses persetujuan elektronik: " + err.message);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  }
+}
+
+// =========================================================================
+// CONTROLLER: PROSES APPROVAL TRANSAKSI OLEH ATASAN / APPROVER
+// =========================================================================
+function openProcessTransactionApprovalModal(txId, stageId, actionType) {
+  const item = APPROVALS_CACHE.find(a => a.tx_id === txId || a.izin_id === "TX-" + txId);
+  if (!item) return;
+
+  PENDING_APPROVAL_ACTION_PAYLOAD = {
+    is_career_transaction: true,
+    tx_id: txId,
+    stage_id: stageId,
+    status: actionType,
+    approver_nip: CURRENT_USER.nip,
+    approver_name: CURRENT_USER.nama
+  };
+
+  const modal = document.getElementById("modal-process-approval");
+  const iconBox = document.getElementById("modal-appr-icon-box");
+  const icon = document.getElementById("modal-appr-icon");
+  const title = document.getElementById("modal-appr-title");
+  const sub = document.getElementById("modal-appr-sub");
+  const pemohon = document.getElementById("modal-appr-pemohon");
+  const jenis = document.getElementById("modal-appr-jenis");
+  const periode = document.getElementById("modal-appr-periode");
+  const catatan = document.getElementById("modal-appr-catatan");
+  const btnConfirm = document.getElementById("btn-confirm-approval-action");
+  const inputNotes = document.getElementById("modal-appr-input-notes");
+
+  if (inputNotes) inputNotes.value = "";
+  if (pemohon) pemohon.innerText = `${item.nama} (${item.nip}) • ${item.cabang}`;
+  if (jenis) jenis.innerText = item.jenis_izin;
+  if (periode) periode.innerText = `Efektif: ${item.effective_date || '-'}`;
+  if (catatan) catatan.innerText = item.catatan || "-";
+
+  if (actionType === "APPROVED") {
+    if (title) title.innerText = `Setujui Transaksi Staging ${item.current_stage_order || 1}`;
+    if (sub) sub.innerText = `Anda akan menyetujui transaksi kepegawaian ${item.nama}`;
+    if (iconBox) iconBox.className = "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-2";
+    if (icon) icon.className = "fa-solid fa-check";
+    if (btnConfirm) {
+      btnConfirm.className = "w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95";
+      btnConfirm.innerText = "Ya, Setujui";
+    }
+  } else {
+    if (title) title.innerText = `Tolak Transaksi Staging ${item.current_stage_order || 1}`;
+    if (sub) sub.innerText = `Anda akan menolak transaksi kepegawaian ${item.nama}`;
+    if (iconBox) iconBox.className = "w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl mx-auto mb-2";
+    if (icon) icon.className = "fa-solid fa-xmark";
+    if (btnConfirm) {
+      btnConfirm.className = "w-2/3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md transition active:scale-95";
+      btnConfirm.innerText = "Ya, Tolak";
+    }
+  }
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+async function executeTransactionApproval(txId, stageId, actionType, notes) {
+  if (!supabaseClient) {
+    showToast("Database Supabase tidak terhubung", "error");
+    return;
+  }
+
+  try {
+    const isApprove = actionType === "APPROVED";
+    const now = new Date().toISOString();
+
+    // 1. Dapatkan data transaksi & seluruh staging
+    const { data: tx, error: txErr } = await supabaseClient
+      .from("hr_employee_transactions")
+      .select(`
+        *,
+        hr_transaction_staging_approvals (*)
+      `)
+      .eq("id", txId)
+      .single();
+
+    if (txErr || !tx) {
+      alert("Transaksi tidak ditemukan di database: " + (txErr?.message || ""));
+      return;
+    }
+
+    const stagings = (tx.hr_transaction_staging_approvals || []).sort((a, b) => a.stage_order - b.stage_order);
+    const currentOrder = tx.current_stage || 1;
+    const currentStageObj = stagings.find(s => s.stage_order === currentOrder || s.id === stageId);
+
+    // 2. Update record staging saat ini
+    if (currentStageObj) {
+      await supabaseClient
+        .from("hr_transaction_staging_approvals")
+        .update({
+          status: isApprove ? "APPROVED" : "REJECTED",
+          decision_notes: notes,
+          decided_at: now,
+          updated_at: now
+        })
+        .eq("id", currentStageObj.id);
+    }
+
+    if (!isApprove) {
+      // Ditolak: update status transaksi menjadi REJECTED
+      await supabaseClient
+        .from("hr_employee_transactions")
+        .update({
+          status: "REJECTED",
+          updated_at: now
+        })
+        .eq("id", txId);
+
+      showToast("Transaksi kepegawaian ditolak.", "info", 2000);
+      await fetchApprovalList();
+      return;
+    }
+
+    // 3. Jika disetujui: periksa apakah ada stage berikutnya
+    const nextStageObj = stagings.find(s => s.stage_order === currentOrder + 1);
+    if (nextStageObj) {
+      // Maju ke stage berikutnya
+      await supabaseClient
+        .from("hr_employee_transactions")
+        .update({
+          current_stage: currentOrder + 1,
+          updated_at: now
+        })
+        .eq("id", txId);
+
+      await supabaseClient
+        .from("hr_transaction_staging_approvals")
+        .update({
+          status: "PENDING",
+          updated_at: now
+        })
+        .eq("id", nextStageObj.id);
+
+      showToast(`Staging ${currentOrder} disetujui! Diteruskan ke Staging ${currentOrder + 1}.`, "success", 2000);
+    } else {
+      // Ini adalah stage terakhir -> Transaksi FINAL APPROVED!
+      await supabaseClient
+        .from("hr_employee_transactions")
+        .update({
+          status: "APPROVED",
+          updated_at: now
+        })
+        .eq("id", txId);
+
+      // Terapkan perubahan ke data karyawan aktif
+      await applyApprovedTransactionToEmployee(tx);
+      showToast("Transaksi kepegawaian telah disetujui penuh & data karyawan aktif ter-update!", "success", 2500);
+    }
+
+    await fetchApprovalList();
+    if (typeof loadPersonaliaEmployees === "function") {
+      await loadPersonaliaEmployees();
+    }
+  } catch (e) {
+    console.error("[Transaction Approval] Error:", e);
+    alert("Gagal memproses transaksi: " + e.message);
+  }
+}
+
+async function applyApprovedTransactionToEmployee(tx) {
+  if (!supabaseClient || !tx) return;
+  try {
+    const empId = tx.employee_id;
+    const now = new Date().toISOString();
+    const updatePayload = { updated_at: now };
+
+    // A. Penerimaan Karyawan (New Hire)
+    if (tx.is_new_hire) {
+      updatePayload.unit_id = tx.new_hire_unit_id;
+      updatePayload.position_id = tx.new_hire_position_id;
+      updatePayload.work_location_id = tx.new_hire_work_location_id;
+      updatePayload.status_kerja = tx.new_hire_employment_status || "PKWT";
+      updatePayload.status_aktif = "AKTIF";
+      updatePayload.is_active = true;
+      updatePayload.tanggal_masuk = tx.new_hire_join_date;
+      if (tx.permanent_contract_no) updatePayload.contract_no = tx.permanent_contract_no;
+      if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
+      if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
+    }
+
+    // B. Pengangkatan Tetap (PKWTT)
+    if (tx.is_permanent_appointment) {
+      updatePayload.status_kerja = "PKWTT";
+      if (tx.permanent_contract_no) updatePayload.contract_no = tx.permanent_contract_no;
+      if (tx.permanent_contract_start_date) updatePayload.contract_start_date = tx.permanent_contract_start_date;
+      if (tx.permanent_contract_end_date) updatePayload.contract_end_date = tx.permanent_contract_end_date;
+    }
+
+    // C/D. Pengangkatan / Perpanjang Kontrak (PKWT)
+    if (tx.is_contract_appointment || tx.is_contract_extension) {
+      updatePayload.status_kerja = "PKWT";
+      if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
+      if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
+      if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
+    }
+
+    // E. Rotasi
+    if (tx.is_rotation && tx.new_rotation_position_id) {
+      updatePayload.position_id = tx.new_rotation_position_id;
+    }
+
+    // F. Promosi
+    if (tx.is_promotion) {
+      if (tx.new_promotion_position_id) updatePayload.position_id = tx.new_promotion_position_id;
+      if (tx.new_promotion_level_id) updatePayload.level_id = tx.new_promotion_level_id;
+    }
+
+    // G. Demosi
+    if (tx.is_demotion) {
+      if (tx.new_demotion_position_id) updatePayload.position_id = tx.new_demotion_position_id;
+      if (tx.new_demotion_level_id) updatePayload.level_id = tx.new_demotion_level_id;
+    }
+
+    // H. Mutasi
+    if (tx.is_mutation) {
+      if (tx.new_mutation_work_location_id) updatePayload.work_location_id = tx.new_mutation_work_location_id;
+      if (tx.new_mutation_unit_id) updatePayload.unit_id = tx.new_mutation_unit_id;
+    }
+
+    // I. Penyesuaian Benefit
+    if (tx.is_benefit_adjustment && tx.new_basic_salary) {
+      updatePayload.basic_salary = parseFloat(tx.new_basic_salary);
+    }
+
+    // J/K/L. Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
+    if (tx.is_resignation || tx.is_phk || tx.is_pension) {
+      updatePayload.status_aktif = "NONAKTIF";
+      updatePayload.is_active = false;
+      updatePayload.deleted_at = tx.effective_date ? new Date(tx.effective_date).toISOString() : now;
+    }
+
+    await supabaseClient
+      .from("employees")
+      .update(updatePayload)
+      .eq("id", empId);
+
+    // Buat riwayat jejak di employee_career_histories
+    const typesStr = Array.isArray(tx.transaction_types) ? tx.transaction_types.join(", ") : (tx.transaction_types || "Transaksi");
+    await supabaseClient
+      .from("employee_career_histories")
+      .insert({
+        employee_id: empId,
+        transaction_date: tx.effective_date || new Date().toISOString().split("T")[0],
+        effective_date: tx.effective_date,
+        transaction_type: typesStr,
+        no_sk: tx.permanent_contract_no || tx.contract_no || ("SK/" + tx.id.slice(0, 8)),
+        description: `Transaksi disetujui: ${typesStr}`,
+        new_basic_salary: tx.new_basic_salary ? parseFloat(tx.new_basic_salary) : null,
+        new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0)),
+        created_at: now
+      });
+
+  } catch (err) {
+    console.warn("[applyApprovedTransactionToEmployee] Warning:", err);
   }
 }
 
