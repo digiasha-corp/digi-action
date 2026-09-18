@@ -90,13 +90,19 @@ CREATE TABLE IF NOT EXISTS public.hr_employee_transactions (
     doc_ktp_url TEXT NULL,
     doc_kk_url TEXT NULL,
     doc_npwp_url TEXT NULL,
-    doc_kontrak_url TEXT NULL
+    doc_kontrak_url TEXT NULL,
+
+    -- Kolom Relasional: Pembaruan Data Pribadi Sipil (Biodata JSONB)
+    personal_data_updates JSONB NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_emp_tx_employee_id ON public.hr_employee_transactions (employee_id);
 CREATE INDEX IF NOT EXISTS idx_emp_tx_nip ON public.hr_employee_transactions (nip);
 CREATE INDEX IF NOT EXISTS idx_emp_tx_status ON public.hr_employee_transactions (status);
 CREATE INDEX IF NOT EXISTS idx_emp_tx_effective_date ON public.hr_employee_transactions (effective_date);
+
+ALTER TABLE IF EXISTS public.hr_employee_transactions
+ADD COLUMN IF NOT EXISTS personal_data_updates JSONB NULL;
 
 
 -- 3. TABEL STAGING APPROVAL BERTINGKAT (hr_transaction_staging_approvals)

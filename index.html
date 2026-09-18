@@ -615,6 +615,13 @@
       <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
         <!-- TAB CONTENT 1: DATA PRIBADI SIPIL MURNI -->
         <div id="dossier-content-personal" class="space-y-3">
+          <div class="flex items-center justify-between pb-1 flex-wrap gap-2">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Identitas Pribadi & Berkas Kependudukan</span>
+            <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip, 'biodata')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition active:scale-95">
+              <i class="fa-solid fa-user-pen text-xs text-amber-300"></i>
+              <span>⚡ Ajukan Transaksi Update Data</span>
+            </button>
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
               <span class="text-[10px] text-slate-400 font-bold block uppercase">Nomor Induk Kependudukan (NIK KTP)</span>
@@ -1354,6 +1361,10 @@
               <input type="checkbox" id="chk-tx-pensiun" onchange="toggleTxSubforms()" class="w-4 h-4 text-rose-600 rounded" />
               <span class="font-semibold text-rose-800 text-[11px]">l. Pensiun</span>
             </label>
+            <label id="lbl-tx-biodata" class="flex items-center space-x-2 p-2 rounded-xl bg-white border border-indigo-200 cursor-pointer hover:border-indigo-500 transition col-span-2 sm:col-span-3">
+              <input type="checkbox" id="chk-tx-biodata" onchange="toggleTxSubforms()" class="w-4 h-4 text-indigo-600 rounded" />
+              <span class="font-bold text-indigo-900 text-[11px]">m. Pembaruan Data Pribadi (Biodata Sipil & Kontak)</span>
+            </label>
           </div>
         </div>
 
@@ -1636,6 +1647,170 @@
           </div>
         </div>
 
+        <!-- SUBFORM M: PEMBARUAN DATA PRIBADI (BIODATA SIPIL) -->
+        <div id="subform-biodata" class="hidden p-3.5 bg-white border-2 border-indigo-200 rounded-2xl space-y-3.5">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <span class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-user-pen text-indigo-600"></i>
+              <span>m. Pembaruan Data Pribadi Sipil & Berkas Karyawan</span>
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">Pre-filled Data Eksisting</span>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            Data pribadi di bawah ini telah otomatis terisi sesuai data profil saat ini. Silakan ubah data yang perlu diperbarui.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap (Sipil): <span class="text-rose-500">*</span></label>
+              <input type="text" id="tx-bio-nama" placeholder="NAMA LENGKAP KARYAWAN" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold uppercase text-slate-900 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor Induk Kependudukan (NIK KTP): <span class="text-rose-500">*</span></label>
+              <input type="text" id="tx-bio-nik" maxlength="16" placeholder="16 digit NIK KTP" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-slate-900 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tempat Lahir:</label>
+              <input type="text" id="tx-bio-pob" placeholder="Contoh: Jakarta" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 outline-none focus:border-indigo-600" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir:</label>
+              <input type="date" id="tx-bio-dob" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 outline-none focus:border-indigo-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin:</label>
+              <select id="tx-bio-gender" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Agama:</label>
+              <select id="tx-bio-religion" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+                <option value="Islam">Islam</option>
+                <option value="Kristen Protestan">Kristen Protestan</option>
+                <option value="Katolik">Katolik</option>
+                <option value="Hindu">Hindu</option>
+                <option value="Buddha">Buddha</option>
+                <option value="Konghucu">Konghucu</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Status Pernikahan:</label>
+              <select id="tx-bio-marital" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+                <option value="Belum Kawin">Belum Kawin / Lajang</option>
+                <option value="Kawin">Kawin / Menikah</option>
+                <option value="Cerai Hidup">Cerai Hidup</option>
+                <option value="Cerai Mati">Cerai Mati</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Data Pasangan & Anak -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Data Pasangan & Anak (Tanggungan)</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Nama Istri / Suami (Pasangan):</label>
+                <input type="text" id="tx-bio-spouse" placeholder="Nama pasangan jika sudah menikah" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-slate-900 outline-none" />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Jumlah Anak:</label>
+                <input type="number" id="tx-bio-children-count" min="0" value="0" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 outline-none" />
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="font-semibold text-slate-700 text-xs">Daftar Nama Anak:</label>
+                <button type="button" onclick="addTxBioChildRow()" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-[10px] border border-indigo-200 flex items-center space-x-1">
+                  <i class="fa-solid fa-plus text-[9px]"></i><span>Tambah Anak</span>
+                </button>
+              </div>
+              <div id="tx-bio-children-container" class="space-y-1.5"></div>
+            </div>
+          </div>
+
+          <!-- Alamat & Geotagging -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Alamat & Geotagging Domisili</span>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Alamat Sesuai KTP:</label>
+              <textarea id="tx-bio-alamat-ktp" rows="2" placeholder="Nama jalan, RT/RW, Kelurahan, Kecamatan, Kota" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-900 outline-none"></textarea>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Alamat Domisili Saat Ini:</label>
+              <textarea id="tx-bio-alamat-dom" rows="2" placeholder="Alamat tinggal saat ini (kos/kontrak/rumah)" class="w-full bg-white border border-slate-300 rounded-xl p-2 text-slate-900 outline-none"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Latitude Domisili:</label>
+                <input type="text" id="tx-bio-lat" placeholder="-6.2088" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-900 outline-none" />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Longitude Domisili:</label>
+                <input type="text" id="tx-bio-lng" placeholder="106.8456" class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono text-slate-900 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Kontak & Kontak Darurat -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor HP:</label>
+              <input type="tel" id="tx-bio-phone" placeholder="08xxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor WhatsApp:</label>
+              <input type="tel" id="tx-bio-wa" placeholder="08xxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 outline-none" />
+            </div>
+          </div>
+
+          <div class="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+            <span class="text-[10px] font-bold text-rose-800 uppercase block"><i class="fa-solid fa-truck-medical mr-1"></i> Kontak Darurat (Emergency Contact)</span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">Nama Kontak:</label>
+                <input type="text" id="tx-bio-emerg-name" placeholder="Nama Saudara/Istri" class="w-full bg-white border border-rose-200 rounded-xl p-2 text-slate-900 outline-none" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">Hubungan:</label>
+                <input type="text" id="tx-bio-emerg-rel" placeholder="Istri / Orang Tua" class="w-full bg-white border border-rose-200 rounded-xl p-2 text-slate-900 outline-none" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">No HP Darurat:</label>
+                <input type="tel" id="tx-bio-emerg-phone" placeholder="08xxxxxxxxxx" oninput="this.value = this.value.replace(/\D/g, '')" class="w-full bg-white border border-rose-200 rounded-xl p-2 font-mono text-slate-900 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Pendidikan -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir:</label>
+              <select id="tx-bio-education" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800">
+                <option value="SMA">SMA</option>
+                <option value="SMK">SMK</option>
+                <option value="Diploma">Diploma (D3)</option>
+                <option value="S1" selected>Strata 1 (S1)</option>
+                <option value="S2">Strata 2 (S2)</option>
+                <option value="S3">Strata 3 (S3)</option>
+                <option value="SMP">SMP</option>
+                <option value="SD">SD</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jurusan Pendidikan:</label>
+              <input type="text" id="tx-bio-major" placeholder="Contoh: Manajemen / Teknik Informatika" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 outline-none" />
+            </div>
+          </div>
+        </div>
+
         <!-- 5. UPLOAD DOKUMEN SESUAI TRANSAKSI -->
         <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
           <span class="text-xs font-bold text-slate-800 block">4. Upload Dokumen Persyaratan:</span>
@@ -1666,7 +1841,10 @@
         <!-- 6. STAGING APPROVAL BERTINGKAT -->
         <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-800">5. Rantai Persetujuan (*Staging Approval*):</span>
+            <div>
+              <span class="text-xs font-bold text-slate-800">5. Rantai Persetujuan (*Staging Approval*):</span>
+              <p class="text-[10px] text-slate-400">Boleh dikosongkan jika transaksi hanya butuh konfirmasi dari karyawan ybs.</p>
+            </div>
             <button type="button" onclick="addTxStagingStage()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-[10px] border border-indigo-200 flex items-center space-x-1">
               <i class="fa-solid fa-plus text-[9px]"></i><span>Tambah Staging</span>
             </button>
@@ -1676,8 +1854,8 @@
             <div class="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2" id="tx-stage-row-1">
               <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
               <div class="flex-1 min-w-0">
-                <select id="tx-stage-approver-1" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
-                  <option value="">-- Pilih Approver Staging 1 --</option>
+                <select id="tx-stage-approver-1" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
+                  <option value="">-- Lewati Staging Atasan (Cukup Konfirmasi Karyawan Ybs) --</option>
                 </select>
               </div>
             </div>
@@ -1758,6 +1936,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260919_v149"></script>
+  <script src="/app.js?v=20260919_v150"></script>
 </body>
 </html>

@@ -19749,7 +19749,7 @@ function generateNewEmployeeNIP() {
   return `${prefix}${nextSeq}`;
 }
 
-async function openEmployeeTransactionModal(empNipOrId) {
+async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
   const modal = document.getElementById("modal-employee-transaction");
   if (!modal) return;
 
@@ -19778,7 +19778,7 @@ async function openEmployeeTransactionModal(empNipOrId) {
   // 3. Populate Work Locations & Units & Positions & Levels
   populateTxMasterDropdowns();
 
-  // 4. Reset Staging Approvals ke 1 Stage
+  // 4. Reset Staging Approvals ke 1 Stage (Opsional)
   resetTxStagingApprovals();
 
   // 5. Reset Inventory Rows
@@ -19798,8 +19798,15 @@ async function openEmployeeTransactionModal(empNipOrId) {
     const matched = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(empNipOrId) || String(e.id) === String(empNipOrId));
     if (matched) {
       empSelect.value = matched.id || matched.nip;
-      onTxEmployeeSelected(empSelect.value);
+      await onTxEmployeeSelected(empSelect.value);
     }
+  }
+
+  // Jika dipanggil khusus untuk Pembaruan Data Pribadi
+  if (initialType === "biodata") {
+    const chkBio = document.getElementById("chk-tx-biodata");
+    if (chkBio) chkBio.checked = true;
+    toggleTxSubforms();
   }
 }
 
@@ -19867,8 +19874,8 @@ function resetTxStagingApprovals() {
     <div class="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2 tx-staging-row" id="tx-stage-row-1">
       <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
       <div class="flex-1 min-w-0">
-        <select id="tx-stage-approver-1" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
-          <option value="">-- Pilih Approver Staging 1 --</option>
+        <select id="tx-stage-approver-1" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
+          <option value="">-- Lewati Staging Atasan (Cukup Konfirmasi Karyawan Ybs) --</option>
           ${approverOptions}
         </select>
       </div>
@@ -19906,7 +19913,7 @@ function addTxStagingStage() {
   row.innerHTML = `
     <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">${nextOrder}</span>
     <div class="flex-1 min-w-0">
-      <select id="tx-stage-approver-${nextOrder}" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
+      <select id="tx-stage-approver-${nextOrder}" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-semibold text-slate-800">
         <option value="">-- Pilih Approver Staging ${nextOrder} --</option>
         ${approverOptions}
       </select>
@@ -19928,7 +19935,107 @@ function reorderTxStaging() {
   });
 }
 
-function onTxEmployeeSelected(empId) {
+async function populateTxPersonalData(emp) {
+  if (!emp) return;
+  let detail = null;
+  let empId = emp.id;
+
+  if (supabaseClient) {
+    try {
+      if (!empId || typeof empId === "number") {
+        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        if (eRow?.id) empId = eRow.id;
+      }
+      if (empId) {
+        let { data } = await supabaseClient.from("hr_employee_personal_details").select("*").eq("employee_id", empId).maybeSingle();
+        if (!data) {
+          const resFallback = await supabaseClient.from("employee_personal_details").select("*").eq("employee_id", empId).maybeSingle();
+          if (resFallback?.data) data = resFallback.data;
+        }
+        if (data) detail = data;
+      }
+    } catch (e) {
+      console.warn("[populateTxPersonalData] error fetching personal details:", e);
+    }
+  }
+
+  const jsonb = detail?.personal_details || {};
+  const nik = detail?.ktp_number || detail?.nik || jsonb.nik_ktp || emp.nik_ktp || "";
+  const nama = emp.nama_lengkap || emp.nama || emp.name || "";
+  const pob = detail?.pob || detail?.tempat_lahir || jsonb.tempat_lahir || "";
+  const dob = detail?.dob || detail?.tanggal_lahir || emp.dob || "";
+  const gender = detail?.gender || detail?.jenis_kelamin || emp.gender || "Laki-laki";
+  const religion = detail?.religion || jsonb.religion || "Islam";
+  const marital = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "Belum Kawin";
+  const spouse = jsonb.spouse_name || detail?.spouse_name || "";
+  const childrenCount = jsonb.children_count ?? (Array.isArray(jsonb.children) ? jsonb.children.length : (detail?.number_of_dependents || 0));
+  const alamatKtp = detail?.address_ktp || jsonb.address_ktp || "";
+  const alamatDom = detail?.address_domicile || jsonb.address_domicile || "";
+  const lat = jsonb.lat || jsonb.latitude || "";
+  const lng = jsonb.lng || jsonb.longitude || "";
+  const phone = detail?.phone || emp.phone || "";
+  const wa = jsonb.wa || jsonb.whatsapp || phone || "";
+  const emergName = detail?.emergency_contact_name || jsonb.emergency_contact_name || "";
+  const emergRel = detail?.emergency_contact_relation || jsonb.emergency_contact_relation || "";
+  const emergPhone = detail?.emergency_contact_phone || jsonb.emergency_contact_phone || "";
+  const edu = jsonb.education_level || detail?.education || emp.education || "S1";
+  const major = jsonb.education_major || detail?.major || emp.major || "";
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val !== undefined && val !== null) el.value = val;
+  };
+  setVal("tx-bio-nama", nama);
+  setVal("tx-bio-nik", nik);
+  setVal("tx-bio-pob", pob);
+  setVal("tx-bio-dob", dob);
+  setVal("tx-bio-gender", gender);
+  setVal("tx-bio-religion", religion);
+  setVal("tx-bio-marital", marital);
+  setVal("tx-bio-spouse", spouse);
+  setVal("tx-bio-children-count", childrenCount);
+  setVal("tx-bio-alamat-ktp", alamatKtp);
+  setVal("tx-bio-alamat-dom", alamatDom);
+  setVal("tx-bio-lat", lat);
+  setVal("tx-bio-lng", lng);
+  setVal("tx-bio-phone", phone);
+  setVal("tx-bio-wa", wa);
+  setVal("tx-bio-emerg-name", emergName);
+  setVal("tx-bio-emerg-rel", emergRel);
+  setVal("tx-bio-emerg-phone", emergPhone);
+  setVal("tx-bio-education", edu);
+  setVal("tx-bio-major", major);
+
+  const childContainer = document.getElementById("tx-bio-children-container");
+  if (childContainer) {
+    childContainer.innerHTML = "";
+    const childrenList = Array.isArray(jsonb.children) ? jsonb.children.filter(Boolean) : [];
+    if (childrenList.length > 0) {
+      childrenList.forEach(childName => addTxBioChildRow(childName));
+    }
+  }
+}
+
+function addTxBioChildRow(val = "") {
+  const container = document.getElementById("tx-bio-children-container");
+  if (!container) return;
+  const row = document.createElement("div");
+  row.className = "flex items-center space-x-1.5 tx-bio-child-row";
+  row.innerHTML = `
+    <input type="text" value="${val}" placeholder="Nama Lengkap Anak" class="flex-1 bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-800 outline-none" />
+    <button type="button" onclick="this.closest('.tx-bio-child-row').remove(); updateTxBioChildrenCount();" class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs shrink-0" title="Hapus"><i class="fa-solid fa-xmark"></i></button>
+  `;
+  container.appendChild(row);
+  updateTxBioChildrenCount();
+}
+
+function updateTxBioChildrenCount() {
+  const rows = document.querySelectorAll(".tx-bio-child-row");
+  const countInput = document.getElementById("tx-bio-children-count");
+  if (countInput) countInput.value = rows.length;
+}
+
+async function onTxEmployeeSelected(empId) {
   if (!empId) {
     CURRENT_TX_SELECTED_EMP = null;
     document.getElementById("tx-emp-selected-summary")?.classList.add("hidden");
@@ -19963,7 +20070,7 @@ function onTxEmployeeSelected(empId) {
   const allOtherCheckboxes = [
     "chk-tx-tetap", "chk-tx-kontrak", "chk-tx-perpanjang", "chk-tx-rotasi",
     "chk-tx-promosi", "chk-tx-demosi", "chk-tx-mutasi", "chk-tx-benefit",
-    "chk-tx-resign", "chk-tx-phk", "chk-tx-pensiun"
+    "chk-tx-resign", "chk-tx-phk", "chk-tx-pensiun", "chk-tx-biodata"
   ];
 
   if (isCalon) {
@@ -20028,6 +20135,9 @@ function onTxEmployeeSelected(empId) {
     const bSalary = parseFloat(emp.basic_salary || emp.gaji_pokok || 0);
     const dispSal = document.getElementById("tx-prev-salary-display");
     if (dispSal) dispSal.innerText = `Rp ${bSalary.toLocaleString('id-ID')}`;
+
+    // Auto-populate data pribadi (pre-filled) ke subform biodata
+    await populateTxPersonalData(emp);
   }
 
   toggleTxSubforms();
@@ -20042,6 +20152,7 @@ function toggleTxSubforms() {
   const isDemosi = document.getElementById("chk-tx-demosi")?.checked;
   const isMutasi = document.getElementById("chk-tx-mutasi")?.checked;
   const isBenefit = document.getElementById("chk-tx-benefit")?.checked;
+  const isBiodata = document.getElementById("chk-tx-biodata")?.checked;
   const isExit = document.getElementById("chk-tx-resign")?.checked || document.getElementById("chk-tx-phk")?.checked || document.getElementById("chk-tx-pensiun")?.checked;
 
   toggleElement("subform-penerimaan", isPenerimaan);
@@ -20052,6 +20163,7 @@ function toggleTxSubforms() {
   toggleElement("subform-demosi", isDemosi);
   toggleElement("subform-mutasi", isMutasi);
   toggleElement("subform-benefit", isBenefit);
+  toggleElement("subform-biodata", isBiodata);
   toggleElement("subform-exit", isExit);
 
   // Update exit title
@@ -20154,6 +20266,9 @@ async function handleSubmitEmployeeTransaction(event) {
   const isPhk = document.getElementById("chk-tx-phk")?.checked;
   const isPensiun = document.getElementById("chk-tx-pensiun")?.checked;
 
+  const isBiodata = document.getElementById("chk-tx-biodata")?.checked;
+  const isExit = isResign || isPhk || isPensiun;
+
   const selectedTypes = [];
   if (isPenerimaan) selectedTypes.push("Penerimaan Karyawan");
   if (isTetap) selectedTypes.push("Tetap (PKWTT)");
@@ -20164,6 +20279,7 @@ async function handleSubmitEmployeeTransaction(event) {
   if (isDemosi) selectedTypes.push("Demosi");
   if (isMutasi) selectedTypes.push("Mutasi");
   if (isBenefit) selectedTypes.push("Penyesuaian Benefit");
+  if (isBiodata) selectedTypes.push("Pembaruan Data Pribadi");
   if (isResign) selectedTypes.push("Resign");
   if (isPhk) selectedTypes.push("PHK");
   if (isPensiun) selectedTypes.push("Pensiun");
@@ -20188,8 +20304,9 @@ async function handleSubmitEmployeeTransaction(event) {
     }
   });
 
-  if (stagingList.length === 0) {
-    alert("Tentukan minimal satu approver pada Staging Approval!");
+  // Jika BUKAN pembaruan biodata dan stagingList kosong, beri peringatan
+  if (stagingList.length === 0 && !isBiodata) {
+    alert("Tentukan minimal satu approver pada Staging Approval atau centang Pembaruan Data Pribadi untuk konfirmasi mandiri!");
     return;
   }
 
@@ -20234,9 +20351,40 @@ async function handleSubmitEmployeeTransaction(event) {
       kontrak: document.getElementById("tx-doc-kontrak")?.value.trim() || null
     };
 
+    // Kumpulkan Data Pembaruan Pribadi jika dicentang
+    let personalDataUpdates = null;
+    if (isBiodata) {
+      const childInputs = document.querySelectorAll("#tx-bio-children-container input");
+      const childNames = Array.from(childInputs).map(inp => inp.value.trim()).filter(Boolean);
+      personalDataUpdates = {
+        nama_lengkap: document.getElementById("tx-bio-nama")?.value.trim() || null,
+        ktp_number: document.getElementById("tx-bio-nik")?.value.trim() || null,
+        nik_ktp: document.getElementById("tx-bio-nik")?.value.trim() || null,
+        pob: document.getElementById("tx-bio-pob")?.value.trim() || null,
+        dob: document.getElementById("tx-bio-dob")?.value || null,
+        gender: document.getElementById("tx-bio-gender")?.value || "Laki-laki",
+        religion: document.getElementById("tx-bio-religion")?.value || "Islam",
+        marital_status: document.getElementById("tx-bio-marital")?.value || "Belum Kawin",
+        spouse_name: document.getElementById("tx-bio-spouse")?.value.trim() || null,
+        number_of_dependents: parseInt(document.getElementById("tx-bio-children-count")?.value) || childNames.length,
+        children: childNames,
+        address_ktp: document.getElementById("tx-bio-alamat-ktp")?.value.trim() || null,
+        address_domicile: document.getElementById("tx-bio-alamat-dom")?.value.trim() || null,
+        lat: document.getElementById("tx-bio-lat")?.value.trim() || null,
+        lng: document.getElementById("tx-bio-lng")?.value.trim() || null,
+        phone: document.getElementById("tx-bio-phone")?.value.trim() || null,
+        wa: document.getElementById("tx-bio-wa")?.value.trim() || null,
+        emergency_contact_name: document.getElementById("tx-bio-emerg-name")?.value.trim() || null,
+        emergency_contact_relation: document.getElementById("tx-bio-emerg-rel")?.value.trim() || null,
+        emergency_contact_phone: document.getElementById("tx-bio-emerg-phone")?.value.trim() || null,
+        education_level: document.getElementById("tx-bio-education")?.value || "S1",
+        education_major: document.getElementById("tx-bio-major")?.value.trim() || null
+      };
+    }
+
     // Tentukan Status Awal:
-    // Jika Rotasi, Promosi, Demosi, Mutasi, atau Penyesuaian Benefit dicentang -> PENDING_AGREEMENT (PIC ybs wajib TTD digital lebih dahulu)
-    const needsAgreement = isRotasi || isPromosi || isDemosi || isMutasi || isBenefit;
+    // Jika Rotasi, Promosi, Demosi, Mutasi, Benefit, atau Biodata (atau staging dikosongkan) -> PENDING_AGREEMENT
+    const needsAgreement = isRotasi || isPromosi || isDemosi || isMutasi || isBenefit || isBiodata || (stagingList.length === 0);
     const initialStatus = needsAgreement ? "PENDING_AGREEMENT" : "IN_REVIEW";
 
     // 100% Relational payload ke hr_employee_transactions
@@ -20288,9 +20436,9 @@ async function handleSubmitEmployeeTransaction(event) {
       new_allowance_kemahalan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-kemahalan")?.value) : parseFloat(emp.allowance_kemahalan || 0),
 
       // Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
-      uang_pisah: (isResign || isPhk || isPensiun) ? parseRupiah(document.getElementById("tx-exit-uangpisah")?.value) : 0,
-      uang_pisah_notes: (isResign || isPhk || isPensiun) ? (document.getElementById("tx-exit-notes")?.value.trim() || null) : null,
-      exit_interview_no: (isResign || isPhk || isPensiun) ? (document.getElementById("tx-exit-formno")?.value.trim() || null) : null,
+      uang_pisah: isExit ? parseRupiah(document.getElementById("tx-exit-uangpisah")?.value) : 0,
+      uang_pisah_notes: isExit ? (document.getElementById("tx-exit-notes")?.value.trim() || null) : null,
+      exit_interview_no: isExit ? (document.getElementById("tx-exit-formno")?.value.trim() || null) : null,
       inventory_returned: invReturned.join(", ") || null,
       inventory_not_returned: invNotReturned.join(", ") || null,
 
@@ -20299,7 +20447,10 @@ async function handleSubmitEmployeeTransaction(event) {
       doc_ktp_url: docUrls.ktp,
       doc_kk_url: docUrls.kk,
       doc_npwp_url: docUrls.npwp,
-      doc_kontrak_url: docUrls.kontrak
+      doc_kontrak_url: docUrls.kontrak,
+
+      // Pembaruan Data Pribadi Sipil
+      personal_data_updates: personalDataUpdates
     };
 
     if (supabaseClient) {
@@ -20443,6 +20594,28 @@ async function openElectronicAgreementModal(txId) {
       </div>
     `;
   }
+
+  // Tampilkan Ringkasan Pembaruan Data Pribadi jika ada
+  if (tx.personal_data_updates) {
+    const pu = tx.personal_data_updates;
+    changeItemsHtml += `
+      <div class="p-2.5 bg-white rounded-xl border border-indigo-100 text-xs space-y-1 mb-1">
+        <span class="font-bold text-indigo-900 block border-b border-slate-100 pb-1"><i class="fa-solid fa-user-pen mr-1 text-indigo-600"></i> Data Pribadi yang Diperbarui:</span>
+        <div class="grid grid-cols-2 gap-1 text-[11px] pt-1">
+          <div><span class="text-slate-400">NIK:</span> <strong>${pu.ktp_number || '-'}</strong></div>
+          <div><span class="text-slate-400">Nama:</span> <strong>${pu.nama_lengkap || '-'}</strong></div>
+          <div><span class="text-slate-400">TTL:</span> <strong>${pu.pob || ''}, ${pu.dob || ''}</strong></div>
+          <div><span class="text-slate-400">No HP/WA:</span> <strong>${pu.phone || pu.wa || '-'}</strong></div>
+          <div><span class="text-slate-400">Status Nikah:</span> <strong>${pu.marital_status || '-'}</strong></div>
+          <div><span class="text-slate-400">Tanggungan:</span> <strong>${pu.number_of_dependents || 0} Anak</strong></div>
+        </div>
+      </div>
+    `;
+    const legalEl = document.getElementById("agree-legal-text");
+    if (legalEl) {
+      legalEl.innerText = `"Dengan ini saya menyatakan bahwa data pribadi/biodata yang diajukan di atas adalah benar, valid, dan sesuai dengan dokumen kependudukan saya, serta saya mengonfirmasi pembaruan data ini pada profil kepegawaian perusahaan."`;
+    }
+  }
   if (summaryContainer) summaryContainer.innerHTML = changeItemsHtml;
 
   // Metadata Audit Trail
@@ -20500,30 +20673,56 @@ async function confirmElectronicAgreement() {
           created_at: now
         });
 
-      // 2. Update status transaksi menjadi IN_REVIEW & aktifkan Staging 1
-      await supabaseClient
-        .from("hr_employee_transactions")
-        .update({
-          status: "IN_REVIEW",
-          current_stage: 1,
-          updated_at: now
-        })
-        .eq("id", txId);
-
-      // 3. Update status staging 1 menjadi PENDING
-      await supabaseClient
+      // 2. Periksa apakah ada staging approvals bertingkat
+      const { data: stagings } = await supabaseClient
         .from("hr_transaction_staging_approvals")
-        .update({
-          status: "PENDING",
-          updated_at: now
-        })
-        .eq("transaction_id", txId)
-        .eq("stage_order", 1);
+        .select("*")
+        .eq("transaction_id", txId);
+
+      if (stagings && stagings.length > 0) {
+        // Ada staging approval -> Maju ke IN_REVIEW dan aktifkan stage 1
+        await supabaseClient
+          .from("hr_employee_transactions")
+          .update({
+            status: "IN_REVIEW",
+            current_stage: 1,
+            updated_at: now
+          })
+          .eq("id", txId);
+
+        await supabaseClient
+          .from("hr_transaction_staging_approvals")
+          .update({
+            status: "PENDING",
+            updated_at: now
+          })
+          .eq("transaction_id", txId)
+          .eq("stage_order", 1);
+
+        closeElectronicAgreementModal();
+        showToast("Persetujuan elektronik berhasil ditandatangani! Berkas diteruskan ke Approver Staging 1.", "success", 2500);
+      } else {
+        // Tanpa Staging (dikosongkan): Cukup konfirmasi user -> Langsung FINAL APPROVED & APPLIED!
+        await supabaseClient
+          .from("hr_employee_transactions")
+          .update({
+            status: "APPROVED",
+            updated_at: now
+          })
+          .eq("id", txId);
+
+        closeElectronicAgreementModal();
+        await applyApprovedTransactionToEmployee(tx);
+        showToast("Pembaruan data pribadi berhasil dikonfirmasi dan telah otomatis diterapkan ke profil karyawan!", "success", 3000);
+      }
+    } else {
+      closeElectronicAgreementModal();
     }
 
-    closeElectronicAgreementModal();
-    showToast("Persetujuan elektronik berhasil ditandatangani! Berkas diteruskan ke Approver Staging 1.", "success", 2500);
     await fetchApprovalList();
+    if (typeof loadPersonaliaEmployees === "function") {
+      await loadPersonaliaEmployees();
+    }
   } catch (err) {
     console.error("[Electronic Agreement] Error:", err);
     alert("Gagal memproses persetujuan elektronik: " + err.message);
@@ -20759,6 +20958,73 @@ async function applyApprovedTransactionToEmployee(tx) {
       updatePayload.status_aktif = "NONAKTIF";
       updatePayload.is_active = false;
       updatePayload.tanggal_keluar = tx.effective_date || new Date().toISOString().split("T")[0];
+    }
+
+    // M. Pembaruan Data Pribadi (Personal Data Updates)
+    if (types.includes("Pembaruan Data Pribadi") || tx.personal_data_updates) {
+      const pu = tx.personal_data_updates || {};
+      if (pu.nama_lengkap) updatePayload.nama_lengkap = pu.nama_lengkap;
+      if (pu.nik_ktp || pu.ktp_number) updatePayload.nik_ktp = pu.nik_ktp || pu.ktp_number;
+      if (pu.dob) updatePayload.dob = pu.dob;
+      if (pu.gender) updatePayload.gender = pu.gender;
+      if (pu.marital_status) updatePayload.marital_status = pu.marital_status;
+      if (pu.phone) updatePayload.phone = pu.phone;
+
+      // Sinkronkan ke hr_employee_personal_details / employee_personal_details
+      try {
+        const detailPayload = {
+          employee_id: empId,
+          ktp_number: pu.ktp_number || pu.nik_ktp || null,
+          pob: pu.pob || null,
+          dob: pu.dob || null,
+          gender: pu.gender || null,
+          religion: pu.religion || null,
+          marital_status: pu.marital_status || null,
+          spouse_name: pu.spouse_name || null,
+          number_of_dependents: pu.number_of_dependents || 0,
+          address_ktp: pu.address_ktp || null,
+          address_domicile: pu.address_domicile || null,
+          phone: pu.phone || null,
+          emergency_contact_name: pu.emergency_contact_name || null,
+          emergency_contact_relation: pu.emergency_contact_relation || null,
+          emergency_contact_phone: pu.emergency_contact_phone || null,
+          education: pu.education_level || null,
+          major: pu.education_major || null,
+          personal_details: pu,
+          updated_at: now
+        };
+
+        const { data: existHr } = await supabaseClient
+          .from("hr_employee_personal_details")
+          .select("id")
+          .eq("employee_id", empId)
+          .maybeSingle();
+
+        if (existHr) {
+          await supabaseClient
+            .from("hr_employee_personal_details")
+            .update(detailPayload)
+            .eq("employee_id", empId);
+        } else {
+          await supabaseClient
+            .from("hr_employee_personal_details")
+            .insert({ ...detailPayload, created_at: now });
+        }
+
+        const { data: existOld } = await supabaseClient
+          .from("employee_personal_details")
+          .select("id")
+          .eq("employee_id", empId)
+          .maybeSingle();
+        if (existOld) {
+          await supabaseClient
+            .from("employee_personal_details")
+            .update(detailPayload)
+            .eq("employee_id", empId);
+        }
+      } catch (detErr) {
+        console.warn("[applyApprovedTransactionToEmployee] personal details sync error:", detErr);
+      }
     }
 
     await supabaseClient
