@@ -170,6 +170,19 @@ let ROLE_PERMISSIONS_STATE = (() => {
 })();
 
 function getPermissionsForRole(roleKey, userObj = null) {
+  const positionId = String(userObj?.position_id || userObj?.id_position || userObj?.jabatan_id || "").trim();
+
+  // 0. Prioritaskan Hak Akses Terpusat Berbasis Jabatan (Digi Active Multi-App RBAC)
+  if (positionId && typeof ORG_POSITION_PERMS_DATA !== "undefined" && ORG_POSITION_PERMS_DATA[positionId]) {
+    const posPerms = ORG_POSITION_PERMS_DATA[positionId] || [];
+    const activePerms = posPerms
+      .filter(p => p.startsWith("digi_active:") && p.endsWith(":view"))
+      .map(p => p.replace("digi_active:", "").replace(":view", ""));
+    if (activePerms.length > 0) {
+      return activePerms;
+    }
+  }
+
   const roleId = String(userObj?.role_id || roleKey || "").trim();
   const roleName = String(userObj?.role || userObj?.jabatan || roleKey || "").trim();
 
@@ -17426,6 +17439,35 @@ async function runSsoTokenSimulation() {
 
 // ---------------- 6. HAK AKSES MULTI-APLIKASI BERBASIS JABATAN (CENTRALIZED RBAC) ----------------
 const ORG_APPS_CONFIG = {
+  digi_active: {
+    name: "Digi Active",
+    icon: "fa-bolt",
+    modules: [
+      { key: "priority", label: "Priority FAC (Monitoring Prioritas Mitra)" },
+      { key: "visit", label: "Form Visit FAC (Kunjungan Regular & OVD)" },
+      { key: "onboarding", label: "Calon Mitra (Input Calon Mitra Baru)" },
+      { key: "pipeline", label: "Pipeline (Progres & Folder Dokumen)" },
+      { key: "gps", label: "GPS Maintain (Pasang / Ganti / Cabut)" },
+      { key: "fac", label: "Report GPS (Monitoring Sinyal Harian)" },
+      { key: "assignment", label: "Assign & Concern Visit Mitra" },
+      { key: "history", label: "Riwayat (Log Visit, Mitra & GPS)" },
+      { key: "laporan_activity", label: "Laporan Activity (Monitoring Kunjungan)" },
+      { key: "izin", label: "Pengajuan Izin (WFA, Cuti, Sakit, Terlambat)" },
+      { key: "persetujuan", label: "Persetujuan (Approval Hub Permohonan)" },
+      { key: "attendance_summary", label: "Rekap Absen Mandiri (Kalender Presensi)" },
+      { key: "rekap_tim", label: "Presensi Tim (Monitoring Presensi Staf)" },
+      { key: "slip_gaji", label: "E-Slip Gaji & Kompensasi Resmi" },
+      { key: "personalia", label: "Data Karyawan & Bagan Organisasi" },
+      { key: "expense_claim", label: "Klaim Biaya / Reimbursement (BBM/Tol/Ops)" },
+      { key: "internal_memo", label: "Memo Pengajuan Internal Resmi" },
+      { key: "employee_loan", label: "Pinjaman Karyawan / Kasbon Darurat" },
+      { key: "helpdesk_support", label: "IT & Helpdesk Support Kendala Sistem" },
+      { key: "ketentuan", label: "Ketentuan, SOP & Kebijakan Perusahaan" },
+      { key: "sop_management", label: "SOP Management (Upload & Kelola SOP)" },
+      { key: "organization_setting", label: "Organization Setting (Struktur, Lokasi, SSO)" },
+      { key: "settings", label: "Pengaturan Sistem (Akun, Geofence, Area, GPS)" }
+    ]
+  },
   digicore: {
     name: "Digiasha Core",
     icon: "fa-laptop",
@@ -17472,6 +17514,32 @@ const ORG_APPS_CONFIG = {
 
 const DEFAULT_POSITION_PERMISSIONS = {
   "POS-DIR-UTAMA": [
+    // Digi Active (Akses Penuh Seluruh Modul)
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view", "digi_active:visit:edit",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view", "digi_active:pipeline:edit",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view", "digi_active:assignment:edit",
+    "digi_active:history:view", "digi_active:history:edit",
+    "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
+    "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
+    "digi_active:rekap_tim:view", "digi_active:rekap_tim:edit",
+    "digi_active:slip_gaji:view", "digi_active:slip_gaji:edit",
+    "digi_active:personalia:view", "digi_active:personalia:edit",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:employee_loan:view", "digi_active:employee_loan:edit",
+    "digi_active:helpdesk_support:view", "digi_active:helpdesk_support:edit",
+    "digi_active:ketentuan:view", "digi_active:ketentuan:edit",
+    "digi_active:sop_management:view", "digi_active:sop_management:edit",
+    "digi_active:organization_setting:view", "digi_active:organization_setting:edit",
+    "digi_active:settings:view", "digi_active:settings:edit",
+
+    // Satelit: Core, Appwork, Spector
     "digicore:org_structure:view", "digicore:org_structure:edit",
     "digicore:employee_mgmt:view", "digicore:employee_mgmt:edit",
     "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
@@ -17498,6 +17566,28 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
   ],
   "POS-GM-OPS": [
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view", "digi_active:visit:edit",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view", "digi_active:pipeline:edit",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view", "digi_active:assignment:edit",
+    "digi_active:history:view", "digi_active:history:edit",
+    "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
+    "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
+    "digi_active:rekap_tim:view", "digi_active:rekap_tim:edit",
+    "digi_active:slip_gaji:view",
+    "digi_active:personalia:view", "digi_active:personalia:edit",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:employee_loan:view", "digi_active:employee_loan:edit",
+    "digi_active:helpdesk_support:view", "digi_active:helpdesk_support:edit",
+    "digi_active:ketentuan:view", "digi_active:ketentuan:edit",
+    "digi_active:sop_management:view", "digi_active:sop_management:edit",
+    "digi_active:organization_setting:view", "digi_active:organization_setting:edit",
     "digicore:org_structure:view", "digicore:org_structure:edit",
     "digicore:employee_mgmt:view", "digicore:employee_mgmt:edit",
     "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
@@ -17509,6 +17599,26 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
   ],
   "POS-BM-SERANG": [
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view", "digi_active:visit:edit",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view", "digi_active:pipeline:edit",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view", "digi_active:assignment:edit",
+    "digi_active:history:view", "digi_active:history:edit",
+    "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
+    "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
+    "digi_active:rekap_tim:view", "digi_active:rekap_tim:edit",
+    "digi_active:slip_gaji:view",
+    "digi_active:personalia:view",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:employee_loan:view",
+    "digi_active:helpdesk_support:view", "digi_active:helpdesk_support:edit",
+    "digi_active:ketentuan:view",
     "digicore:org_structure:view",
     "digicore:employee_mgmt:view",
     "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
@@ -17526,6 +17636,26 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
   ],
   "POS-BM-TGR": [
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view", "digi_active:visit:edit",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view", "digi_active:pipeline:edit",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view", "digi_active:assignment:edit",
+    "digi_active:history:view", "digi_active:history:edit",
+    "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
+    "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
+    "digi_active:rekap_tim:view", "digi_active:rekap_tim:edit",
+    "digi_active:slip_gaji:view",
+    "digi_active:personalia:view",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:employee_loan:view",
+    "digi_active:helpdesk_support:view", "digi_active:helpdesk_support:edit",
+    "digi_active:ketentuan:view",
     "digicore:org_structure:view",
     "digicore:employee_mgmt:view",
     "digicore:approval_onboarding:view", "digicore:approval_onboarding:edit",
@@ -17543,6 +17673,24 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_spector:inspection_approval:view", "digi_spector:inspection_approval:edit"
   ],
   "POS-SPV-FAC": [
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view", "digi_active:visit:edit",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view", "digi_active:pipeline:edit",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view", "digi_active:assignment:edit",
+    "digi_active:history:view", "digi_active:history:edit",
+    "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
+    "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
+    "digi_active:rekap_tim:view", "digi_active:rekap_tim:edit",
+    "digi_active:slip_gaji:view",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:helpdesk_support:view", "digi_active:helpdesk_support:edit",
+    "digi_active:ketentuan:view",
     "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
     "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
     "digi_workapp:visit_dealer:view", "digi_workapp:visit_dealer:edit",
@@ -17558,16 +17706,54 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_spector:bpkb_stnk_validation:view"
   ],
   "POS-FAC-OFFICER": [
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view", "digi_active:visit:edit",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view",
+    "digi_active:history:view",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:attendance_summary:view",
+    "digi_active:slip_gaji:view",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:helpdesk_support:view",
+    "digi_active:ketentuan:view",
     "digi_workapp:attendance_gps:view", "digi_workapp:attendance_gps:edit",
     "digi_workapp:task_assignment:view", "digi_workapp:task_assignment:edit",
     "digi_workapp:visit_dealer:view", "digi_workapp:visit_dealer:edit",
     "digi_workapp:onboarding_partner:view", "digi_workapp:onboarding_partner:edit",
     "digi_workapp:daily_activity:view", "digi_workapp:daily_activity:edit",
     "digi_workapp:expense_claim:view", "digi_workapp:expense_claim:edit",
-    "digi_workapp:leave_permit:view", "digi_workapp:leave_permit:edit",
+    "digi_workapp:leave_permit:view",
     "digi_workapp:payslip_info:view"
   ],
   "POS-ADMIN-HO": [
+    "digi_active:priority:view", "digi_active:priority:edit",
+    "digi_active:visit:view",
+    "digi_active:onboarding:view", "digi_active:onboarding:edit",
+    "digi_active:pipeline:view", "digi_active:pipeline:edit",
+    "digi_active:gps:view", "digi_active:gps:edit",
+    "digi_active:fac:view", "digi_active:fac:edit",
+    "digi_active:assignment:view", "digi_active:assignment:edit",
+    "digi_active:history:view", "digi_active:history:edit",
+    "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:izin:view", "digi_active:izin:edit",
+    "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
+    "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
+    "digi_active:rekap_tim:view", "digi_active:rekap_tim:edit",
+    "digi_active:slip_gaji:view", "digi_active:slip_gaji:edit",
+    "digi_active:personalia:view", "digi_active:personalia:edit",
+    "digi_active:expense_claim:view", "digi_active:expense_claim:edit",
+    "digi_active:internal_memo:view", "digi_active:internal_memo:edit",
+    "digi_active:employee_loan:view", "digi_active:employee_loan:edit",
+    "digi_active:helpdesk_support:view", "digi_active:helpdesk_support:edit",
+    "digi_active:ketentuan:view", "digi_active:ketentuan:edit",
+    "digi_active:sop_management:view", "digi_active:sop_management:edit",
+    "digi_active:organization_setting:view", "digi_active:organization_setting:edit",
+    "digi_active:settings:view", "digi_active:settings:edit",
     "digicore:org_structure:view", "digicore:org_structure:edit",
     "digicore:employee_mgmt:view", "digicore:employee_mgmt:edit",
     "digicore:vehicle_pricelist:view", "digicore:vehicle_pricelist:edit",
@@ -17579,7 +17765,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
 
 let ORG_POSITION_PERMS_DATA = { ...DEFAULT_POSITION_PERMISSIONS };
 let CURRENT_PERM_POSITION_ID = null;
-let CURRENT_PERM_APP_TAB = "digicore";
+let CURRENT_PERM_APP_TAB = "digi_active";
 let CURRENT_TEMP_PERMS_SET = new Set();
 let CURRENT_ROLE_FILTER_KEYWORD = "";
 
@@ -17659,7 +17845,7 @@ function renderOrgRolePermissions(filterKeyword = "") {
             <th class="p-3 min-w-[140px]">Unit Penempatan</th>
             <th class="p-3 min-w-[100px]">Level / Grade</th>
             <th class="p-3 text-center w-24">Status</th>
-            <th class="p-3 min-w-[240px]">Akses Aplikasi Aktif</th>
+            <th class="p-3 min-w-[260px]">Akses Aplikasi Aktif</th>
             <th class="p-3 text-right w-32">Aksi</th>
           </tr>
         </thead>
@@ -17670,6 +17856,7 @@ function renderOrgRolePermissions(filterKeyword = "") {
             const isActive = pos.is_active !== false;
             const perms = ORG_POSITION_PERMS_DATA[pos.id_position] || [];
 
+            const activeCount = perms.filter(c => c.startsWith("digi_active:") && c.endsWith(":view")).length;
             const coreCount = perms.filter(c => c.startsWith("digicore:") && c.endsWith(":view")).length;
             const workappCount = perms.filter(c => c.startsWith("digi_workapp:") && c.endsWith(":view")).length;
             const spectorCount = perms.filter(c => c.startsWith("digi_spector:") && c.endsWith(":view")).length;
@@ -17695,6 +17882,9 @@ function renderOrgRolePermissions(filterKeyword = "") {
                 </td>
                 <td class="p-3">
                   <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${activeCount > 0 ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-50 text-slate-400 border-slate-200'}">
+                      <i class="fa-solid fa-bolt mr-1 text-amber-500"></i>Active: ${activeCount}
+                    </span>
                     <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${coreCount > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}">
                       <i class="fa-solid fa-laptop mr-1"></i>Core: ${coreCount}
                     </span>
@@ -17729,7 +17919,7 @@ function openPositionPermissionsModal(positionId) {
   }
 
   CURRENT_PERM_POSITION_ID = positionId;
-  CURRENT_PERM_APP_TAB = "digicore";
+  CURRENT_PERM_APP_TAB = "digi_active";
 
   // Ambil data izin yang sudah tersimpan untuk jabatan ini ke dalam working set
   const savedPerms = ORG_POSITION_PERMS_DATA[positionId] || DEFAULT_POSITION_PERMISSIONS[positionId] || [];
@@ -17739,8 +17929,8 @@ function openPositionPermissionsModal(positionId) {
   document.getElementById("perm-modal-title").innerText = `Hak Akses: ${pos.nama_jabatan}`;
   document.getElementById("perm-modal-subtitle").innerText = `ID Position: ${pos.id_position}`;
 
-  // Buka tab default
-  switchPositionPermAppTab("digicore");
+  // Buka tab default Digi Active
+  switchPositionPermAppTab("digi_active");
 
   document.getElementById("modal-position-permissions").classList.remove("hidden");
 }
@@ -17753,15 +17943,15 @@ function closePositionPermissionsModal() {
 
 function switchPositionPermAppTab(appKey) {
   CURRENT_PERM_APP_TAB = appKey;
-  const appKeys = ["digicore", "digi_workapp", "digi_spector"];
+  const appKeys = ["digi_active", "digicore", "digi_workapp", "digi_spector"];
 
   appKeys.forEach(key => {
     const btn = document.getElementById(`perm-tab-btn-${key}`);
     if (btn) {
       if (key === appKey) {
-        btn.className = "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-indigo-600 text-indigo-700";
+        btn.className = "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-indigo-600 text-indigo-700 whitespace-nowrap";
       } else {
-        btn.className = "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800";
+        btn.className = "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap";
       }
     }
   });

@@ -3,12 +3,15 @@
 -- SENTRALISASI HAK AKSES MULTI-APLIKASI BERBASIS JABATAN (RBAC)
 -- =========================================================================
 -- Ekosistem Aplikasi yang diatur terpusat:
--- 1. digicore      -> Digiasha Core Enterprise (Web Portal)
--- 2. digi_workapp  -> Digi Appwork (Mobile Operational & Presensi)
--- 3. digi_spector  -> Digispector (Aplikasi Inspeksi Kendaraan)
+-- 1. digi_active   -> Digi Active (Aplikasi Operasional & Workflow Lapangan)
+-- 2. digicore      -> Digiasha Core Enterprise (Web Portal)
+-- 3. digi_workapp  -> Digi Appwork (Mobile Operational & Presensi)
+-- 4. digi_spector  -> Digispector (Aplikasi Inspeksi Kendaraan)
 --
 -- Format permission_code: {app_key}:{module_key}:{action}
 -- Contoh:
+--   - digi_active:priority:view
+--   - digi_active:priority:edit
 --   - digicore:org_structure:view
 --   - digicore:org_structure:edit
 --   - digi_workapp:attendance_gps:view
@@ -43,6 +46,52 @@ SELECT v.pos_id, v.perm_code
 FROM (
   VALUES
     -- POS-DIR-UTAMA (Direktur Utama - Akses Penuh Seluruh Aplikasi)
+    ('POS-DIR-UTAMA', 'digi_active:priority:view'),
+    ('POS-DIR-UTAMA', 'digi_active:priority:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:visit:view'),
+    ('POS-DIR-UTAMA', 'digi_active:visit:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:onboarding:view'),
+    ('POS-DIR-UTAMA', 'digi_active:onboarding:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:pipeline:view'),
+    ('POS-DIR-UTAMA', 'digi_active:pipeline:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:gps:view'),
+    ('POS-DIR-UTAMA', 'digi_active:gps:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:fac:view'),
+    ('POS-DIR-UTAMA', 'digi_active:fac:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:assignment:view'),
+    ('POS-DIR-UTAMA', 'digi_active:assignment:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:history:view'),
+    ('POS-DIR-UTAMA', 'digi_active:history:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:laporan_activity:view'),
+    ('POS-DIR-UTAMA', 'digi_active:laporan_activity:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:izin:view'),
+    ('POS-DIR-UTAMA', 'digi_active:izin:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:persetujuan:view'),
+    ('POS-DIR-UTAMA', 'digi_active:persetujuan:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:attendance_summary:view'),
+    ('POS-DIR-UTAMA', 'digi_active:attendance_summary:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:rekap_tim:view'),
+    ('POS-DIR-UTAMA', 'digi_active:rekap_tim:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:slip_gaji:view'),
+    ('POS-DIR-UTAMA', 'digi_active:slip_gaji:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:personalia:view'),
+    ('POS-DIR-UTAMA', 'digi_active:personalia:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:expense_claim:view'),
+    ('POS-DIR-UTAMA', 'digi_active:expense_claim:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:internal_memo:view'),
+    ('POS-DIR-UTAMA', 'digi_active:internal_memo:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:employee_loan:view'),
+    ('POS-DIR-UTAMA', 'digi_active:employee_loan:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:helpdesk_support:view'),
+    ('POS-DIR-UTAMA', 'digi_active:helpdesk_support:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:ketentuan:view'),
+    ('POS-DIR-UTAMA', 'digi_active:ketentuan:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:sop_management:view'),
+    ('POS-DIR-UTAMA', 'digi_active:sop_management:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:organization_setting:view'),
+    ('POS-DIR-UTAMA', 'digi_active:organization_setting:edit'),
+    ('POS-DIR-UTAMA', 'digi_active:settings:view'),
+    ('POS-DIR-UTAMA', 'digi_active:settings:edit'),
     ('POS-DIR-UTAMA', 'digicore:org_structure:view'),
     ('POS-DIR-UTAMA', 'digicore:org_structure:edit'),
     ('POS-DIR-UTAMA', 'digicore:employee_mgmt:view'),
@@ -93,6 +142,23 @@ FROM (
     ('POS-DIR-UTAMA', 'digi_spector:inspection_approval:edit'),
 
     -- POS-BM-SERANG & POS-BM-TGR (Branch Manager)
+    ('POS-BM-SERANG', 'digi_active:priority:view'),
+    ('POS-BM-SERANG', 'digi_active:priority:edit'),
+    ('POS-BM-SERANG', 'digi_active:visit:view'),
+    ('POS-BM-SERANG', 'digi_active:visit:edit'),
+    ('POS-BM-SERANG', 'digi_active:pipeline:view'),
+    ('POS-BM-SERANG', 'digi_active:pipeline:edit'),
+    ('POS-BM-SERANG', 'digi_active:assignment:view'),
+    ('POS-BM-SERANG', 'digi_active:assignment:edit'),
+    ('POS-BM-SERANG', 'digi_active:history:view'),
+    ('POS-BM-SERANG', 'digi_active:laporan_activity:view'),
+    ('POS-BM-SERANG', 'digi_active:persetujuan:view'),
+    ('POS-BM-SERANG', 'digi_active:persetujuan:edit'),
+    ('POS-BM-SERANG', 'digi_active:attendance_summary:view'),
+    ('POS-BM-SERANG', 'digi_active:rekap_tim:view'),
+    ('POS-BM-SERANG', 'digi_active:expense_claim:view'),
+    ('POS-BM-SERANG', 'digi_active:expense_claim:edit'),
+    ('POS-BM-SERANG', 'digi_active:ketentuan:view'),
     ('POS-BM-SERANG', 'digicore:org_structure:view'),
     ('POS-BM-SERANG', 'digicore:employee_mgmt:view'),
     ('POS-BM-SERANG', 'digicore:approval_onboarding:view'),
@@ -117,6 +183,20 @@ FROM (
     ('POS-BM-SERANG', 'digi_spector:inspection_approval:edit'),
 
     -- POS-FAC-OFFICER (Field Action Coordinator)
+    ('POS-FAC-OFFICER', 'digi_active:priority:view'),
+    ('POS-FAC-OFFICER', 'digi_active:visit:view'),
+    ('POS-FAC-OFFICER', 'digi_active:visit:edit'),
+    ('POS-FAC-OFFICER', 'digi_active:pipeline:view'),
+    ('POS-FAC-OFFICER', 'digi_active:assignment:view'),
+    ('POS-FAC-OFFICER', 'digi_active:assignment:edit'),
+    ('POS-FAC-OFFICER', 'digi_active:history:view'),
+    ('POS-FAC-OFFICER', 'digi_active:laporan_activity:view'),
+    ('POS-FAC-OFFICER', 'digi_active:laporan_activity:edit'),
+    ('POS-FAC-OFFICER', 'digi_active:izin:view'),
+    ('POS-FAC-OFFICER', 'digi_active:izin:edit'),
+    ('POS-FAC-OFFICER', 'digi_active:expense_claim:view'),
+    ('POS-FAC-OFFICER', 'digi_active:expense_claim:edit'),
+    ('POS-FAC-OFFICER', 'digi_active:ketentuan:view'),
     ('POS-FAC-OFFICER', 'digi_workapp:attendance_gps:view'),
     ('POS-FAC-OFFICER', 'digi_workapp:attendance_gps:edit'),
     ('POS-FAC-OFFICER', 'digi_workapp:task_assignment:view'),
