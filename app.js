@@ -16684,38 +16684,42 @@ function renderOrgPositionsList(list) {
   }
 
   container.innerHTML = list.map(pos => {
-    const parentPos = list.find(p => p.id_position === pos.reports_to_unit_id);
-    const unit = (ORG_UNITS_DATA || []).find(u => u.id_unit === pos.unit_id);
-    const level = (ORG_LEVELS_DATA || []).find(l => l.id_level === pos.level_id);
     const isActive = pos.is_active !== false;
 
     return `
-      <div class="bg-white p-3.5 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center space-x-2">
-            <span class="font-mono text-xs font-bold text-slate-900">${pos.id_position}</span>
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">${level?.nama_level || pos.level_id || '-'}</span>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-300'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span>
-          </div>
-          <h4 class="font-bold text-xs sm:text-sm text-slate-800 mt-1">${pos.nama_jabatan}</h4>
-          <div class="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
-            <span>Unit: <strong class="text-slate-700">${unit?.nama_unit || pos.unit_id || '-'}</strong></span>
-            ${parentPos ? `<span>•</span><span>Melapor Ke: <strong class="text-indigo-700">${parentPos.nama_jabatan}</strong></span>` : ''}
-          </div>
+      <div class="bg-white px-3.5 py-2.5 rounded-2xl border ${isActive ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-300/80 bg-slate-50/70 border-dashed'} shadow-xs flex items-center justify-between gap-3 transition">
+        <div class="min-w-0 flex-1 flex items-center space-x-2.5">
+          <h4 class="font-bold text-xs sm:text-sm text-slate-800 truncate" title="${pos.nama_jabatan}">${pos.nama_jabatan}</h4>
+          <span class="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'}">
+            <i class="fa-solid fa-circle text-[6px] mr-1 ${isActive ? 'text-emerald-500' : 'text-rose-400'}"></i>${isActive ? 'AKTIF' : 'NONAKTIF'}
+          </span>
         </div>
         <div class="flex items-center space-x-1.5 shrink-0">
-          <button type="button" onclick="openPositionPermissionsModal('${pos.id_position}')" class="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-indigo-200 transition" title="Atur Hak Akses Multi-Aplikasi">
-            <i class="fa-solid fa-shield-halved"></i>
+          <button type="button" onclick="openPositionPermissionsModal('${pos.id_position}')" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-indigo-200 transition" title="Atur Hak Akses Multi-Aplikasi">
+            <i class="fa-solid fa-shield-halved text-xs"></i>
             <span class="hidden sm:inline">Hak Akses</span>
           </button>
-          <button type="button" onclick="openEditJobPositionModal('${pos.id_position}')" class="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
-            <i class="fa-solid fa-pen-to-square"></i>
+          <button type="button" onclick="openEditJobPositionModal('${pos.id_position}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition" title="Edit Posisi Jabatan">
+            <i class="fa-solid fa-pen-to-square text-xs"></i>
             <span>Edit</span>
           </button>
         </div>
       </div>
     `;
   }).join("");
+}
+
+function filterOrgPositions(query = "") {
+  const q = (query || "").trim().toLowerCase();
+  if (!q) {
+    renderOrgPositionsList(ORG_POSITIONS_DATA);
+    return;
+  }
+  const filtered = (ORG_POSITIONS_DATA || []).filter(p => 
+    (p.nama_jabatan || "").toLowerCase().includes(q) ||
+    (p.id_position || "").toLowerCase().includes(q)
+  );
+  renderOrgPositionsList(filtered);
 }
 
 function openAddJobPositionModal() {
