@@ -761,69 +761,101 @@
           <div class="h-2"></div>
         </div>
 
+
         <!-- TAB CONTENT 2: KEPEGAWAIAN (STATUS AKTIF TERKINI) -->
-        <div id="dossier-content-job" class="space-y-3 hidden">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Nomor Induk Pegawai (NIP)</span>
-              <span id="dossier-nip-val" class="font-bold font-mono text-indigo-900 text-sm block mt-0.5">-</span>
+        <div id="dossier-content-job" class="space-y-0 text-xs hidden">
+
+          <!-- SEKSI 1: IDENTITAS KEPEGAWAIAN -->
+          <div class="border-l-4 border-indigo-500 pl-3 py-2.5">
+            <span class="text-[9px] font-extrabold text-indigo-600 uppercase tracking-widest">Identitas Kepegawaian</span>
+          </div>
+          <div class="pl-3 divide-y divide-slate-100">
+            <!-- NIP & Status Kepegawaian -->
+            <div class="grid grid-cols-2 gap-x-4 py-1.5">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[90px]">NIP</span>
+                <span id="dossier-nip-val" class="font-bold font-mono text-indigo-800 truncate">-</span>
+              </div>
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[72px]">Status Kerja</span>
+                <span id="dossier-statuskerja-val" class="font-bold text-emerald-700">-</span>
+              </div>
             </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Status Kepegawaian</span>
-              <span id="dossier-statuskerja-val" class="font-bold text-emerald-800 text-xs block mt-0.5">-</span>
+            <!-- Jabatan & Level -->
+            <div class="grid grid-cols-2 gap-x-4 py-1.5">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[90px]">Jabatan</span>
+                <span id="dossier-jabatan-val" class="font-bold text-indigo-900 truncate">-</span>
+              </div>
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[72px]">Level/Grade</span>
+                <span id="dossier-level-val" class="font-semibold text-slate-800">-</span>
+              </div>
             </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Penempatan (Work Location)</span>
-              <span id="dossier-penempatan-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Unit Kerja</span>
-              <span id="dossier-unit-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Jabatan</span>
-              <span id="dossier-jabatan-val" class="font-bold text-indigo-900 text-xs block mt-0.5">-</span>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <span class="text-[10px] text-slate-400 font-bold block uppercase">Level (Grade)</span>
-              <span id="dossier-level-val" class="font-bold text-slate-900 text-xs block mt-0.5">-</span>
+            <!-- Penempatan & Unit Kerja -->
+            <div class="grid grid-cols-2 gap-x-4 py-1.5">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[90px]">Penempatan</span>
+                <span id="dossier-penempatan-val" class="font-semibold text-slate-800 truncate">-</span>
+              </div>
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[72px]">Unit Kerja</span>
+                <span id="dossier-unit-val" class="font-semibold text-slate-800 truncate">-</span>
+              </div>
             </div>
           </div>
 
-          <div class="p-3 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-1">
-            <span class="text-[10px] text-indigo-700 font-bold block uppercase">Atasan Langsung (Garis Pelaporan)</span>
-            <div class="flex items-center justify-between text-xs">
-              <span id="dossier-atasan-val" class="font-bold text-indigo-950">-</span>
-              <span id="dossier-atasan-sub-val" class="text-[10px] text-indigo-700 font-medium">Hierarki Terhitung Otomatis</span>
+          <!-- SEKSI 2: GARIS PELAPORAN -->
+          <div class="border-l-4 border-sky-500 pl-3 py-2.5 mt-3">
+            <span class="text-[9px] font-extrabold text-sky-600 uppercase tracking-widest">Garis Pelaporan</span>
+          </div>
+          <div class="pl-3 divide-y divide-slate-100">
+            <div class="flex items-center justify-between py-1.5 gap-4">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[90px]">Atasan Langsung</span>
+                <span id="dossier-atasan-val" class="font-bold text-indigo-900 truncate">-</span>
+              </div>
+              <span id="dossier-atasan-sub-val" class="text-[9px] text-sky-600 font-semibold shrink-0 italic">Auto Hierarki</span>
             </div>
           </div>
 
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-            <span class="text-[10px] text-slate-400 font-bold block uppercase">Perjanjian Kerja & Kontrak</span>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div>
-                <span class="text-slate-500">Tanggal Bergabung:</span>
-                <span id="dossier-tglgabung-val" class="font-bold text-slate-800 ml-1">-</span>
+          <!-- SEKSI 3: PERJANJIAN KERJA & KONTRAK -->
+          <div class="border-l-4 border-slate-400 pl-3 py-2.5 mt-3">
+            <span class="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Perjanjian Kerja & Kontrak</span>
+          </div>
+          <div class="pl-3 divide-y divide-slate-100">
+            <!-- Tgl Bergabung & No. Kontrak -->
+            <div class="grid grid-cols-2 gap-x-4 py-1.5">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[90px]">Tgl Bergabung</span>
+                <span id="dossier-tglgabung-val" class="font-semibold text-slate-800">-</span>
               </div>
-              <div>
-                <span class="text-slate-500">No. Perjanjian Kerja:</span>
-                <span id="dossier-nokontrak-val" class="font-mono font-bold text-slate-800 ml-1">-</span>
-              </div>
-              <div>
-                <span class="text-slate-500">Tanggal Perjanjian Kerja:</span>
-                <span id="dossier-tglkontrak-val" class="font-bold text-slate-800 ml-1">-</span>
-              </div>
-              <div>
-                <span class="text-slate-500">Tanggal Berakhir Kontrak:</span>
-                <span id="dossier-tglselesaikontrak-val" class="font-bold text-rose-700 ml-1">-</span>
-              </div>
-              <div class="col-span-1 sm:col-span-2 pt-1 border-t border-slate-200">
-                <span class="text-slate-500">Tanggal Resign / Nonaktif:</span>
-                <span id="dossier-tglresign-val" class="font-bold text-slate-800 ml-1">-</span>
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[72px]">No. Kontrak</span>
+                <span id="dossier-nokontrak-val" class="font-bold font-mono text-slate-800 truncate">-</span>
               </div>
             </div>
+            <!-- Tgl Kontrak & Tgl Berakhir -->
+            <div class="grid grid-cols-2 gap-x-4 py-1.5">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[90px]">Tgl Perjanjian</span>
+                <span id="dossier-tglkontrak-val" class="font-semibold text-slate-800">-</span>
+              </div>
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-slate-400 shrink-0 w-[72px]">Berakhir</span>
+                <span id="dossier-tglselesaikontrak-val" class="font-bold text-rose-700">-</span>
+              </div>
+            </div>
+            <!-- Tgl Resign / Nonaktif -->
+            <div class="flex items-center gap-2 py-1.5">
+              <span class="text-slate-400 shrink-0 w-[90px]">Resign/Nonaktif</span>
+              <span id="dossier-tglresign-val" class="font-semibold text-slate-700">-</span>
+            </div>
           </div>
+          <!-- spacer bawah -->
+          <div class="h-2"></div>
         </div>
+
 
         <!-- TAB CONTENT 3: RINCIAN PAYROLL & BENEFIT -->
         <div id="dossier-content-payroll" class="space-y-3 hidden">
