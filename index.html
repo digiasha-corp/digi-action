@@ -2226,6 +2226,68 @@
     </div>
   </div>
 
+  <!-- MODAL DETAIL LENGKAP PENGAJUAN TRANSAKSI KEPEGAWAIAN (UNTUK APPROVER & PEMOHON) -->
+  <div id="modal-career-tx-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+      <!-- Header -->
+      <div class="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-sm shrink-0">
+            <i class="fa-solid fa-file-invoice"></i>
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-bold text-xs sm:text-sm truncate">Detail Pengajuan Transaksi Kepegawaian</h4>
+            <p class="text-[10px] text-indigo-300 truncate" id="tx-detail-sub-header">Rincian Perubahan & Rekomendasi Persetujuan</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCareerTransactionDetailModal()" class="text-white/80 hover:text-white p-1 rounded-lg transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Body Scrollable -->
+      <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-3.5 text-xs">
+        <!-- Info Profil Karyawan Ringkas -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center space-x-2">
+              <h5 class="font-bold text-slate-900 text-xs sm:text-sm truncate" id="tx-detail-emp-nama">-</h5>
+              <span id="tx-detail-status-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold border shrink-0 bg-slate-100 text-slate-700">-</span>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-0.5" id="tx-detail-emp-info">NIP: - • Cabang: -</p>
+          </div>
+          <div class="text-right shrink-0 text-[10px] text-slate-500">
+            <span class="block text-slate-400">Tgl Pengajuan:</span>
+            <strong class="text-slate-700 font-mono" id="tx-detail-created-at">-</strong>
+          </div>
+        </div>
+
+        <!-- Kontainer Rincian Perubahan (Dihasilkan Dinamis) -->
+        <div id="tx-detail-summary-container" class="space-y-2">
+          <!-- Rincian dinamis -->
+        </div>
+
+        <!-- Alur Staging Approval -->
+        <div class="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2">
+          <span class="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">Alur & Status Persetujuan (Staging Approval):</span>
+          <div id="tx-detail-staging-container" class="space-y-1.5 text-xs">
+            <!-- Staging items dinamis -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Action -->
+      <div class="p-3.5 bg-white border-t border-slate-200 flex items-center justify-between gap-2 shrink-0" id="tx-detail-footer-actions">
+        <button type="button" onclick="closeCareerTransactionDetailModal()" class="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+          Tutup
+        </button>
+        <div id="tx-detail-action-buttons" class="flex items-center space-x-2">
+          <!-- Dinamis: tombol Tolak & Setujui jika user berhak -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL PREVIEW DOKUMEN / BERKAS TRANSAKSI (PDF & GAMBAR) -->
   <div id="modal-tx-doc-preview" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[70] hidden flex flex-col items-center justify-center p-3 sm:p-5">
     <div class="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -2275,6 +2337,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260919_v155"></script>
+  <script src="/app.js?v=20260919_v156"></script>
 </body>
 </html>
