@@ -18989,10 +18989,6 @@ async function loadDossierDocuments(emp) {
             Belum ada berkas CV, KTP, KK, NPWP, atau Kontrak/SK yang terlampir untuk karyawan ini.
           </p>
         </div>
-        <button type="button" onclick="openEmployeeTransactionModal('${emp.nip}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm active:scale-95">
-          <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
-          <span>Upload Dokumen via Transaksi</span>
-        </button>
       </div>
     `;
     return;
@@ -19592,10 +19588,6 @@ function renderPersonaliaEmployees(list) {
 
         <!-- Tombol Aksi Personalia & Dossier -->
         <div class="flex items-center space-x-2 shrink-0 border-t sm:border-t-0 pt-2.5 sm:pt-0 border-slate-100 justify-end">
-          <button type="button" onclick="openAddCareerTransactionModalFor('${emp.nip}')" title="Catat Mutasi / Promosi / Penyesuaian Gaji" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-bold text-xs flex items-center space-x-1.5 border border-emerald-200 transition">
-            <i class="fa-solid fa-file-contract text-emerald-600"></i>
-            <span>Catat Transaksi</span>
-          </button>
           <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Detail Personalia & Buku Induk" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-sm transition">
             <i class="fa-solid fa-id-badge text-indigo-200"></i>
             <span>Detail Personalia</span>

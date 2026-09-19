@@ -620,12 +620,8 @@
       <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
         <!-- TAB CONTENT 1: DATA PRIBADI SIPIL MURNI -->
         <div id="dossier-content-personal" class="space-y-3">
-          <div class="flex items-center justify-between pb-1 flex-wrap gap-2">
+          <div class="pb-1">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Identitas Pribadi & Berkas Kependudukan</span>
-            <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip, 'biodata')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition active:scale-95">
-              <i class="fa-solid fa-user-pen text-xs text-amber-300"></i>
-              <span>⚡ Ajukan Transaksi Update Data</span>
-            </button>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
@@ -859,15 +855,9 @@
 
         <!-- TAB CONTENT 4: HISTORY TRANSAKSI KARYAWAN -->
         <div id="dossier-content-history" class="space-y-3 hidden">
-          <div class="flex items-center justify-between">
-            <div>
-              <h5 class="font-bold text-xs text-slate-800">Riwayat Pengajuan Transaksi Karyawan</h5>
-              <p class="text-[10px] text-slate-500">Penerimaan, Mutasi, Promosi, Penyesuaian Benefit, hingga Resign</p>
-            </div>
-            <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip)" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow flex items-center space-x-1 transition">
-              <i class="fa-solid fa-plus text-xs"></i>
-              <span>Buat Transaksi</span>
-            </button>
+          <div class="pb-1 border-b border-slate-100">
+            <h5 class="font-bold text-xs text-slate-800">Riwayat Pengajuan Transaksi Karyawan</h5>
+            <p class="text-[10px] text-slate-500">Penerimaan, Mutasi, Promosi, Penyesuaian Benefit, hingga Resign</p>
           </div>
 
           <div id="dossier-tx-history-container" class="space-y-2 relative border-l-2 border-indigo-200 ml-3 pl-4 pt-1">
@@ -877,18 +867,12 @@
 
         <!-- TAB CONTENT 5: BERKAS & DOKUMEN TERUPLOAD KARYAWAN -->
         <div id="dossier-content-documents" class="space-y-3 hidden">
-          <div class="flex items-center justify-between pb-1 border-b border-slate-100 flex-wrap gap-2">
-            <div>
-              <h5 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
-                <i class="fa-solid fa-folder-open text-amber-500"></i>
-                Berkas & Dokumen Terupload Karyawan
-              </h5>
-              <p class="text-[10px] text-slate-400">Arsip digital KTP, KK, NPWP, CV, dan SK/Kontrak Kerja yang telah terunggah</p>
-            </div>
-            <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip)" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition active:scale-95">
-              <i class="fa-solid fa-cloud-arrow-up text-xs text-amber-300"></i>
-              <span>⚡ Upload / Update Berkas</span>
-            </button>
+          <div class="pb-1 border-b border-slate-100">
+            <h5 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+              <i class="fa-solid fa-folder-open text-amber-500"></i>
+              Berkas & Dokumen Terupload Karyawan
+            </h5>
+            <p class="text-[10px] text-slate-400">Arsip digital KTP, KK, NPWP, CV, dan SK/Kontrak Kerja yang telah terunggah</p>
           </div>
 
           <!-- Container Dokumen Terupload Dossier -->
@@ -902,12 +886,8 @@
       </div>
 
       <!-- Footer Dossier -->
-      <div class="p-3.5 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
-        <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip)" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
-          <i class="fa-solid fa-bolt text-xs text-amber-300"></i>
-          <span>⚡ Buat Transaksi Karyawan</span>
-        </button>
-        <button type="button" onclick="closeEmployeeDossierModal()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold rounded-xl text-xs transition">
+      <div class="p-3.5 bg-slate-100 border-t border-slate-200 flex justify-end items-center shrink-0">
+        <button type="button" onclick="closeEmployeeDossierModal()" class="px-5 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold rounded-xl text-xs transition">
           Tutup
         </button>
       </div>
@@ -2218,6 +2198,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260919_v152"></script>
+  <script src="/app.js?v=20260919_v153"></script>
 </body>
 </html>
