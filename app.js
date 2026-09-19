@@ -21021,13 +21021,13 @@ async function handleSubmitEmployeeTransaction(event) {
       contract_end_date: isTetap ? end50Str : (isKontrak ? (document.getElementById("tx-kontrak-contractend")?.value || null) : (document.getElementById("tx-penerimaan-contractend")?.value || null)),
 
       // Pergerakan Posisi (Rotasi, Promosi, Demosi, Mutasi)
-      prev_position_id: emp.position_id || null,
+      prev_position_id: emp.position_id || emp.id_position || (ORG_POSITIONS_DATA || []).find(p => p.nama_jabatan === emp.jabatan)?.id_position || emp.jabatan || null,
       new_position_id: isRotasi ? (document.getElementById("tx-rotasi-new-pos")?.value || null) : (isPromosi ? (document.getElementById("tx-promosi-new-pos")?.value || null) : (isDemosi ? (document.getElementById("tx-demosi-new-pos")?.value || null) : null)),
-      prev_level_id: emp.level_id || null,
+      prev_level_id: emp.level_id || emp.id_level || (ORG_LEVELS_DATA || []).find(l => l.nama_level === emp.level_name)?.id_level || emp.level_name || null,
       new_level_id: isPromosi ? (document.getElementById("tx-promosi-new-lvl")?.value || null) : (isDemosi ? (document.getElementById("tx-demosi-new-lvl")?.value || null) : null),
-      prev_location_id: emp.work_location_id || null,
+      prev_location_id: emp.work_location_id || emp.work_location_name || emp.area_cover || null,
       new_location_id: isMutasi ? (document.getElementById("tx-mutasi-new-loc")?.value || null) : null,
-      prev_unit_id: emp.unit_id || null,
+      prev_unit_id: emp.unit_id || emp.cabang || null,
       new_unit_id: isMutasi ? (document.getElementById("tx-mutasi-new-unit")?.value || null) : null,
 
       // Penyesuaian Benefit & Remunerasi
@@ -21178,11 +21178,27 @@ async function openElectronicAgreementModal(txId) {
   const summaryContainer = document.getElementById("agree-summary-container");
   const types = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || "Perubahan Karir"];
 
-  // Helper name resolvers
-  const getPosName = (id) => (ORG_POSITIONS_DATA || []).find(p => p.id_position === id)?.nama_jabatan || id || "-";
-  const getLvlName = (id) => (ORG_LEVELS_DATA || []).find(l => l.id_level === id)?.nama_level || id || "-";
-  const getUnitName = (id) => (ORG_UNITS_DATA || []).find(u => u.id_unit === id)?.nama_unit || id || "-";
-  const getLocName = (id) => (ORG_WORK_LOCATIONS_DATA || []).find(w => w.id_work_location === id)?.nama_lokasi || id || "-";
+  // Cari data karyawan eksisting untuk fallback data posisi/level sebelumnya jika belum terisi di tx
+  const relatedEmp = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.id) === String(tx.employee_id) || String(e.nip) === String(tx.nip)) ||
+                     (APP_STATE.employees || []).find(e => String(e.id) === String(tx.employee_id) || String(e.nip) === String(tx.nip));
+
+  // Helper name resolvers (support id or name string)
+  const getPosName = (id) => {
+    if (!id) return "-";
+    return (ORG_POSITIONS_DATA || []).find(p => String(p.id_position) === String(id) || p.nama_jabatan === id)?.nama_jabatan || id;
+  };
+  const getLvlName = (id) => {
+    if (!id) return "-";
+    return (ORG_LEVELS_DATA || []).find(l => String(l.id_level) === String(id) || l.nama_level === id)?.nama_level || id;
+  };
+  const getUnitName = (id) => {
+    if (!id) return "-";
+    return (ORG_UNITS_DATA || []).find(u => String(u.id_unit) === String(id) || u.nama_unit === id)?.nama_unit || id;
+  };
+  const getLocName = (id) => {
+    if (!id) return "-";
+    return (ORG_WORK_LOCATIONS_DATA || []).find(w => String(w.id_work_location) === String(id) || w.nama_lokasi === id)?.nama_lokasi || id;
+  };
 
   let changeItemsHtml = `
     <div class="p-2.5 bg-white rounded-xl border border-purple-100 shadow-xs space-y-1 mb-2">
@@ -21206,6 +21222,9 @@ async function openElectronicAgreementModal(txId) {
     const titleText = isPromo ? "Detail Promosi Pegawai" : "Detail Demosi Pegawai";
     const iconClass = isPromo ? "fa-arrow-trend-up text-amber-600" : "fa-arrow-trend-down text-orange-600";
 
+    const prevPos = tx.prev_position_id || relatedEmp?.jabatan || relatedEmp?.id_position;
+    const prevLvl = tx.prev_level_id || relatedEmp?.level_name || relatedEmp?.role_id || relatedEmp?.id_level;
+
     changeItemsHtml += `
       <div class="p-2.5 rounded-xl border ${badgeColor} space-y-1.5 text-xs mb-1.5 shadow-xs">
         <div class="flex items-center space-x-1.5 font-bold border-b border-black/5 pb-1">
@@ -21216,8 +21235,7 @@ async function openElectronicAgreementModal(txId) {
           <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
             <span class="text-[11px] text-slate-500">Perubahan Level:</span>
             <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              <span class="text-slate-400 line-through">${getLvlName(tx.prev_level_id)}</span>
-              <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
+              ${prevLvl ? `<span class="text-slate-400 line-through">${getLvlName(prevLvl)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
               <strong class="text-indigo-900 font-bold">${getLvlName(tx.new_level_id)}</strong>
             </div>
           </div>
@@ -21226,7 +21244,7 @@ async function openElectronicAgreementModal(txId) {
           <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
             <span class="text-[11px] text-slate-500">Perubahan Jabatan:</span>
             <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${tx.prev_position_id ? `<span class="text-slate-400 line-through">${getPosName(tx.prev_position_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              ${prevPos ? `<span class="text-slate-400 line-through">${getPosName(prevPos)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
               <strong class="text-indigo-900 font-bold">${getPosName(tx.new_position_id)}</strong>
             </div>
           </div>
@@ -21238,6 +21256,7 @@ async function openElectronicAgreementModal(txId) {
   // 2. DETAIL ROTASI JABATAN
   const hasRotasi = types.some(t => t.toLowerCase().includes("rotasi"));
   if (hasRotasi && tx.new_position_id && !hasPromosi && !hasDemosi) {
+    const prevPos = tx.prev_position_id || relatedEmp?.jabatan || relatedEmp?.id_position;
     changeItemsHtml += `
       <div class="p-2.5 rounded-xl border bg-blue-50 border-blue-200 text-blue-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
         <div class="flex items-center space-x-1.5 font-bold border-b border-blue-200/50 pb-1">
@@ -21245,9 +21264,9 @@ async function openElectronicAgreementModal(txId) {
           <span>Detail Rotasi Jabatan</span>
         </div>
         <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
-          <span class="text-[11px] text-slate-500">Jabatan Baru:</span>
+          <span class="text-[11px] text-slate-500">Perubahan Jabatan:</span>
           <div class="flex items-center space-x-1.5 text-xs font-semibold">
-            ${tx.prev_position_id ? `<span class="text-slate-400 line-through">${getPosName(tx.prev_position_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+            ${prevPos ? `<span class="text-slate-400 line-through">${getPosName(prevPos)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
             <strong class="text-blue-900 font-bold">${getPosName(tx.new_position_id)}</strong>
           </div>
         </div>
@@ -21258,6 +21277,9 @@ async function openElectronicAgreementModal(txId) {
   // 3. DETAIL MUTASI LOKASI / UNIT KERJA
   const hasMutasi = types.some(t => t.toLowerCase().includes("mutasi"));
   if (hasMutasi || tx.new_location_id || tx.new_unit_id) {
+    const prevLoc = tx.prev_location_id || relatedEmp?.work_location_name || relatedEmp?.area_cover || relatedEmp?.work_location_id;
+    const prevUnit = tx.prev_unit_id || relatedEmp?.cabang || relatedEmp?.unit_id;
+
     changeItemsHtml += `
       <div class="p-2.5 rounded-xl border bg-cyan-50 border-cyan-200 text-cyan-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
         <div class="flex items-center space-x-1.5 font-bold border-b border-cyan-200/50 pb-1">
@@ -21268,7 +21290,7 @@ async function openElectronicAgreementModal(txId) {
           <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
             <span class="text-[11px] text-slate-500">Lokasi Kerja:</span>
             <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${tx.prev_location_id ? `<span class="text-slate-400 line-through">${getLocName(tx.prev_location_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              ${prevLoc ? `<span class="text-slate-400 line-through">${getLocName(prevLoc)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
               <strong class="text-cyan-950 font-bold">${getLocName(tx.new_location_id)}</strong>
             </div>
           </div>
@@ -21277,7 +21299,7 @@ async function openElectronicAgreementModal(txId) {
           <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
             <span class="text-[11px] text-slate-500">Unit Kerja:</span>
             <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${tx.prev_unit_id ? `<span class="text-slate-400 line-through">${getUnitName(tx.prev_unit_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              ${prevUnit ? `<span class="text-slate-400 line-through">${getUnitName(prevUnit)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
               <strong class="text-cyan-950 font-bold">${getUnitName(tx.new_unit_id)}</strong>
             </div>
           </div>
@@ -21370,24 +21392,88 @@ async function openElectronicAgreementModal(txId) {
     `;
   }
 
-  // 7. DETAIL PEMBARUAN DATA PRIBADI (BIODATA)
+  // 7. DETAIL PEMBARUAN DATA PRIBADI (BIODATA SIPIL LENGKAP)
   if (tx.personal_data_updates) {
     const pu = tx.personal_data_updates;
+    const childrenArr = Array.isArray(pu.children) ? pu.children.filter(Boolean) : [];
+
     changeItemsHtml += `
-      <div class="p-2.5 bg-white rounded-xl border border-indigo-200 text-xs space-y-1.5 mb-1.5 shadow-xs">
+      <div class="p-2.5 bg-white rounded-xl border border-indigo-200 text-xs space-y-2 mb-1.5 shadow-xs">
         <div class="flex items-center space-x-1.5 font-bold text-indigo-900 border-b border-indigo-100 pb-1">
           <i class="fa-solid fa-user-pen text-indigo-600"></i>
           <span>Pembaruan Data Pribadi / Sipil Pegawai</span>
         </div>
-        <div class="grid grid-cols-2 gap-1 text-[11px] pt-0.5">
-          <div><span class="text-slate-400">NIK (KTP):</span> <strong>${pu.ktp_number || pu.nik_ktp || '-'}</strong></div>
+        <div class="grid grid-cols-2 gap-1.5 text-[11px] pt-0.5">
+          <div><span class="text-slate-400">NIK (KTP):</span> <strong class="font-mono">${pu.ktp_number || pu.nik_ktp || '-'}</strong></div>
           <div><span class="text-slate-400">Nama Lengkap:</span> <strong>${pu.nama_lengkap || '-'}</strong></div>
           <div><span class="text-slate-400">Tempat, Tgl Lahir:</span> <strong>${[pu.pob, pu.dob].filter(Boolean).join(", ") || '-'}</strong></div>
-          <div><span class="text-slate-400">No HP / WhatsApp:</span> <strong>${pu.phone || pu.wa || '-'}</strong></div>
-          <div><span class="text-slate-400">Status Pernikahan:</span> <strong>${pu.marital_status || '-'}</strong></div>
-          <div><span class="text-slate-400">Tanggungan Anak:</span> <strong>${pu.number_of_dependents ?? 0} Anak</strong></div>
-          ${pu.emergency_contact_name ? `<div class="col-span-2 text-[10px] bg-slate-50 p-1 rounded"><span class="text-slate-400">Kontak Darurat:</span> <strong>${pu.emergency_contact_name} (${pu.emergency_contact_relation || '-'}) - ${pu.emergency_contact_phone || '-'}</strong></div>` : ''}
-          ${pu.address_ktp ? `<div class="col-span-2 text-[10px] text-slate-500"><span class="text-slate-400">Alamat KTP:</span> ${pu.address_ktp}</div>` : ''}
+          <div><span class="text-slate-400">Jenis Kelamin:</span> <strong>${pu.gender || '-'}</strong></div>
+          <div><span class="text-slate-400">Agama:</span> <strong>${pu.religion || '-'}</strong></div>
+          <div><span class="text-slate-400">Status Nikah:</span> <strong>${pu.marital_status || '-'}</strong></div>
+          ${pu.spouse_name ? `<div><span class="text-slate-400">Nama Pasangan:</span> <strong>${pu.spouse_name}</strong></div>` : ''}
+          <div><span class="text-slate-400">Tanggungan Anak:</span> <strong>${pu.number_of_dependents ?? childrenArr.length} Anak</strong></div>
+          ${childrenArr.length > 0 ? `
+            <div class="col-span-2 text-[10px] bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+              <span class="text-slate-400 font-bold block mb-0.5">Daftar Anak:</span>
+              <span class="text-slate-700 font-medium">${childrenArr.join(", ")}</span>
+            </div>
+          ` : ''}
+          <div><span class="text-slate-400">No HP:</span> <strong class="font-mono">${pu.phone || '-'}</strong></div>
+          <div><span class="text-slate-400">WhatsApp:</span> <strong class="font-mono">${pu.wa || pu.phone || '-'}</strong></div>
+          ${(pu.education_level || pu.education_major) ? `
+            <div class="col-span-2 text-[11px]">
+              <span class="text-slate-400">Pendidikan:</span> <strong>${pu.education_level || '-'}</strong> ${pu.education_major ? ` - Jurusan <strong>${pu.education_major}</strong>` : ''}
+            </div>
+          ` : ''}
+          ${pu.emergency_contact_name ? `
+            <div class="col-span-2 text-[10px] bg-rose-50/70 border border-rose-100 p-1.5 rounded-lg">
+              <span class="text-rose-500 font-bold block mb-0.5">Kontak Darurat:</span>
+              <strong class="text-rose-950">${pu.emergency_contact_name}</strong> 
+              <span class="text-rose-700 font-medium">(${pu.emergency_contact_relation || '-'})</span> 
+              • <strong class="font-mono text-rose-900">${pu.emergency_contact_phone || '-'}</strong>
+            </div>
+          ` : ''}
+          ${pu.address_ktp ? `<div class="col-span-2 text-[10px] text-slate-600"><span class="text-slate-400 font-semibold">Alamat KTP:</span> ${pu.address_ktp}</div>` : ''}
+          ${pu.address_domicile ? `<div class="col-span-2 text-[10px] text-slate-600"><span class="text-slate-400 font-semibold">Alamat Domisili:</span> ${pu.address_domicile}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // 8. DOKUMEN PERSYARATAN / LAMPIRAN BERKAS
+  const attachedDocs = [
+    { label: "Curriculum Vitae (CV)", url: tx.doc_cv_url, icon: "fa-file-lines", color: "text-indigo-600 bg-indigo-50 border-indigo-200" },
+    { label: "Scan KTP Asli", url: tx.doc_ktp_url, icon: "fa-id-card", color: "text-blue-600 bg-blue-50 border-blue-200" },
+    { label: "Kartu Keluarga (KK)", url: tx.doc_kk_url, icon: "fa-users-line", color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
+    { label: "NPWP", url: tx.doc_npwp_url, icon: "fa-file-invoice", color: "text-amber-600 bg-amber-50 border-amber-200" },
+    { label: "Kontrak Kerja / SK", url: tx.doc_kontrak_url, icon: "fa-file-signature", color: "text-purple-600 bg-purple-50 border-purple-200" }
+  ].filter(d => Boolean(d.url));
+
+  if (attachedDocs.length > 0) {
+    changeItemsHtml += `
+      <div class="p-2.5 bg-slate-50/90 rounded-xl border border-slate-200 text-xs space-y-1.5 mb-1.5 shadow-xs">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-1">
+          <div class="flex items-center space-x-1.5 font-bold text-slate-800">
+            <i class="fa-solid fa-paperclip text-indigo-600"></i>
+            <span>Lampiran Dokumen Persyaratan (${attachedDocs.length})</span>
+          </div>
+          <span class="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">Terlampir</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+          ${attachedDocs.map(doc => `
+            <div class="p-1.5 bg-white rounded-lg border border-slate-200 flex items-center justify-between gap-1 shadow-2xs">
+              <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                <div class="w-6 h-6 rounded-md ${doc.color} flex items-center justify-center text-[10px] shrink-0 border">
+                  <i class="fa-solid ${doc.icon}"></i>
+                </div>
+                <span class="text-[10px] font-bold text-slate-700 truncate">${doc.label}</span>
+              </div>
+              <a href="${doc.url}" target="_blank" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[9px] font-bold border border-indigo-200 inline-flex items-center gap-1 shrink-0 transition" title="Lihat Lampiran">
+                <i class="fa-solid fa-eye text-[8px]"></i>
+                <span>Lihat</span>
+              </a>
+            </div>
+          `).join("")}
         </div>
       </div>
     `;
