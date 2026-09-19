@@ -18593,7 +18593,7 @@ async function loadDossierPersonalDetails(emp) {
   const elEmergRel = document.getElementById("dossier-emergency-rel-val");
   const elEmergPhone = document.getElementById("dossier-emergency-phone-val");
   if (elEmergName) elEmergName.innerText = emergName;
-  if (elEmergRel) elEmergRel.innerText = `Hubungan: ${emergRel}`;
+  if (elEmergRel) elEmergRel.innerText = emergRel;
   if (elEmergPhone) elEmergPhone.innerText = emergPhone;
 
   // Pendidikan & Email
@@ -18602,7 +18602,7 @@ async function loadDossierPersonalDetails(emp) {
   const elEdu = document.getElementById("dossier-education-val");
   const elMajor = document.getElementById("dossier-major-val");
   if (elEdu) elEdu.innerText = edu;
-  if (elMajor) elMajor.innerText = `Jurusan: ${major}`;
+  if (elMajor) elMajor.innerText = major;
 
   const elEmail = document.getElementById("dossier-email-val");
   if (elEmail) elEmail.innerText = emp.email || "-";
@@ -21836,8 +21836,16 @@ async function applyApprovedTransactionToEmployee(tx) {
     }
 
     // M. Pembaruan Data Pribadi (Personal Data Updates)
-    if (types.includes("Pembaruan Data Pribadi") || tx.personal_data_updates) {
-      const pu = tx.personal_data_updates || {};
+    let pu = tx.personal_data_updates || {};
+    if (typeof pu === "string") {
+      try {
+        pu = JSON.parse(pu);
+      } catch (e) {
+        pu = {};
+      }
+    }
+
+    if (types.includes("Pembaruan Data Pribadi") || Object.keys(pu).length > 0) {
       if (pu.nama_lengkap) updatePayload.nama_lengkap = pu.nama_lengkap;
       if (pu.nik_ktp || pu.ktp_number) updatePayload.nik_ktp = pu.nik_ktp || pu.ktp_number;
       if (pu.dob) updatePayload.dob = pu.dob;
@@ -21856,7 +21864,7 @@ async function applyApprovedTransactionToEmployee(tx) {
           religion: pu.religion || null,
           marital_status: pu.marital_status || null,
           spouse_name: pu.spouse_name || null,
-          number_of_dependents: pu.number_of_dependents || 0,
+          number_of_dependents: parseInt(pu.number_of_dependents) || 0,
           address_ktp: pu.address_ktp || null,
           address_domicile: pu.address_domicile || null,
           phone: pu.phone || null,
@@ -21869,33 +21877,40 @@ async function applyApprovedTransactionToEmployee(tx) {
           updated_at: now
         };
 
-        const { data: existHr } = await supabaseClient
+        // Coba simpan ke hr_employee_personal_details (tabel utama)
+        let { error: upsertErr } = await supabaseClient
           .from("hr_employee_personal_details")
-          .select("id")
-          .eq("employee_id", empId)
-          .maybeSingle();
+          .upsert([detailPayload], { onConflict: "employee_id" });
 
-        if (existHr) {
-          await supabaseClient
+        // Jika kolom spouse_name / education belum ada di database, hilangkan kolom tambahan lalu coba lagi
+        if (upsertErr && upsertErr.message && upsertErr.message.includes("column")) {
+          console.warn("[applyApprovedTransactionToEmployee] Fallback without extra columns:", upsertErr.message);
+          const safePayload = {
+            employee_id: empId,
+            ktp_number: pu.ktp_number || pu.nik_ktp || null,
+            pob: pu.pob || null,
+            dob: pu.dob || null,
+            gender: pu.gender || null,
+            religion: pu.religion || null,
+            marital_status: pu.marital_status || null,
+            number_of_dependents: parseInt(pu.number_of_dependents) || 0,
+            address_ktp: pu.address_ktp || null,
+            address_domicile: pu.address_domicile || null,
+            phone: pu.phone || null,
+            emergency_contact_name: pu.emergency_contact_name || null,
+            emergency_contact_relation: pu.emergency_contact_relation || null,
+            emergency_contact_phone: pu.emergency_contact_phone || null,
+            updated_at: now
+          };
+          const resFallback = await supabaseClient
             .from("hr_employee_personal_details")
-            .update(detailPayload)
-            .eq("employee_id", empId);
-        } else {
-          await supabaseClient
-            .from("hr_employee_personal_details")
-            .insert({ ...detailPayload, created_at: now });
-        }
-
-        const { data: existOld } = await supabaseClient
-          .from("employee_personal_details")
-          .select("id")
-          .eq("employee_id", empId)
-          .maybeSingle();
-        if (existOld) {
-          await supabaseClient
-            .from("employee_personal_details")
-            .update(detailPayload)
-            .eq("employee_id", empId);
+            .upsert([safePayload], { onConflict: "employee_id" });
+          if (resFallback.error) {
+            // Coba ke view employee_personal_details
+            await supabaseClient
+              .from("employee_personal_details")
+              .upsert([safePayload], { onConflict: "employee_id" });
+          }
         }
       } catch (detErr) {
         console.warn("[applyApprovedTransactionToEmployee] personal details sync error:", detErr);
