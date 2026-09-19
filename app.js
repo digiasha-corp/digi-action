@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v152";
+const APP_BUILD_VERSION = "20260919_v153";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
