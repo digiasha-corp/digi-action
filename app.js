@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v149";
+const APP_BUILD_VERSION = "20260919_v150";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di localStorage)
@@ -18456,6 +18456,117 @@ async function openEmployeeDossierModal(nipOrId) {
 
 function closeEmployeeDossierModal() {
   document.getElementById("modal-employee-dossier")?.classList.add("hidden");
+  // Reset file input avatar saat modal ditutup
+  const avatarInput = document.getElementById("dossier-avatar-file-input");
+  if (avatarInput) avatarInput.value = "";
+}
+
+// -------------------- UPLOAD FOTO PROFIL KARYAWAN --------------------
+async function handleDossierAvatarUpload(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  input.value = ""; // Reset agar bisa pilih file yang sama lagi
+
+  // Validasi format & ukuran (max 5 MB)
+  if (!file.type.startsWith("image/")) {
+    showToast("Hanya file gambar (JPG/PNG/WEBP) yang diperbolehkan!", "error", 3000);
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("Ukuran foto melebihi batas maksimal 5 MB!", "error", 3000);
+    return;
+  }
+
+  const avatarBox = document.getElementById("dossier-avatar-container");
+  if (!avatarBox) return;
+
+  // Tampilkan loading spinner di avatar
+  const origContent = avatarBox.innerHTML;
+  avatarBox.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-indigo-300 text-base"></i>';
+
+  try {
+    let photoUrl = "";
+    const emp = CURRENT_DOSSIER_EMP;
+    if (!emp) throw new Error("Data karyawan tidak ditemukan");
+
+    const nip = emp.nip || emp.id || "EMP";
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const timestamp = Date.now();
+    const filePath = `employee_photos/${nip}/foto_profil_${timestamp}.${ext}`;
+
+    // 1. Upload ke Supabase Storage
+    if (supabaseClient) {
+      try {
+        const { error: upErr } = await supabaseClient.storage
+          .from(CONFIG.MEDIA_BUCKET || "digiasha-media")
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: true
+          });
+
+        if (!upErr) {
+          const { data: pubData } = supabaseClient.storage
+            .from(CONFIG.MEDIA_BUCKET || "digiasha-media")
+            .getPublicUrl(filePath);
+          if (pubData?.publicUrl) {
+            photoUrl = pubData.publicUrl;
+          }
+        } else {
+          console.warn("[AvatarUpload] Storage error:", upErr);
+        }
+      } catch (se) {
+        console.warn("[AvatarUpload] Storage exception:", se);
+      }
+    }
+
+    // 2. Fallback ke Base64 compressed jika storage gagal
+    if (!photoUrl) {
+      photoUrl = await compressImage(file, 800, 0.85);
+    }
+
+    // 3. Simpan URL ke hr_employee_personal_details.foto_profile_url
+    if (supabaseClient && photoUrl) {
+      try {
+        // Cari employee_id
+        let empId = emp.id;
+        if (!empId || typeof empId === "number") {
+          const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", nip).maybeSingle();
+          if (eRow?.id) empId = eRow.id;
+        }
+        if (empId) {
+          // Upsert ke hr_employee_personal_details
+          const { error: dbErr } = await supabaseClient
+            .from("hr_employee_personal_details")
+            .upsert(
+              { employee_id: empId, foto_profile_url: photoUrl },
+              { onConflict: "employee_id" }
+            );
+          if (dbErr) console.warn("[AvatarUpload] DB update error:", dbErr);
+
+          // Update juga di employees table jika ada kolom foto
+          await supabaseClient.from("employees").update({ foto_profile_url: photoUrl }).eq("id", empId);
+        }
+      } catch (dbEx) {
+        console.warn("[AvatarUpload] DB exception:", dbEx);
+      }
+    }
+
+    // 4. Update avatar di header modal secara realtime
+    if (photoUrl) {
+      avatarBox.innerHTML = `<img src="${photoUrl}" class="w-full h-full object-cover" alt="Foto Profil" />`;
+      // Simpan ke state lokal
+      if (CURRENT_DOSSIER_EMP) CURRENT_DOSSIER_EMP.foto_profile_url = photoUrl;
+      showToast("Foto profil berhasil diperbarui!", "success", 2000);
+    } else {
+      avatarBox.innerHTML = origContent;
+      showToast("Foto berhasil diubah secara lokal (Storage offline)", "info", 2500);
+    }
+
+  } catch (err) {
+    console.error("[AvatarUpload] Error:", err);
+    avatarBox.innerHTML = origContent;
+    showToast("Gagal mengunggah foto: " + err.message, "error", 3000);
+  }
 }
 
 function switchDossierTab(tab) {
@@ -18573,9 +18684,9 @@ async function loadDossierPersonalDetails(emp) {
   const elAlamatDom = document.getElementById("dossier-alamatdom-val");
   if (elAlamatDom) elAlamatDom.innerText = alamatDom;
 
-  // Geotagging Koordinat Manual
-  const geoLat = jsonb.geo_domisili?.latitude || jsonb.geo_domisili?.lat || jsonb.latitude || "";
-  const geoLng = jsonb.geo_domisili?.longitude || jsonb.geo_domisili?.lng || jsonb.longitude || "";
+  // Geotagging Koordinat Manual — fallback ke key langsung di JSONB (lat/lng)
+  const geoLat = jsonb.geo_domisili?.latitude || jsonb.geo_domisili?.lat || jsonb.latitude || jsonb.lat || "";
+  const geoLng = jsonb.geo_domisili?.longitude || jsonb.geo_domisili?.lng || jsonb.longitude || jsonb.lng || "";
   const elGeotag = document.getElementById("dossier-geotag-val");
   if (elGeotag) {
     if (geoLat && geoLng) {
@@ -18596,9 +18707,9 @@ async function loadDossierPersonalDetails(emp) {
   if (elEmergRel) elEmergRel.innerText = emergRel;
   if (elEmergPhone) elEmergPhone.innerText = emergPhone;
 
-  // Pendidikan & Email
-  const edu = jsonb.pendidikan_terakhir || detail?.education || "S1";
-  const major = jsonb.jurusan || detail?.major || "-";
+  // Pendidikan & Email — support key education_level/education_major (dari JSONB aktual)
+  const edu = jsonb.education_level || jsonb.pendidikan_terakhir || detail?.education || "-";
+  const major = jsonb.education_major || jsonb.jurusan || detail?.major || "-";
   const elEdu = document.getElementById("dossier-education-val");
   const elMajor = document.getElementById("dossier-major-val");
   if (elEdu) elEdu.innerText = edu;

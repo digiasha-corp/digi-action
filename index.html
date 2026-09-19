@@ -578,8 +578,16 @@
       <!-- Header Dossier -->
       <div class="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-start shrink-0">
         <div class="flex items-center space-x-3">
-          <div id="dossier-avatar-container" class="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-xl text-indigo-300 font-bold shrink-0 overflow-hidden">
-            <i class="fa-solid fa-user-tie"></i>
+          <!-- Avatar (klik untuk upload foto profil) -->
+          <div class="relative shrink-0 group cursor-pointer" onclick="document.getElementById('dossier-avatar-file-input').click()" title="Klik untuk ubah foto profil">
+            <div id="dossier-avatar-container" class="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-xl text-indigo-300 font-bold overflow-hidden transition group-hover:border-indigo-300">
+              <i class="fa-solid fa-user-tie"></i>
+            </div>
+            <!-- Overlay kamera saat hover -->
+            <div class="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center pointer-events-none">
+              <i class="fa-solid fa-camera text-white text-xs"></i>
+            </div>
+            <input type="file" id="dossier-avatar-file-input" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleDossierAvatarUpload(this)" />
           </div>
           <div class="min-w-0">
             <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
@@ -598,20 +606,20 @@
       <!-- Navigasi 5 Tab Dossier -->
       <div class="flex border-b border-slate-200 bg-slate-50 px-3 pt-2 space-x-1 text-xs font-bold overflow-x-auto shrink-0">
         <button type="button" id="dossier-tab-btn-personal" onclick="switchDossierTab('personal')" class="px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs whitespace-nowrap">
-          <i class="fa-solid fa-id-card mr-1"></i> 1. Data Pribadi Sipil
+          <i class="fa-solid fa-id-card mr-1"></i> Data Pribadi
         </button>
         <button type="button" id="dossier-tab-btn-job" onclick="switchDossierTab('job')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
-          <i class="fa-solid fa-briefcase mr-1"></i> 2. Kepegawaian
+          <i class="fa-solid fa-briefcase mr-1"></i> Kepegawaian
         </button>
         <button type="button" id="dossier-tab-btn-payroll" onclick="switchDossierTab('payroll')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
-          <i class="fa-solid fa-money-bill-wave mr-1"></i> 3. Rincian Payroll
+          <i class="fa-solid fa-money-bill-wave mr-1"></i> Payroll
         </button>
         <button type="button" id="dossier-tab-btn-history" onclick="switchDossierTab('history')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
-          <i class="fa-solid fa-clock-rotate-left mr-1"></i> 4. History Transaksi
+          <i class="fa-solid fa-clock-rotate-left mr-1"></i> History
         </button>
         <button type="button" id="dossier-tab-btn-documents" onclick="switchDossierTab('documents')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap flex items-center">
           <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i>
-          <span>5. Berkas & Dokumen</span>
+          <span>Berkas</span>
           <span id="dossier-doc-count-badge" class="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700">0</span>
         </button>
       </div>
