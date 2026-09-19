@@ -3908,17 +3908,14 @@ function renderApprovalList() {
       if (isOwnSubmission) {
         if (a.raw_tx_status === "PENDING_AGREEMENT") {
           actionSection = `
-            <div class="mt-2.5 p-3 bg-purple-50 border border-purple-200 rounded-2xl space-y-2">
+            <div class="mt-2.5 p-3 bg-purple-50/70 border border-purple-200 rounded-2xl flex items-center justify-between gap-3">
               <div class="flex items-center space-x-2 text-purple-950 font-bold text-xs">
                 <i class="fa-solid fa-signature text-purple-600 text-sm"></i>
                 <span>Persetujuan Elektronik Karyawan Diperlukan</span>
               </div>
-              <p class="text-[11px] text-purple-800 leading-relaxed">
-                Perubahan data kepegawaian (Rotasi / Promosi / Demosi / Mutasi / Benefit) membutuhkan pernyataan resmi dari Anda sebelum diteruskan ke Staging Approver.
-              </p>
-              <button type="button" onclick="openElectronicAgreementModal('${a.tx_id}')" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition active:scale-95">
-                <i class="fa-solid fa-signature"></i>
-                <span>Tanda Tangani Kesepakatan Elektronik</span>
+              <button type="button" onclick="openElectronicAgreementModal('${a.tx_id}')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition active:scale-95 shrink-0">
+                <i class="fa-solid fa-file-signature text-xs"></i>
+                <span>Review Pengajuan</span>
               </button>
             </div>
           `;
@@ -21181,55 +21178,233 @@ async function openElectronicAgreementModal(txId) {
   const summaryContainer = document.getElementById("agree-summary-container");
   const types = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || "Perubahan Karir"];
 
-  let changeItemsHtml = `<div class="font-bold text-indigo-950 mb-1">Jenis Transaksi: <span class="text-indigo-700">${types.join(", ")}</span></div>`;
-  changeItemsHtml += `<div class="text-[11px] text-slate-600 mb-2">Tanggal Efektif Berlaku: <strong>${tx.effective_date}</strong></div>`;
+  // Helper name resolvers
+  const getPosName = (id) => (ORG_POSITIONS_DATA || []).find(p => p.id_position === id)?.nama_jabatan || id || "-";
+  const getLvlName = (id) => (ORG_LEVELS_DATA || []).find(l => l.id_level === id)?.nama_level || id || "-";
+  const getUnitName = (id) => (ORG_UNITS_DATA || []).find(u => u.id_unit === id)?.nama_unit || id || "-";
+  const getLocName = (id) => (ORG_WORK_LOCATIONS_DATA || []).find(w => w.id_work_location === id)?.nama_lokasi || id || "-";
 
-  if (tx.new_position_id) {
-    changeItemsHtml += `
-      <div class="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs mb-1">
-        <span>Jabatan Baru:</span>
-        <strong class="text-indigo-900">${tx.new_position_id}</strong>
+  let changeItemsHtml = `
+    <div class="p-2.5 bg-white rounded-xl border border-purple-100 shadow-xs space-y-1 mb-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jenis Transaksi:</span>
+        <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">${types.join(", ")}</span>
       </div>
-    `;
-  }
-  if (tx.new_unit_id || tx.new_location_id) {
-    changeItemsHtml += `
-      <div class="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs mb-1">
-        <span>Penempatan / Unit Baru:</span>
-        <strong class="text-indigo-900">${[tx.new_location_id, tx.new_unit_id].filter(Boolean).join(" - ")}</strong>
+      <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+        <span class="text-slate-500">Tanggal Efektif:</span>
+        <strong class="text-purple-950 font-bold">${tx.effective_date || '-'}</strong>
       </div>
-    `;
-  }
-  if (tx.new_basic_salary && parseFloat(tx.new_basic_salary) > 0) {
+    </div>
+  `;
+
+  // 1. DETAIL PROMOSI / DEMOSI
+  const hasPromosi = types.some(t => t.toLowerCase().includes("promosi"));
+  const hasDemosi = types.some(t => t.toLowerCase().includes("demosi"));
+  if (hasPromosi || hasDemosi || tx.new_level_id || (tx.new_position_id && (hasPromosi || hasDemosi))) {
+    const isPromo = hasPromosi || (!hasDemosi && tx.new_level_id);
+    const badgeColor = isPromo ? "bg-amber-50 border-amber-200 text-amber-900" : "bg-orange-50 border-orange-200 text-orange-900";
+    const titleText = isPromo ? "Detail Promosi Pegawai" : "Detail Demosi Pegawai";
+    const iconClass = isPromo ? "fa-arrow-trend-up text-amber-600" : "fa-arrow-trend-down text-orange-600";
+
     changeItemsHtml += `
-      <div class="p-2 bg-white rounded-xl border border-emerald-100 flex items-center justify-between text-xs mb-1">
-        <span>Penyesuaian Gaji Pokok:</span>
-        <strong class="text-emerald-700 font-mono">Rp ${parseFloat(tx.new_basic_salary).toLocaleString('id-ID')}</strong>
+      <div class="p-2.5 rounded-xl border ${badgeColor} space-y-1.5 text-xs mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-black/5 pb-1">
+          <i class="fa-solid ${iconClass}"></i>
+          <span>${titleText}</span>
+        </div>
+        ${tx.new_level_id ? `
+          <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
+            <span class="text-[11px] text-slate-500">Perubahan Level:</span>
+            <div class="flex items-center space-x-1.5 text-xs font-semibold">
+              <span class="text-slate-400 line-through">${getLvlName(tx.prev_level_id)}</span>
+              <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
+              <strong class="text-indigo-900 font-bold">${getLvlName(tx.new_level_id)}</strong>
+            </div>
+          </div>
+        ` : ''}
+        ${tx.new_position_id ? `
+          <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
+            <span class="text-[11px] text-slate-500">Perubahan Jabatan:</span>
+            <div class="flex items-center space-x-1.5 text-xs font-semibold">
+              ${tx.prev_position_id ? `<span class="text-slate-400 line-through">${getPosName(tx.prev_position_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              <strong class="text-indigo-900 font-bold">${getPosName(tx.new_position_id)}</strong>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
   }
 
-  // Tampilkan Ringkasan Pembaruan Data Pribadi jika ada
-  if (tx.personal_data_updates) {
-    const pu = tx.personal_data_updates;
+  // 2. DETAIL ROTASI JABATAN
+  const hasRotasi = types.some(t => t.toLowerCase().includes("rotasi"));
+  if (hasRotasi && tx.new_position_id && !hasPromosi && !hasDemosi) {
     changeItemsHtml += `
-      <div class="p-2.5 bg-white rounded-xl border border-indigo-100 text-xs space-y-1 mb-1">
-        <span class="font-bold text-indigo-900 block border-b border-slate-100 pb-1"><i class="fa-solid fa-user-pen mr-1 text-indigo-600"></i> Data Pribadi yang Diperbarui:</span>
-        <div class="grid grid-cols-2 gap-1 text-[11px] pt-1">
-          <div><span class="text-slate-400">NIK:</span> <strong>${pu.ktp_number || '-'}</strong></div>
-          <div><span class="text-slate-400">Nama:</span> <strong>${pu.nama_lengkap || '-'}</strong></div>
-          <div><span class="text-slate-400">TTL:</span> <strong>${pu.pob || ''}, ${pu.dob || ''}</strong></div>
-          <div><span class="text-slate-400">No HP/WA:</span> <strong>${pu.phone || pu.wa || '-'}</strong></div>
-          <div><span class="text-slate-400">Status Nikah:</span> <strong>${pu.marital_status || '-'}</strong></div>
-          <div><span class="text-slate-400">Tanggungan:</span> <strong>${pu.number_of_dependents || 0} Anak</strong></div>
+      <div class="p-2.5 rounded-xl border bg-blue-50 border-blue-200 text-blue-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-blue-200/50 pb-1">
+          <i class="fa-solid fa-arrows-rotate text-blue-600"></i>
+          <span>Detail Rotasi Jabatan</span>
+        </div>
+        <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
+          <span class="text-[11px] text-slate-500">Jabatan Baru:</span>
+          <div class="flex items-center space-x-1.5 text-xs font-semibold">
+            ${tx.prev_position_id ? `<span class="text-slate-400 line-through">${getPosName(tx.prev_position_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+            <strong class="text-blue-900 font-bold">${getPosName(tx.new_position_id)}</strong>
+          </div>
         </div>
       </div>
     `;
-    const legalEl = document.getElementById("agree-legal-text");
-    if (legalEl) {
+  }
+
+  // 3. DETAIL MUTASI LOKASI / UNIT KERJA
+  const hasMutasi = types.some(t => t.toLowerCase().includes("mutasi"));
+  if (hasMutasi || tx.new_location_id || tx.new_unit_id) {
+    changeItemsHtml += `
+      <div class="p-2.5 rounded-xl border bg-cyan-50 border-cyan-200 text-cyan-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-cyan-200/50 pb-1">
+          <i class="fa-solid fa-location-dot text-cyan-600"></i>
+          <span>Detail Mutasi Penempatan & Unit</span>
+        </div>
+        ${tx.new_location_id ? `
+          <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
+            <span class="text-[11px] text-slate-500">Lokasi Kerja:</span>
+            <div class="flex items-center space-x-1.5 text-xs font-semibold">
+              ${tx.prev_location_id ? `<span class="text-slate-400 line-through">${getLocName(tx.prev_location_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              <strong class="text-cyan-950 font-bold">${getLocName(tx.new_location_id)}</strong>
+            </div>
+          </div>
+        ` : ''}
+        ${tx.new_unit_id ? `
+          <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
+            <span class="text-[11px] text-slate-500">Unit Kerja:</span>
+            <div class="flex items-center space-x-1.5 text-xs font-semibold">
+              ${tx.prev_unit_id ? `<span class="text-slate-400 line-through">${getUnitName(tx.prev_unit_id)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              <strong class="text-cyan-950 font-bold">${getUnitName(tx.new_unit_id)}</strong>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  // 4. DETAIL PENYESUAIAN BENEFIT & REMUNERASI
+  const hasBenefit = types.some(t => t.toLowerCase().includes("benefit"));
+  if (hasBenefit || (tx.new_basic_salary && parseFloat(tx.new_basic_salary) > 0)) {
+    const prevSalary = parseFloat(tx.prev_basic_salary || 0);
+    const newSalary = parseFloat(tx.new_basic_salary || 0);
+    
+    // Tunjangan-tunjangan yang disesuaikan
+    const allowances = [
+      { label: "Tunj. Jabatan", oldVal: parseFloat(tx.prev_allowance_jabatan || 0), newVal: parseFloat(tx.new_allowance_jabatan || 0) },
+      { label: "Tunj. Transport", oldVal: parseFloat(tx.prev_allowance_transport || 0), newVal: parseFloat(tx.new_allowance_transport || 0) },
+      { label: "Tunj. Komunikasi", oldVal: parseFloat(tx.prev_allowance_komunikasi || 0), newVal: parseFloat(tx.new_allowance_komunikasi || 0) },
+      { label: "Tunj. Tempat Tinggal", oldVal: parseFloat(tx.prev_allowance_tempat_tinggal || 0), newVal: parseFloat(tx.new_allowance_tempat_tinggal || 0) },
+      { label: "Tunj. Penempatan", oldVal: parseFloat(tx.prev_allowance_penempatan || 0), newVal: parseFloat(tx.new_allowance_penempatan || 0) },
+      { label: "Tunj. Kemahalan", oldVal: parseFloat(tx.prev_allowance_kemahalan || 0), newVal: parseFloat(tx.new_allowance_kemahalan || 0) }
+    ].filter(a => a.newVal > 0 || a.oldVal > 0);
+
+    changeItemsHtml += `
+      <div class="p-2.5 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-emerald-200/50 pb-1">
+          <i class="fa-solid fa-money-bill-wave text-emerald-600"></i>
+          <span>Detail Penyesuaian Remunerasi & Benefit</span>
+        </div>
+        ${newSalary > 0 ? `
+          <div class="flex items-center justify-between bg-white/70 p-1.5 rounded-lg">
+            <span class="text-[11px] text-slate-500">Gaji Pokok Baru:</span>
+            <div class="flex items-center space-x-1.5 text-xs font-mono font-bold">
+              ${prevSalary > 0 ? `<span class="text-slate-400 line-through text-[11px]">Rp ${prevSalary.toLocaleString('id-ID')}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
+              <strong class="text-emerald-700">Rp ${newSalary.toLocaleString('id-ID')}</strong>
+            </div>
+          </div>
+        ` : ''}
+        ${allowances.length > 0 ? `
+          <div class="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
+            ${allowances.map(a => `
+              <div class="bg-white/70 p-1 rounded-md border border-emerald-100">
+                <span class="text-slate-400 block text-[10px]">${a.label}:</span>
+                <strong class="text-emerald-900 font-mono">Rp ${a.newVal.toLocaleString('id-ID')}</strong>
+              </div>
+            `).join("")}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  // 5. DETAIL PENGANGKATAN TETAP / KONTRAK
+  const hasTetap = types.some(t => t.toLowerCase().includes("tetap") || t.toLowerCase().includes("pkwtt"));
+  const hasKontrak = types.some(t => t.toLowerCase().includes("kontrak"));
+  if (hasTetap || hasKontrak || tx.contract_no) {
+    changeItemsHtml += `
+      <div class="p-2.5 rounded-xl border bg-violet-50 border-violet-200 text-violet-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-violet-200/50 pb-1">
+          <i class="fa-solid fa-file-contract text-violet-600"></i>
+          <span>Detail Perjanjian / Kontrak Kerja</span>
+        </div>
+        <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+          <div><span class="text-slate-400">Status Kerja:</span> <strong class="text-violet-950">${tx.employment_status || (hasTetap ? 'PKWTT' : 'PKWT')}</strong></div>
+          <div><span class="text-slate-400">No. Surat / Kontrak:</span> <strong class="text-violet-950 font-mono">${tx.contract_no || '-'}</strong></div>
+          <div><span class="text-slate-400">Tgl Mulai:</span> <strong>${tx.contract_start_date || tx.effective_date || '-'}</strong></div>
+          <div><span class="text-slate-400">Tgl Berakhir:</span> <strong>${tx.contract_end_date || (hasTetap ? 'Pensiun (50 Thn)' : '-')}</strong></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 6. DETAIL PENGAKHIRAN (RESIGN / PHK / PENSIUN)
+  const hasExit = types.some(t => ["resign", "phk", "pensiun"].some(k => t.toLowerCase().includes(k)));
+  if (hasExit || tx.exit_interview_no || (tx.uang_pisah && parseFloat(tx.uang_pisah) > 0)) {
+    changeItemsHtml += `
+      <div class="p-2.5 rounded-xl border bg-rose-50 border-rose-200 text-rose-950 space-y-1.5 text-xs mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-rose-200/50 pb-1">
+          <i class="fa-solid fa-arrow-right-from-bracket text-rose-600"></i>
+          <span>Detail Pengakhiran Hubungan Kerja</span>
+        </div>
+        <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+          <div><span class="text-slate-400">No Form Exit:</span> <strong>${tx.exit_interview_no || '-'}</strong></div>
+          <div><span class="text-slate-400">Uang Pisah/Kompensasi:</span> <strong class="text-rose-900 font-mono">Rp ${parseFloat(tx.uang_pisah || 0).toLocaleString('id-ID')}</strong></div>
+        </div>
+        ${tx.inventory_returned ? `<div class="text-[10px] text-slate-600">Inventaris Dikembalikan: <strong>${tx.inventory_returned}</strong></div>` : ''}
+        ${tx.uang_pisah_notes ? `<div class="text-[10px] italic text-slate-500">Catatan: ${tx.uang_pisah_notes}</div>` : ''}
+      </div>
+    `;
+  }
+
+  // 7. DETAIL PEMBARUAN DATA PRIBADI (BIODATA)
+  if (tx.personal_data_updates) {
+    const pu = tx.personal_data_updates;
+    changeItemsHtml += `
+      <div class="p-2.5 bg-white rounded-xl border border-indigo-200 text-xs space-y-1.5 mb-1.5 shadow-xs">
+        <div class="flex items-center space-x-1.5 font-bold text-indigo-900 border-b border-indigo-100 pb-1">
+          <i class="fa-solid fa-user-pen text-indigo-600"></i>
+          <span>Pembaruan Data Pribadi / Sipil Pegawai</span>
+        </div>
+        <div class="grid grid-cols-2 gap-1 text-[11px] pt-0.5">
+          <div><span class="text-slate-400">NIK (KTP):</span> <strong>${pu.ktp_number || pu.nik_ktp || '-'}</strong></div>
+          <div><span class="text-slate-400">Nama Lengkap:</span> <strong>${pu.nama_lengkap || '-'}</strong></div>
+          <div><span class="text-slate-400">Tempat, Tgl Lahir:</span> <strong>${[pu.pob, pu.dob].filter(Boolean).join(", ") || '-'}</strong></div>
+          <div><span class="text-slate-400">No HP / WhatsApp:</span> <strong>${pu.phone || pu.wa || '-'}</strong></div>
+          <div><span class="text-slate-400">Status Pernikahan:</span> <strong>${pu.marital_status || '-'}</strong></div>
+          <div><span class="text-slate-400">Tanggungan Anak:</span> <strong>${pu.number_of_dependents ?? 0} Anak</strong></div>
+          ${pu.emergency_contact_name ? `<div class="col-span-2 text-[10px] bg-slate-50 p-1 rounded"><span class="text-slate-400">Kontak Darurat:</span> <strong>${pu.emergency_contact_name} (${pu.emergency_contact_relation || '-'}) - ${pu.emergency_contact_phone || '-'}</strong></div>` : ''}
+          ${pu.address_ktp ? `<div class="col-span-2 text-[10px] text-slate-500"><span class="text-slate-400">Alamat KTP:</span> ${pu.address_ktp}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // Legal Statement dinamis
+  const legalEl = document.getElementById("agree-legal-text");
+  if (legalEl) {
+    if (tx.personal_data_updates && types.length === 1) {
       legalEl.innerText = `"Dengan ini saya menyatakan bahwa data pribadi/biodata yang diajukan di atas adalah benar, valid, dan sesuai dengan dokumen kependudukan saya, serta saya mengonfirmasi pembaruan data ini pada profil kepegawaian perusahaan."`;
+    } else if (tx.personal_data_updates && types.length > 1) {
+      legalEl.innerText = `"Dengan ini saya menyatakan bahwa data pribadi/biodata serta seluruh perubahan kepegawaian (${types.join(", ")}) sebagaimana tercantum di atas adalah benar, sah, dan telah saya sepakati bersama untuk diberlakukan terhitung mulai Tanggal Berlaku (Effective Date) yang ditetapkan."`;
+    } else {
+      legalEl.innerText = `"Dengan ini saya menyatakan telah membaca, memahami, dan menyetujui seluruh perubahan data kepegawaian (${types.join(", ")}) sebagaimana tercantum di atas, untuk diberlakukan terhitung mulai Tanggal Berlaku (Effective Date) yang telah ditetapkan perusahaan."`;
     }
   }
+
   if (summaryContainer) summaryContainer.innerHTML = changeItemsHtml;
 
   // Metadata Audit Trail

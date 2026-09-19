@@ -19,15 +19,6 @@ ADD COLUMN IF NOT EXISTS marital_status TEXT NULL,
 ADD COLUMN IF NOT EXISTS email TEXT NULL,
 ADD COLUMN IF NOT EXISTS personal_details JSONB DEFAULT '{}'::jsonb;
 
--- Pastikan tabel fallback employee_personal_details juga memiliki kolom JSONB
-ALTER TABLE IF EXISTS public.employee_personal_details
-ADD COLUMN IF NOT EXISTS name TEXT NULL,
-ADD COLUMN IF NOT EXISTS dob DATE NULL,
-ADD COLUMN IF NOT EXISTS gender TEXT NULL,
-ADD COLUMN IF NOT EXISTS marital_status TEXT NULL,
-ADD COLUMN IF NOT EXISTS email TEXT NULL,
-ADD COLUMN IF NOT EXISTS personal_details JSONB DEFAULT '{}'::jsonb;
-
 
 -- 2. TABEL TRANSAKSI KEPEGAWAIAN (hr_employee_transactions)
 CREATE TABLE IF NOT EXISTS public.hr_employee_transactions (
@@ -172,14 +163,29 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- 6. NONAKTIFKAN RLS & BERIKAN HAK AKSES API LENGKAP (UNRESTRICTED)
+-- =========================================================================
+-- 5. HAK AKSES API & RLS (IZINKAN AKSES PENUH AGAR TIDAK ADA VIOLATE RLS)
+-- =========================================================================
 ALTER TABLE public.hr_employee_transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hr_transaction_staging_approvals DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hr_transaction_agreements DISABLE ROW LEVEL SECURITY;
 
-GRANT ALL ON TABLE public.hr_employee_transactions TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.hr_transaction_staging_approvals TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.hr_transaction_agreements TO anon, authenticated, service_role;
+-- Buat Permissive Policy jika sewaktu-waktu RLS aktif di Supabase dashboard
+DROP POLICY IF EXISTS "Allow public all on hr_employee_transactions" ON public.hr_employee_transactions;
+CREATE POLICY "Allow public all on hr_employee_transactions" ON public.hr_employee_transactions
+FOR ALL TO public USING (true) WITH CHECK (true);
 
--- 7. REFRESH CACHE POSTGREST
+DROP POLICY IF EXISTS "Allow public all on hr_transaction_staging_approvals" ON public.hr_transaction_staging_approvals;
+CREATE POLICY "Allow public all on hr_transaction_staging_approvals" ON public.hr_transaction_staging_approvals
+FOR ALL TO public USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all on hr_transaction_agreements" ON public.hr_transaction_agreements;
+CREATE POLICY "Allow public all on hr_transaction_agreements" ON public.hr_transaction_agreements
+FOR ALL TO public USING (true) WITH CHECK (true);
+
+GRANT ALL ON public.hr_employee_transactions TO anon, authenticated, service_role, postgres;
+GRANT ALL ON public.hr_transaction_staging_approvals TO anon, authenticated, service_role, postgres;
+GRANT ALL ON public.hr_transaction_agreements TO anon, authenticated, service_role, postgres;
+
+-- Reload Schema Cache Supabase
 NOTIFY pgrst, 'reload schema';
