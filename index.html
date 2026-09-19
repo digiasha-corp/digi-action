@@ -595,7 +595,7 @@
         <button type="button" onclick="closeEmployeeDossierModal()" class="text-white/70 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
-      <!-- Navigasi 4 Tab Dossier -->
+      <!-- Navigasi 5 Tab Dossier -->
       <div class="flex border-b border-slate-200 bg-slate-50 px-3 pt-2 space-x-1 text-xs font-bold overflow-x-auto shrink-0">
         <button type="button" id="dossier-tab-btn-personal" onclick="switchDossierTab('personal')" class="px-3 py-2 rounded-t-xl bg-white text-indigo-700 border-t border-x border-slate-200 shadow-2xs whitespace-nowrap">
           <i class="fa-solid fa-id-card mr-1"></i> 1. Data Pribadi Sipil
@@ -608,6 +608,11 @@
         </button>
         <button type="button" id="dossier-tab-btn-history" onclick="switchDossierTab('history')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap">
           <i class="fa-solid fa-clock-rotate-left mr-1"></i> 4. History Transaksi
+        </button>
+        <button type="button" id="dossier-tab-btn-documents" onclick="switchDossierTab('documents')" class="px-3 py-2 rounded-t-xl text-slate-600 hover:text-slate-900 whitespace-nowrap flex items-center">
+          <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i>
+          <span>5. Berkas & Dokumen</span>
+          <span id="dossier-doc-count-badge" class="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700">0</span>
         </button>
       </div>
 
@@ -867,6 +872,31 @@
 
           <div id="dossier-tx-history-container" class="space-y-2 relative border-l-2 border-indigo-200 ml-3 pl-4 pt-1">
             <div class="p-4 text-center text-xs text-slate-400">Belum ada riwayat transaksi tercatat.</div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 5: BERKAS & DOKUMEN TERUPLOAD KARYAWAN -->
+        <div id="dossier-content-documents" class="space-y-3 hidden">
+          <div class="flex items-center justify-between pb-1 border-b border-slate-100 flex-wrap gap-2">
+            <div>
+              <h5 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-folder-open text-amber-500"></i>
+                Berkas & Dokumen Terupload Karyawan
+              </h5>
+              <p class="text-[10px] text-slate-400">Arsip digital KTP, KK, NPWP, CV, dan SK/Kontrak Kerja yang telah terunggah</p>
+            </div>
+            <button type="button" onclick="openEmployeeTransactionModal(CURRENT_DOSSIER_EMP?.id || CURRENT_DOSSIER_EMP?.nip)" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition active:scale-95">
+              <i class="fa-solid fa-cloud-arrow-up text-xs text-amber-300"></i>
+              <span>⚡ Upload / Update Berkas</span>
+            </button>
+          </div>
+
+          <!-- Container Dokumen Terupload Dossier -->
+          <div id="dossier-documents-container" class="space-y-2.5">
+            <div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <i class="fa-solid fa-circle-notch fa-spin text-indigo-600 text-lg mb-2"></i>
+              <p>Memuat daftar dokumen terupload...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1811,36 +1841,20 @@
           </div>
         </div>
 
-        <!-- 4. DOKUMEN PERSYARATAN TRANSAKSI (UPLOAD & VIEWER TABS) -->
-        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-          <!-- Tab Navigation -->
-          <div class="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 text-xs font-bold">
-            <button type="button" id="tab-tx-doc-upload-btn" onclick="switchTxDocTab('upload')"
-              class="flex-1 py-2 px-3 rounded-xl bg-white text-indigo-700 shadow-xs border border-slate-200 flex items-center justify-center space-x-1.5 transition">
+        <!-- 4. UPLOAD DOKUMEN PERSYARATAN -->
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i>
-              <span>Upload Dokumen</span>
-            </button>
-            <button type="button" id="tab-tx-doc-view-btn" onclick="switchTxDocTab('view')"
-              class="flex-1 py-2 px-3 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white/60 flex items-center justify-center space-x-1.5 transition">
-              <i class="fa-solid fa-folder-open text-amber-500"></i>
-              <span>Lihat File Terupload</span>
-              <span id="tx-doc-uploaded-count-badge" class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700">0</span>
-            </button>
+              4. Upload Dokumen Persyaratan:
+            </span>
+            <span class="text-emerald-600 font-semibold text-[10px] flex items-center gap-1">
+              <i class="fa-solid fa-shield-halved"></i> Cloud Storage Aman
+            </span>
           </div>
+          <p class="text-[10px] text-slate-500">Pilih atau seret berkas <strong>PDF, JPG, atau PNG</strong> dari perangkat Anda (maksimal 10 MB per berkas)</p>
 
-          <!-- TAB 1: UPLOAD DOKUMEN -->
-          <div id="tab-tx-doc-upload-content" class="p-3.5 space-y-3">
-            <div class="flex items-center justify-between text-[11px] text-slate-500 pb-1 border-b border-slate-100">
-              <span class="flex items-center gap-1.5">
-                <i class="fa-solid fa-circle-info text-indigo-500"></i>
-                Format didukung: <strong>PDF, JPG, PNG</strong> (maks 10MB per berkas)
-              </span>
-              <span class="text-emerald-600 font-semibold flex items-center gap-1">
-                <i class="fa-solid fa-shield-halved"></i> Cloud Storage Aman
-              </span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="tx-docs-container">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="tx-docs-container">
               <!-- Item 1: CV -->
               <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 transition hover:border-indigo-200" id="tx-doc-box-cv">
                 <div class="flex items-center justify-between">
@@ -2066,28 +2080,6 @@
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- TAB 2: LIHAT FILE TERUPLOAD -->
-          <div id="tab-tx-doc-view-content" class="hidden p-3.5 space-y-3">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div>
-                <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                  <i class="fa-solid fa-folder-open text-amber-500"></i>
-                  Berkas Terlampir untuk Transaksi Ini
-                </span>
-                <p class="text-[10px] text-slate-400">Dokumen yang telah berhasil diunggah atau tersimpan dari profil karyawan</p>
-              </div>
-              <button type="button" onclick="renderTxUploadedDocsView()" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition">
-                <i class="fa-solid fa-arrows-rotate text-[9px]"></i> Refresh
-              </button>
-            </div>
-
-            <!-- List Container of Uploaded Files -->
-            <div id="tx-doc-view-list" class="space-y-2">
-              <!-- Dynamically populated via renderTxUploadedDocsView() -->
-            </div>
-          </div>
         </div>
 
         <!-- 6. STAGING APPROVAL BERTINGKAT -->
@@ -2226,6 +2218,6 @@
   <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260919_v151"></script>
+  <script src="/app.js?v=20260919_v152"></script>
 </body>
 </html>

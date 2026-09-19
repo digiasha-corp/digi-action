@@ -18451,6 +18451,7 @@ async function openEmployeeDossierModal(nipOrId) {
     loadDossierJobDetails(emp);
     await loadDossierPayrollDetails(emp);
     await loadDossierTransactionsHistory(emp);
+    await loadDossierDocuments(emp);
   } catch (errLoad) {
     console.warn("[Dossier] Error loading dossier tabs:", errLoad);
   }
@@ -18461,7 +18462,7 @@ function closeEmployeeDossierModal() {
 }
 
 function switchDossierTab(tab) {
-  const tabs = ["personal", "job", "payroll", "history"];
+  const tabs = ["personal", "job", "payroll", "history", "documents"];
   tabs.forEach(t => {
     const el = document.getElementById(`dossier-content-${t}`);
     const btn = document.getElementById(`dossier-tab-btn-${t}`);
@@ -18843,6 +18844,194 @@ async function loadDossierTransactionsHistory(emp) {
       </div>
     `;
   }).join("");
+}
+
+// TAB 5: BERKAS & DOKUMEN TERUPLOAD KARYAWAN (DOSSIER)
+async function loadDossierDocuments(emp) {
+  const container = document.getElementById("dossier-documents-container");
+  const countBadge = document.getElementById("dossier-doc-count-badge");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+      <i class="fa-solid fa-circle-notch fa-spin text-indigo-600 text-lg mb-2"></i>
+      <p>Memuat berkas & dokumen digital...</p>
+    </div>
+  `;
+
+  let docs = [];
+  const empId = emp.id;
+  const nip = emp.nip;
+
+  // 1. Dokumen dari objek Employee
+  if (emp.doc_cv_url || emp.cv_url) {
+    docs.push({
+      key: "cv",
+      label: "Berkas CV / Portofolio",
+      url: emp.doc_cv_url || emp.cv_url,
+      source: "Profil Karyawan",
+      icon: "fa-solid fa-file-pdf",
+      color: "text-red-600",
+      bg: "bg-red-50"
+    });
+  }
+  if (emp.doc_ktp_url || emp.ktp_url) {
+    docs.push({
+      key: "ktp",
+      label: "Scan KTP Kependudukan",
+      url: emp.doc_ktp_url || emp.ktp_url,
+      source: "Profil Karyawan",
+      icon: "fa-solid fa-id-card",
+      color: "text-blue-600",
+      bg: "bg-blue-50"
+    });
+  }
+  if (emp.doc_kk_url || emp.kk_url) {
+    docs.push({
+      key: "kk",
+      label: "Scan Kartu Keluarga (KK)",
+      url: emp.doc_kk_url || emp.kk_url,
+      source: "Profil Karyawan",
+      icon: "fa-solid fa-users-rectangle",
+      color: "text-emerald-600",
+      bg: "bg-emerald-50"
+    });
+  }
+  if (emp.doc_npwp_url || emp.npwp_url) {
+    docs.push({
+      key: "npwp",
+      label: "Scan NPWP Karyawan",
+      url: emp.doc_npwp_url || emp.npwp_url,
+      source: "Profil Karyawan",
+      icon: "fa-solid fa-receipt",
+      color: "text-amber-600",
+      bg: "bg-amber-50"
+    });
+  }
+  if (emp.doc_kontrak_url || emp.contract_url) {
+    docs.push({
+      key: "kontrak",
+      label: "Dokumen Kontrak Kerja / SK",
+      url: emp.doc_kontrak_url || emp.contract_url,
+      source: "Profil Karyawan",
+      icon: "fa-solid fa-file-signature",
+      color: "text-purple-600",
+      bg: "bg-purple-50"
+    });
+  }
+
+  // 2. Query dari Database Supabase (hr_employee_transactions & hr_employee_personal_details)
+  if (supabaseClient) {
+    try {
+      // Query dari transaksi
+      const { data: txList } = await supabaseClient
+        .from("hr_employee_transactions")
+        .select("id, transaction_types, effective_date, status, created_at, doc_cv_url, doc_ktp_url, doc_kk_url, doc_npwp_url, doc_kontrak_url")
+        .or(`employee_id.eq.${empId},nip.eq.${nip}`)
+        .order("created_at", { ascending: false });
+
+      if (txList && txList.length > 0) {
+        txList.forEach(tx => {
+          const tName = Array.isArray(tx.transaction_types) ? tx.transaction_types.join(", ") : (tx.transaction_types || "Transaksi");
+          const dateStr = tx.effective_date || (tx.created_at ? tx.created_at.split("T")[0] : "");
+          const srcLabel = `Transaksi ${tName} (${dateStr})`;
+
+          const checkAndPush = (url, key, label, icon, color, bg) => {
+            if (url && !docs.some(d => d.url === url)) {
+              docs.push({ key, label, url, source: srcLabel, icon, color, bg });
+            }
+          };
+
+          checkAndPush(tx.doc_cv_url, "cv", "Berkas CV / Portofolio", "fa-solid fa-file-pdf", "text-red-600", "bg-red-50");
+          checkAndPush(tx.doc_ktp_url, "ktp", "Scan KTP Kependudukan", "fa-solid fa-id-card", "text-blue-600", "bg-blue-50");
+          checkAndPush(tx.doc_kk_url, "kk", "Scan Kartu Keluarga (KK)", "fa-solid fa-users-rectangle", "text-emerald-600", "bg-emerald-50");
+          checkAndPush(tx.doc_npwp_url, "npwp", "Scan NPWP Karyawan", "fa-solid fa-receipt", "text-amber-600", "bg-amber-50");
+          checkAndPush(tx.doc_kontrak_url, "kontrak", "Dokumen Kontrak / SK", "fa-solid fa-file-signature", "text-purple-600", "bg-purple-50");
+        });
+      }
+
+      // Query dari personal_details jika ada
+      const { data: pRow } = await supabaseClient
+        .from("hr_employee_personal_details")
+        .select("personal_details")
+        .or(`employee_id.eq.${empId}`)
+        .maybeSingle();
+
+      const pJson = pRow?.personal_details || {};
+      if (pJson.doc_ktp_url && !docs.some(d => d.url === pJson.doc_ktp_url)) {
+        docs.push({ key: "ktp", label: "Scan KTP Kependudukan", url: pJson.doc_ktp_url, source: "Data Pribadi Sipil", icon: "fa-solid fa-id-card", color: "text-blue-600", bg: "bg-blue-50" });
+      }
+      if (pJson.doc_kk_url && !docs.some(d => d.url === pJson.doc_kk_url)) {
+        docs.push({ key: "kk", label: "Scan Kartu Keluarga", url: pJson.doc_kk_url, source: "Data Pribadi Sipil", icon: "fa-solid fa-users-rectangle", color: "text-emerald-600", bg: "bg-emerald-50" });
+      }
+    } catch (errDocs) {
+      console.warn("[loadDossierDocuments] Error fetching documents:", errDocs);
+    }
+  }
+
+  // Update badge jumlah dokumen di Tab 5
+  if (countBadge) {
+    countBadge.innerText = docs.length;
+    countBadge.className = docs.length > 0 
+      ? "ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-700" 
+      : "ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700";
+  }
+
+  if (docs.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-3">
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl mx-auto border border-amber-100">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <div>
+          <h5 class="font-bold text-xs sm:text-sm text-slate-800">Belum Ada Dokumen Terupload</h5>
+          <p class="text-[11px] text-slate-400 max-w-sm mx-auto mt-0.5">
+            Belum ada berkas CV, KTP, KK, NPWP, atau Kontrak/SK yang terlampir untuk karyawan ini.
+          </p>
+        </div>
+        <button type="button" onclick="openEmployeeTransactionModal('${emp.nip}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm active:scale-95">
+          <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
+          <span>Upload Dokumen via Transaksi</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `<div class="grid grid-cols-1 gap-2.5">`;
+  docs.forEach((doc) => {
+    const rawFileName = doc.url.startsWith("data:") 
+      ? `${doc.label}.pdf` 
+      : (doc.url.split("/").pop() || `${doc.key}_document`);
+
+    html += `
+      <div class="p-3 bg-white border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-2xs hover:border-indigo-300 transition">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="w-10 h-10 rounded-xl ${doc.bg} flex items-center justify-center ${doc.color} text-lg shrink-0 border border-slate-100">
+            <i class="${doc.icon}"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-xs text-slate-900">${doc.label}</span>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">✓ Tersedia di Cloud</span>
+              <span class="text-[9px] text-slate-400">Sumber: ${doc.source}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 truncate max-w-md font-mono mt-0.5">${rawFileName}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="openTxDocPreview('${doc.url}', '${doc.label}', '${rawFileName}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs border border-indigo-200 flex items-center gap-1.5 transition active:scale-95 shadow-2xs">
+            <i class="fa-solid fa-eye text-[11px]"></i><span>Buka / Lihat</span>
+          </button>
+          <a href="${doc.url}" target="_blank" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition" title="Buka Tab Baru / Unduh">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
 }
 
 function openAddCareerTransactionModal() {
