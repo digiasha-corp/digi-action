@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v153";
+const APP_BUILD_VERSION = "20260919_v154";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -22188,60 +22188,56 @@ async function applyApprovedTransactionToEmployee(tx) {
 
     // A. Penerimaan Karyawan (New Hire)
     if (types.includes("Penerimaan Karyawan") || tx.is_new_hire) {
-      if (tx.unit_id) updatePayload.unit_id = tx.unit_id;
-      if (tx.position_id) updatePayload.position_id = tx.position_id;
-      if (tx.work_location_id) updatePayload.work_location_id = tx.work_location_id;
+      if (tx.unit_id || tx.work_location_id) {
+        updatePayload.location_id = tx.unit_id || tx.work_location_id;
+      }
+      if (tx.position_id) {
+        updatePayload.position_id = tx.position_id;
+      }
       updatePayload.status_kerja = tx.employment_status || "PKWT";
-      updatePayload.status_aktif = "AKTIF";
-      updatePayload.is_active = true;
-      if (tx.join_date) updatePayload.tanggal_masuk = tx.join_date;
-      if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
-      if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
-      if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
+      if (tx.join_date) {
+        updatePayload.tanggal_masuk = tx.join_date;
+      }
+      if (tx.contract_end_date) {
+        updatePayload.tanggal_selesai_kontrak = tx.contract_end_date;
+      }
     }
 
     // B. Pengangkatan Tetap (PKWTT)
     if (types.includes("Tetap (PKWTT)") || tx.is_permanent_appointment) {
       updatePayload.status_kerja = "PKWTT";
-      if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
-      if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
-      if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
+      updatePayload.tanggal_selesai_kontrak = null;
     }
 
     // C/D. Pengangkatan / Perpanjang Kontrak (PKWT)
     if (types.includes("Pengangkatan Kontrak") || types.includes("Perpanjang Kontrak") || tx.is_contract_appointment || tx.is_contract_extension) {
       updatePayload.status_kerja = "PKWT";
-      if (tx.contract_no) updatePayload.contract_no = tx.contract_no;
-      if (tx.contract_start_date) updatePayload.contract_start_date = tx.contract_start_date;
-      if (tx.contract_end_date) updatePayload.contract_end_date = tx.contract_end_date;
+      if (tx.contract_end_date) {
+        updatePayload.tanggal_selesai_kontrak = tx.contract_end_date;
+      }
     }
 
     // E/F/G. Rotasi, Promosi, Demosi
     if (tx.new_position_id) {
       updatePayload.position_id = tx.new_position_id;
-    }
-    if (tx.new_level_id) {
-      updatePayload.level_id = tx.new_level_id;
+    } else if (tx.position_id && !updatePayload.position_id) {
+      updatePayload.position_id = tx.position_id;
     }
 
-    // H. Mutasi
-    if (tx.new_location_id) {
-      updatePayload.work_location_id = tx.new_location_id;
-    }
+    // H. Mutasi / Penempatan Unit
     if (tx.new_unit_id) {
-      updatePayload.unit_id = tx.new_unit_id;
-    }
-
-    // I. Penyesuaian Benefit
-    if (tx.new_basic_salary && parseFloat(tx.new_basic_salary) > 0) {
-      updatePayload.basic_salary = parseFloat(tx.new_basic_salary);
+      updatePayload.location_id = tx.new_unit_id;
+    } else if (tx.new_location_id) {
+      updatePayload.location_id = tx.new_location_id;
+    } else if (tx.unit_id && !updatePayload.location_id) {
+      updatePayload.location_id = tx.unit_id;
+    } else if (tx.work_location_id && !updatePayload.location_id) {
+      updatePayload.location_id = tx.work_location_id;
     }
 
     // J/K/L. Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
     if (types.some(t => ["Resign", "PHK", "Pensiun"].includes(t)) || tx.is_resignation || tx.is_phk || tx.is_pension) {
-      updatePayload.status_aktif = "NONAKTIF";
-      updatePayload.is_active = false;
-      updatePayload.tanggal_keluar = tx.effective_date || new Date().toISOString().split("T")[0];
+      updatePayload.deleted_at = tx.effective_date ? `${tx.effective_date}T00:00:00Z` : now;
     }
 
     // M. Pembaruan Data Pribadi (Personal Data Updates)
@@ -22255,14 +22251,14 @@ async function applyApprovedTransactionToEmployee(tx) {
     }
 
     if (types.includes("Pembaruan Data Pribadi") || Object.keys(pu).length > 0) {
-      if (pu.nama_lengkap) updatePayload.nama_lengkap = pu.nama_lengkap;
-      if (pu.nik_ktp || pu.ktp_number) updatePayload.nik_ktp = pu.nik_ktp || pu.ktp_number;
-      if (pu.dob) updatePayload.dob = pu.dob;
-      if (pu.gender) updatePayload.gender = pu.gender;
-      if (pu.marital_status) updatePayload.marital_status = pu.marital_status;
-      if (pu.phone) updatePayload.phone = pu.phone;
+      if (pu.nama_lengkap || pu.name) {
+        updatePayload.name = pu.nama_lengkap || pu.name;
+      }
+      if (pu.email) {
+        updatePayload.email = pu.email;
+      }
 
-      // Sinkronkan ke hr_employee_personal_details / employee_personal_details
+      // Sinkronkan ke hr_employee_personal_details
       try {
         const detailPayload = {
           employee_id: empId,
@@ -22280,75 +22276,99 @@ async function applyApprovedTransactionToEmployee(tx) {
           emergency_contact_name: pu.emergency_contact_name || null,
           emergency_contact_relation: pu.emergency_contact_relation || null,
           emergency_contact_phone: pu.emergency_contact_phone || null,
-          education: pu.education_level || null,
-          major: pu.education_major || null,
           personal_details: pu,
           updated_at: now
         };
 
-        // Coba simpan ke hr_employee_personal_details (tabel utama)
         let { error: upsertErr } = await supabaseClient
           .from("hr_employee_personal_details")
           .upsert([detailPayload], { onConflict: "employee_id" });
 
-        // Jika kolom spouse_name / education belum ada di database, hilangkan kolom tambahan lalu coba lagi
-        if (upsertErr && upsertErr.message && upsertErr.message.includes("column")) {
-          console.warn("[applyApprovedTransactionToEmployee] Fallback without extra columns:", upsertErr.message);
-          const safePayload = {
-            employee_id: empId,
-            ktp_number: pu.ktp_number || pu.nik_ktp || null,
-            pob: pu.pob || null,
-            dob: pu.dob || null,
-            gender: pu.gender || null,
-            religion: pu.religion || null,
-            marital_status: pu.marital_status || null,
-            number_of_dependents: parseInt(pu.number_of_dependents) || 0,
-            address_ktp: pu.address_ktp || null,
-            address_domicile: pu.address_domicile || null,
-            phone: pu.phone || null,
-            emergency_contact_name: pu.emergency_contact_name || null,
-            emergency_contact_relation: pu.emergency_contact_relation || null,
-            emergency_contact_phone: pu.emergency_contact_phone || null,
-            updated_at: now
-          };
-          const resFallback = await supabaseClient
-            .from("hr_employee_personal_details")
-            .upsert([safePayload], { onConflict: "employee_id" });
-          if (resFallback.error) {
-            // Coba ke view employee_personal_details
-            await supabaseClient
-              .from("employee_personal_details")
-              .upsert([safePayload], { onConflict: "employee_id" });
-          }
+        if (upsertErr) {
+          console.warn("[applyApprovedTransactionToEmployee] hr_employee_personal_details upsert error:", upsertErr);
         }
       } catch (detErr) {
         console.warn("[applyApprovedTransactionToEmployee] personal details sync error:", detErr);
       }
     }
 
-    await supabaseClient
-      .from("employees")
+    // UPDATE TABEL MASTER hr_employees (Tabel fisik base)
+    const { error: empUpErr } = await supabaseClient
+      .from("hr_employees")
       .update(updatePayload)
       .eq("id", empId);
 
-    // Buat riwayat jejak di employee_career_histories
-    const typesStr = types.join(", ");
+    if (empUpErr) {
+      console.error("[applyApprovedTransactionToEmployee] Gagal update hr_employees:", empUpErr);
+      // Fallback coba view employees jika tabel base berbeda hak akses
+      await supabaseClient
+        .from("employees")
+        .update(updatePayload)
+        .eq("id", empId);
+    } else {
+      console.log(`[applyApprovedTransactionToEmployee] Sukses update hr_employees untuk ID ${empId}:`, updatePayload);
+    }
+
+    // Update status transaksi menjadi APPLIED agar terdata telah diaktifkan ke core employee
     await supabaseClient
-      .from("employee_career_histories")
-      .insert({
-        employee_id: empId,
-        transaction_date: tx.effective_date || new Date().toISOString().split("T")[0],
-        effective_date: tx.effective_date,
-        transaction_type: typesStr,
-        no_sk: tx.contract_no || ("SK/" + tx.id.slice(0, 8)),
-        description: `Transaksi disetujui: ${typesStr}`,
-        new_basic_salary: tx.new_basic_salary ? parseFloat(tx.new_basic_salary) : null,
-        new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0) + parseFloat(tx.new_allowance_komunikasi || 0) + parseFloat(tx.new_allowance_tempat_tinggal || 0) + parseFloat(tx.new_allowance_penempatan || 0) + parseFloat(tx.new_allowance_kemahalan || 0)),
-        created_at: now
-      });
+      .from("hr_employee_transactions")
+      .update({ status: "APPROVED", updated_at: now })
+      .eq("id", tx.id);
+
+    // Buat riwayat jejak di hr_employee_career_histories
+    const typesStr = types.join(", ");
+    const careerPayload = {
+      employee_id: empId,
+      transaction_date: tx.effective_date || now.split("T")[0],
+      effective_date: tx.effective_date || now.split("T")[0],
+      transaction_type: typesStr,
+      no_sk: tx.contract_no || ("SK/" + tx.id.slice(0, 8)),
+      description: `Transaksi disetujui: ${typesStr}`,
+      new_position_id: tx.new_position_id || tx.position_id || null,
+      previous_position_id: tx.prev_position_id || null,
+      new_location_id: tx.new_unit_id || tx.new_location_id || tx.unit_id || null,
+      previous_location_id: tx.prev_unit_id || tx.prev_location_id || null,
+      new_status_kerja: updatePayload.status_kerja || null,
+      new_basic_salary: tx.new_basic_salary ? parseFloat(tx.new_basic_salary) : null,
+      previous_basic_salary: tx.prev_basic_salary ? parseFloat(tx.prev_basic_salary) : null,
+      new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0) + parseFloat(tx.new_allowance_komunikasi || 0) + parseFloat(tx.new_allowance_tempat_tinggal || 0) + parseFloat(tx.new_allowance_penempatan || 0) + parseFloat(tx.new_allowance_kemahalan || 0)),
+      previous_allowances: (parseFloat(tx.prev_allowance_jabatan || 0) + parseFloat(tx.prev_allowance_transport || 0) + parseFloat(tx.prev_allowance_komunikasi || 0) + parseFloat(tx.prev_allowance_tempat_tinggal || 0) + parseFloat(tx.prev_allowance_penempatan || 0) + parseFloat(tx.prev_allowance_kemahalan || 0)),
+      created_at: now
+    };
+
+    let { error: chErr } = await supabaseClient
+      .from("hr_employee_career_histories")
+      .insert(careerPayload);
+
+    if (chErr) {
+      // Fallback ke view
+      await supabaseClient
+        .from("employee_career_histories")
+        .insert(careerPayload);
+    }
 
   } catch (err) {
-    console.warn("[applyApprovedTransactionToEmployee] Warning:", err);
+    console.error("[applyApprovedTransactionToEmployee] Fatal Error:", err);
+  }
+}
+
+// Fungsi sinkronisasi transaksi APPROVED yang belum teraplikasikan ke tabel hr_employees
+async function syncPendingApprovedTransactions() {
+  if (!supabaseClient) return;
+  try {
+    const { data: approvedTxs, error } = await supabaseClient
+      .from("hr_employee_transactions")
+      .select("*")
+      .eq("status", "APPROVED");
+
+    if (error || !approvedTxs || approvedTxs.length === 0) return;
+
+    for (const tx of approvedTxs) {
+      // Terapkan ke hr_employees
+      await applyApprovedTransactionToEmployee(tx);
+    }
+  } catch (e) {
+    console.warn("[syncPendingApprovedTransactions] Warning:", e);
   }
 }
 
@@ -22359,9 +22379,13 @@ window.addEventListener("popstate", function (event) {
 });
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initAppBootstrap);
+  document.addEventListener("DOMContentLoaded", () => {
+    initAppBootstrap();
+    syncPendingApprovedTransactions();
+  });
 } else {
   initAppBootstrap();
+  syncPendingApprovedTransactions();
 }
 
 document.addEventListener("click", function (e) {
