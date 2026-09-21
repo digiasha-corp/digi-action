@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v157";
+const APP_BUILD_VERSION = "20260919_v158";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -20768,6 +20768,22 @@ function toggleTxSubforms() {
   const isBiodata = document.getElementById("chk-tx-biodata")?.checked;
   const isExit = document.getElementById("chk-tx-resign")?.checked || document.getElementById("chk-tx-phk")?.checked || document.getElementById("chk-tx-pensiun")?.checked;
 
+  // Disable benefit checkbox if exit transactions (J, K, L) are selected
+  const benefitChk = document.getElementById("chk-tx-benefit");
+  const benefitLabel = document.getElementById("lbl-tx-benefit");
+  if (benefitChk && benefitLabel) {
+    if (isExit) {
+      benefitChk.disabled = true;
+      benefitChk.checked = false;
+      benefitLabel.classList.add("opacity-50", "cursor-not-allowed");
+      benefitLabel.classList.remove("cursor-pointer", "hover:border-indigo-400");
+    } else {
+      benefitChk.disabled = false;
+      benefitLabel.classList.remove("opacity-50", "cursor-not-allowed");
+      benefitLabel.classList.add("cursor-pointer", "hover:border-indigo-400");
+    }
+  }
+
   toggleElement("subform-penerimaan", isPenerimaan);
   toggleElement("subform-tetap", isTetap);
   toggleElement("subform-kontrak", isKontrak);
@@ -20775,7 +20791,7 @@ function toggleTxSubforms() {
   toggleElement("subform-promosi", isPromosi);
   toggleElement("subform-demosi", isDemosi);
   toggleElement("subform-mutasi", isMutasi);
-  toggleElement("subform-benefit", isBenefit);
+  toggleElement("subform-benefit", isBenefit && !isExit);
   toggleElement("subform-biodata", isBiodata);
   toggleElement("subform-exit", isExit);
 
