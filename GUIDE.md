@@ -242,6 +242,25 @@ personal_data_updates JSONB
 - [x] Tambah `syncPendingApprovedTransactions()` — jalankan otomatis saat app boot
 - [x] Error logging: ganti `console.warn` → `console.error` agar terlihat di DevTools
 
+### [SELESAI] Fix Form Input Calon Karyawan
+**Tanggal**: 2026-09-21
+**Status**: ✅ DONE
+
+**Root Cause Ditemukan**:
+1. `handleSaveCandidate()` insert ke VIEW `employees` (bukan `hr_employees`) → error "Could not find the 'dob' column of 'employees' in the schema cache"
+2. Payload berisi kolom yang TIDAK ADA di `hr_employees`: `dob`, `gender`, `marital_status`, `status_aktif`, `is_active`
+3. Label UI form menampilkan istilah teknis "(JSONB)" yang membingungkan user
+4. Error message menampilkan detail teknis Supabase langsung ke user
+
+**Yang Sudah Diperbaiki**:
+- [x] Target query: `.from("employees")` → `.from("hr_employees")` (baris ~19978)
+- [x] Hapus kolom tidak valid dari empPayload: `dob`, `gender`, `marital_status`, `status_aktif`, `is_active`
+- [x] Data pribadi (dob, gender, marital_status, dll.) tetap disimpan di `hr_employee_personal_details` (sudah benar sejak awal)
+- [x] Tambah kolom baru ke personalPayload: `name`, `email`, `spouse_name`, `education`, `major`
+- [x] Hapus label "(JSONB)" dari 3 section UI di `index.html`: "Data Keluarga & Anak", "Alamat & Geotagging Domisili", "Kontak Darurat"
+- [x] Error handling: pesan teknis Supabase di-log ke `console.error`, user hanya melihat pesan user-friendly
+- [x] Tambah error handling eksplisit untuk upsert `hr_employee_personal_details`
+
 ---
 
 ## 🚨 MASALAH YANG MASIH TERBUKA (TODO)

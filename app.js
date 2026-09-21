@@ -19962,29 +19962,27 @@ async function handleSaveCandidate(event) {
     let newEmpId = null;
 
     if (supabaseClient) {
-      // 1. Simpan akun calon karyawan ke employees / hr_employees
+      // 1. Simpan akun calon karyawan ke hr_employees (TABEL FISIK — bukan VIEW 'employees')
+      // PENTING: hr_employees TIDAK punya kolom dob, gender, marital_status, status_aktif, is_active
+      // Data pribadi sipil disimpan di hr_employee_personal_details (langkah ke-2)
       const empPayload = {
         nip: tempNip,
         name: nama,
         email: email,
-        dob: dob,
-        gender: gender,
-        marital_status: marital,
         status_kerja: "CALON",
-        status_aktif: "CALON",
-        is_active: false,
         created_at: now,
         updated_at: now
       };
 
       const { data: createdEmp, error: empErr } = await supabaseClient
-        .from("employees")
+        .from("hr_employees")
         .insert([empPayload])
         .select("id")
         .single();
 
       if (empErr) {
-        throw new Error("Gagal menyimpan akun calon karyawan: " + empErr.message);
+        console.error("[handleSaveCandidate] hr_employees insert error:", empErr);
+        throw new Error("Gagal menyimpan data calon karyawan. Silakan coba lagi atau hubungi Administrator.");
       }
 
       newEmpId = createdEmp.id;
@@ -19992,25 +19990,34 @@ async function handleSaveCandidate(event) {
       // 2. Simpan data pribadi sipil ke hr_employee_personal_details
       const personalPayload = {
         employee_id: newEmpId,
+        name: nama,
+        email: email,
         ktp_number: nik,
         phone: phone || null,
         pob: pob || null,
         dob: dob,
         gender: gender,
         marital_status: marital,
+        spouse_name: spouse || null,
         number_of_dependents: childrenCount,
         address_ktp: alamatKtp || null,
         address_domicile: alamatDom || null,
         emergency_contact_name: emergName || null,
         emergency_contact_relation: emergRel || null,
         emergency_contact_phone: emergPhone || null,
+        education: education || null,
+        major: major || null,
         personal_details: personalDetailsJsonb,
         updated_at: now
       };
 
-      await supabaseClient
+      const { error: pdErr } = await supabaseClient
         .from("hr_employee_personal_details")
         .upsert([personalPayload], { onConflict: "employee_id" });
+
+      if (pdErr) {
+        console.error("[handleSaveCandidate] hr_employee_personal_details upsert error:", pdErr);
+      }
     }
 
     closeCandidateInputModal();
@@ -20020,8 +20027,12 @@ async function handleSaveCandidate(event) {
       await loadPersonaliaEmployees();
     }
   } catch (err) {
-    console.error("[Candidate Input] Error:", err);
-    alert("Gagal menyimpan calon karyawan: " + err.message);
+    console.error("[handleSaveCandidate] Error:", err);
+    // Tampilkan pesan user-friendly (tanpa detail teknis di production)
+    const userMsg = err.message.includes("Silakan") || err.message.includes("Gagal menyimpan data")
+      ? err.message
+      : "Gagal menyimpan data calon karyawan. Silakan coba lagi atau hubungi Administrator.";
+    alert(userMsg);
   } finally {
     if (btn) {
       btn.innerHTML = origText;
