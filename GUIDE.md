@@ -10,11 +10,16 @@
 
 > **ATURAN WAJIB**: Semua pekerjaan development dilakukan di branch `feature/fac-workflow`. **Jangan pernah push langsung ke `main`/`master`.**
 
-### Struktur Branch
-| Branch | Tujuan |
-|--------|--------|
-| `main` | **Production** — hanya menerima merge dari branch yang sudah ditest |
-| `feature/fac-workflow` | **Development aktif** — semua perbaikan, fitur baru, dan eksperimen masuk sini |
+### Struktur Branch & Deployment
+| Branch | Target Vercel | Tujuan |
+|--------|---------------|--------|
+| `main` | **Production URL** | Hanya menerima merge PR setelah fitur stabil & teruji |
+| `feature/fac-workflow` | **Preview / Dev URL** | **Development aktif** — tempat menguji fitur & tampilan baru sebelum production |
+
+> **CATATAN PENTING**:
+> - **Branching HANYA ada di GitHub & Vercel**: Digunakan semata-mata untuk memisahkan deployment tampilan frontend (Development vs Production).
+> - **Database Supabase TIDAK menggunakan branching**: Instance database Supabase adalah satu kesatuan langsung. Setiap script migrasi SQL (`supabase/*.sql`) dieksekusi langsung di SQL Editor dashboard Supabase tersebut.
+
 
 ### Prosedur Kerja (Wajib Diikuti Setiap Agent)
 
@@ -353,10 +358,12 @@ await supabaseClient
 | `09_job_position_multi_app_permissions.sql` | ✅ Applied | Izin multi-app per jabatan |
 | `10_employee_lifecycle_transactions.sql` | ✅ Applied | Tabel transaksi kepegawaian |
 | `11_fix_personal_details_sync.sql` | ✅ Applied | Fix skema personal_details + backfill APPROVED |
-| `12_add_applied_status.sql` | ⏳ PLANNED | Tambah applied_at + status APPLIED |
+| `12_ensure_personal_details_schema.sql` | ⏳ SIAP DIJALANKAN | Pastikan kolom personal details lengkap, disable RLS, reload cache, & backfill orphan |
+| `13_add_applied_status.sql` | ⏳ PLANNED | Tambah applied_at + status APPLIED |
 
 ---
 
-*Last updated: 2026-09-20 11:34 WIB — Claude Sonnet*
+*Last updated: 2026-09-21 10:55 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `feature/fac-workflow` (development) → `main` (production)*
+

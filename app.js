@@ -19988,14 +19988,18 @@ async function handleSaveCandidate(event) {
       newEmpId = createdEmp.id;
 
       // 2. Simpan data pribadi sipil ke hr_employee_personal_details
-      const personalPayload = {
+      // STRATEGI 3-TAHAP:
+      // Tahap 1: Full payload (semua kolom terdedikasi + JSONB)
+      // Tahap 2: Standard payload + personal_details JSONB (kolom base + snapshot JSONB)
+      // Tahap 3: Bare base payload (hanya kolom fisik migration 05)
+      const personalPayloadFull = {
         employee_id: newEmpId,
         name: nama,
         email: email,
         ktp_number: nik,
         phone: phone || null,
         pob: pob || null,
-        dob: dob,
+        dob: dob || null,
         gender: gender,
         marital_status: marital,
         spouse_name: spouse || null,
@@ -20011,26 +20015,99 @@ async function handleSaveCandidate(event) {
         updated_at: now
       };
 
+      const personalPayloadWithJsonb = {
+        employee_id: newEmpId,
+        ktp_number: nik,
+        phone: phone || null,
+        pob: pob || null,
+        dob: dob || null,
+        gender: gender,
+        marital_status: marital,
+        number_of_dependents: childrenCount,
+        address_ktp: alamatKtp || null,
+        address_domicile: alamatDom || null,
+        emergency_contact_name: emergName || null,
+        emergency_contact_relation: emergRel || null,
+        emergency_contact_phone: emergPhone || null,
+        personal_details: personalDetailsJsonb,
+        updated_at: now
+      };
+
+      const personalPayloadBase = {
+        employee_id: newEmpId,
+        ktp_number: nik,
+        phone: phone || null,
+        pob: pob || null,
+        dob: dob || null,
+        gender: gender,
+        marital_status: marital,
+        number_of_dependents: childrenCount,
+        address_ktp: alamatKtp || null,
+        address_domicile: alamatDom || null,
+        emergency_contact_name: emergName || null,
+        emergency_contact_relation: emergRel || null,
+        emergency_contact_phone: emergPhone || null,
+        updated_at: now
+      };
+
+      let personalDetailsSaved = false;
+
+      // Tahap 1: Coba full payload
       const { error: pdErr } = await supabaseClient
         .from("hr_employee_personal_details")
-        .upsert([personalPayload], { onConflict: "employee_id" });
+        .upsert([personalPayloadFull], { onConflict: "employee_id" });
 
-      if (pdErr) {
-        console.error("[handleSaveCandidate] hr_employee_personal_details upsert error:", pdErr);
+      if (!pdErr) {
+        personalDetailsSaved = true;
+        console.log("[handleSaveCandidate] Full payload berhasil disimpan. employee_id:", newEmpId);
+      } else {
+        console.warn("[handleSaveCandidate] Full payload gagal (" + (pdErr.message || pdErr.code) + "). Mencoba Tahap 2 (Base + JSONB)...");
+        
+        // Tahap 2: Coba Base + JSONB
+        const { error: pdErrJsonb } = await supabaseClient
+          .from("hr_employee_personal_details")
+          .upsert([personalPayloadWithJsonb], { onConflict: "employee_id" });
+
+        if (!pdErrJsonb) {
+          personalDetailsSaved = true;
+          console.log("[handleSaveCandidate] Tahap 2 (Base + JSONB) berhasil disimpan. employee_id:", newEmpId);
+        } else {
+          console.warn("[handleSaveCandidate] Tahap 2 gagal (" + (pdErrJsonb.message || pdErrJsonb.code) + "). Mencoba Tahap 3 (Bare Base)...");
+
+          // Tahap 3: Coba Bare Base
+          const { error: pdErrBase } = await supabaseClient
+            .from("hr_employee_personal_details")
+            .upsert([personalPayloadBase], { onConflict: "employee_id" });
+
+          if (!pdErrBase) {
+            personalDetailsSaved = true;
+            console.log("[handleSaveCandidate] Tahap 3 (Bare Base) berhasil disimpan. employee_id:", newEmpId);
+          } else {
+            console.error("[handleSaveCandidate] Semua tahapan penyimpanan personal details gagal:", pdErrBase);
+          }
+        }
       }
-    }
 
-    closeCandidateInputModal();
-    showToast(`Data calon karyawan "${nama}" berhasil disimpan! NIP resmi akan dibuat saat Penerimaan Karyawan diajukan.`, "success", 3000);
+      closeCandidateInputModal();
+
+      if (personalDetailsSaved) {
+        showToast(`Data calon karyawan "${nama}" berhasil disimpan! NIP resmi akan dibuat saat Penerimaan Karyawan diajukan.`, "success", 4000);
+      } else {
+        showToast(`Data akun calon "${nama}" tersimpan di sistem, namun data biodata detail perlu diperbarui. Jalankan migrasi 12 di Supabase untuk sinkronisasi penuh.`, "warning", 6000);
+      }
+    } else {
+      closeCandidateInputModal();
+      showToast(`Data calon karyawan "${nama}" berhasil disimpan (mode offline).`, "info", 3000);
+    }
 
     if (typeof loadPersonaliaEmployees === "function") {
       await loadPersonaliaEmployees();
     }
   } catch (err) {
     console.error("[handleSaveCandidate] Error:", err);
-    // Tampilkan pesan user-friendly (tanpa detail teknis di production)
-    const userMsg = err.message.includes("Silakan") || err.message.includes("Gagal menyimpan data")
-      ? err.message
+    const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const userMsg = isDev
+      ? `[Dev Error] ${err.message || err}`
       : "Gagal menyimpan data calon karyawan. Silakan coba lagi atau hubungi Administrator.";
     alert(userMsg);
   } finally {
