@@ -18699,30 +18699,32 @@ async function loadDossierPersonalDetails(emp) {
   // NIK & Identitas Pokok
   const nikVal = detail?.ktp_number || detail?.nik || jsonb.nik_ktp || emp.nik_ktp || "-";
   const elNik = document.getElementById("dossier-nik-val");
-  if (elNik) elNik.innerText = nikVal;
+  if (elNik) elNik.value = nikVal;
 
   const elPribadiNama = document.getElementById("dossier-pribadi-nama-val");
-  if (elPribadiNama) elPribadiNama.innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
+  if (elPribadiNama) elPribadiNama.value = emp.nama_lengkap || emp.nama || emp.name || "-";
 
   const pob = detail?.pob || detail?.tempat_lahir || jsonb.tempat_lahir || "-";
   const dob = detail?.dob || detail?.tanggal_lahir || emp.dob || "-";
-  const elTtl = document.getElementById("dossier-ttl-val");
-  if (elTtl) elTtl.innerText = (pob !== "-" || dob !== "-") ? `${pob}, ${dob}` : "-";
+  const elPob = document.getElementById("dossier-pob-val");
+  const elDob = document.getElementById("dossier-dob-val");
+  if (elPob) elPob.value = pob;
+  if (elDob) elDob.value = dob;
 
   const elGender = document.getElementById("dossier-gender-val");
-  if (elGender) elGender.innerText = detail?.gender || detail?.jenis_kelamin || emp.gender || "-";
+  if (elGender) elGender.value = detail?.gender || detail?.jenis_kelamin || emp.gender || "-";
 
   const elMarital = document.getElementById("dossier-marital-val");
-  if (elMarital) elMarital.innerText = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "-";
+  if (elMarital) elMarital.value = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "-";
 
   // Pasangan & Anak
   const spouse = jsonb.spouse_name || detail?.spouse_name || "-";
   const elSpouse = document.getElementById("dossier-spouse-val");
-  if (elSpouse) elSpouse.innerText = spouse;
+  if (elSpouse) elSpouse.value = spouse;
 
   const childrenCount = jsonb.children_count ?? (Array.isArray(jsonb.children) ? jsonb.children.length : (detail?.number_of_dependents || 0));
   const elChildrenCount = document.getElementById("dossier-children-count-val");
-  if (elChildrenCount) elChildrenCount.innerText = `${childrenCount} Anak`;
+  if (elChildrenCount) elChildrenCount.value = childrenCount;
 
   const childrenContainer = document.getElementById("dossier-children-list-container");
   if (childrenContainer) {
@@ -18741,31 +18743,27 @@ async function loadDossierPersonalDetails(emp) {
   // Kontak & Alamat
   const phone = detail?.phone || jsonb.no_hp || emp.phone || "-";
   const elPhone = document.getElementById("dossier-phone-val");
-  if (elPhone) elPhone.innerText = phone;
+  if (elPhone) elPhone.value = phone;
 
   const wa = jsonb.no_wa || detail?.phone || emp.phone || "-";
   const elWa = document.getElementById("dossier-wa-val");
-  if (elWa) elWa.innerText = wa;
+  if (elWa) elWa.value = wa;
 
   const alamatKtp = detail?.address_ktp || detail?.alamat_ktp || jsonb.alamat_ktp || "-";
   const elAlamatKtp = document.getElementById("dossier-alamatktp-val");
-  if (elAlamatKtp) elAlamatKtp.innerText = alamatKtp;
+  if (elAlamatKtp) elAlamatKtp.value = alamatKtp;
 
   const alamatDom = detail?.address_domicile || detail?.alamat_domisili || jsonb.alamat_domisili || alamatKtp;
   const elAlamatDom = document.getElementById("dossier-alamatdom-val");
-  if (elAlamatDom) elAlamatDom.innerText = alamatDom;
+  if (elAlamatDom) elAlamatDom.value = alamatDom;
 
   // Geotagging Koordinat Manual — fallback ke key langsung di JSONB (lat/lng)
   const geoLat = jsonb.geo_domisili?.latitude || jsonb.geo_domisili?.lat || jsonb.latitude || jsonb.lat || "";
   const geoLng = jsonb.geo_domisili?.longitude || jsonb.geo_domisili?.lng || jsonb.longitude || jsonb.lng || "";
-  const elGeotag = document.getElementById("dossier-geotag-val");
-  if (elGeotag) {
-    if (geoLat && geoLng) {
-      elGeotag.innerHTML = `<a href="https://maps.google.com/?q=${geoLat},${geoLng}" target="_blank" class="text-indigo-600 hover:underline"><i class="fa-solid fa-location-dot mr-1 text-rose-500"></i>${geoLat}, ${geoLng}</a>`;
-    } else {
-      elGeotag.innerText = "Koordinat belum diset";
-    }
-  }
+  const elLat = document.getElementById("dossier-lat-val");
+  const elLng = document.getElementById("dossier-lng-val");
+  if (elLat) elLat.value = geoLat || "-";
+  if (elLng) elLng.value = geoLng || "-";
 
   // Kontak Darurat
   const emergName = jsonb.kontak_darurat?.nama || detail?.emergency_contact_name || "-";
@@ -18774,20 +18772,20 @@ async function loadDossierPersonalDetails(emp) {
   const elEmergName = document.getElementById("dossier-emergency-name-val");
   const elEmergRel = document.getElementById("dossier-emergency-rel-val");
   const elEmergPhone = document.getElementById("dossier-emergency-phone-val");
-  if (elEmergName) elEmergName.innerText = emergName;
-  if (elEmergRel) elEmergRel.innerText = emergRel;
-  if (elEmergPhone) elEmergPhone.innerText = emergPhone;
+  if (elEmergName) elEmergName.value = emergName;
+  if (elEmergRel) elEmergRel.value = emergRel;
+  if (elEmergPhone) elEmergPhone.value = emergPhone;
 
   // Pendidikan & Email — support key education_level/education_major (dari JSONB aktual)
   const edu = jsonb.education_level || jsonb.pendidikan_terakhir || detail?.education || "-";
   const major = jsonb.education_major || jsonb.jurusan || detail?.major || "-";
   const elEdu = document.getElementById("dossier-education-val");
   const elMajor = document.getElementById("dossier-major-val");
-  if (elEdu) elEdu.innerText = edu;
-  if (elMajor) elMajor.innerText = major;
+  if (elEdu) elEdu.value = edu;
+  if (elMajor) elMajor.value = major;
 
   const elEmail = document.getElementById("dossier-email-val");
-  if (elEmail) elEmail.innerText = emp.email || "-";
+  if (elEmail) elEmail.value = emp.email || "-";
 }
 
 // TAB 2: KEPEGAWAIAN (STATUS AKTIF TERKINI)

@@ -627,138 +627,135 @@
       <!-- Content Dossier -->
       <div class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
         <!-- TAB CONTENT 1: DATA PRIBADI SIPIL MURNI -->
-        <div id="dossier-content-personal" class="space-y-0 text-xs">
+        <div id="dossier-content-personal" class="space-y-3.5 text-xs">
 
           <!-- SEKSI 1: IDENTITAS KEPENDUDUKAN -->
-          <div class="border-l-4 border-indigo-500 pl-3 py-2.5 mb-0">
-            <span class="text-[9px] font-extrabold text-indigo-600 uppercase tracking-widest">Identitas Kependudukan</span>
-          </div>
-          <div class="pl-3 divide-y divide-slate-100">
-            <!-- NIK & Nama — 2 kolom inline -->
-            <div class="grid grid-cols-2 gap-x-4 py-1.5">
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[90px]">NIK KTP</span>
-                <span id="dossier-nik-val" class="font-bold font-mono text-slate-900 truncate">-</span>
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Identitas Kependudukan</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap:</label>
+                <input type="text" id="dossier-pribadi-nama-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 cursor-not-allowed" />
               </div>
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[72px]">Nama (Sipil)</span>
-                <span id="dossier-pribadi-nama-val" class="font-bold text-slate-900 truncate">-</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">NIK KTP:</label>
+                <input type="text" id="dossier-nik-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-slate-900 cursor-not-allowed" />
               </div>
             </div>
-            <!-- TTL & Gender — 2 kolom inline -->
-            <div class="grid grid-cols-2 gap-x-4 py-1.5">
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[90px]">Tempat/Tgl Lahir</span>
-                <span id="dossier-ttl-val" class="font-semibold text-slate-800 truncate">-</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Tempat Lahir:</label>
+                <input type="text" id="dossier-pob-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 text-slate-900 cursor-not-allowed" />
               </div>
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[72px]">Jenis Kelamin</span>
-                <span id="dossier-gender-val" class="font-semibold text-slate-800">-</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir:</label>
+                <input type="text" id="dossier-dob-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 cursor-not-allowed" />
               </div>
             </div>
-            <!-- Status & Pasangan — 2 kolom inline -->
-            <div class="grid grid-cols-2 gap-x-4 py-1.5">
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[90px]">Status Nikah</span>
-                <span id="dossier-marital-val" class="font-semibold text-slate-800">-</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin:</label>
+                <input type="text" id="dossier-gender-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 cursor-not-allowed" />
               </div>
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[72px]">Nama Pasangan</span>
-                <span id="dossier-spouse-val" class="font-semibold text-slate-800 truncate">-</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Status Pernikahan:</label>
+                <input type="text" id="dossier-marital-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 cursor-not-allowed" />
               </div>
             </div>
           </div>
 
-          <!-- SEKSI 2: TANGGUNGAN ANAK -->
-          <div class="border-l-4 border-violet-500 pl-3 py-2.5 mt-3">
-            <div class="flex items-center gap-2">
-              <span class="text-[9px] font-extrabold text-violet-600 uppercase tracking-widest">Tanggungan</span>
-              <span id="dossier-children-count-val" class="text-[9px] font-bold px-1.5 py-0.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-full">0 Anak</span>
+          <!-- SEKSI 2: DATA KELUARGA & ANAK -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Data Keluarga & Anak</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Nama Istri / Suami (Pasangan):</label>
+                <input type="text" id="dossier-spouse-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 text-slate-900 cursor-not-allowed" />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Jumlah Anak:</label>
+                <input type="text" id="dossier-children-count-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900 cursor-not-allowed" />
+              </div>
             </div>
-          </div>
-          <div class="pl-3 pb-2">
-            <div id="dossier-children-list-container" class="flex flex-wrap gap-1.5 pt-0.5">
-              <span class="text-slate-400 italic text-[11px]">- Tidak ada data anak terdaftar -</span>
+            <div>
+              <label class="font-semibold text-slate-700 text-xs block mb-1">Daftar Nama Anak:</label>
+              <div id="dossier-children-list-container" class="p-2.5 bg-white border border-slate-200 rounded-xl min-h-[40px]">
+                <span class="text-slate-400 italic text-[11px]">- Tidak ada data anak terdaftar -</span>
+              </div>
             </div>
           </div>
 
-          <!-- SEKSI 3: KONTAK & DOMISILI -->
-          <div class="border-l-4 border-teal-500 pl-3 py-2.5 mt-3">
-            <span class="text-[9px] font-extrabold text-teal-600 uppercase tracking-widest">Kontak & Domisili</span>
-          </div>
-          <div class="pl-3 divide-y divide-slate-100">
-            <!-- HP & WA inline -->
-            <div class="grid grid-cols-2 gap-x-4 py-1.5">
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[90px]">No. HP</span>
-                <span id="dossier-phone-val" class="font-bold text-slate-900 font-mono">-</span>
-              </div>
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[72px]">No. WhatsApp</span>
-                <span id="dossier-wa-val" class="font-bold text-slate-900 font-mono">-</span>
-              </div>
+          <!-- SEKSI 3: ALAMAT & GEOTAGGING DOMISILI -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Alamat & Geotagging Domisili</span>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Alamat Sesuai KTP:</label>
+              <textarea id="dossier-alamatktp-val" rows="2" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 text-slate-900 cursor-not-allowed resize-none"></textarea>
             </div>
-            <!-- Alamat KTP -->
-            <div class="py-1.5">
-              <div class="flex gap-2">
-                <span class="text-slate-400 shrink-0 w-[90px]">Alamat KTP</span>
-                <p id="dossier-alamatktp-val" class="text-slate-700 font-medium leading-relaxed">-</p>
-              </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Alamat Domisili Saat Ini:</label>
+              <textarea id="dossier-alamatdom-val" rows="2" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 text-slate-900 cursor-not-allowed resize-none"></textarea>
             </div>
-            <!-- Alamat Domisili -->
-            <div class="py-1.5">
-              <div class="flex gap-2">
-                <span class="text-slate-400 shrink-0 w-[90px]">Domisili</span>
-                <p id="dossier-alamatdom-val" class="text-slate-700 font-medium leading-relaxed">-</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Latitude Domisili:</label>
+                <input type="text" id="dossier-lat-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-mono text-slate-900 cursor-not-allowed" />
               </div>
-            </div>
-            <!-- Geotag -->
-            <div class="flex items-center gap-2 py-1.5">
-              <span class="text-slate-400 shrink-0 w-[90px]">Geotagging</span>
-              <span id="dossier-geotag-val" class="font-mono text-indigo-600 font-bold">-</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Longitude Domisili:</label>
+                <input type="text" id="dossier-lng-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-mono text-slate-900 cursor-not-allowed" />
+              </div>
             </div>
           </div>
 
-          <!-- SEKSI 4: KONTAK DARURAT -->
-          <div class="border-l-4 border-rose-500 pl-3 py-2.5 mt-3">
-            <span class="text-[9px] font-extrabold text-rose-600 uppercase tracking-widest">Kontak Darurat</span>
-          </div>
-          <div class="pl-3 divide-y divide-slate-100">
-            <div class="flex items-center justify-between py-1.5">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[90px]">Nama</span>
-                <span id="dossier-emergency-name-val" class="font-bold text-rose-800 truncate">-</span>
+          <!-- SEKSI 4: KONTAK & KONTAK DARURAT -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+              <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Kontak</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Nomor HP:</label>
+                <input type="text" id="dossier-phone-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 cursor-not-allowed" />
               </div>
-              <span id="dossier-emergency-phone-val" class="font-mono font-bold text-rose-700 shrink-0 ml-2">-</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Nomor WhatsApp:</label>
+                <input type="text" id="dossier-wa-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 cursor-not-allowed" />
+              </div>
             </div>
-            <div class="flex items-center gap-2 py-1.5">
-              <span class="text-slate-400 shrink-0 w-[90px]">Hubungan</span>
-              <span id="dossier-emergency-rel-val" class="font-semibold text-slate-700">-</span>
+            <div class="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+              <span class="text-[10px] font-bold text-rose-800 uppercase block"><i class="fa-solid fa-truck-medical mr-1"></i> Kontak Darurat</span>
+              <div>
+                <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">Nama Kontak:</label>
+                <input type="text" id="dossier-emergency-name-val" disabled class="w-full bg-rose-50 border border-rose-200 rounded-xl p-2 text-slate-900 cursor-not-allowed" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">Hubungan:</label>
+                <input type="text" id="dossier-emergency-rel-val" disabled class="w-full bg-rose-50 border border-rose-200 rounded-xl p-2 text-slate-900 cursor-not-allowed" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-rose-700 mb-0.5">No HP Darurat:</label>
+                <input type="text" id="dossier-emergency-phone-val" disabled class="w-full bg-rose-50 border border-rose-200 rounded-xl p-2 font-mono text-slate-900 cursor-not-allowed" />
+              </div>
             </div>
           </div>
 
-          <!-- SEKSI 5: PENDIDIKAN & EMAIL -->
-          <div class="border-l-4 border-amber-500 pl-3 py-2.5 mt-3">
-            <span class="text-[9px] font-extrabold text-amber-600 uppercase tracking-widest">Pendidikan & Akun</span>
-          </div>
-          <div class="pl-3 divide-y divide-slate-100">
-            <div class="grid grid-cols-2 gap-x-4 py-1.5">
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[90px]">Pendidikan</span>
-                <span id="dossier-education-val" class="font-bold text-slate-900">-</span>
+          <!-- SEKSI 5: PENDIDIKAN & EMAIL AKUN -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Pendidikan & Akun</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir:</label>
+                <input type="text" id="dossier-education-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 cursor-not-allowed" />
               </div>
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="text-slate-400 shrink-0 w-[72px]">Jurusan</span>
-                <span id="dossier-major-val" class="font-semibold text-slate-800 truncate">-</span>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Jurusan Pendidikan:</label>
+                <input type="text" id="dossier-major-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 text-slate-900 cursor-not-allowed" />
               </div>
             </div>
-            <div class="flex items-center gap-2 py-1.5">
-              <span class="text-slate-400 shrink-0 w-[90px]">Email Login</span>
-              <span id="dossier-email-val" class="font-bold font-mono text-slate-900">-</span>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Email Akun Login:</label>
+              <input type="text" id="dossier-email-val" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-900 cursor-not-allowed" />
             </div>
           </div>
-          <!-- spacer bawah -->
-          <div class="h-2"></div>
         </div>
 
 
