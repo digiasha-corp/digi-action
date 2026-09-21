@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v155";
+const APP_BUILD_VERSION = "20260919_v156";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -3610,7 +3610,7 @@ async function fetchApprovalList() {
               loadOrgLevels(),
               typeof loadOrgWorkLocations === "function" ? loadOrgWorkLocations() : Promise.resolve()
             ]);
-          } catch (_) {}
+          } catch (_) { }
         }
         if ((!PERSONALIA_EMPLOYEES_DATA || PERSONALIA_EMPLOYEES_DATA.length === 0) && supabaseClient) {
           try {
@@ -3625,7 +3625,7 @@ async function fetchApprovalList() {
                 jabatan: e.job_positions?.nama_jabatan || "Staff"
               }));
             }
-          } catch (_) {}
+          } catch (_) { }
         }
 
         const { data: txList, error: txErr } = await supabaseClient
@@ -18762,8 +18762,22 @@ async function loadDossierPersonalDetails(emp) {
   const geoLng = jsonb.geo_domisili?.longitude || jsonb.geo_domisili?.lng || jsonb.longitude || jsonb.lng || "";
   const elLat = document.getElementById("dossier-lat-val");
   const elLng = document.getElementById("dossier-lng-val");
-  if (elLat) elLat.value = geoLat || "-";
-  if (elLng) elLng.value = geoLng || "-";
+  if (elLat) {
+    elLat.textContent = geoLat || "-";
+    if (geoLat && geoLng) {
+      elLat.href = `https://www.google.com/maps?q=${geoLat},${geoLng}`;
+    } else {
+      elLat.href = "#";
+    }
+  }
+  if (elLng) {
+    elLng.textContent = geoLng || "-";
+    if (geoLat && geoLng) {
+      elLng.href = `https://www.google.com/maps?q=${geoLat},${geoLng}`;
+    } else {
+      elLng.href = "#";
+    }
+  }
 
   // Kontak Darurat
   const emergName = jsonb.kontak_darurat?.nama || detail?.emergency_contact_name || "-";
@@ -18828,13 +18842,13 @@ async function loadDossierJobDetails(emp) {
   );
 
   const isCalon = !hasApprovedHire && (
-    emp.status_kerja === "CALON" || 
+    emp.status_kerja === "CALON" ||
     (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"))
   );
 
   // A. NIP Resmi
-  const finalNip = (emp.nip && !String(emp.nip).startsWith("CAND-")) 
-    ? emp.nip 
+  const finalNip = (emp.nip && !String(emp.nip).startsWith("CAND-"))
+    ? emp.nip
     : (latestTx?.nip && !String(latestTx.nip).startsWith("CAND-") ? latestTx.nip : (emp.nip || "-"));
   const elNip = document.getElementById("dossier-nip-val");
   if (elNip) elNip.innerText = finalNip;
@@ -18939,8 +18953,8 @@ async function loadDossierJobDetails(emp) {
     if (isCalon) {
       elTglResign.innerText = "N/A";
     } else {
-      elTglResign.innerText = emp.deleted_at 
-        ? `Nonaktif sejak ${emp.deleted_at.split('T')[0]}` 
+      elTglResign.innerText = emp.deleted_at
+        ? `Nonaktif sejak ${emp.deleted_at.split('T')[0]}`
         : (emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja"));
     }
   }
@@ -18955,7 +18969,7 @@ async function loadDossierPayrollDetails(emp) {
     )
   );
   const isCalon = !hasApprovedHire && (
-    emp.status_kerja === "CALON" || 
+    emp.status_kerja === "CALON" ||
     (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"))
   );
   let txSalary = null;
@@ -20245,7 +20259,7 @@ async function handleSaveCandidate(event) {
         console.log("[handleSaveCandidate] Full payload berhasil disimpan. employee_id:", newEmpId);
       } else {
         console.warn("[handleSaveCandidate] Full payload gagal (" + (pdErr.message || pdErr.code) + "). Mencoba Tahap 2 (Base + JSONB)...");
-        
+
         // Tahap 2: Coba Base + JSONB
         const { error: pdErrJsonb } = await supabaseClient
           .from("hr_employee_personal_details")
@@ -22089,13 +22103,13 @@ async function openCareerTransactionDetailModal(txId) {
 
   // Pastikan master data organisasi (jabatan, unit, lokasi) sudah terisi agar ID referensi ter-resolve dengan nama aslinya
   if ((!ORG_POSITIONS_DATA || ORG_POSITIONS_DATA.length === 0) && typeof loadOrgPositions === "function") {
-    try { await loadOrgPositions(); } catch (_) {}
+    try { await loadOrgPositions(); } catch (_) { }
   }
   if ((!ORG_UNITS_DATA || ORG_UNITS_DATA.length === 0) && typeof loadOrgUnits === "function") {
-    try { await loadOrgUnits(); } catch (_) {}
+    try { await loadOrgUnits(); } catch (_) { }
   }
   if ((!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) && typeof loadOrgWorkLocations === "function") {
-    try { await loadOrgWorkLocations(); } catch (_) {}
+    try { await loadOrgWorkLocations(); } catch (_) { }
   }
 
   const modal = document.getElementById("modal-career-tx-detail");

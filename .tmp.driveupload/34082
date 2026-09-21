@@ -853,13 +853,13 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block font-semibold text-slate-700 mb-1">Latitude Domisili:</label>
-                <input type="text" id="dossier-lat-val" disabled
-                  class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-mono text-slate-900 cursor-not-allowed" />
+                <a id="dossier-lat-val" href="#" target="_blank" 
+                  class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-mono text-indigo-600 hover:text-indigo-800 hover:border-indigo-400 block cursor-pointer transition decoration-none">-</a>
               </div>
               <div>
                 <label class="block font-semibold text-slate-700 mb-1">Longitude Domisili:</label>
-                <input type="text" id="dossier-lng-val" disabled
-                  class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-mono text-slate-900 cursor-not-allowed" />
+                <a id="dossier-lng-val" href="#" target="_blank" 
+                  class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2 font-mono text-indigo-600 hover:text-indigo-800 hover:border-indigo-400 block cursor-pointer transition decoration-none">-</a>
               </div>
             </div>
           </div>
