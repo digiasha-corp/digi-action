@@ -3660,7 +3660,7 @@ async function fetchApprovalList() {
               // Cari nama karyawan jika tersedia di master
               const empMatch = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(tx.nip) || String(e.id) === String(tx.employee_id));
               const empName = empMatch?.nama_lengkap || empMatch?.nama || tx.nip || "Karyawan";
-              const empCabang = empMatch?.cabang || "Head Office";
+              const empCabang = empMatch?.cabang || "N/A";
 
               careerTxApprovals.push({
                 is_career_transaction: true,
@@ -18410,10 +18410,11 @@ async function openEmployeeDossierModal(nipOrId) {
         .maybeSingle();
 
       if (eRow) {
+        const isCalon = eRow.status_kerja === "CALON" || String(eRow.nip || "").startsWith("CAND-");
         emp = {
           ...eRow,
-          cabang: eRow.organization_units?.nama_unit || eRow.cabang || "Head Office",
-          jabatan: eRow.job_positions?.nama_jabatan || eRow.jabatan || "Staff"
+          cabang: eRow.organization_units?.nama_unit || eRow.cabang || (isCalon ? "N/A" : "N/A"),
+          jabatan: eRow.job_positions?.nama_jabatan || eRow.jabatan || (isCalon ? "Calon Karyawan" : "N/A")
         };
       } else {
         // 2. Fallback cari di m_employee
@@ -18439,21 +18440,35 @@ async function openEmployeeDossierModal(nipOrId) {
 
   // Header Detail Personalia
   try {
+    const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
     const elNama = document.getElementById("dossier-nama");
     if (elNama) elNama.innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
     const elNip = document.getElementById("dossier-nip-badge");
     if (elNip) elNip.innerText = emp.nip || "-";
     const elSub = document.getElementById("dossier-jabatan-sub");
-    if (elSub) elSub.innerText = `${emp.jabatan || 'Staff'} • ${emp.cabang || 'Head Office'}`;
+    if (elSub) {
+      if (isCalon) {
+        elSub.innerText = "Calon Karyawan • Menunggu Penerimaan";
+      } else {
+        const jbt = emp.jabatan || "N/A";
+        const cbg = emp.cabang || emp.work_location_name || "N/A";
+        elSub.innerText = `${jbt} • ${cbg}`;
+      }
+    }
     const elSk = document.getElementById("dossier-status-kerja-badge");
-    if (elSk) elSk.innerText = emp.status_kerja || "PKWTT";
+    if (elSk) elSk.innerText = emp.status_kerja || (isCalon ? "CALON" : "N/A");
     const elAktif = document.getElementById("dossier-status-aktif-badge");
     if (elAktif) {
-      const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
-      elAktif.innerText = isAktif ? "AKTIF" : (emp.status_kerja === "CALON" ? "CALON" : "NONAKTIF");
-      elAktif.className = isAktif
-        ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase"
-        : (emp.status_kerja === "CALON" ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white uppercase" : "text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase");
+      if (isCalon) {
+        elAktif.innerText = "MENUNGGU PROSES";
+        elAktif.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white uppercase";
+      } else {
+        const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
+        elAktif.innerText = isAktif ? "AKTIF" : "NONAKTIF";
+        elAktif.className = isAktif
+          ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase"
+          : "text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase";
+      }
     }
 
     // Avatar
@@ -18669,10 +18684,10 @@ async function loadDossierPersonalDetails(emp) {
   if (elTtl) elTtl.innerText = (pob !== "-" || dob !== "-") ? `${pob}, ${dob}` : "-";
 
   const elGender = document.getElementById("dossier-gender-val");
-  if (elGender) elGender.innerText = detail?.gender || detail?.jenis_kelamin || emp.gender || "Laki-laki";
+  if (elGender) elGender.innerText = detail?.gender || detail?.jenis_kelamin || emp.gender || "-";
 
   const elMarital = document.getElementById("dossier-marital-val");
-  if (elMarital) elMarital.innerText = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "Belum Kawin";
+  if (elMarital) elMarital.innerText = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "-";
 
   // Pasangan & Anak
   const spouse = jsonb.spouse_name || detail?.spouse_name || "-";
@@ -18751,39 +18766,51 @@ async function loadDossierPersonalDetails(emp) {
 
 // TAB 2: KEPEGAWAIAN (STATUS AKTIF TERKINI)
 function loadDossierJobDetails(emp) {
+  const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+
   const elNip = document.getElementById("dossier-nip-val");
   if (elNip) elNip.innerText = emp.nip || "-";
 
   const elStatusKerja = document.getElementById("dossier-statuskerja-val");
-  if (elStatusKerja) elStatusKerja.innerText = emp.status_kerja || "PKWTT";
+  if (elStatusKerja) elStatusKerja.innerText = emp.status_kerja || (isCalon ? "CALON" : "N/A");
 
   const elLoc = document.getElementById("dossier-penempatan-val");
-  if (elLoc) elLoc.innerText = emp.work_location_name || emp.area_cover || "Head Office";
+  if (elLoc) elLoc.innerText = emp.work_location_name || emp.area_cover || (isCalon ? "N/A" : (emp.location_id || "N/A"));
 
   const elUnit = document.getElementById("dossier-unit-val");
-  if (elUnit) elUnit.innerText = emp.cabang || emp.unit_name || "Head Office";
+  if (elUnit) elUnit.innerText = emp.cabang || emp.unit_name || (isCalon ? "N/A" : (emp.location_id || "N/A"));
 
   const elJabatan = document.getElementById("dossier-jabatan-val");
-  if (elJabatan) elJabatan.innerText = emp.jabatan || "Staff";
+  if (elJabatan) elJabatan.innerText = emp.jabatan || (isCalon ? "Calon Karyawan" : (emp.position_id || "N/A"));
 
   const elLevel = document.getElementById("dossier-level-val");
-  if (elLevel) elLevel.innerText = emp.level_name || emp.role_id || "Staff";
+  if (elLevel) elLevel.innerText = emp.level_name || (isCalon ? "N/A" : (emp.role_id || "N/A"));
 
   const elAtasan = document.getElementById("dossier-atasan-val");
-  if (elAtasan) elAtasan.innerText = emp.atasan_nama ? `${emp.atasan_nama} (${emp.atasan_nip || ''})` : "Pimpinan Tertinggi / Tanpa Atasan Langsung";
+  if (elAtasan) {
+    if (emp.atasan_nama) {
+      elAtasan.innerText = `${emp.atasan_nama} (${emp.atasan_nip || ''})`.trim();
+    } else if (isCalon) {
+      elAtasan.innerText = "N/A";
+    } else {
+      elAtasan.innerText = "N/A";
+    }
+  }
 
   const elTglGabung = document.getElementById("dossier-tglgabung-val");
-  if (elTglGabung) elTglGabung.innerText = emp.tanggal_masuk || emp.join_date || "-";
+  if (elTglGabung) elTglGabung.innerText = emp.tanggal_masuk || emp.join_date || (isCalon ? "N/A" : "-");
 
   const elNoKontrak = document.getElementById("dossier-nokontrak-val");
-  if (elNoKontrak) elNoKontrak.innerText = emp.contract_no || emp.no_sk || "-";
+  if (elNoKontrak) elNoKontrak.innerText = emp.contract_no || emp.no_sk || (isCalon ? "N/A" : "-");
 
   const elTglKontrak = document.getElementById("dossier-tglkontrak-val");
-  if (elTglKontrak) elTglKontrak.innerText = emp.contract_start_date || emp.tanggal_masuk || "-";
+  if (elTglKontrak) elTglKontrak.innerText = emp.contract_start_date || emp.tanggal_masuk || (isCalon ? "N/A" : "-");
 
   const elTglSelesai = document.getElementById("dossier-tglselesaikontrak-val");
   if (elTglSelesai) {
-    if (emp.status_kerja === "PKWTT") {
+    if (isCalon) {
+      elTglSelesai.innerText = "N/A";
+    } else if (emp.status_kerja === "PKWTT") {
       const dob = emp.dob || CURRENT_DOSSIER_PERSONAL?.dob || CURRENT_DOSSIER_PERSONAL?.tanggal_lahir;
       if (dob) {
         const d = new Date(dob);
@@ -18792,18 +18819,23 @@ function loadDossierJobDetails(emp) {
         elTglSelesai.innerText = "Ulang Tahun ke-50 (PKWTT Permanen)";
       }
     } else {
-      elTglSelesai.innerText = emp.contract_end_date || "-";
+      elTglSelesai.innerText = emp.contract_end_date || emp.tanggal_selesai_kontrak || "N/A";
     }
   }
 
   const elTglResign = document.getElementById("dossier-tglresign-val");
   if (elTglResign) {
-    elTglResign.innerText = emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja");
+    if (isCalon) {
+      elTglResign.innerText = "N/A";
+    } else {
+      elTglResign.innerText = emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja");
+    }
   }
 }
 
 // TAB 3: RINCIAN PAYROLL (GAJI POKOK + 6 TUNJANGAN)
 async function loadDossierPayrollDetails(emp) {
+  const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
   let txSalary = null;
   let empId = emp.id;
 
@@ -18853,51 +18885,63 @@ async function loadDossierPayrollDetails(emp) {
   const totalAllowances = allowJabatan + allowTransport + allowKomunikasi + allowTempatTinggal + allowPenempatan + allowKemahalan;
 
   const elGaji = document.getElementById("dossier-gajipokok-val");
-  if (elGaji) elGaji.innerText = basicSalary > 0 ? `Rp ${basicSalary.toLocaleString('id-ID')}` : "Rp 0 (Belum Diset)";
+  if (elGaji) elGaji.innerText = basicSalary > 0 ? `Rp ${basicSalary.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0 (Belum Diset)");
 
   const elTotAllow = document.getElementById("dossier-total-tunjangan-val");
-  if (elTotAllow) elTotAllow.innerText = `Rp ${totalAllowances.toLocaleString('id-ID')}`;
+  if (elTotAllow) elTotAllow.innerText = totalAllowances > 0 ? `Rp ${totalAllowances.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   const elTunjJabatan = document.getElementById("dossier-tunj-jabatan-val");
-  if (elTunjJabatan) elTunjJabatan.innerText = `Rp ${allowJabatan.toLocaleString('id-ID')}`;
+  if (elTunjJabatan) elTunjJabatan.innerText = allowJabatan > 0 ? `Rp ${allowJabatan.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   const elTunjTransport = document.getElementById("dossier-tunj-transport-val");
-  if (elTunjTransport) elTunjTransport.innerText = `Rp ${allowTransport.toLocaleString('id-ID')}`;
+  if (elTunjTransport) elTunjTransport.innerText = allowTransport > 0 ? `Rp ${allowTransport.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   const elTunjKomunikasi = document.getElementById("dossier-tunj-komunikasi-val");
-  if (elTunjKomunikasi) elTunjKomunikasi.innerText = `Rp ${allowKomunikasi.toLocaleString('id-ID')}`;
+  if (elTunjKomunikasi) elTunjKomunikasi.innerText = allowKomunikasi > 0 ? `Rp ${allowKomunikasi.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   const elTunjTempatTinggal = document.getElementById("dossier-tunj-tempattinggal-val");
-  if (elTunjTempatTinggal) elTunjTempatTinggal.innerText = `Rp ${allowTempatTinggal.toLocaleString('id-ID')}`;
+  if (elTunjTempatTinggal) elTunjTempatTinggal.innerText = allowTempatTinggal > 0 ? `Rp ${allowTempatTinggal.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   const elTunjPenempatan = document.getElementById("dossier-tunj-penempatan-val");
-  if (elTunjPenempatan) elTunjPenempatan.innerText = `Rp ${allowPenempatan.toLocaleString('id-ID')}`;
+  if (elTunjPenempatan) elTunjPenempatan.innerText = allowPenempatan > 0 ? `Rp ${allowPenempatan.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   const elTunjKemahalan = document.getElementById("dossier-tunj-kemahalan-val");
-  if (elTunjKemahalan) elTunjKemahalan.innerText = `Rp ${allowKemahalan.toLocaleString('id-ID')}`;
+  if (elTunjKemahalan) elTunjKemahalan.innerText = allowKemahalan > 0 ? `Rp ${allowKemahalan.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   // Bank, BPJS & Pajak
   const elBank = document.getElementById("dossier-bank-val");
-  if (elBank) elBank.innerText = txSalary?.bank_name || emp.bank_name || "BCA";
+  if (elBank) elBank.innerText = txSalary?.bank_name || emp.bank_name || "N/A";
 
   const elRek = document.getElementById("dossier-rekening-val");
   if (elRek) {
-    const noRek = txSalary?.bank_account_no || emp.bank_account_no || "-";
+    const noRek = txSalary?.bank_account_no || emp.bank_account_no;
     const an = txSalary?.bank_account_holder || emp.nama_lengkap || emp.nama || "";
-    elRek.innerText = `${noRek} ${an ? `(a/n ${an})` : ''}`.trim();
+    elRek.innerText = noRek ? `${noRek} ${an ? `(a/n ${an})` : ''}`.trim() : "N/A";
   }
 
   const elBpjsKes = document.getElementById("dossier-bpjskes-val");
-  if (elBpjsKes) elBpjsKes.innerText = `Kes: ${txSalary?.bpjs_kesehatan_number || emp.bpjs_kesehatan_number || '-'}`;
+  if (elBpjsKes) {
+    const v = txSalary?.bpjs_kesehatan_number || emp.bpjs_kesehatan_number;
+    elBpjsKes.innerText = v ? `Kes: ${v}` : "Kes: N/A";
+  }
 
   const elBpjsTk = document.getElementById("dossier-bpjstk-val");
-  if (elBpjsTk) elBpjsTk.innerText = `TK: ${txSalary?.bpjs_ketenagakerjaan_number || emp.bpjs_ketenagakerjaan_number || '-'}`;
+  if (elBpjsTk) {
+    const v = txSalary?.bpjs_ketenagakerjaan_number || emp.bpjs_ketenagakerjaan_number;
+    elBpjsTk.innerText = v ? `TK: ${v}` : "TK: N/A";
+  }
 
   const elNpwp = document.getElementById("dossier-npwp-val");
-  if (elNpwp) elNpwp.innerText = `NPWP: ${txSalary?.npwp_number || emp.npwp_number || '-'}`;
+  if (elNpwp) {
+    const v = txSalary?.npwp_number || emp.npwp_number;
+    elNpwp.innerText = v ? `NPWP: ${v}` : "NPWP: N/A";
+  }
 
   const elPtkp = document.getElementById("dossier-ptkp-val");
-  if (elPtkp) elPtkp.innerText = `PTKP: ${txSalary?.tax_status || emp.tax_status || 'TK/0'}`;
+  if (elPtkp) {
+    const v = txSalary?.tax_status || emp.tax_status;
+    elPtkp.innerText = v ? `PTKP: ${v}` : "PTKP: N/A";
+  }
 }
 
 // TAB 4: HISTORY TRANSAKSI KARYAWAN
@@ -18905,6 +18949,7 @@ async function loadDossierTransactionsHistory(emp) {
   const container = document.getElementById("dossier-tx-history-container");
   if (!container) return;
 
+  const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
   let transactions = [];
   let empId = emp.id;
 
@@ -18932,6 +18977,15 @@ async function loadDossierTransactionsHistory(emp) {
   CURRENT_DOSSIER_TX_LIST = transactions;
 
   if (transactions.length === 0) {
+    if (isCalon) {
+      container.innerHTML = `
+        <div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
+          <i class="fa-solid fa-clock-rotate-left text-2xl text-slate-300 mb-2 block"></i>
+          Belum ada riwayat transaksi kepegawaian. Saat ini masih berstatus Calon Karyawan.
+        </div>
+      `;
+      return;
+    }
     container.innerHTML = `
       <div class="relative pb-3">
         <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white shadow"></div>
@@ -18941,7 +18995,7 @@ async function loadDossierTransactionsHistory(emp) {
             <span class="text-[10px] text-slate-400 font-mono">${emp.tanggal_masuk || 'Awal Bergabung'}</span>
           </div>
           <h6 class="font-bold text-xs text-slate-800 mt-1">Pengangkatan Awal Karyawan</h6>
-          <p class="text-[10px] text-slate-500 mt-0.5">Penempatan: ${emp.cabang || 'Head Office'} • Posisi: ${emp.jabatan || 'Staff'}</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">Penempatan: ${emp.cabang || 'N/A'} • Posisi: ${emp.jabatan || 'N/A'}</p>
         </div>
       </div>
     `;
@@ -19570,13 +19624,16 @@ async function loadPersonaliaEmployees() {
         .order("nip");
 
       if (!empErr && empData && empData.length > 0) {
-        PERSONALIA_EMPLOYEES_DATA = empData.map(e => ({
-          ...e,
-          nama_lengkap: e.name || e.nama_lengkap || e.nip,
-          cabang: e.organization_units?.nama_unit || e.cabang || "Head Office",
-          jabatan: e.job_positions?.nama_jabatan || e.jabatan || "Staff",
-          status_aktif: !e.deleted_at ? "AKTIF" : "NONAKTIF"
-        }));
+        PERSONALIA_EMPLOYEES_DATA = empData.map(e => {
+          const isCalon = e.status_kerja === "CALON" || String(e.nip || "").startsWith("CAND-");
+          return {
+            ...e,
+            nama_lengkap: e.name || e.nama_lengkap || e.nip,
+            cabang: e.organization_units?.nama_unit || e.cabang || (isCalon ? "N/A" : "N/A"),
+            jabatan: e.job_positions?.nama_jabatan || e.jabatan || (isCalon ? "Calon Karyawan" : "N/A"),
+            status_aktif: isCalon ? "CALON" : (!e.deleted_at ? "AKTIF" : "NONAKTIF")
+          };
+        });
         populatePersonaliaFilters(PERSONALIA_EMPLOYEES_DATA);
         updatePersonaliaStats(PERSONALIA_EMPLOYEES_DATA);
         renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
@@ -19680,6 +19737,7 @@ function renderPersonaliaEmployees(list) {
   }
 
   container.innerHTML = list.map(emp => {
+    const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
     const rId = String(emp.role_id || emp.role || "R-04").trim();
     let roleObj = ROLE_PERMISSIONS_STATE[rId];
     if (!roleObj) {
@@ -19688,10 +19746,10 @@ function renderPersonaliaEmployees(list) {
     const rBadge = roleObj?.badgeBg || "bg-slate-100 text-slate-700 border-slate-200";
     const rName = roleObj?.name || rId;
     const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
-    const statusKerja = emp.status_kerja || "PKWTT";
-    const skColor = statusKerja === "PKWTT"
-      ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-      : "bg-amber-50 text-amber-700 border-amber-200";
+    const statusKerja = emp.status_kerja || (isCalon ? "CALON" : "PKWTT");
+    const skColor = isCalon
+      ? "bg-amber-100 text-amber-800 border-amber-300"
+      : (statusKerja === "PKWTT" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-amber-50 text-amber-700 border-amber-200");
 
     const avatarHtml = (emp.foto_profile_url || emp.foto)
       ? `<img src="${emp.foto_profile_url || emp.foto}" class="w-full h-full object-cover" />`
@@ -19708,16 +19766,18 @@ function renderPersonaliaEmployees(list) {
             <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
               <span class="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${emp.nip}</span>
               <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${skColor} uppercase">${statusKerja}</span>
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${rBadge} uppercase">${rName}</span>
-              ${isAktif
-        ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">AKTIF</span>'
-        : '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 uppercase">NONAKTIF</span>'}
+              ${!isCalon ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${rBadge} uppercase">${rName}</span>` : ''}
+              ${isCalon
+        ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase">BELUM DIAKTIFKAN</span>'
+        : (isAktif
+          ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">AKTIF</span>'
+          : '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 uppercase">NONAKTIF</span>')}
             </div>
             <h4 class="font-bold text-sm text-slate-900 mt-1 truncate">${emp.nama_lengkap || emp.nama || "-"}</h4>
             <div class="text-[11px] text-slate-500 mt-0.5 flex items-center space-x-2 flex-wrap">
-              <span class="font-semibold text-indigo-950">${emp.jabatan || "Staff"}</span>
+              <span class="font-semibold text-indigo-950">${emp.jabatan || (isCalon ? "Calon Karyawan" : "N/A")}</span>
               <span>•</span>
-              <span>Unit: <strong class="text-slate-700">${emp.cabang || "Head Office"}</strong></span>
+              <span>Unit: <strong class="text-slate-700">${emp.cabang || "N/A"}</strong></span>
               ${emp.area_cover ? `<span>•</span><span>Area: <strong class="text-indigo-900">${emp.area_cover}</strong></span>` : ''}
               ${emp.atasan_nama ? `<span>•</span><span>Atasan: <strong class="text-slate-600">${emp.atasan_nama}</strong></span>` : ''}
             </div>
@@ -19800,6 +19860,7 @@ function renderVisualOrgChartTree() {
   const roots = list.filter(e => !e.atasan_nip || e.atasan_nip === e.nip || !list.some(p => p.nip === e.atasan_nip));
 
   function renderOrgNode(emp) {
+    const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
     const subordinates = list.filter(e => e.atasan_nip === emp.nip && e.nip !== emp.nip);
     const hasSubs = subordinates.length > 0;
     const avatarHtml = (emp.foto_profile_url || emp.foto)
@@ -19813,11 +19874,11 @@ function renderVisualOrgChartTree() {
             ${avatarHtml}
           </div>
           <span class="font-bold text-slate-900 block truncate group-hover:text-indigo-700 transition" title="${emp.nama_lengkap || emp.nama}">${emp.nama_lengkap || emp.nama}</span>
-          <span class="font-semibold text-indigo-600 block text-[10px] truncate">${emp.jabatan || 'Staff'}</span>
+          <span class="font-semibold text-indigo-600 block text-[10px] truncate">${emp.jabatan || (isCalon ? 'Calon Karyawan' : 'N/A')}</span>
           <div class="flex items-center justify-center space-x-1 text-[9px] text-slate-400">
             <span class="font-mono bg-slate-100 px-1.5 py-0.2 rounded">${emp.nip}</span>
             <span>•</span>
-            <span class="truncate">${emp.cabang || 'HO'}</span>
+            <span class="truncate">${emp.cabang || 'N/A'}</span>
           </div>
         </div>
         ${hasSubs ? `
@@ -20177,7 +20238,8 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
     list.forEach(emp => {
       const isCalon = emp.status_kerja === "CALON" || String(emp.nip).startsWith("CAND-");
       const tag = isCalon ? "[CALON KARYAWAN]" : `[${emp.nip}]`;
-      optionsHtml += `<option value="${emp.id || emp.nip}">${tag} ${emp.nama_lengkap || emp.nama} (${emp.jabatan || 'Staff'})</option>`;
+      const jbt = emp.jabatan || (isCalon ? 'Calon Karyawan' : 'N/A');
+      optionsHtml += `<option value="${emp.id || emp.nip}">${tag} ${emp.nama_lengkap || emp.nama} (${jbt})</option>`;
     });
     empSelect.innerHTML = optionsHtml;
   }
@@ -20298,7 +20360,7 @@ function getApproverOptionsHtml() {
   const uniqueMap = new Map();
   emps.forEach(e => {
     if (e.nip && !String(e.nip).startsWith("CAND-")) {
-      uniqueMap.set(e.nip, `${e.nama_lengkap || e.nama} (${e.jabatan || 'Staff'} • ${e.nip})`);
+      uniqueMap.set(e.nip, `${e.nama_lengkap || e.nama} (${e.jabatan || 'N/A'} • ${e.nip})`);
     }
   });
 
@@ -20465,7 +20527,9 @@ async function onTxEmployeeSelected(empId) {
   if (sumBox) {
     sumBox.classList.remove("hidden");
     document.getElementById("tx-sum-name").innerText = emp.nama_lengkap || emp.nama || "-";
-    document.getElementById("tx-sum-pos-branch").innerText = `${emp.jabatan || 'Staff'} • ${emp.cabang || 'Head Office'}`;
+    document.getElementById("tx-sum-pos-branch").innerText = isCalon
+      ? "Calon Karyawan • Menunggu Penerimaan"
+      : `${emp.jabatan || 'N/A'} • ${emp.cabang || 'N/A'}`;
     document.getElementById("tx-sum-nip").innerText = emp.nip;
   }
 
@@ -20521,25 +20585,25 @@ async function onTxEmployeeSelected(empId) {
 
     // Auto-populate data sebelumnya ke subform rotasi, promosi, demosi, mutasi, benefit
     const prevPosRotasi = document.getElementById("tx-rotasi-prev-pos");
-    if (prevPosRotasi) prevPosRotasi.value = emp.jabatan || "Staff";
+    if (prevPosRotasi) prevPosRotasi.value = emp.jabatan || "N/A";
 
     const prevPosPromosi = document.getElementById("tx-promosi-prev-pos");
-    if (prevPosPromosi) prevPosPromosi.value = emp.jabatan || "Staff";
+    if (prevPosPromosi) prevPosPromosi.value = emp.jabatan || "N/A";
 
     const prevLvlPromosi = document.getElementById("tx-promosi-prev-lvl");
-    if (prevLvlPromosi) prevLvlPromosi.value = emp.level_name || emp.role_id || "Level 1";
+    if (prevLvlPromosi) prevLvlPromosi.value = emp.level_name || emp.role_id || "N/A";
 
     const prevPosDemosi = document.getElementById("tx-demosi-prev-pos");
-    if (prevPosDemosi) prevPosDemosi.value = emp.jabatan || "Staff";
+    if (prevPosDemosi) prevPosDemosi.value = emp.jabatan || "N/A";
 
     const prevLvlDemosi = document.getElementById("tx-demosi-prev-lvl");
-    if (prevLvlDemosi) prevLvlDemosi.value = emp.level_name || emp.role_id || "Level 1";
+    if (prevLvlDemosi) prevLvlDemosi.value = emp.level_name || emp.role_id || "N/A";
 
     const prevLocMutasi = document.getElementById("tx-mutasi-prev-loc");
-    if (prevLocMutasi) prevLocMutasi.value = emp.work_location_name || emp.area_cover || "Head Office";
+    if (prevLocMutasi) prevLocMutasi.value = emp.work_location_name || emp.area_cover || "N/A";
 
     const prevUnitMutasi = document.getElementById("tx-mutasi-prev-unit");
-    if (prevUnitMutasi) prevUnitMutasi.value = emp.cabang || "Head Office";
+    if (prevUnitMutasi) prevUnitMutasi.value = emp.cabang || "N/A";
 
     // Benefit sebelumnya
     const bSalary = parseFloat(emp.basic_salary || emp.gaji_pokok || 0);
@@ -21835,14 +21899,14 @@ async function openCareerTransactionDetailModal(txId) {
   // Data karyawan terkait
   const relatedEmp = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.id) === String(tx.employee_id) || String(e.nip) === String(tx.nip)) ||
     (APP_STATE.employees || []).find(e => String(e.id) === String(tx.employee_id) || String(e.nip) === String(tx.nip)) ||
-    { nama_lengkap: item?.nama || tx.nip, nip: tx.nip, cabang: item?.cabang || "Head Office" };
+    { nama_lengkap: item?.nama || tx.nip, nip: tx.nip, cabang: item?.cabang || "N/A" };
 
   // Set Profile Box
   const empNama = document.getElementById("tx-detail-emp-nama");
   if (empNama) empNama.innerText = relatedEmp?.nama_lengkap || relatedEmp?.nama || item?.nama || tx.nip;
 
   const empInfo = document.getElementById("tx-detail-emp-info");
-  if (empInfo) empInfo.innerText = `NIP: ${tx.nip} • ${relatedEmp?.cabang || item?.cabang || 'Head Office'}`;
+  if (empInfo) empInfo.innerText = `NIP: ${tx.nip} • ${relatedEmp?.cabang || item?.cabang || 'N/A'}`;
 
   const createdAtEl = document.getElementById("tx-detail-created-at");
   if (createdAtEl) createdAtEl.innerText = tx.created_at ? tx.created_at.slice(0, 10) : (tx.effective_date || '-');
