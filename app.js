@@ -21481,6 +21481,51 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
     </div>
   `;
 
+  // 0. DETAIL PENERIMAAN KARYAWAN BARU (PENEMPATAN, UNIT, JABATAN, JOIN DATE)
+  const hasPenerimaan = types.some(t => t.toLowerCase().includes("penerimaan"));
+  if (hasPenerimaan || tx.position_id || tx.work_location_id || tx.unit_id || tx.join_date) {
+    const posName = getPosName(tx.position_id);
+    const locName = getLocName(tx.work_location_id);
+    const unitName = getUnitName(tx.unit_id);
+    const joinDate = tx.join_date || tx.effective_date || '-';
+    const statusKerja = tx.employment_status || '-';
+
+    changeItemsHtml += `
+      <div class="p-3 rounded-2xl border bg-emerald-50/70 border-emerald-200 text-emerald-950 space-y-2 mb-2.5 shadow-2xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-emerald-200/60 pb-1.5 text-emerald-900">
+          <i class="fa-solid fa-user-check text-emerald-600 text-sm"></i>
+          <span class="text-xs uppercase tracking-wide">Detail Penerimaan & Penempatan Karyawan</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-0.5">
+          <div class="bg-white/90 p-2 rounded-xl border border-emerald-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Jabatan / Posisi:</span>
+            <strong class="text-emerald-950 font-bold text-xs">${posName}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-emerald-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Status Kepegawaian:</span>
+            <strong class="text-emerald-950 font-bold">${statusKerja}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-emerald-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Unit Kerja:</span>
+            <strong class="text-emerald-950 font-semibold">${unitName}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-emerald-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Work Location:</span>
+            <strong class="text-emerald-950 font-semibold">${locName}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-emerald-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Tanggal Bergabung (Join Date):</span>
+            <strong class="text-emerald-950">${joinDate}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-emerald-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">NIP Resmi Karyawan:</span>
+            <strong class="text-indigo-900 font-mono font-bold">${tx.nip || '-'}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // 1. DETAIL PROMOSI / DEMOSI
   const hasPromosi = types.some(t => t.toLowerCase().includes("promosi"));
   const hasDemosi = types.some(t => t.toLowerCase().includes("demosi"));
@@ -21620,21 +21665,33 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
     `;
   }
 
-  // 5. DETAIL PENGANGKATAN TETAP / KONTRAK
+  // 5. DETAIL PENGANGKATAN TETAP / KONTRAK / PERJANJIAN KERJA
   const hasTetap = types.some(t => t.toLowerCase().includes("tetap") || t.toLowerCase().includes("pkwtt"));
   const hasKontrak = types.some(t => t.toLowerCase().includes("kontrak"));
-  if (hasTetap || hasKontrak || tx.contract_no || tx.contract_end_date) {
+  if (hasTetap || hasKontrak || tx.contract_no || tx.contract_end_date || tx.contract_start_date) {
     changeItemsHtml += `
-      <div class="p-2.5 rounded-xl border bg-violet-50 border-violet-200 text-violet-950 space-y-1.5 text-xs mb-2 shadow-xs">
-        <div class="flex items-center space-x-1.5 font-bold border-b border-violet-200/50 pb-1">
-          <i class="fa-solid fa-file-contract text-violet-600"></i>
-          <span>Detail Perjanjian / Kontrak Kerja</span>
+      <div class="p-3 rounded-2xl border bg-violet-50/70 border-violet-200 text-violet-950 space-y-2 mb-2.5 shadow-2xs">
+        <div class="flex items-center space-x-1.5 font-bold border-b border-violet-200/60 pb-1.5 text-violet-900">
+          <i class="fa-solid fa-file-contract text-violet-600 text-sm"></i>
+          <span class="text-xs uppercase tracking-wide">Detail Perjanjian / Kontrak Kerja</span>
         </div>
-        <div class="grid grid-cols-2 gap-1.5 text-[11px]">
-          <div class="bg-white/80 p-1.5 rounded-lg border border-violet-100"><span class="text-slate-400 block text-[10px]">Status Kerja:</span> <strong class="text-violet-950">${tx.employment_status || (hasTetap ? 'PKWTT' : 'PKWT')}</strong></div>
-          <div class="bg-white/80 p-1.5 rounded-lg border border-violet-100"><span class="text-slate-400 block text-[10px]">No. Surat / Kontrak:</span> <strong class="text-violet-950 font-mono">${tx.contract_no || '-'}</strong></div>
-          <div class="bg-white/80 p-1.5 rounded-lg border border-violet-100"><span class="text-slate-400 block text-[10px]">Tgl Mulai:</span> <strong>${tx.contract_start_date || tx.effective_date || '-'}</strong></div>
-          <div class="bg-white/80 p-1.5 rounded-lg border border-violet-100"><span class="text-slate-400 block text-[10px]">Tgl Berakhir:</span> <strong>${tx.contract_end_date || (hasTetap ? 'Pensiun (50 Thn)' : '-')}</strong></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-0.5">
+          <div class="bg-white/90 p-2 rounded-xl border border-violet-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Status Hubungan Kerja:</span>
+            <strong class="text-violet-950 font-bold">${tx.employment_status || (hasTetap ? 'PKWTT' : 'PKWT')}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-violet-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">No. Perjanjian / Surat Kontrak:</span>
+            <strong class="text-violet-950 font-mono font-bold">${tx.contract_no || '-'}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-violet-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Tgl Mulai / Perjanjian Kerja:</span>
+            <strong class="text-slate-900 font-medium">${tx.contract_start_date || tx.effective_date || '-'}</strong>
+          </div>
+          <div class="bg-white/90 p-2 rounded-xl border border-violet-100/80">
+            <span class="text-slate-400 block text-[10px] uppercase font-semibold">Tgl Berakhir Kontrak:</span>
+            <strong class="text-slate-900 font-medium">${tx.contract_end_date || (hasTetap ? 'Pensiun (Usia 50 Thn)' : '-')}</strong>
+          </div>
         </div>
       </div>
     `;
@@ -21775,6 +21832,14 @@ function buildCareerTransactionHighlightsHtml(tx, a) {
     badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-semibold"><i class="fa-solid fa-file-contract text-[9px]"></i>${label}</span>`);
   }
 
+  // Penerimaan Karyawan / Posisi & Unit
+  if (types.some(t => t.toLowerCase().includes("penerimaan")) || (!tx.new_position_id && tx.position_id)) {
+    const posTxt = getPosName(tx.position_id);
+    if (posTxt && posTxt !== "-") {
+      badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold"><i class="fa-solid fa-user-plus text-[9px]"></i>${posTxt}</span>`);
+    }
+  }
+
   // Rotasi / Promosi / Demosi (Jabatan & Level)
   if (tx.new_position_id || tx.new_level_id) {
     const posTxt = tx.new_position_id ? getPosName(tx.new_position_id) : '';
@@ -21783,12 +21848,16 @@ function buildCareerTransactionHighlightsHtml(tx, a) {
     badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold"><i class="fa-solid fa-briefcase text-[9px]"></i>${txt}</span>`);
   }
 
-  // Mutasi (Lokasi & Unit)
-  if (tx.new_location_id || tx.new_unit_id) {
-    const locTxt = tx.new_location_id ? getLocName(tx.new_location_id) : '';
-    const unitTxt = tx.new_unit_id ? getUnitName(tx.new_unit_id) : '';
-    const txt = [locTxt, unitTxt].filter(Boolean).join(" • ");
-    badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200 text-[10px] font-semibold"><i class="fa-solid fa-location-dot text-[9px]"></i>${txt}</span>`);
+  // Mutasi / Penempatan (Lokasi & Unit)
+  const mutasiLoc = tx.new_location_id || (!tx.new_location_id && tx.work_location_id ? tx.work_location_id : null);
+  const mutasiUnit = tx.new_unit_id || (!tx.new_unit_id && tx.unit_id ? tx.unit_id : null);
+  if (mutasiLoc || mutasiUnit) {
+    const locTxt = mutasiLoc ? getLocName(mutasiLoc) : '';
+    const unitTxt = mutasiUnit ? getUnitName(mutasiUnit) : '';
+    const txt = [locTxt, unitTxt].filter(t => t && t !== "-").join(" • ");
+    if (txt) {
+      badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200 text-[10px] font-semibold"><i class="fa-solid fa-location-dot text-[9px]"></i>${txt}</span>`);
+    }
   }
 
   // Remunerasi
@@ -21832,19 +21901,30 @@ function buildCareerTransactionHighlightsHtml(tx, a) {
 function buildCareerTransactionCompactHtml(tx) {
   if (!tx) return '-';
   const types = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || "Transaksi"];
-  const getPosName = (id) => (!id ? "-" : ((ORG_POSITIONS_DATA || []).find(p => String(p.id_position) === String(id) || p.nama_jabatan === id)?.nama_jabatan || id));
-  const getLocName = (id) => (!id ? "-" : ((ORG_WORK_LOCATIONS_DATA || []).find(w => String(w.id_work_location) === String(id) || w.nama_lokasi === id)?.nama_lokasi || id));
-  const getUnitName = (id) => (!id ? "-" : ((ORG_UNITS_DATA || []).find(u => String(u.id_unit) === String(id) || u.nama_unit === id)?.nama_unit || id));
+  const getPosName = (id) => (!id ? "-" : ((ORG_POSITIONS_DATA || []).find(p => String(p.id_position) === String(id) || String(p.id) === String(id) || p.nama_jabatan === id)?.nama_jabatan || id));
+  const getLocName = (id) => (!id ? "-" : ((ORG_WORK_LOCATIONS_DATA || []).find(w => String(w.id_work_location) === String(id) || String(w.id) === String(id) || w.nama_lokasi === id)?.nama_lokasi || id));
+  const getUnitName = (id) => (!id ? "-" : ((ORG_UNITS_DATA || []).find(u => String(u.id_unit) === String(id) || String(u.id) === String(id) || u.nama_unit === id)?.nama_unit || id));
 
   const items = [];
+  const posId = tx.new_position_id || tx.position_id;
+  if (posId) {
+    items.push(`<div>• <strong>Jabatan:</strong> ${getPosName(posId)}</div>`);
+  }
+  const locId = tx.new_location_id || tx.work_location_id;
+  const unitId = tx.new_unit_id || tx.unit_id;
+  if (locId || unitId) {
+    const locTxt = locId ? getLocName(locId) : '';
+    const unitTxt = unitId ? getUnitName(unitId) : '';
+    const penempatan = [locTxt, unitTxt].filter(t => t && t !== "-").join(" • ");
+    if (penempatan) {
+      items.push(`<div>• <strong>Penempatan:</strong> ${penempatan}</div>`);
+    }
+  }
+  if (tx.join_date) {
+    items.push(`<div>• <strong>Tgl Bergabung:</strong> ${tx.join_date}</div>`);
+  }
   if (tx.contract_no || tx.contract_end_date) {
-    items.push(`<div>• <strong>Kontrak Baru:</strong> ${tx.contract_no || '-'} (s/d ${tx.contract_end_date || '-'})</div>`);
-  }
-  if (tx.new_position_id) {
-    items.push(`<div>• <strong>Jabatan Baru:</strong> ${getPosName(tx.new_position_id)}</div>`);
-  }
-  if (tx.new_location_id || tx.new_unit_id) {
-    items.push(`<div>• <strong>Penempatan Baru:</strong> ${getLocName(tx.new_location_id)} • ${getUnitName(tx.new_unit_id)}</div>`);
+    items.push(`<div>• <strong>Kontrak/SK:</strong> ${tx.contract_no || '-'} (s/d ${tx.contract_end_date || '-'})</div>`);
   }
   if (tx.new_basic_salary && parseFloat(tx.new_basic_salary) > 0) {
     items.push(`<div>• <strong>Gaji Pokok Baru:</strong> Rp ${parseFloat(tx.new_basic_salary).toLocaleString('id-ID')}</div>`);
@@ -21881,6 +21961,17 @@ async function openCareerTransactionDetailModal(txId) {
     return;
   }
 
+  // Pastikan master data organisasi (jabatan, unit, lokasi) sudah terisi agar ID referensi ter-resolve dengan nama aslinya
+  if ((!ORG_POSITIONS_DATA || ORG_POSITIONS_DATA.length === 0) && typeof loadOrgPositions === "function") {
+    try { await loadOrgPositions(); } catch (_) {}
+  }
+  if ((!ORG_UNITS_DATA || ORG_UNITS_DATA.length === 0) && typeof loadOrgUnits === "function") {
+    try { await loadOrgUnits(); } catch (_) {}
+  }
+  if ((!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) && typeof loadOrgWorkLocations === "function") {
+    try { await loadOrgWorkLocations(); } catch (_) {}
+  }
+
   const modal = document.getElementById("modal-career-tx-detail");
   if (!modal) return;
 
@@ -21905,8 +21996,28 @@ async function openCareerTransactionDetailModal(txId) {
   const empNama = document.getElementById("tx-detail-emp-nama");
   if (empNama) empNama.innerText = relatedEmp?.nama_lengkap || relatedEmp?.nama || item?.nama || tx.nip;
 
+  const getPosHdr = (id) => (!id ? "" : ((ORG_POSITIONS_DATA || []).find(p => String(p.id_position) === String(id) || String(p.id) === String(id) || p.nama_jabatan === id)?.nama_jabatan || id));
+  const getUnitHdr = (id) => (!id ? "" : ((ORG_UNITS_DATA || []).find(u => String(u.id_unit) === String(id) || String(u.id) === String(id) || u.nama_unit === id)?.nama_unit || id));
+  const getLocHdr = (id) => (!id ? "" : ((ORG_WORK_LOCATIONS_DATA || []).find(w => String(w.id_work_location) === String(id) || String(w.id) === String(id) || w.nama_lokasi === id)?.nama_lokasi || id));
+
+  const posStr = getPosHdr(tx.position_id || tx.new_position_id) || relatedEmp?.jabatan || "";
+  const unitStr = getUnitHdr(tx.unit_id || tx.new_unit_id) || "";
+  const locStr = getLocHdr(tx.work_location_id || tx.new_location_id) || relatedEmp?.cabang || item?.cabang || "";
+
+  const infoBits = [`NIP: ${tx.nip || relatedEmp?.nip || '-'}`];
+  if (posStr && posStr !== "-") infoBits.push(posStr);
+  if (locStr && unitStr && locStr !== unitStr && locStr !== "-" && unitStr !== "-") {
+    infoBits.push(`${unitStr} (${locStr})`);
+  } else if (unitStr && unitStr !== "-") {
+    infoBits.push(unitStr);
+  } else if (locStr && locStr !== "-") {
+    infoBits.push(locStr);
+  } else {
+    infoBits.push("N/A");
+  }
+
   const empInfo = document.getElementById("tx-detail-emp-info");
-  if (empInfo) empInfo.innerText = `NIP: ${tx.nip} • ${relatedEmp?.cabang || item?.cabang || 'N/A'}`;
+  if (empInfo) empInfo.innerText = infoBits.join(" • ");
 
   const createdAtEl = document.getElementById("tx-detail-created-at");
   if (createdAtEl) createdAtEl.innerText = tx.created_at ? tx.created_at.slice(0, 10) : (tx.effective_date || '-');
