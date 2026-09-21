@@ -18438,9 +18438,36 @@ async function openEmployeeDossierModal(nipOrId) {
   CURRENT_DOSSIER_EMP = emp;
   modal.classList.remove("hidden");
 
+  // Muat riwayat transaksi terlebih dahulu agar informasi kontrak & status mutasi/penerimaan terbaru tersedia
+  try {
+    await loadDossierTransactionsHistory(emp);
+  } catch (errTx) {
+    console.warn("[Dossier] Error pre-loading tx history:", errTx);
+  }
+
   // Header Detail Personalia
   try {
-    const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+    const latestApprovedTx = (CURRENT_DOSSIER_TX_LIST || []).find(t => t.status === "APPROVED") || CURRENT_DOSSIER_TX_LIST?.[0];
+    const hasApprovedHire = (CURRENT_DOSSIER_TX_LIST || []).some(t =>
+      t.status === "APPROVED" && (
+        (Array.isArray(t.transaction_types) && t.transaction_types.includes("Penerimaan Karyawan")) ||
+        t.is_new_hire
+      )
+    );
+
+    // Sinkronkan NIP resmi & status kerja jika transaksi penerimaan telah disetujui
+    if (latestApprovedTx?.nip && !latestApprovedTx.nip.startsWith("CAND-") && (String(emp.nip || "").startsWith("CAND-") || !emp.nip)) {
+      emp.nip = latestApprovedTx.nip;
+    }
+    if (latestApprovedTx?.employment_status && (!emp.status_kerja || emp.status_kerja === "CALON")) {
+      emp.status_kerja = latestApprovedTx.employment_status;
+    }
+
+    const isCalon = !hasApprovedHire && (
+      emp.status_kerja === "CALON" ||
+      (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"))
+    );
+
     const elNama = document.getElementById("dossier-nama");
     if (elNama) elNama.innerText = emp.nama_lengkap || emp.nama || emp.name || "-";
     const elNip = document.getElementById("dossier-nip-badge");
@@ -18463,7 +18490,7 @@ async function openEmployeeDossierModal(nipOrId) {
         elAktif.innerText = "MENUNGGU PROSES";
         elAktif.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white uppercase";
       } else {
-        const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true;
+        const isAktif = emp.status_aktif === "AKTIF" || emp.status_aktif === true || !emp.deleted_at;
         elAktif.innerText = isAktif ? "AKTIF" : "NONAKTIF";
         elAktif.className = isAktif
           ? "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase"
@@ -18490,9 +18517,8 @@ async function openEmployeeDossierModal(nipOrId) {
   // Load Data di 4 Tab
   try {
     await loadDossierPersonalDetails(emp);
-    loadDossierJobDetails(emp);
+    await loadDossierJobDetails(emp);
     await loadDossierPayrollDetails(emp);
-    await loadDossierTransactionsHistory(emp);
     await loadDossierDocuments(emp);
   } catch (errLoad) {
     console.warn("[Dossier] Error loading dossier tabs:", errLoad);
@@ -18765,52 +18791,138 @@ async function loadDossierPersonalDetails(emp) {
 }
 
 // TAB 2: KEPEGAWAIAN (STATUS AKTIF TERKINI)
-function loadDossierJobDetails(emp) {
-  const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+async function loadDossierJobDetails(emp) {
+  // 1. Pastikan data referensi master (Posisi, Level, Unit, Tempat Kerja) siap
+  if (!ORG_POSITIONS_DATA || ORG_POSITIONS_DATA.length === 0) {
+    try { await loadOrgPositions(); } catch (e) { }
+  }
+  if (!ORG_LEVELS_DATA || ORG_LEVELS_DATA.length === 0) {
+    try { await loadOrgLevels(); } catch (e) { }
+  }
+  if (!ORG_UNITS_DATA || ORG_UNITS_DATA.length === 0) {
+    try { await loadOrgUnits(); } catch (e) { }
+  }
+  if (!ORG_WORK_LOCATIONS_DATA || ORG_WORK_LOCATIONS_DATA.length === 0) {
+    try { await loadWorkLocations(); } catch (e) { }
+  }
 
+  // 2. Evaluasi transaksi kepegawaian terbaru (snapshot kontrak, work location, dll.)
+  let latestTx = null;
+  if (Array.isArray(CURRENT_DOSSIER_TX_LIST) && CURRENT_DOSSIER_TX_LIST.length > 0) {
+    latestTx = CURRENT_DOSSIER_TX_LIST.find(t => t.status === "APPROVED") || CURRENT_DOSSIER_TX_LIST[0];
+  } else if (supabaseClient && (emp?.id || emp?.nip)) {
+    try {
+      const empFilter = emp.id ? `employee_id.eq.${emp.id},nip.eq.${emp.nip}` : `nip.eq.${emp.nip}`;
+      const { data: txList } = await supabaseClient
+        .from("hr_employee_transactions")
+        .select("*")
+        .or(empFilter)
+        .order("effective_date", { ascending: false });
+      if (txList && txList.length > 0) {
+        latestTx = txList.find(t => t.status === "APPROVED") || txList[0];
+      }
+    } catch (e) { }
+  }
+
+  const hasApprovedHire = latestTx && latestTx.status === "APPROVED" && (
+    (Array.isArray(latestTx.transaction_types) && latestTx.transaction_types.includes("Penerimaan Karyawan")) ||
+    latestTx.is_new_hire
+  );
+
+  const isCalon = !hasApprovedHire && (
+    emp.status_kerja === "CALON" || 
+    (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"))
+  );
+
+  // A. NIP Resmi
+  const finalNip = (emp.nip && !String(emp.nip).startsWith("CAND-")) 
+    ? emp.nip 
+    : (latestTx?.nip && !String(latestTx.nip).startsWith("CAND-") ? latestTx.nip : (emp.nip || "-"));
   const elNip = document.getElementById("dossier-nip-val");
-  if (elNip) elNip.innerText = emp.nip || "-";
+  if (elNip) elNip.innerText = finalNip;
 
+  // B. Status Kerja
+  const statusKerjaVal = emp.status_kerja || latestTx?.employment_status || (isCalon ? "CALON" : "PKWT");
   const elStatusKerja = document.getElementById("dossier-statuskerja-val");
-  if (elStatusKerja) elStatusKerja.innerText = emp.status_kerja || (isCalon ? "CALON" : "N/A");
+  if (elStatusKerja) elStatusKerja.innerText = statusKerjaVal;
 
-  const elLoc = document.getElementById("dossier-penempatan-val");
-  if (elLoc) elLoc.innerText = emp.work_location_name || emp.area_cover || (isCalon ? "N/A" : (emp.location_id || "N/A"));
-
-  const elUnit = document.getElementById("dossier-unit-val");
-  if (elUnit) elUnit.innerText = emp.cabang || emp.unit_name || (isCalon ? "N/A" : (emp.location_id || "N/A"));
-
+  // C. Jabatan
+  const posId = emp.position_id || latestTx?.new_position_id || latestTx?.position_id;
+  const posObj = (ORG_POSITIONS_DATA || []).find(p => p.id_position === posId);
+  const namaJabatan = posObj?.nama_jabatan || emp.jabatan || (isCalon ? "Calon Karyawan" : (posId || "N/A"));
   const elJabatan = document.getElementById("dossier-jabatan-val");
-  if (elJabatan) elJabatan.innerText = emp.jabatan || (isCalon ? "Calon Karyawan" : (emp.position_id || "N/A"));
+  if (elJabatan) elJabatan.innerText = namaJabatan;
 
+  // D. Level / Grade (Dicari otomatis dari relasi jabatan -> master_levels)
+  let levelDisplay = "N/A";
+  const levelId = posObj?.level_id || emp.role_id || latestTx?.new_level_id || latestTx?.prev_level_id;
+  if (levelId) {
+    const levelObj = (ORG_LEVELS_DATA || []).find(l => l.id_level === levelId);
+    if (levelObj) {
+      levelDisplay = `${levelObj.id_level} - ${levelObj.nama_level}`;
+    } else {
+      levelDisplay = levelId;
+    }
+  } else if (!isCalon && emp.role) {
+    levelDisplay = emp.role;
+  }
   const elLevel = document.getElementById("dossier-level-val");
-  if (elLevel) elLevel.innerText = emp.level_name || (isCalon ? "N/A" : (emp.role_id || "N/A"));
+  if (elLevel) elLevel.innerText = isCalon ? "N/A" : levelDisplay;
 
+  // E. Unit Kerja
+  const unitId = emp.location_id || latestTx?.new_unit_id || latestTx?.unit_id;
+  const unitObj = (ORG_UNITS_DATA || []).find(u => u.id_unit === unitId);
+  const namaUnit = unitObj?.nama_unit || emp.cabang || (isCalon ? "N/A" : (unitId || "N/A"));
+  const elUnit = document.getElementById("dossier-unit-val");
+  if (elUnit) elUnit.innerText = namaUnit;
+
+  // F. Penempatan (Work Location fisik dari transaksi atau unit)
+  let workLocId = latestTx?.work_location_id || unitObj?.work_location_id || emp.work_location_id || null;
+  let workLocDisplay = "N/A";
+  if (workLocId) {
+    const locObj = (ORG_WORK_LOCATIONS_DATA || []).find(w => (w.id_work_location === workLocId || w.location_id === workLocId));
+    if (locObj) {
+      workLocDisplay = `${locObj.nama_lokasi} (${locObj.id_work_location})`;
+    } else {
+      workLocDisplay = workLocId;
+    }
+  } else if (unitObj?.nama_unit) {
+    workLocDisplay = unitObj.nama_unit;
+  }
+  const elLoc = document.getElementById("dossier-penempatan-val");
+  if (elLoc) elLoc.innerText = isCalon ? "N/A" : workLocDisplay;
+
+  // G. Atasan Langsung
   const elAtasan = document.getElementById("dossier-atasan-val");
   if (elAtasan) {
     if (emp.atasan_nama) {
       elAtasan.innerText = `${emp.atasan_nama} (${emp.atasan_nip || ''})`.trim();
-    } else if (isCalon) {
-      elAtasan.innerText = "N/A";
     } else {
       elAtasan.innerText = "N/A";
     }
   }
 
+  // H. Tgl Bergabung
+  const tglGabung = emp.tanggal_masuk || latestTx?.join_date || (isCalon ? "N/A" : "-");
   const elTglGabung = document.getElementById("dossier-tglgabung-val");
-  if (elTglGabung) elTglGabung.innerText = emp.tanggal_masuk || emp.join_date || (isCalon ? "N/A" : "-");
+  if (elTglGabung) elTglGabung.innerText = tglGabung;
 
+  // I. No. Kontrak
+  const noKontrak = latestTx?.contract_no || latestTx?.permanent_contract_no || emp.contract_no || emp.no_sk || (isCalon ? "N/A" : "-");
   const elNoKontrak = document.getElementById("dossier-nokontrak-val");
-  if (elNoKontrak) elNoKontrak.innerText = emp.contract_no || emp.no_sk || (isCalon ? "N/A" : "-");
+  if (elNoKontrak) elNoKontrak.innerText = noKontrak;
 
+  // J. Tgl Perjanjian / Kontrak
+  const tglKontrak = latestTx?.contract_start_date || emp.tanggal_masuk || latestTx?.join_date || (isCalon ? "N/A" : "-");
   const elTglKontrak = document.getElementById("dossier-tglkontrak-val");
-  if (elTglKontrak) elTglKontrak.innerText = emp.contract_start_date || emp.tanggal_masuk || (isCalon ? "N/A" : "-");
+  if (elTglKontrak) elTglKontrak.innerText = tglKontrak;
 
+  // K. Tgl Berakhir Kontrak
   const elTglSelesai = document.getElementById("dossier-tglselesaikontrak-val");
   if (elTglSelesai) {
     if (isCalon) {
       elTglSelesai.innerText = "N/A";
-    } else if (emp.status_kerja === "PKWTT") {
+    } else if (statusKerjaVal === "PKWTT") {
       const dob = emp.dob || CURRENT_DOSSIER_PERSONAL?.dob || CURRENT_DOSSIER_PERSONAL?.tanggal_lahir;
       if (dob) {
         const d = new Date(dob);
@@ -18819,23 +18931,35 @@ function loadDossierJobDetails(emp) {
         elTglSelesai.innerText = "Ulang Tahun ke-50 (PKWTT Permanen)";
       }
     } else {
-      elTglSelesai.innerText = emp.contract_end_date || emp.tanggal_selesai_kontrak || "N/A";
+      elTglSelesai.innerText = emp.tanggal_selesai_kontrak || latestTx?.contract_end_date || "N/A";
     }
   }
 
+  // L. Tgl Resign / Nonaktif
   const elTglResign = document.getElementById("dossier-tglresign-val");
   if (elTglResign) {
     if (isCalon) {
       elTglResign.innerText = "N/A";
     } else {
-      elTglResign.innerText = emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja");
+      elTglResign.innerText = emp.deleted_at 
+        ? `Nonaktif sejak ${emp.deleted_at.split('T')[0]}` 
+        : (emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja"));
     }
   }
 }
 
 // TAB 3: RINCIAN PAYROLL (GAJI POKOK + 6 TUNJANGAN)
 async function loadDossierPayrollDetails(emp) {
-  const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+  const hasApprovedHire = (CURRENT_DOSSIER_TX_LIST || []).some(t =>
+    t.status === "APPROVED" && (
+      (Array.isArray(t.transaction_types) && t.transaction_types.includes("Penerimaan Karyawan")) ||
+      t.is_new_hire
+    )
+  );
+  const isCalon = !hasApprovedHire && (
+    emp.status_kerja === "CALON" || 
+    (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"))
+  );
   let txSalary = null;
   let empId = emp.id;
 
@@ -18949,7 +19073,7 @@ async function loadDossierTransactionsHistory(emp) {
   const container = document.getElementById("dossier-tx-history-container");
   if (!container) return;
 
-  const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+  const isCalon = emp.status_kerja === "CALON" || (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"));
   let transactions = [];
   let empId = emp.id;
 
@@ -19625,7 +19749,7 @@ async function loadPersonaliaEmployees() {
 
       if (!empErr && empData && empData.length > 0) {
         PERSONALIA_EMPLOYEES_DATA = empData.map(e => {
-          const isCalon = e.status_kerja === "CALON" || String(e.nip || "").startsWith("CAND-");
+          const isCalon = e.status_kerja === "CALON" || (String(e.nip || "").startsWith("CAND-") && (!e.status_kerja || e.status_kerja === "CALON"));
           return {
             ...e,
             nama_lengkap: e.name || e.nama_lengkap || e.nip,
@@ -19737,7 +19861,7 @@ function renderPersonaliaEmployees(list) {
   }
 
   container.innerHTML = list.map(emp => {
-    const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+    const isCalon = emp.status_kerja === "CALON" || (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"));
     const rId = String(emp.role_id || emp.role || "R-04").trim();
     let roleObj = ROLE_PERMISSIONS_STATE[rId];
     if (!roleObj) {
@@ -19860,7 +19984,7 @@ function renderVisualOrgChartTree() {
   const roots = list.filter(e => !e.atasan_nip || e.atasan_nip === e.nip || !list.some(p => p.nip === e.atasan_nip));
 
   function renderOrgNode(emp) {
-    const isCalon = emp.status_kerja === "CALON" || String(emp.nip || "").startsWith("CAND-");
+    const isCalon = emp.status_kerja === "CALON" || (String(emp.nip || "").startsWith("CAND-") && (!emp.status_kerja || emp.status_kerja === "CALON"));
     const subordinates = list.filter(e => e.atasan_nip === emp.nip && e.nip !== emp.nip);
     const hasSubs = subordinates.length > 0;
     const avatarHtml = (emp.foto_profile_url || emp.foto)
@@ -21388,23 +21512,27 @@ async function handleSubmitEmployeeTransaction(event) {
 
       // 3. Jika Penerimaan Karyawan: Update langsung akun calon karyawan dengan NIP resmi baru
       if (isPenerimaan) {
-        await supabaseClient
-          .from("employees")
-          .update({
-            nip: finalNip,
-            unit_id: txPayload.unit_id,
-            position_id: txPayload.position_id,
-            work_location_id: txPayload.work_location_id,
-            status_kerja: txPayload.employment_status,
-            tanggal_masuk: txPayload.join_date,
-            contract_no: txPayload.contract_no,
-            contract_start_date: txPayload.contract_start_date,
-            contract_end_date: txPayload.contract_end_date,
-            status_aktif: "AKTIF",
-            is_active: true,
-            updated_at: now
-          })
+        const empHirePayload = {
+          nip: finalNip,
+          location_id: txPayload.unit_id || txPayload.work_location_id || null,
+          position_id: txPayload.position_id || null,
+          status_kerja: txPayload.employment_status || "PKWT",
+          tanggal_masuk: txPayload.join_date || null,
+          tanggal_selesai_kontrak: txPayload.contract_end_date || null,
+          updated_at: now
+        };
+        const { error: hireUpErr } = await supabaseClient
+          .from("hr_employees")
+          .update(empHirePayload)
           .eq("id", emp.id);
+
+        if (hireUpErr) {
+          console.error("[handleSaveEmployeeTransaction] Error update hr_employees:", hireUpErr);
+          await supabaseClient
+            .from("employees")
+            .update(empHirePayload)
+            .eq("id", emp.id);
+        }
       }
     }
 
@@ -22451,6 +22579,9 @@ async function applyApprovedTransactionToEmployee(tx) {
 
     // A. Penerimaan Karyawan (New Hire)
     if (types.includes("Penerimaan Karyawan") || tx.is_new_hire) {
+      if (tx.nip && tx.nip !== "N/A" && !tx.nip.startsWith("CAND-")) {
+        updatePayload.nip = tx.nip;
+      }
       if (tx.unit_id || tx.work_location_id) {
         updatePayload.location_id = tx.unit_id || tx.work_location_id;
       }
@@ -22496,6 +22627,11 @@ async function applyApprovedTransactionToEmployee(tx) {
       updatePayload.location_id = tx.unit_id;
     } else if (tx.work_location_id && !updatePayload.location_id) {
       updatePayload.location_id = tx.work_location_id;
+    }
+
+    // Pastikan NIP resmi selalu terupdate jika transaksi membawa NIP baru
+    if (tx.nip && tx.nip !== "N/A" && !tx.nip.startsWith("CAND-") && !updatePayload.nip) {
+      updatePayload.nip = tx.nip;
     }
 
     // J/K/L. Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)

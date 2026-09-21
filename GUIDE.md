@@ -266,6 +266,32 @@ personal_data_updates JSONB
 - [x] Error handling: pesan teknis Supabase di-log ke `console.error`, user hanya melihat pesan user-friendly
 - [x] Tambah error handling eksplisit untuk upsert `hr_employee_personal_details`
 
+### [SELESAI] Fix NIP & Tab Kepegawaian Dossier Sync
+**Tanggal**: 2026-09-21
+**Status**: ✅ DONE
+
+**Root Cause Ditemukan**:
+1. `applyApprovedTransactionToEmployee(tx)` tidak pernah meng-assign `updatePayload.nip = tx.nip` sehingga NIP karyawan tidak pernah terupdate dari temporary (`CAND-xxxx`) ke NIP resmi baru (`09260001`).
+2. Di `handleSubmitEmployeeTransaction`, blok `isPenerimaan` mengupdate VIEW `employees` dengan kolom-kolom yang tidak ada di skema fisik (`unit_id`, `work_location_id`, `contract_no`, dll.) sehingga ditolak PostgreSQL.
+3. Karena `emp.nip` tetap berawalan `CAND-`, logika `isCalon` selalu `true` di seluruh halaman Personalia dan modal Dossier, menyebabkan header modal terkunci di "MENUNGGU PROSES" / "Calon Karyawan • Menunggu Penerimaan", dan field-field kepegawaian dipaksa bernilai `"N/A"`.
+4. Di Tab Kepegawaian (`loadDossierJobDetails`), Level/Grade tidak mencari ke master posisi/level, Penempatan tidak mengecek work location transaksi, dan No. Kontrak tidak mengambil dari transaksi approved.
+
+**Yang Sudah Diperbaiki**:
+- [x] Tambah update NIP resmi di `applyApprovedTransactionToEmployee(tx)`: `updatePayload.nip = tx.nip`
+- [x] Perbaiki blok `isPenerimaan` di `handleSubmitEmployeeTransaction` agar menarget tabel fisik `hr_employees` dengan kolom skema valid (`location_id`, `position_id`, `status_kerja`, `tanggal_masuk`, `tanggal_selesai_kontrak`)
+- [x] Perbaiki logika `isCalon`: memeriksa apakah karyawan memiliki transaksi penerimaan APPROVED atau status kerja aktif (Magang, PKWT, PKWTT) sehingga tidak keliru dianggap calon
+- [x] Update `openEmployeeDossierModal`: memuat transaksi approved lebih dulu, mensinkronkan NIP resmi, mengupdate badge status aktif (AKTIF) dan sub-judul jabatan/unit kerja
+- [x] Refactor `loadDossierJobDetails`:
+  - NIP: menampilkan NIP resmi transaksi (`09260001`)
+  - Status Kerja: menampilkan status kerja aktif (`Magang`)
+  - Level/Grade: lookup otomatis dari jabatan (`FAC`) → `hr_job_positions.level_id` (`L-07`) → `hr_master_levels` (`L-07 - Field Staff / FAC / Pelaksana`)
+  - Penempatan: lookup otomatis dari `work_location_id` transaksi (`WL-HO-01`) → `hr_work_locations` (`Head Office Graha Digiasha`)
+  - Unit Kerja: lookup otomatis dari `unit_id` / `location_id` (`TGR 1`) → `hr_organization_units` (`Cabang Tangerang 1`)
+  - No. Kontrak: menampilkan nomor kontrak dari transaksi (`PK/HRD`)
+  - Tgl Perjanjian: menampilkan tanggal mulai perjanjian (`2026-09-21`)
+  - Berakhir: menampilkan tanggal berakhir kontrak (`2026-12-21`)
+- [x] Buat file migrasi database: `supabase/13_sync_approved_transactions_and_fix_dossier.sql` untuk sinkronisasi NIP dan data kepegawaian langsung di database Supabase.
+
 ---
 
 ## 🚨 MASALAH YANG MASIH TERBUKA (TODO)
@@ -359,11 +385,12 @@ await supabaseClient
 | `10_employee_lifecycle_transactions.sql` | ✅ Applied | Tabel transaksi kepegawaian |
 | `11_fix_personal_details_sync.sql` | ✅ Applied | Fix skema personal_details + backfill APPROVED |
 | `12_ensure_personal_details_schema.sql` | ⏳ SIAP DIJALANKAN | Pastikan kolom personal details lengkap, disable RLS, reload cache, & backfill orphan |
-| `13_add_applied_status.sql` | ⏳ PLANNED | Tambah applied_at + status APPLIED |
+| `13_sync_approved_transactions_and_fix_dossier.sql` | ⏳ SIAP DIJALANKAN | Sinkronisasi NIP resmi & data kepegawaian dari transaksi APPROVED ke hr_employees |
+| `14_add_applied_status.sql` | ⏳ PLANNED | Tambah applied_at + status APPLIED |
 
 ---
 
-*Last updated: 2026-09-21 10:55 WIB*
+*Last updated: 2026-09-21 13:40 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `feature/fac-workflow` (development) → `main` (production)*
 
