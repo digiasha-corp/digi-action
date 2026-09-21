@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v156";
+const APP_BUILD_VERSION = "20260919_v157";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -18851,19 +18851,19 @@ async function loadDossierJobDetails(emp) {
     ? emp.nip
     : (latestTx?.nip && !String(latestTx.nip).startsWith("CAND-") ? latestTx.nip : (emp.nip || "-"));
   const elNip = document.getElementById("dossier-nip-val");
-  if (elNip) elNip.innerText = finalNip;
+  if (elNip) elNip.value = finalNip;
 
   // B. Status Kerja
   const statusKerjaVal = emp.status_kerja || latestTx?.employment_status || (isCalon ? "CALON" : "PKWT");
   const elStatusKerja = document.getElementById("dossier-statuskerja-val");
-  if (elStatusKerja) elStatusKerja.innerText = statusKerjaVal;
+  if (elStatusKerja) elStatusKerja.value = statusKerjaVal;
 
   // C. Jabatan
   const posId = emp.position_id || latestTx?.new_position_id || latestTx?.position_id;
   const posObj = (ORG_POSITIONS_DATA || []).find(p => p.id_position === posId);
   const namaJabatan = posObj?.nama_jabatan || emp.jabatan || (isCalon ? "Calon Karyawan" : (posId || "N/A"));
   const elJabatan = document.getElementById("dossier-jabatan-val");
-  if (elJabatan) elJabatan.innerText = namaJabatan;
+  if (elJabatan) elJabatan.value = namaJabatan;
 
   // D. Level / Grade (Dicari otomatis dari relasi jabatan -> master_levels)
   let levelDisplay = "N/A";
@@ -18879,14 +18879,14 @@ async function loadDossierJobDetails(emp) {
     levelDisplay = emp.role;
   }
   const elLevel = document.getElementById("dossier-level-val");
-  if (elLevel) elLevel.innerText = isCalon ? "N/A" : levelDisplay;
+  if (elLevel) elLevel.value = isCalon ? "N/A" : levelDisplay;
 
   // E. Unit Kerja
   const unitId = emp.location_id || latestTx?.new_unit_id || latestTx?.unit_id;
   const unitObj = (ORG_UNITS_DATA || []).find(u => u.id_unit === unitId);
   const namaUnit = unitObj?.nama_unit || emp.cabang || (isCalon ? "N/A" : (unitId || "N/A"));
   const elUnit = document.getElementById("dossier-unit-val");
-  if (elUnit) elUnit.innerText = namaUnit;
+  if (elUnit) elUnit.value = namaUnit;
 
   // F. Penempatan (Work Location fisik dari transaksi atau unit)
   let workLocId = latestTx?.work_location_id || unitObj?.work_location_id || emp.work_location_id || null;
@@ -18902,48 +18902,48 @@ async function loadDossierJobDetails(emp) {
     workLocDisplay = unitObj.nama_unit;
   }
   const elLoc = document.getElementById("dossier-penempatan-val");
-  if (elLoc) elLoc.innerText = isCalon ? "N/A" : workLocDisplay;
+  if (elLoc) elLoc.value = isCalon ? "N/A" : workLocDisplay;
 
   // G. Atasan Langsung
   const elAtasan = document.getElementById("dossier-atasan-val");
   if (elAtasan) {
     if (emp.atasan_nama) {
-      elAtasan.innerText = `${emp.atasan_nama} (${emp.atasan_nip || ''})`.trim();
+      elAtasan.value = `${emp.atasan_nama} (${emp.atasan_nip || ''})`.trim();
     } else {
-      elAtasan.innerText = "N/A";
+      elAtasan.value = "N/A";
     }
   }
 
   // H. Tgl Bergabung
   const tglGabung = emp.tanggal_masuk || latestTx?.join_date || (isCalon ? "N/A" : "-");
   const elTglGabung = document.getElementById("dossier-tglgabung-val");
-  if (elTglGabung) elTglGabung.innerText = tglGabung;
+  if (elTglGabung) elTglGabung.value = tglGabung;
 
   // I. No. Kontrak
   const noKontrak = latestTx?.contract_no || latestTx?.permanent_contract_no || emp.contract_no || emp.no_sk || (isCalon ? "N/A" : "-");
   const elNoKontrak = document.getElementById("dossier-nokontrak-val");
-  if (elNoKontrak) elNoKontrak.innerText = noKontrak;
+  if (elNoKontrak) elNoKontrak.value = noKontrak;
 
   // J. Tgl Perjanjian / Kontrak
   const tglKontrak = latestTx?.contract_start_date || emp.tanggal_masuk || latestTx?.join_date || (isCalon ? "N/A" : "-");
   const elTglKontrak = document.getElementById("dossier-tglkontrak-val");
-  if (elTglKontrak) elTglKontrak.innerText = tglKontrak;
+  if (elTglKontrak) elTglKontrak.value = tglKontrak;
 
   // K. Tgl Berakhir Kontrak
   const elTglSelesai = document.getElementById("dossier-tglselesaikontrak-val");
   if (elTglSelesai) {
     if (isCalon) {
-      elTglSelesai.innerText = "N/A";
+      elTglSelesai.value = "N/A";
     } else if (statusKerjaVal === "PKWTT") {
       const dob = emp.dob || CURRENT_DOSSIER_PERSONAL?.dob || CURRENT_DOSSIER_PERSONAL?.tanggal_lahir;
       if (dob) {
         const d = new Date(dob);
-        elTglSelesai.innerText = `${d.getFullYear() + 50}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} (Ulang Tahun ke-50)`;
+        elTglSelesai.value = `${d.getFullYear() + 50}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} (Ulang Tahun ke-50)`;
       } else {
-        elTglSelesai.innerText = "Ulang Tahun ke-50 (PKWTT Permanen)";
+        elTglSelesai.value = "Ulang Tahun ke-50 (PKWTT Permanen)";
       }
     } else {
-      elTglSelesai.innerText = emp.tanggal_selesai_kontrak || latestTx?.contract_end_date || "N/A";
+      elTglSelesai.value = emp.tanggal_selesai_kontrak || latestTx?.contract_end_date || "N/A";
     }
   }
 
@@ -18951,9 +18951,9 @@ async function loadDossierJobDetails(emp) {
   const elTglResign = document.getElementById("dossier-tglresign-val");
   if (elTglResign) {
     if (isCalon) {
-      elTglResign.innerText = "N/A";
+      elTglResign.value = "N/A";
     } else {
-      elTglResign.innerText = emp.deleted_at
+      elTglResign.value = emp.deleted_at
         ? `Nonaktif sejak ${emp.deleted_at.split('T')[0]}`
         : (emp.tanggal_keluar || (!emp.is_active && emp.status_aktif === "NONAKTIF" ? "Nonaktif" : "Masih Aktif Bekerja"));
     }
