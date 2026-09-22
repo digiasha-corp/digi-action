@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v158";
+const APP_BUILD_VERSION = "20260919_v159";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -20808,7 +20808,41 @@ function toggleElement(id, show) {
   const el = document.getElementById(id);
   if (!el) return;
   if (show) el.classList.remove("hidden");
-  else el.classList.add("hidden");
+  else {
+    el.classList.add("hidden");
+    resetFormContents(el);
+  }
+}
+
+function resetFormContents(container) {
+  if (!container) return;
+
+  // Reset all input fields within the container
+  const inputs = container.querySelectorAll('input, select, textarea');
+  inputs.forEach(input => {
+    if (input.type === 'checkbox' || input.type === 'radio') {
+      input.checked = false;
+    } else {
+      input.value = '';
+    }
+  });
+
+  // Reset all dynamic containers
+  const dynamicContainers = container.querySelectorAll('[id$="-container"]');
+  dynamicContainers.forEach(container => {
+    container.innerHTML = '';
+  });
+
+  // Reset specific containers that might have custom content
+  const specificContainers = [
+    'tx-inv-returned-container',
+    'tx-inv-notreturned-container'
+  ];
+
+  specificContainers.forEach(containerId => {
+    const el = container.querySelector(`#${containerId}`);
+    if (el) el.innerHTML = '';
+  });
 }
 
 function populateTxUnitsByLocation(locId) {
