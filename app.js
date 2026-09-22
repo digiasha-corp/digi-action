@@ -20746,6 +20746,36 @@ async function onTxEmployeeSelected(empId) {
     const dispSal = document.getElementById("tx-prev-salary-display");
     if (dispSal) dispSal.innerText = `Rp ${bSalary.toLocaleString('id-ID')}`;
 
+    // Tunjangan sebelumnya
+    const allowJabatan = parseFloat(emp.allowance_jabatan || 0);
+    const allowTransport = parseFloat(emp.allowance_transport || 0);
+    const allowKomunikasi = parseFloat(emp.allowance_komunikasi || 0);
+    const allowTempatTinggal = parseFloat(emp.allowance_tempat_tinggal || 0);
+    const allowPenempatan = parseFloat(emp.allowance_penempatan || 0);
+    const allowKemahalan = parseFloat(emp.allowance_kemahalan || 0);
+    const allowMakan = parseFloat(emp.allowance_makan || 0);
+    const allowKhusus = parseFloat(emp.allowance_khusus || 0);
+    const allowInsentif = parseFloat(emp.allowance_insentif || 0);
+
+    const dispAllowJabatan = document.getElementById("tx-prev-allow-jabatan");
+    if (dispAllowJabatan) dispAllowJabatan.innerText = `Rp ${allowJabatan.toLocaleString('id-ID')}`;
+    const dispAllowTransport = document.getElementById("tx-prev-allow-transport");
+    if (dispAllowTransport) dispAllowTransport.innerText = `Rp ${allowTransport.toLocaleString('id-ID')}`;
+    const dispAllowKomunikasi = document.getElementById("tx-prev-allow-komunikasi");
+    if (dispAllowKomunikasi) dispAllowKomunikasi.innerText = `Rp ${allowKomunikasi.toLocaleString('id-ID')}`;
+    const dispAllowTempatTinggal = document.getElementById("tx-prev-allow-tempattinggal");
+    if (dispAllowTempatTinggal) dispAllowTempatTinggal.innerText = `Rp ${allowTempatTinggal.toLocaleString('id-ID')}`;
+    const dispAllowPenempatan = document.getElementById("tx-prev-allow-penempatan");
+    if (dispAllowPenempatan) dispAllowPenempatan.innerText = `Rp ${allowPenempatan.toLocaleString('id-ID')}`;
+    const dispAllowKemahalan = document.getElementById("tx-prev-allow-kemahalan");
+    if (dispAllowKemahalan) dispAllowKemahalan.innerText = `Rp ${allowKemahalan.toLocaleString('id-ID')}`;
+    const dispAllowMakan = document.getElementById("tx-prev-allow-makan");
+    if (dispAllowMakan) dispAllowMakan.innerText = `Rp ${allowMakan.toLocaleString('id-ID')}`;
+    const dispAllowKhusus = document.getElementById("tx-prev-allow-khusus");
+    if (dispAllowKhusus) dispAllowKhusus.innerText = `Rp ${allowKhusus.toLocaleString('id-ID')}`;
+    const dispAllowInsentif = document.getElementById("tx-prev-allow-insentif");
+    if (dispAllowInsentif) dispAllowInsentif.innerText = `Rp ${allowInsentif.toLocaleString('id-ID')}`;
+
     // Auto-populate data pribadi (pre-filled) ke subform biodata
     await populateTxPersonalData(emp);
 
@@ -21524,6 +21554,18 @@ async function handleSubmitEmployeeTransaction(event) {
       new_allowance_penempatan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-penempatan")?.value) : parseFloat(emp.allowance_penempatan || 0),
       prev_allowance_kemahalan: parseFloat(emp.allowance_kemahalan || 0),
       new_allowance_kemahalan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-kemahalan")?.value) : parseFloat(emp.allowance_kemahalan || 0),
+      prev_allowance_makan: parseFloat(emp.allowance_makan || 0),
+      new_allowance_makan: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-makan")?.value) : parseFloat(emp.allowance_makan || 0),
+      prev_allowance_khusus: parseFloat(emp.allowance_khusus || 0),
+      new_allowance_khusus: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-khusus")?.value) : parseFloat(emp.allowance_khusus || 0),
+      prev_allowance_insentif: parseFloat(emp.allowance_insentif || 0),
+      new_allowance_insentif: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-insentif")?.value) : parseFloat(emp.allowance_insentif || 0),
+      payroll_period_type: isBenefit ? (document.getElementById("tx-input-period-type")?.value || 'CUT_OFF') : (emp.payroll_period_type || 'CUT_OFF'),
+      payroll_deductions_json: isBenefit ? {
+        apply_bpjs_kes: document.getElementById("chk-deduct-bpjskes")?.checked || false,
+        apply_bpjs_tk: document.getElementById("chk-deduct-bpjstk")?.checked || false,
+        apply_pph21: document.getElementById("chk-deduct-pph21")?.checked || false
+      } : (emp.payroll_deductions_json || {}),
 
       // Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
       uang_pisah: isExit ? parseRupiah(document.getElementById("tx-exit-uangpisah")?.value) : 0,
@@ -21823,7 +21865,10 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
       { label: "Tunj. Komunikasi", oldVal: parseFloat(tx.prev_allowance_komunikasi || 0), newVal: parseFloat(tx.new_allowance_komunikasi || 0) },
       { label: "Tunj. Tempat Tinggal", oldVal: parseFloat(tx.prev_allowance_tempat_tinggal || 0), newVal: parseFloat(tx.new_allowance_tempat_tinggal || 0) },
       { label: "Tunj. Penempatan", oldVal: parseFloat(tx.prev_allowance_penempatan || 0), newVal: parseFloat(tx.new_allowance_penempatan || 0) },
-      { label: "Tunj. Kemahalan", oldVal: parseFloat(tx.prev_allowance_kemahalan || 0), newVal: parseFloat(tx.new_allowance_kemahalan || 0) }
+      { label: "Tunj. Kemahalan", oldVal: parseFloat(tx.prev_allowance_kemahalan || 0), newVal: parseFloat(tx.new_allowance_kemahalan || 0) },
+      { label: "Tunj. Makan", oldVal: parseFloat(tx.prev_allowance_makan || 0), newVal: parseFloat(tx.new_allowance_makan || 0) },
+      { label: "Tunj. Khusus", oldVal: parseFloat(tx.prev_allowance_khusus || 0), newVal: parseFloat(tx.new_allowance_khusus || 0) },
+      { label: "Tunj. Insentif", oldVal: parseFloat(tx.prev_allowance_insentif || 0), newVal: parseFloat(tx.new_allowance_insentif || 0) }
     ].filter(a => a.newVal > 0 || a.oldVal > 0);
 
     changeItemsHtml += `
@@ -21839,6 +21884,10 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
               ${prevSalary > 0 ? `<span class="text-slate-400 line-through text-[11px]">Rp ${prevSalary.toLocaleString('id-ID')}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
               <strong class="text-emerald-700">Rp ${newSalary.toLocaleString('id-ID')}</strong>
             </div>
+          </div>
+          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
+            <span class="text-[11px] text-slate-500">Periode Penggajian:</span>
+            <strong class="text-indigo-900 font-semibold text-xs">${tx.payroll_period_type === 'BULANAN' ? 'Bulanan (Tgl 1 s/d Akhir Bulan)' : 'Cut-Off (Tgl 16 s/d 15)'}</strong>
           </div>
         ` : ''}
         ${allowances.length > 0 ? `
@@ -22792,8 +22841,16 @@ async function applyApprovedTransactionToEmployee(tx) {
       new_status_kerja: updatePayload.status_kerja || null,
       new_basic_salary: tx.new_basic_salary ? parseFloat(tx.new_basic_salary) : null,
       previous_basic_salary: tx.prev_basic_salary ? parseFloat(tx.prev_basic_salary) : null,
-      new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0) + parseFloat(tx.new_allowance_komunikasi || 0) + parseFloat(tx.new_allowance_tempat_tinggal || 0) + parseFloat(tx.new_allowance_penempatan || 0) + parseFloat(tx.new_allowance_kemahalan || 0)),
-      previous_allowances: (parseFloat(tx.prev_allowance_jabatan || 0) + parseFloat(tx.prev_allowance_transport || 0) + parseFloat(tx.prev_allowance_komunikasi || 0) + parseFloat(tx.prev_allowance_tempat_tinggal || 0) + parseFloat(tx.prev_allowance_penempatan || 0) + parseFloat(tx.prev_allowance_kemahalan || 0)),
+      new_allowances: (parseFloat(tx.new_allowance_jabatan || 0) + parseFloat(tx.new_allowance_transport || 0) + parseFloat(tx.new_allowance_komunikasi || 0) + parseFloat(tx.new_allowance_tempat_tinggal || 0) + parseFloat(tx.new_allowance_penempatan || 0) + parseFloat(tx.new_allowance_kemahalan || 0) + parseFloat(tx.new_allowance_makan || 0) + parseFloat(tx.new_allowance_khusus || 0) + parseFloat(tx.new_allowance_insentif || 0)),
+      previous_allowances: (parseFloat(tx.prev_allowance_jabatan || 0) + parseFloat(tx.prev_allowance_transport || 0) + parseFloat(tx.prev_allowance_komunikasi || 0) + parseFloat(tx.prev_allowance_tempat_tinggal || 0) + parseFloat(tx.prev_allowance_penempatan || 0) + parseFloat(tx.prev_allowance_kemahalan || 0) + parseFloat(tx.prev_allowance_makan || 0) + parseFloat(tx.prev_allowance_khusus || 0) + parseFloat(tx.prev_allowance_insentif || 0)),
+      new_allowance_makan: tx.new_allowance_makan ? parseFloat(tx.new_allowance_makan) : null,
+      previous_allowance_makan: tx.prev_allowance_makan ? parseFloat(tx.prev_allowance_makan) : null,
+      new_allowance_khusus: tx.new_allowance_khusus ? parseFloat(tx.new_allowance_khusus) : null,
+      previous_allowance_khusus: tx.prev_allowance_khusus ? parseFloat(tx.prev_allowance_khusus) : null,
+      new_allowance_insentif: tx.new_allowance_insentif ? parseFloat(tx.new_allowance_insentif) : null,
+      previous_allowance_insentif: tx.prev_allowance_insentif ? parseFloat(tx.prev_allowance_insentif) : null,
+      payroll_period_type: tx.payroll_period_type || 'CUT_OFF',
+      payroll_deductions_json: tx.payroll_deductions_json || {},
       created_at: now
     };
 

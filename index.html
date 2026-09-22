@@ -1971,6 +1971,13 @@
           <span class="text-xs font-bold text-emerald-900 block border-b border-slate-200 pb-1"><i
               class="fa-solid fa-money-bill-wave mr-1 text-emerald-600"></i> i. Penyesuaian Remunerasi & Benefit (Format
             #,##0)</span>
+          <div class="mb-3 p-3 bg-indigo-50/50 border border-indigo-200 rounded-xl">
+            <label class="block text-[10px] font-bold text-indigo-900 mb-1">Periode Penggajian (Pro-Rata): <span class="text-rose-500">*</span></label>
+            <select id="tx-input-period-type" class="w-full bg-white border border-indigo-300 rounded-lg p-1.5 text-xs font-bold text-indigo-900 outline-none">
+                <option value="CUT_OFF">Cut-Off (Tgl 16 s/d 15)</option>
+                <option value="BULANAN">Bulanan (Tgl 1 s/d Akhir Bulan)</option>
+            </select>
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <!-- Kolom Kiri: Sebelumnya -->
             <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
@@ -1979,7 +1986,7 @@
                 <span class="text-slate-500 text-[10px]">Gaji Pokok:</span>
                 <span id="tx-prev-salary-display" class="font-bold font-mono text-slate-800 block text-xs">Rp 0</span>
               </div>
-              <div class="grid grid-cols-2 gap-1 text-[11px]">
+              <div class="grid grid-cols-3 gap-1 text-[11px]">
                 <div><span class="text-slate-500 text-[10px]">Tunj. Jabatan:</span><span id="tx-prev-allow-jabatan"
                     class="font-mono block">Rp 0</span></div>
                 <div><span class="text-slate-500 text-[10px]">Tunj. Transport:</span><span id="tx-prev-allow-transport"
@@ -1992,6 +1999,9 @@
                     id="tx-prev-allow-penempatan" class="font-mono block">Rp 0</span></div>
                 <div><span class="text-slate-500 text-[10px]">Tunj. Kemahalan:</span><span id="tx-prev-allow-kemahalan"
                     class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Makan:</span><span id="tx-prev-allow-makan" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Khusus:</span><span id="tx-prev-allow-khusus" class="font-mono block">Rp 0</span></div>
+                <div><span class="text-slate-500 text-[10px]">Tunj. Insentif:</span><span id="tx-prev-allow-insentif" class="font-mono block">Rp 0</span></div>
               </div>
             </div>
 
@@ -2004,7 +2014,7 @@
                 <input type="text" id="tx-new-salary" placeholder="0" oninput="formatRupiahInput(this)"
                   class="w-full bg-white border border-emerald-300 rounded-lg p-1.5 font-mono font-bold text-emerald-900 outline-none text-xs" />
               </div>
-              <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div class="grid grid-cols-3 gap-1.5 text-[11px]">
                 <div>
                   <label class="block text-[9px] font-semibold text-slate-700">Tunj. Jabatan:</label>
                   <input type="text" id="tx-new-allow-jabatan" placeholder="0" oninput="formatRupiahInput(this)"
@@ -2035,7 +2045,33 @@
                   <input type="text" id="tx-new-allow-kemahalan" placeholder="0" oninput="formatRupiahInput(this)"
                     class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
                 </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Makan:</label>
+                  <input type="text" id="tx-new-allow-makan" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Khusus:</label>
+                  <input type="text" id="tx-new-allow-khusus" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[9px] font-semibold text-slate-700">Tunj. Insentif:</label>
+                  <input type="text" id="tx-new-allow-insentif" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
               </div>
+            </div>
+          </div>
+          <div class="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <span class="block text-[10px] font-bold text-slate-600 uppercase">Penerapan Potongan / Subsidi Otomatis (Mesin Payroll):</span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer p-1.5 bg-white border border-slate-200 rounded-lg hover:border-indigo-400">
+                <input type="checkbox" id="chk-deduct-bpjskes" class="rounded text-indigo-600"> <span class="font-semibold text-[10px]">Terapkan BPJS Kesehatan</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer p-1.5 bg-white border border-slate-200 rounded-lg hover:border-indigo-400">
+                <input type="checkbox" id="chk-deduct-bpjstk" class="rounded text-indigo-600"> <span class="font-semibold text-[10px]">Terapkan BPJS Ketenagakerjaan</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer p-1.5 bg-white border border-slate-200 rounded-lg hover:border-indigo-400">
+                <input type="checkbox" id="chk-deduct-pph21" class="rounded text-indigo-600"> <span class="font-semibold text-[10px]">Terapkan PPh21 (TER)</span>
+              </label>
             </div>
           </div>
         </div>
