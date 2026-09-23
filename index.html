@@ -2015,32 +2015,7 @@
             <!-- Kolom Kanan: Perubahan Baru -->
             <div class="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-2">
               <span class="text-[10px] font-bold text-emerald-800 uppercase block">Benefit Perubahan Baru (Rp)</span>
-              
-              <!-- Periode Penggajian Baru -->
-              <div class="mb-2 pb-2 border-b border-emerald-200">
-                <label class="block text-[10px] font-semibold text-emerald-900 mb-1">Periode Penggajian: <span class="text-rose-500">*</span></label>
-                <div class="inline-flex items-center gap-2">
-                  <label class="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded-lg border border-slate-200 hover:border-indigo-400 text-[11px] font-medium text-slate-700">
-                    <input type="radio" name="tx_payroll_period" value="1-30" class="text-indigo-600 focus:ring-0" />
-                    <span>1-30</span>
-                  </label>
-                  <label class="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded-lg border border-slate-200 hover:border-indigo-400 text-[11px] font-medium text-slate-700">
-                    <input type="radio" name="tx_payroll_period" value="16-15" checked class="text-indigo-600 focus:ring-0" />
-                    <span>16-15</span>
-                  </label>
-                </div>
-              </div>
-              
-              <!-- Skema PPh Baru -->
-              <div class="mb-2 pb-2 border-b border-emerald-200">
-                <label class="block text-[10px] font-semibold text-emerald-900 mb-1">Skema PPh:</label>
-                <select id="tx-input-pph-scheme" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
-                  <option value="Net">Net</option>
-                  <option value="Gross" selected>Gross</option>
-                  <option value="Gross Up">Gross Up</option>
-                </select>
-              </div>
-              
+
               <div>
                 <label class="block text-[10px] font-semibold text-emerald-900 mb-0.5">Gaji Pokok Baru: <span
                     class="text-rose-500">*</span></label>
@@ -2089,6 +2064,25 @@
                 <div>
                   <label class="block text-[9px] font-semibold text-slate-700">Tunj. Insentif:</label>
                   <input type="text" id="tx-new-allow-insentif" placeholder="0" oninput="formatRupiahInput(this)" class="w-full bg-white border border-slate-300 rounded-lg p-1 font-mono text-xs" />
+                </div>
+              </div>
+
+              <!-- Periode Penggajian & Skema PPh (Sebaris) -->
+              <div class="flex items-center gap-3 pt-2 border-t border-emerald-200/80">
+                <div class="flex-1">
+                  <label class="block text-[10px] font-semibold text-emerald-900 mb-1">Periode Penggajian: <span class="text-rose-500">*</span></label>
+                  <select id="tx-input-period-type" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
+                    <option value="1-30">1-30</option>
+                    <option value="16-15" selected>16-15</option>
+                  </select>
+                </div>
+                <div class="flex-1">
+                  <label class="block text-[10px] font-semibold text-emerald-900 mb-1">Skema PPh:</label>
+                  <select id="tx-input-pph-scheme" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
+                    <option value="Net">Net</option>
+                    <option value="Gross" selected>Gross</option>
+                    <option value="Gross Up">Gross Up</option>
+                  </select>
                 </div>
               </div>
 

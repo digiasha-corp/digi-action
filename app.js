@@ -20754,6 +20754,12 @@ async function onTxEmployeeSelected(empId) {
     if (dispPrevPeriod) dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
     if (dispPrevPph) dispPrevPph.innerText = prevPph;
 
+    // Pre-select Periode Penggajian & PPh di dropdown
+    const periodSelect = document.getElementById("tx-input-period-type");
+    if (periodSelect) periodSelect.value = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+    const pphSelect = document.getElementById("tx-input-pph-scheme");
+    if (pphSelect) pphSelect.value = prevPph;
+
     // Tunjangan sebelumnya
     const allowJabatan = parseFloat(emp.allowance_jabatan || 0);
     const allowTransport = parseFloat(emp.allowance_transport || 0);
@@ -20784,13 +20790,7 @@ async function onTxEmployeeSelected(empId) {
     const dispAllowInsentif = document.getElementById("tx-prev-allow-insentif");
     if (dispAllowInsentif) dispAllowInsentif.innerText = `Rp ${allowInsentif.toLocaleString('id-ID')}`;
 
-    // Pre-select Periode Penggajian & PPh / BPJS
-    const empPeriod = (emp.payroll_period_type === '1-30' || emp.payroll_period_type === 'BULANAN') ? '1-30' : '16-15';
-    const periodRadio = document.querySelector(`input[name="tx_payroll_period"][value="${empPeriod}"]`);
-    if (periodRadio) periodRadio.checked = true;
-    
-    const pphSelect = document.getElementById("tx-input-pph-scheme");
-    if (pphSelect) pphSelect.value = prevPph;
+
 
     const pphSchemeEl = document.getElementById("tx-input-pph-scheme");
     if (pphSchemeEl && emp.pph_scheme) pphSchemeEl.value = emp.pph_scheme;
@@ -21533,8 +21533,8 @@ async function handleSubmitEmployeeTransaction(event) {
     const needsAgreement = isRotasi || isPromosi || isDemosi || isMutasi || isBenefit || isBiodata || (stagingList.length === 0);
     const initialStatus = needsAgreement ? "PENDING_AGREEMENT" : "IN_REVIEW";
 
-    const selectedPeriodRadio = document.querySelector('input[name="tx_payroll_period"]:checked');
-    const periodVal = selectedPeriodRadio ? selectedPeriodRadio.value : "16-15";
+    const periodSelect = document.getElementById("tx-input-period-type");
+    const periodVal = periodSelect ? periodSelect.value : "16-15";
     const pphScheme = document.getElementById("tx-input-pph-scheme")?.value || "Gross";
     const applyBpjsKes = document.getElementById("chk-deduct-bpjskes")?.checked ?? true;
     const applyBpjsTk = document.getElementById("chk-deduct-bpjstk")?.checked ?? true;
