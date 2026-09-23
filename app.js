@@ -20747,18 +20747,44 @@ async function onTxEmployeeSelected(empId) {
     if (dispSal) dispSal.innerText = `Rp ${bSalary.toLocaleString('id-ID')}`;
 
     // Periode dan PPh sebelumnya
-    const prevPeriod = emp.payroll_period_type || '16-15';
-    const prevPph = emp.pph_scheme || 'Gross';
+    const prevPeriod = emp.payroll_period_type;
+    const prevPph = emp.pph_scheme;
     const dispPrevPeriod = document.getElementById("tx-prev-period-display");
     const dispPrevPph = document.getElementById("tx-prev-pph-display");
-    if (dispPrevPeriod) dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
-    if (dispPrevPph) dispPrevPph.innerText = prevPph;
+    
+    // Tampilkan "na" jika data tidak tersedia di database
+    if (dispPrevPeriod) {
+      if (prevPeriod === null || prevPeriod === undefined || prevPeriod === '') {
+        dispPrevPeriod.innerText = 'na';
+      } else {
+        dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+      }
+    }
+    if (dispPrevPph) {
+      if (prevPph === null || prevPph === undefined || prevPph === '') {
+        dispPrevPph.innerText = 'na';
+      } else {
+        dispPrevPph.innerText = prevPph;
+      }
+    }
 
-    // Pre-select Periode Penggajian & PPh di dropdown
+    // Pre-select Periode Penggajian & PPh di dropdown dengan default 16-15 dan Gross
     const periodSelect = document.getElementById("tx-input-period-type");
-    if (periodSelect) periodSelect.value = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+    if (periodSelect) {
+      if (prevPeriod === null || prevPeriod === undefined || prevPeriod === '') {
+        periodSelect.value = '16-15'; // Default jika data tidak tersedia
+      } else {
+        periodSelect.value = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+      }
+    }
     const pphSelect = document.getElementById("tx-input-pph-scheme");
-    if (pphSelect) pphSelect.value = prevPph;
+    if (pphSelect) {
+      if (prevPph === null || prevPph === undefined || prevPph === '') {
+        pphSelect.value = 'Gross'; // Default jika data tidak tersedia
+      } else {
+        pphSelect.value = prevPph;
+      }
+    }
 
     // Tunjangan sebelumnya
     const allowJabatan = parseFloat(emp.allowance_jabatan || 0);
