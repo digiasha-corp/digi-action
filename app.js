@@ -20746,6 +20746,14 @@ async function onTxEmployeeSelected(empId) {
     const dispSal = document.getElementById("tx-prev-salary-display");
     if (dispSal) dispSal.innerText = `Rp ${bSalary.toLocaleString('id-ID')}`;
 
+    // Periode dan PPh sebelumnya
+    const prevPeriod = emp.payroll_period_type || '16-15';
+    const prevPph = emp.pph_scheme || 'Gross';
+    const dispPrevPeriod = document.getElementById("tx-prev-period-display");
+    const dispPrevPph = document.getElementById("tx-prev-pph-display");
+    if (dispPrevPeriod) dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+    if (dispPrevPph) dispPrevPph.innerText = prevPph;
+
     // Tunjangan sebelumnya
     const allowJabatan = parseFloat(emp.allowance_jabatan || 0);
     const allowTransport = parseFloat(emp.allowance_transport || 0);
@@ -20780,6 +20788,9 @@ async function onTxEmployeeSelected(empId) {
     const empPeriod = (emp.payroll_period_type === '1-30' || emp.payroll_period_type === 'BULANAN') ? '1-30' : '16-15';
     const periodRadio = document.querySelector(`input[name="tx_payroll_period"][value="${empPeriod}"]`);
     if (periodRadio) periodRadio.checked = true;
+    
+    const pphSelect = document.getElementById("tx-input-pph-scheme");
+    if (pphSelect) pphSelect.value = prevPph;
 
     const pphSchemeEl = document.getElementById("tx-input-pph-scheme");
     if (pphSchemeEl && emp.pph_scheme) pphSchemeEl.value = emp.pph_scheme;
@@ -21581,12 +21592,12 @@ async function handleSubmitEmployeeTransaction(event) {
       new_allowance_khusus: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-khusus")?.value) : parseFloat(emp.allowance_khusus || 0),
       prev_allowance_insentif: parseFloat(emp.allowance_insentif || 0),
       new_allowance_insentif: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-insentif")?.value) : parseFloat(emp.allowance_insentif || 0),
-      payroll_period_type: isBenefit ? periodVal : (emp.payroll_period_type || '16-15'),
+      payroll_period_type: isBenefit ? (periodVal === '1-30' ? 'BULANAN' : 'CUT_OFF') : (emp.payroll_period_type || 'CUT_OFF'),
+      pph_scheme: isBenefit ? pphScheme : (emp.pph_scheme || 'Gross'),
       payroll_deductions_json: isBenefit ? {
         apply_bpjs_kes: applyBpjsKes,
         apply_bpjs_tk: applyBpjsTk,
-        pph_scheme: pphScheme,
-        apply_pph21: true
+        apply_pph21: document.getElementById("chk-deduct-pph21")?.checked || false
       } : (emp.payroll_deductions_json || {}),
 
       // Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
@@ -21910,6 +21921,10 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
             <span class="text-[11px] text-slate-500">Periode Penggajian:</span>
             <strong class="text-indigo-900 font-semibold text-xs">${(tx.payroll_period_type === '1-30' || tx.payroll_period_type === 'BULANAN') ? '1-30' : '16-15'}</strong>
+          </div>
+          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
+            <span class="text-[11px] text-slate-500">Skema PPh:</span>
+            <strong class="text-indigo-900 font-semibold text-xs">${tx.pph_scheme || 'Gross'}</strong>
           </div>
           ${tx.payroll_deductions_json ? `
             <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100 text-[11px]">
@@ -22882,6 +22897,7 @@ async function applyApprovedTransactionToEmployee(tx) {
       new_allowance_insentif: tx.new_allowance_insentif ? parseFloat(tx.new_allowance_insentif) : null,
       previous_allowance_insentif: tx.prev_allowance_insentif ? parseFloat(tx.prev_allowance_insentif) : null,
       payroll_period_type: tx.payroll_period_type || 'CUT_OFF',
+      pph_scheme: tx.pph_scheme || 'Gross',
       payroll_deductions_json: tx.payroll_deductions_json || {},
       created_at: now
     };
