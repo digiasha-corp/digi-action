@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v159";
+const APP_BUILD_VERSION = "20260919_v160";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -20395,6 +20395,9 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
   // 6. Reset Dokumen & Tab Viewer
   resetTxDocForm();
 
+  // 6b. Reset Benefit Sebelumnya & Input Benefit
+  resetTxBenefitDisplay();
+
   // 7. Reset summary box & subforms
   document.getElementById("tx-emp-selected-summary")?.classList.add("hidden");
   toggleTxSubforms();
@@ -20643,10 +20646,38 @@ function updateTxBioChildrenCount() {
   if (countInput) countInput.value = rows.length;
 }
 
+function resetTxBenefitDisplay() {
+  const dispPeriod = document.getElementById("tx-prev-period-display");
+  if (dispPeriod) dispPeriod.innerText = "NA";
+
+  const dispPph = document.getElementById("tx-prev-pph-display");
+  if (dispPph) dispPph.innerText = "NA";
+
+  const dispSal = document.getElementById("tx-prev-salary-display");
+  if (dispSal) dispSal.innerText = "Rp 0";
+
+  const allowIds = [
+    "tx-prev-allow-jabatan", "tx-prev-allow-transport", "tx-prev-allow-komunikasi",
+    "tx-prev-allow-tempattinggal", "tx-prev-allow-penempatan", "tx-prev-allow-kemahalan",
+    "tx-prev-allow-makan", "tx-prev-allow-khusus", "tx-prev-allow-insentif"
+  ];
+  allowIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = "Rp 0";
+  });
+
+  const periodSelect = document.getElementById("tx-input-period-type");
+  if (periodSelect) periodSelect.value = "";
+
+  const pphSelect = document.getElementById("tx-input-pph-scheme");
+  if (pphSelect) pphSelect.value = "";
+}
+
 async function onTxEmployeeSelected(empId) {
   if (!empId) {
     CURRENT_TX_SELECTED_EMP = null;
     document.getElementById("tx-emp-selected-summary")?.classList.add("hidden");
+    resetTxBenefitDisplay();
     return;
   }
 
@@ -20695,6 +20726,9 @@ async function onTxEmployeeSelected(empId) {
         el.disabled = true;
       }
     });
+
+    // Reset Benefit Sebelumnya & Input Benefit untuk Calon Karyawan ke NA
+    resetTxBenefitDisplay();
   } else {
     // Pegawai Aktif -> Penerimaan Karyawan dinonaktifkan
     if (chkPenerimaan) {
@@ -20752,35 +20786,35 @@ async function onTxEmployeeSelected(empId) {
     const dispPrevPeriod = document.getElementById("tx-prev-period-display");
     const dispPrevPph = document.getElementById("tx-prev-pph-display");
     
-    // Tampilkan "na" jika data tidak tersedia di database
+    // Tampilkan "NA" jika data tidak tersedia di database
     if (dispPrevPeriod) {
-      if (prevPeriod === null || prevPeriod === undefined || prevPeriod === '') {
-        dispPrevPeriod.innerText = 'na';
+      if (prevPeriod === null || prevPeriod === undefined || String(prevPeriod).trim() === '') {
+        dispPrevPeriod.innerText = 'NA';
       } else {
-        dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+        dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : (prevPeriod === 'CUT_OFF' ? '16-15' : prevPeriod);
       }
     }
     if (dispPrevPph) {
-      if (prevPph === null || prevPph === undefined || prevPph === '') {
-        dispPrevPph.innerText = 'na';
+      if (prevPph === null || prevPph === undefined || String(prevPph).trim() === '') {
+        dispPrevPph.innerText = 'NA';
       } else {
         dispPrevPph.innerText = prevPph;
       }
     }
 
-    // Pre-select Periode Penggajian & PPh di dropdown dengan default 16-15 dan Gross
+    // Pre-select Periode Penggajian & PPh di dropdown dengan fallback kosong / NA jika belum ada data
     const periodSelect = document.getElementById("tx-input-period-type");
     if (periodSelect) {
-      if (prevPeriod === null || prevPeriod === undefined || prevPeriod === '') {
-        periodSelect.value = '16-15'; // Default jika data tidak tersedia
+      if (prevPeriod === null || prevPeriod === undefined || String(prevPeriod).trim() === '') {
+        periodSelect.value = ''; // Kosongkan agar HR memilih sendiri
       } else {
         periodSelect.value = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
       }
     }
     const pphSelect = document.getElementById("tx-input-pph-scheme");
     if (pphSelect) {
-      if (prevPph === null || prevPph === undefined || prevPph === '') {
-        pphSelect.value = 'Gross'; // Default jika data tidak tersedia
+      if (prevPph === null || prevPph === undefined || String(prevPph).trim() === '') {
+        pphSelect.value = ''; // Kosongkan agar HR memilih sendiri
       } else {
         pphSelect.value = prevPph;
       }

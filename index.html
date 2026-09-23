@@ -1980,13 +1980,13 @@
               <!-- Periode Penggajian Sebelumnya -->
               <div class="mb-2 pb-2 border-b border-slate-200">
                 <span class="text-slate-500 text-[10px] block mb-1">Periode Penggajian:</span>
-                <span id="tx-prev-period-display" class="font-semibold text-indigo-700 text-xs">16-15</span>
+                <span id="tx-prev-period-display" class="font-semibold text-indigo-700 text-xs">NA</span>
               </div>
               
               <!-- Skema PPh Sebelumnya -->
               <div class="mb-2 pb-2 border-b border-slate-200">
                 <span class="text-slate-500 text-[10px] block mb-1">Skema PPh:</span>
-                <span id="tx-prev-pph-display" class="font-semibold text-indigo-700 text-xs">Gross</span>
+                <span id="tx-prev-pph-display" class="font-semibold text-indigo-700 text-xs">NA</span>
               </div>
               
               <div>
@@ -2072,15 +2072,17 @@
                 <div class="flex-1">
                   <label class="block text-[10px] font-semibold text-emerald-900 mb-1">Periode Penggajian: <span class="text-rose-500">*</span></label>
                   <select id="tx-input-period-type" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
+                    <option value="">-- Pilih Periode --</option>
                     <option value="1-30">1-30</option>
-                    <option value="16-15" selected>16-15</option>
+                    <option value="16-15">16-15</option>
                   </select>
                 </div>
                 <div class="flex-1">
                   <label class="block text-[10px] font-semibold text-emerald-900 mb-1">Skema PPh:</label>
                   <select id="tx-input-pph-scheme" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
+                    <option value="">-- Pilih Skema PPh --</option>
                     <option value="Net">Net</option>
-                    <option value="Gross" selected>Gross</option>
+                    <option value="Gross">Gross</option>
                     <option value="Gross Up">Gross Up</option>
                   </select>
                 </div>
