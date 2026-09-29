@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260929_v164";
+const APP_BUILD_VERSION = "20260929_v165";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -19181,12 +19181,25 @@ async function loadDossierTransactionsHistory(emp) {
           ${tx.contract_no ? `<p class="text-[10px] text-slate-600 font-mono">No. Kontrak: <strong>${tx.contract_no}</strong></p>` : ''}
           ${salaryChange ? `<p class="text-[10px] text-emerald-700 font-bold">Gaji Pokok: ${salaryChange}</p>` : ''}
           ${tx.exit_notes ? `<p class="text-[10px] text-slate-500 italic mt-0.5">"${tx.exit_notes}"</p>` : ''}
-          ${tx.status === "PENDING_AGREEMENT" ? `
-            <div class="mt-1.5 p-2 bg-purple-50 border border-purple-200 rounded-xl text-[10px] text-purple-900 flex items-center justify-between">
-              <span><i class="fa-solid fa-signature mr-1"></i>Menunggu Tanda Tangan Elektronik PIC ybs</span>
-              <button type="button" onclick="openElectronicAgreementModal('${tx.id}')" class="px-2 py-0.5 bg-purple-600 text-white rounded font-bold text-[9px]">Tanda Tangani</button>
-            </div>
-          ` : ''}
+          ${tx.status === "PENDING_AGREEMENT" ? (() => {
+            const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
+                           (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
+            if (isSelf) {
+              return `
+                <div class="mt-1.5 p-2 bg-purple-50 border border-purple-200 rounded-xl text-[10px] text-purple-900 flex items-center justify-between">
+                  <span><i class="fa-solid fa-signature mr-1"></i>Persetujuan elektronik diperlukan dari Anda</span>
+                  <button type="button" onclick="openElectronicAgreementModal('${tx.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-[9px] shadow-2xs transition">Tanda Tangani</button>
+                </div>
+              `;
+            } else {
+              return `
+                <div class="mt-1.5 p-2 bg-purple-50/70 border border-purple-200 rounded-xl text-[10px] text-purple-800 flex items-center gap-1.5">
+                  <i class="fa-solid fa-clock-rotate-left text-purple-600"></i>
+                  <span>Menunggu tanda tangan persetujuan elektronik oleh karyawan ybs di Menu Persetujuan</span>
+                </div>
+              `;
+            }
+          })() : ''}
         </div>
       </div>
     `;
@@ -21570,9 +21583,16 @@ async function handleSubmitEmployeeTransaction(event) {
       };
     }
 
-    // Tentukan Status Awal:
-    // Jika Rotasi, Promosi, Demosi, Mutasi, Benefit, atau Biodata (atau staging dikosongkan) -> PENDING_AGREEMENT
-    const needsAgreement = isRotasi || isPromosi || isDemosi || isMutasi || isBenefit || isBiodata || (stagingList.length === 0);
+    // Tentukan Status Awal & Kebutuhan Persetujuan Karyawan (Agreement):
+    // ATURAN BISNIS:
+    // 1. Jika transaksi melibatkan Kontrak / Kerja A s/d D:
+    //    (Penerimaan Karyawan, Pengangkatan Tetap PKWTT, Pengangkatan Kontrak PKWT, Perpanjangan Kontrak)
+    //    -> TIDAK memerlukan persetujuan elektronik / agreement (sudah terikat langsung via kontrak fisik/perjanjian kerja).
+    // 2. Jika transaksi murni perubahan internal (Rotasi, Promosi, Demosi, Mutasi, Benefit, Biodata) TANPA A s/d D:
+    //    -> Memerlukan persetujuan elektronik PIC ybs (PENDING_AGREEMENT).
+    const hasContractAction = isPenerimaan || isTetap || isKontrak || isPerpanjang;
+    const hasInternalAdjustment = isRotasi || isPromosi || isDemosi || isMutasi || isBenefit || isBiodata;
+    const needsAgreement = !hasContractAction && (hasInternalAdjustment || stagingList.length === 0);
     const initialStatus = needsAgreement ? "PENDING_AGREEMENT" : "IN_REVIEW";
 
     const periodSelect = document.getElementById("tx-input-period-type");
@@ -22459,6 +22479,15 @@ async function openElectronicAgreementModal(txId) {
     return;
   }
 
+  // VALIDASI HAK AKSES PIC YBS:
+  // Hanya karyawan pemilik transaksi yang berhak melakukan review & tanda tangan kesepakatan
+  const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
+                 (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
+  if (!isSelf) {
+    alert("Akses Ditolak: Hanya karyawan yang bersangkutan (" + (tx.nip || "PIC") + ") yang berhak menandatangani persetujuan ini melalui akun mereka.");
+    return;
+  }
+
   CURRENT_AGREEMENT_TX = tx;
   document.getElementById("agree-tx-id").value = tx.id;
 
@@ -22506,6 +22535,16 @@ async function confirmElectronicAgreement() {
   if (!CURRENT_AGREEMENT_TX) return;
   const tx = CURRENT_AGREEMENT_TX;
   const txId = tx.id;
+
+  // Double check hak akses
+  const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
+                 (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
+  if (!isSelf) {
+    alert("Gagal: Anda tidak berhak menandatangani transaksi atas nama karyawan lain.");
+    closeElectronicAgreementModal();
+    return;
+  }
+
   const btn = document.getElementById("btn-confirm-agree");
   const origText = btn ? btn.innerHTML : "Setuju";
 
