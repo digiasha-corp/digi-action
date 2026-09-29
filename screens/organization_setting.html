@@ -35,9 +35,6 @@
     <button type="button" id="tab-btn-org-workloc" onclick="switchOrgSettingTab('workloc')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
       <i class="fa-solid fa-building-shield mr-1.5 text-emerald-600"></i> Work Location
     </button>
-    <button type="button" id="tab-btn-org-role" onclick="switchOrgSettingTab('role')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
-      <i class="fa-solid fa-shield-halved mr-1.5 text-purple-600"></i> Role & Hak Akses
-    </button>
     <button type="button" id="tab-btn-org-sso" onclick="switchOrgSettingTab('sso')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
       <i class="fa-solid fa-key mr-1.5 text-amber-600"></i> Integrasi SSO
     </button>
@@ -180,32 +177,6 @@
     </div>
   </div>
 
-  <!-- ========================================================================= -->
-  <!-- TAB 3: ROLE & HAK AKSES MULTI-APLIKASI BERBASIS JABATAN -->
-  <!-- ========================================================================= -->
-  <div id="org-setting-tab-role" class="space-y-3.5 hidden">
-    <div class="flex items-center justify-between gap-3 bg-indigo-50/80 border border-indigo-200 p-3.5 rounded-2xl flex-wrap">
-      <div>
-        <h4 class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-          <i class="fa-solid fa-shield-halved text-indigo-600"></i> Matriks Hak Akses Terpusat Berbasis Jabatan
-        </h4>
-        <p class="text-[10px] text-indigo-700">Atur hak akses granular (Lihat & Ubah) per jabatan untuk seluruh aplikasi satelit: Digiasha Core, Digi Appwork, dan Digispector</p>
-      </div>
-      <div class="flex items-center space-x-2 flex-wrap gap-y-1.5">
-        <div class="relative">
-          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
-          <input type="text" id="role-filter-input" oninput="filterOrgRolePermissions(this.value)" placeholder="Cari jabatan / ID..." class="pl-8 pr-3 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 outline-none w-48 focus:w-60 transition-all shadow-xs" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Tabel Matriks Role -->
-    <div id="role-permissions-matrix-container" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-      <div class="p-8 text-center text-xs text-slate-400">
-        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat matriks hak akses jabatan...
-      </div>
-    </div>
-  </div>
 
   <!-- ========================================================================= -->
   <!-- TAB 4: INTEGRASI SINGLE SIGN-ON (SSO) DIGIASHA -->
