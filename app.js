@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v160";
+const APP_BUILD_VERSION = "20260919_v162";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -10172,7 +10172,7 @@ async function initSettingsScreen() {
 }
 
 function switchSettingsTab(tab) {
-  const tabs = ["emp", "banner", "dealer", "office", "gps", "role"];
+  const tabs = ["emp", "banner", "dealer", "office", "gps"];
   tabs.forEach(t => {
     const el = document.getElementById(`settings-tab-${t}`);
     const btn = document.getElementById(`tab-btn-${t}`);
@@ -10194,8 +10194,6 @@ function switchSettingsTab(tab) {
     }
   } else if (tab === "banner") {
     loadBannersForSettings();
-  } else if (tab === "role") {
-    loadRolePermissionsSettings();
   }
 }
 
@@ -16156,7 +16154,7 @@ async function initOrganizationSettingScreen() {
 }
 
 function switchOrgSettingTab(tab) {
-  const tabs = ["unit", "position", "level", "chart", "workloc", "role", "sso"];
+  const tabs = ["unit", "position", "level", "chart", "workloc", "sso"];
   tabs.forEach(t => {
     const el = document.getElementById(`org-setting-tab-${t}`);
     const btn = document.getElementById(`tab-btn-org-${t}`);
@@ -16183,8 +16181,6 @@ function switchOrgSettingTab(tab) {
     renderVisualOrgChartTree();
   } else if (tab === "workloc") {
     loadWorkLocations();
-  } else if (tab === "role") {
-    loadOrgRolePermissions();
   } else if (tab === "sso") {
     loadSsoClients();
     populateSsoTestEmpSelect();
@@ -19646,44 +19642,7 @@ async function handleSaveEmployeeFull(event) {
   }
 }
 
-function loadOrgRolePermissions() {
-  const container = document.getElementById("role-permissions-matrix-container");
-  if (!container) return;
 
-  const roles = Object.keys(ROLE_PERMISSIONS_STATE || {});
-  if (roles.length === 0) {
-    container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">Belum ada role terdefinisi.</div>';
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="divide-y divide-slate-100 text-xs">
-      ${roles.map(rKey => {
-    const r = ROLE_PERMISSIONS_STATE[rKey];
-    const perms = r.permissions || [];
-    return `
-          <div class="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 transition">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center space-x-2">
-                <span class="font-bold text-slate-900">${r.name}</span>
-                <span class="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded border ${r.badgeBg || 'bg-slate-100 text-slate-700'}">${rKey}</span>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-0.5">${r.desc || '-'}</p>
-              <div class="flex items-center space-x-1 flex-wrap gap-y-1 mt-1.5">
-                <span class="text-[10px] text-slate-400 font-semibold mr-1">Menu:</span>
-                ${perms.map(p => `<span class="px-2 py-0.2 rounded-full text-[9px] bg-purple-50 text-purple-700 border border-purple-200 font-mono">${p}</span>`).join(" ")}
-              </div>
-            </div>
-            <button type="button" onclick="openEditRoleInfoModal('${rKey}')" class="px-2.5 py-2 bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl font-bold text-xs shrink-0 flex items-center space-x-1 border border-slate-200 transition">
-              <i class="fa-solid fa-pen-to-square"></i>
-              <span>Atur Akses</span>
-            </button>
-          </div>
-        `;
-  }).join("")}
-    </div>
-  `;
-}
 
 // =========================================================================
 // CONTROLLER: PERSONALIA & DATA KEPEGAWAIAN (CORE HR MASTER & DOSSIER)
@@ -20785,7 +20744,7 @@ async function onTxEmployeeSelected(empId) {
     const prevPph = emp.pph_scheme;
     const dispPrevPeriod = document.getElementById("tx-prev-period-display");
     const dispPrevPph = document.getElementById("tx-prev-pph-display");
-    
+
     // Tampilkan "NA" jika data tidak tersedia di database
     if (dispPrevPeriod) {
       if (prevPeriod === null || prevPeriod === undefined || String(prevPeriod).trim() === '') {
@@ -21594,8 +21553,9 @@ async function handleSubmitEmployeeTransaction(event) {
     const initialStatus = needsAgreement ? "PENDING_AGREEMENT" : "IN_REVIEW";
 
     const periodSelect = document.getElementById("tx-input-period-type");
-    const periodVal = periodSelect ? periodSelect.value : "16-15";
-    const pphScheme = document.getElementById("tx-input-pph-scheme")?.value || "Gross";
+    const periodVal = periodSelect?.value || (emp.payroll_period_type === "BULANAN" ? "1-30" : "16-15");
+    const pphSchemeRaw = document.getElementById("tx-input-pph-scheme")?.value;
+    const pphScheme = pphSchemeRaw ? pphSchemeRaw : (emp.pph_scheme || "Not Set");
     const applyBpjsKes = document.getElementById("chk-deduct-bpjskes")?.checked ?? true;
     const applyBpjsTk = document.getElementById("chk-deduct-bpjstk")?.checked ?? true;
 
