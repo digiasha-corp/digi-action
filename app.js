@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260919_v162";
+const APP_BUILD_VERSION = "20260929_v163";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -21613,12 +21613,13 @@ async function handleSubmitEmployeeTransaction(event) {
       prev_allowance_insentif: parseFloat(emp.allowance_insentif || 0),
       new_allowance_insentif: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-insentif")?.value) : parseFloat(emp.allowance_insentif || 0),
       payroll_period_type: isBenefit ? (periodVal === '1-30' ? 'BULANAN' : 'CUT_OFF') : (emp.payroll_period_type || 'CUT_OFF'),
-      pph_scheme: isBenefit ? pphScheme : (emp.pph_scheme || 'Gross'),
+      pph_scheme: isBenefit ? pphScheme : (emp.pph_scheme || 'Not Set'),
       payroll_deductions_json: isBenefit ? {
+        pph_scheme: pphScheme,
         apply_bpjs_kes: applyBpjsKes,
         apply_bpjs_tk: applyBpjsTk,
         apply_pph21: document.getElementById("chk-deduct-pph21")?.checked || false
-      } : (emp.payroll_deductions_json || {}),
+      } : { ...(emp.payroll_deductions_json || {}), pph_scheme: emp.pph_scheme || emp.payroll_deductions_json?.pph_scheme || 'Not Set' },
 
       // Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
       uang_pisah: isExit ? parseRupiah(document.getElementById("tx-exit-uangpisah")?.value) : 0,
@@ -21639,12 +21640,25 @@ async function handleSubmitEmployeeTransaction(event) {
     };
 
     if (supabaseClient) {
-      // 1. Insert ke hr_employee_transactions
-      const { data: createdTx, error: txInsertErr } = await supabaseClient
+      // 1. Insert ke hr_employee_transactions (dengan auto-retry tanpa pph_scheme jika kolom belum termigrasi)
+      let { data: createdTx, error: txInsertErr } = await supabaseClient
         .from("hr_employee_transactions")
         .insert([txPayload])
         .select("id")
         .single();
+
+      if (txInsertErr && (txInsertErr.message?.includes("pph_scheme") || txInsertErr.code === "PGRST204" || txInsertErr.code === "42703")) {
+        console.warn("[handleSubmitEmployeeTransaction] pph_scheme column not found in schema cache, retrying without direct column...", txInsertErr.message);
+        const retryPayload = { ...txPayload };
+        delete retryPayload.pph_scheme;
+        const retryRes = await supabaseClient
+          .from("hr_employee_transactions")
+          .insert([retryPayload])
+          .select("id")
+          .single();
+        createdTx = retryRes.data;
+        txInsertErr = retryRes.error;
+      }
 
       if (txInsertErr) {
         throw new Error("Gagal menyimpan transaksi kepegawaian: " + txInsertErr.message);
@@ -22925,6 +22939,15 @@ async function applyApprovedTransactionToEmployee(tx) {
     let { error: chErr } = await supabaseClient
       .from("hr_employee_career_histories")
       .insert(careerPayload);
+
+    if (chErr && (chErr.message?.includes("pph_scheme") || chErr.code === "PGRST204" || chErr.code === "42703")) {
+      const retryCareerPayload = { ...careerPayload };
+      delete retryCareerPayload.pph_scheme;
+      const retryChRes = await supabaseClient
+        .from("hr_employee_career_histories")
+        .insert(retryCareerPayload);
+      chErr = retryChRes.error;
+    }
 
     if (chErr) {
       // Fallback ke view

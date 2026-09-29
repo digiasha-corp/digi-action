@@ -90,6 +90,7 @@ Hanya dilakukan oleh owner proyek secara manual via GitHub Pull Request, setelah
 | `hr_job_positions` | `job_positions` | Master jabatan |
 | `hr_master_levels` | `master_levels` | Level/grade jabatan |
 | `hr_work_locations` | `work_locations` | Master lokasi kerja |
+| `hr_payroll_parameters` | *(tidak ada view)* | Master parameter rumus payroll (BPJS, PPh21, dll.) |
 
 ### Kolom Kritis: `hr_employees`
 ```sql
@@ -97,17 +98,17 @@ id              UUID PRIMARY KEY
 nip             TEXT UNIQUE          -- Format: MMYYXXXX (e.g. 09260001)
 name            TEXT
 email           TEXT UNIQUE
-user_id         UUID
 location_id     TEXT                 -- FK → hr_organization_units.id_unit (BOD, HO-CORP, dll.)
 position_id     TEXT                 -- FK → hr_job_positions.id_position (COO, POS-GM-OPS, dll.)
 supervisor_id   UUID                 -- FK → hr_employees.id
-role            TEXT                 -- R-01 sampai R-07
 status_kerja    TEXT                 -- 'PKWTT' | 'PKWT' | 'PROBATION' | 'MAGANG'
 tanggal_masuk   DATE
 tanggal_selesai_kontrak DATE
 deleted_at      TIMESTAMPTZ          -- NULL = AKTIF; NOT NULL = NONAKTIF/Keluar
 created_at, updated_at TIMESTAMPTZ
 ```
+
+> **CATATAN:** Kolom `user_id` dan `role` telah dihapus dari `hr_employees`. Autentikasi dan SSO kini mengandalkan NIP (atau id uuid), sedangkan hak akses role sepenuhnya diturunkan secara dinamis dari relasi master jabatan di `hr_job_position_permissions`.
 
 > **Kolom yang TIDAK ADA di hr_employees** (jangan dikirim!):
 > `work_location_id`, `unit_id`, `basic_salary`, `level_id`, `status_aktif`, `is_active`, `tanggal_keluar`, `contract_no`, `contract_start_date`
@@ -158,7 +159,7 @@ prev_unit_id TEXT
 -- Kontrak:
 join_date DATE, employment_status TEXT
 contract_no TEXT, contract_start_date DATE, contract_end_date DATE
--- Remunerasi (NUMERIC, 6 jenis tunjangan):
+-- Remunerasi (NUMERIC, 9 jenis tunjangan):
 prev_basic_salary, new_basic_salary
 prev_allowance_jabatan, new_allowance_jabatan
 prev_allowance_transport, new_allowance_transport
@@ -166,6 +167,12 @@ prev_allowance_komunikasi, new_allowance_komunikasi
 prev_allowance_tempat_tinggal, new_allowance_tempat_tinggal
 prev_allowance_penempatan, new_allowance_penempatan
 prev_allowance_kemahalan, new_allowance_kemahalan
+prev_allowance_makan, new_allowance_makan
+prev_allowance_khusus, new_allowance_khusus
+prev_allowance_insentif, new_allowance_insentif
+-- Payroll Parameters:
+payroll_period_type TEXT         -- 'CUT_OFF' | 'BULANAN'
+payroll_deductions_json JSONB    -- Flag potongan/subsidi otomatis (BPJS, PPh21)
 -- PHK:
 uang_pisah NUMERIC, uang_pisah_notes TEXT
 exit_interview_no TEXT, inventory_returned TEXT, inventory_not_returned TEXT
@@ -326,7 +333,6 @@ await supabaseClient
     position_id: "POS-COO",      // ID dari hr_job_positions.id_position
     status_kerja: "PKWT",
     tanggal_selesai_kontrak: "2027-09-19",
-    updated_at: new Date().toISOString()
   })
   .eq("id", empId);
 
@@ -341,6 +347,24 @@ await supabaseClient
 - **Selalu destructure error**: `const { data, error } = await supabase...`
 - **Selalu log error eksplisit**: `if (error) console.error("[FunctionName]", error);`
 - **Jangan sembunyikan error** dengan `console.warn` di catch blok utama
+
+---
+
+#### ⚙️ ARSITEKTUR PAYROLL ENGINE
+**Fase 1 (Saat ini): Setup Benefit & Potongan di Formulir Transaksi**
+- Formulir transaksi "Penyesuaian Benefit" hanya bertugas mendaftarkan komponen benefit dan menyimpan konfigurasi penggajian:
+  - **Periode Penggajian**: Radio button compact `1-30` atau `16-15`
+  - **Skema PPh**: Dropdown `Net`, `Gross`, atau `Gross Up`
+  - **Kepesertaan BPJS**: Checkbox `BPJS Kesehatan` dan `BPJS Ketenagakerjaan` (terletak di bagian bawah kelompok Benefit Perubahan Baru)
+- Menyimpan flag JSONB untuk potongan/subsidi: `payroll_deductions_json` (`apply_bpjs_kes`, `apply_bpjs_tk`, `pph_scheme`, `apply_pph21`)
+- Kalkulasi nominal Rupiah pajak/BPJS TIDAK dilakukan di form transaksi ini
+- Parameter rumus disimpan di tabel `hr_payroll_parameters` dengan format string (contoh: `({gaji_pokok} + {tunj_tetap}) * 0.01`)
+
+**Fase 2 (Akan Datang): Mesin Kalkulasi Penggajian Bulanan**
+- Modul terpisah yang akan membaca flag JSONB dari transaksi benefit yang sudah disetujui
+- Mesin akan mem-parsing string rumus dari `hr_payroll_parameters` dan mengganti placeholder variabel
+- Kalkulasi pro-rata berdasarkan kalender absensi (cut-off vs bulanan penuh)
+- Menghasilkan slip gaji final dengan semua potongan dan subsidi otomatis
 
 ---
 
@@ -387,10 +411,11 @@ await supabaseClient
 | `12_ensure_personal_details_schema.sql` | ⏳ SIAP DIJALANKAN | Pastikan kolom personal details lengkap, disable RLS, reload cache, & backfill orphan |
 | `13_sync_approved_transactions_and_fix_dossier.sql` | ⏳ SIAP DIJALANKAN | Sinkronisasi NIP resmi & data kepegawaian dari transaksi APPROVED ke hr_employees |
 | `14_add_applied_status.sql` | ⏳ PLANNED | Tambah applied_at + status APPLIED |
+| `15_payroll_setup_and_allowances.sql` | ⏳ SIAP DIJALANKAN | Setup parameter payroll & tambah tunjangan baru (makan, khusus, insentif) + payroll period type |
 
 ---
 
-*Last updated: 2026-09-21 13:40 WIB*
+*Last updated: 2026-09-22 15:30 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `feature/fac-workflow` (development) → `main` (production)*
 

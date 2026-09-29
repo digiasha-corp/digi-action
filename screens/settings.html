@@ -28,9 +28,6 @@
     <button type="button" id="tab-btn-gps" onclick="switchSettingsTab('gps')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900">
       <i class="fa-solid fa-satellite-dish mr-1 text-cyan-600"></i> Stok GPS
     </button>
-    <button type="button" id="tab-btn-role" onclick="loadScreen('organization_setting'); setTimeout(() => switchOrgSettingTab('role'), 150)" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-purple-700 hover:text-purple-900 hover:bg-purple-50">
-      <i class="fa-solid fa-shield-halved mr-1 text-purple-600"></i> Role & Akses <i class="fa-solid fa-arrow-up-right-from-square text-[9px] ml-0.5 opacity-60"></i>
-    </button>
   </div>
 
   <!-- ================= TAB 1: KARYAWAN & AKUN ================= -->
@@ -125,25 +122,7 @@
     </div>
   </div>
 
-  <!-- ================= TAB 5: ROLE & HAK AKSES MODUL (TERPUSAT DI MASTER JABATAN) ================= -->
-  <div id="settings-tab-role" class="space-y-4 hidden">
-    <div class="bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50 border border-indigo-200/80 p-6 rounded-3xl shadow-xs text-center">
-      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-500/20">
-        <i class="fa-solid fa-shield-halved text-2xl"></i>
-      </div>
-      <h3 class="text-base font-black text-slate-900 mb-1.5">Pengaturan Hak Akses Telah Disentralisasi</h3>
-      <p class="text-xs text-slate-600 max-w-md mx-auto mb-5 leading-relaxed">
-        Hak akses modul <strong>Digi Active</strong> kini disatukan ke dalam <strong>Master Jabatan (Job Position)</strong> bersama aplikasi satelit (<em>Digiasha Core</em>, <em>Digi Appwork</em>, dan <em>Digispector</em>). Tidak perlu lagi mengelola role akses terpisah.
-      </p>
-      <div class="flex items-center justify-center gap-3">
-        <button type="button" onclick="loadScreen('organization_setting'); setTimeout(() => switchOrgSettingTab('role'), 150)" class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 flex items-center space-x-2 transition">
-          <i class="fa-solid fa-bolt text-amber-400"></i>
-          <span>Buka Hak Akses Jabatan Terpusat</span>
-          <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
-        </button>
-      </div>
-    </div>
-  </div>
+
 </div>
 
 <!-- ================= MODAL EDIT / TAMBAH KARYAWAN ================= -->
