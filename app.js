@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260929_v163";
+const APP_BUILD_VERSION = "20260929_v164";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -18443,7 +18443,7 @@ async function openEmployeeDossierModal(nipOrId) {
 
   // Header Detail Personalia
   try {
-    const latestApprovedTx = (CURRENT_DOSSIER_TX_LIST || []).find(t => t.status === "APPROVED") || CURRENT_DOSSIER_TX_LIST?.[0];
+    const latestApprovedTx = (CURRENT_DOSSIER_TX_LIST || []).find(t => t.status === "APPROVED");
     const hasApprovedHire = (CURRENT_DOSSIER_TX_LIST || []).some(t =>
       t.status === "APPROVED" && (
         (Array.isArray(t.transaction_types) && t.transaction_types.includes("Penerimaan Karyawan")) ||
@@ -18451,7 +18451,7 @@ async function openEmployeeDossierModal(nipOrId) {
       )
     );
 
-    // Sinkronkan NIP resmi & status kerja jika transaksi penerimaan telah disetujui
+    // Sinkronkan NIP resmi & status kerja HANYA jika transaksi penerimaan telah disetujui (APPROVED)
     if (latestApprovedTx?.nip && !latestApprovedTx.nip.startsWith("CAND-") && (String(emp.nip || "").startsWith("CAND-") || !emp.nip)) {
       emp.nip = latestApprovedTx.nip;
     }
@@ -18814,10 +18814,10 @@ async function loadDossierJobDetails(emp) {
     try { await loadWorkLocations(); } catch (e) { }
   }
 
-  // 2. Evaluasi transaksi kepegawaian terbaru (snapshot kontrak, work location, dll.)
+  // 2. Evaluasi transaksi kepegawaian yang SUDAH DISETUJUI (APPROVED)
   let latestTx = null;
   if (Array.isArray(CURRENT_DOSSIER_TX_LIST) && CURRENT_DOSSIER_TX_LIST.length > 0) {
-    latestTx = CURRENT_DOSSIER_TX_LIST.find(t => t.status === "APPROVED") || CURRENT_DOSSIER_TX_LIST[0];
+    latestTx = CURRENT_DOSSIER_TX_LIST.find(t => t.status === "APPROVED");
   } else if (supabaseClient && (emp?.id || emp?.nip)) {
     try {
       const empFilter = emp.id ? `employee_id.eq.${emp.id},nip.eq.${emp.nip}` : `nip.eq.${emp.nip}`;
@@ -18825,9 +18825,10 @@ async function loadDossierJobDetails(emp) {
         .from("hr_employee_transactions")
         .select("*")
         .or(empFilter)
+        .eq("status", "APPROVED")
         .order("effective_date", { ascending: false });
       if (txList && txList.length > 0) {
-        latestTx = txList.find(t => t.status === "APPROVED") || txList[0];
+        latestTx = txList[0];
       }
     } catch (e) { }
   }
@@ -18905,6 +18906,28 @@ async function loadDossierJobDetails(emp) {
   if (elAtasan) {
     if (emp.atasan_nama) {
       elAtasan.value = `${emp.atasan_nama} (${emp.atasan_nip || ''})`.trim();
+    } else if (emp.supervisor_id && supabaseClient) {
+      // Cari nama atasan berdasarkan supervisor_id
+      try {
+        const supMatch = (PERSONALIA_EMPLOYEES_DATA || []).find(e => e.id === emp.supervisor_id) ||
+                         (APP_STATE.employees || []).find(e => e.id === emp.supervisor_id);
+        if (supMatch) {
+          elAtasan.value = `${supMatch.nama_lengkap || supMatch.nama || supMatch.name} (${supMatch.nip || ''})`.trim();
+        } else {
+          const { data: supRow } = await supabaseClient
+            .from("hr_employees")
+            .select("name, nip")
+            .eq("id", emp.supervisor_id)
+            .maybeSingle();
+          if (supRow) {
+            elAtasan.value = `${supRow.name} (${supRow.nip || ''})`.trim();
+          } else {
+            elAtasan.value = "N/A";
+          }
+        }
+      } catch (errSup) {
+        elAtasan.value = "N/A";
+      }
     } else {
       elAtasan.value = "N/A";
     }
@@ -21681,30 +21704,9 @@ async function handleSubmitEmployeeTransaction(event) {
         .from("hr_transaction_staging_approvals")
         .insert(stagingInserts);
 
-      // 3. Jika Penerimaan Karyawan: Update langsung akun calon karyawan dengan NIP resmi baru
-      if (isPenerimaan) {
-        const empHirePayload = {
-          nip: finalNip,
-          location_id: txPayload.unit_id || txPayload.work_location_id || null,
-          position_id: txPayload.position_id || null,
-          status_kerja: txPayload.employment_status || "PKWT",
-          tanggal_masuk: txPayload.join_date || null,
-          tanggal_selesai_kontrak: txPayload.contract_end_date || null,
-          updated_at: now
-        };
-        const { error: hireUpErr } = await supabaseClient
-          .from("hr_employees")
-          .update(empHirePayload)
-          .eq("id", emp.id);
-
-        if (hireUpErr) {
-          console.error("[handleSaveEmployeeTransaction] Error update hr_employees:", hireUpErr);
-          await supabaseClient
-            .from("employees")
-            .update(empHirePayload)
-            .eq("id", emp.id);
-        }
-      }
+      // NOTE: Tabel master hr_employees TIDAK di-update saat pengajuan transaksi.
+      // Seluruh pembaruan data karyawan (NIP definitif, status kerja, unit, benefit, dll.)
+      // HANYA akan diterapkan secara otomatis saat transaksi mencapai FINAL APPROVED di applyApprovedTransactionToEmployee(tx).
     }
 
     closeEmployeeTransactionModal();
