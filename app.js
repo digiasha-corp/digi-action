@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261001_v167";
+const APP_BUILD_VERSION = "20261001_v168";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -20388,11 +20388,11 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
 
   // 2. Populate Dropdown Karyawan (Pegawai Aktif & Calon Karyawan)
   const empSelect = document.getElementById("tx-select-emp");
-  if (empSelect) {
-    const list = PERSONALIA_EMPLOYEES_DATA && PERSONALIA_EMPLOYEES_DATA.length > 0
-      ? PERSONALIA_EMPLOYEES_DATA
-      : (APP_STATE.employees || []);
+  const list = PERSONALIA_EMPLOYEES_DATA && PERSONALIA_EMPLOYEES_DATA.length > 0
+    ? PERSONALIA_EMPLOYEES_DATA
+    : (APP_STATE.employees || []);
 
+  if (empSelect) {
     let optionsHtml = '<option value="">-- Pilih Calon Karyawan atau Pegawai Aktif --</option>';
     list.forEach(emp => {
       const isCalon = emp.status_kerja === "CALON" || String(emp.nip).startsWith("CAND-");
@@ -20402,6 +20402,9 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
     });
     empSelect.innerHTML = optionsHtml;
   }
+
+  // Reset searchable input & dropdown
+  clearTxEmpSelection();
 
   // 3. Populate Work Locations & Units & Positions & Levels
   populateTxMasterDropdowns();
@@ -20428,11 +20431,11 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
   modal.classList.remove("hidden");
 
   // Jika parameter empNipOrId dikirim, pilih otomatis
-  if (empNipOrId && empSelect) {
-    const matched = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(empNipOrId) || String(e.id) === String(empNipOrId));
+  if (empNipOrId) {
+    const matched = (PERSONALIA_EMPLOYEES_DATA || []).find(e => String(e.nip) === String(empNipOrId) || String(e.id) === String(empNipOrId)) ||
+      (APP_STATE.employees || []).find(e => String(e.nip) === String(empNipOrId) || String(e.id) === String(empNipOrId));
     if (matched) {
-      empSelect.value = matched.id || matched.nip;
-      await onTxEmployeeSelected(empSelect.value);
+      selectTxEmp(matched.id || matched.nip);
     }
   }
 
@@ -20446,8 +20449,147 @@ async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
 
 function closeEmployeeTransactionModal() {
   document.getElementById("modal-employee-transaction")?.classList.add("hidden");
+  closeTxEmpSearchDropdown();
   CURRENT_TX_SELECTED_EMP = null;
 }
+
+// =========================================================================
+// CONTROLLER: SEARCHABLE DROPDOWN KARYAWAN (TRANSAKSI SDM)
+// =========================================================================
+function openTxEmpSearchDropdown() {
+  const dropdown = document.getElementById("tx-emp-search-dropdown");
+  if (dropdown) {
+    dropdown.classList.remove("hidden");
+    const input = document.getElementById("tx-emp-search-input");
+    renderTxEmpSearchDropdown(input ? input.value : "");
+  }
+}
+
+function closeTxEmpSearchDropdown() {
+  const dropdown = document.getElementById("tx-emp-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function filterTxEmpSearchOptions(query) {
+  openTxEmpSearchDropdown();
+  renderTxEmpSearchDropdown(query);
+}
+
+function renderTxEmpSearchDropdown(query = "") {
+  const dropdown = document.getElementById("tx-emp-search-dropdown");
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
+  const selectedVal = document.getElementById("tx-select-emp")?.value || "";
+
+  const list = PERSONALIA_EMPLOYEES_DATA && PERSONALIA_EMPLOYEES_DATA.length > 0
+    ? PERSONALIA_EMPLOYEES_DATA
+    : (APP_STATE.employees || []);
+
+  const filtered = list.filter(e => {
+    if (!q) return true;
+    const nip = String(e.nip || "").toLowerCase();
+    const nama = String(e.nama_lengkap || e.nama || "").toLowerCase();
+    const jbt = String(e.jabatan || "").toLowerCase();
+    const cabang = String(e.cabang || "").toLowerCase();
+    const statusKerja = String(e.status_kerja || "").toLowerCase();
+    return nip.includes(q) || nama.includes(q) || jbt.includes(q) || cabang.includes(q) || statusKerja.includes(q);
+  });
+
+  let itemsHtml = `
+    <div onclick="selectTxEmp('')" class="p-2.5 hover:bg-slate-100 cursor-pointer flex items-center justify-between text-xs transition ${!selectedVal ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-slate-600'}">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-ban text-slate-400 text-xs"></i>
+        <span>-- Pilih Calon Karyawan atau Pegawai Aktif --</span>
+      </div>
+      ${!selectedVal ? '<i class="fa-solid fa-check text-indigo-600 text-xs"></i>' : ''}
+    </div>
+  `;
+
+  if (filtered.length === 0) {
+    itemsHtml += '<div class="p-3 text-center text-slate-400 text-[11px]"><i class="fa-solid fa-user-slash mr-1"></i>Tidak ada karyawan yang cocok</div>';
+  } else {
+    itemsHtml += filtered.map(emp => {
+      const empKey = String(emp.id || emp.nip);
+      const isSel = String(empKey).trim() === String(selectedVal).trim();
+      const isCalon = emp.status_kerja === "CALON" || String(emp.nip).startsWith("CAND-");
+      const tag = isCalon ? "CALON KARYAWAN" : emp.nip;
+      const jbt = emp.jabatan || (isCalon ? 'Calon Karyawan' : 'N/A');
+      const nama = emp.nama_lengkap || emp.nama || 'Tanpa Nama';
+      const cleanNama = nama.replace(/'/g, "\\'");
+
+      return `
+        <div onclick="selectTxEmp('${empKey}')" class="p-2.5 hover:bg-indigo-50/80 cursor-pointer flex items-center justify-between text-xs transition ${isSel ? 'bg-indigo-50 font-bold text-indigo-950' : 'text-slate-700'}">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-1.5 flex-wrap">
+              <span class="font-bold text-slate-900 truncate">${nama}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded font-mono shrink-0 ${isCalon ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}">${tag}</span>
+              ${emp.status_kerja && !isCalon ? `<span class="text-[9px] px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-semibold">${emp.status_kerja}</span>` : ''}
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5 flex items-center space-x-2">
+              <span class="text-indigo-600 font-semibold truncate">${jbt}</span>
+              <span>•</span>
+              <span class="truncate">${emp.cabang || '-'}</span>
+            </div>
+          </div>
+          ${isSel ? '<i class="fa-solid fa-circle-check text-indigo-600 text-sm ml-2 shrink-0"></i>' : ''}
+        </div>
+      `;
+    }).join("");
+  }
+
+  dropdown.innerHTML = itemsHtml;
+}
+
+function selectTxEmp(empId) {
+  const hiddenSelect = document.getElementById("tx-select-emp");
+  const searchInput = document.getElementById("tx-emp-search-input");
+  const clearBtn = document.getElementById("tx-emp-search-clear-btn");
+
+  if (hiddenSelect) {
+    hiddenSelect.value = empId || "";
+  }
+
+  if (!empId) {
+    if (searchInput) searchInput.value = "";
+    if (clearBtn) clearBtn.classList.add("hidden");
+    onTxEmployeeSelected("");
+    closeTxEmpSearchDropdown();
+    return;
+  }
+
+  const list = PERSONALIA_EMPLOYEES_DATA && PERSONALIA_EMPLOYEES_DATA.length > 0
+    ? PERSONALIA_EMPLOYEES_DATA
+    : (APP_STATE.employees || []);
+
+  const emp = list.find(e => String(e.id) === String(empId) || String(e.nip) === String(empId));
+  if (emp) {
+    const isCalon = emp.status_kerja === "CALON" || String(emp.nip).startsWith("CAND-");
+    const tag = isCalon ? "[CALON]" : `[${emp.nip}]`;
+    const nama = emp.nama_lengkap || emp.nama || "";
+    const jbt = emp.jabatan || (isCalon ? 'Calon Karyawan' : 'N/A');
+
+    if (searchInput) {
+      searchInput.value = `${tag} ${nama} - ${jbt}`;
+    }
+    if (clearBtn) clearBtn.classList.remove("hidden");
+  }
+
+  closeTxEmpSearchDropdown();
+  onTxEmployeeSelected(empId);
+}
+
+function clearTxEmpSelection() {
+  selectTxEmp("");
+}
+
+// Tutup dropdown saat klik di luar container
+document.addEventListener("click", (e) => {
+  const container = document.getElementById("tx-emp-search-container");
+  if (container && !container.contains(e.target)) {
+    closeTxEmpSearchDropdown();
+  }
+});
 
 function populateTxMasterDropdowns() {
   // Work Locations

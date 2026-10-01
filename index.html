@@ -1605,7 +1605,7 @@
 
       <form id="form-employee-transaction" onsubmit="handleSubmitEmployeeTransaction(event)"
         class="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 text-xs">
-        <!-- 1. PENCARIAN & PEMILIHAN KARYAWAN -->
+        <!-- 1. PENCARIAN & PEMILIHAN KARYAWAN (SEARCHABLE DROPDOWN) -->
         <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
           <div class="flex items-center justify-between">
             <label class="font-bold text-slate-800 text-xs">1. Pilih Karyawan / Calon Pegawai: <span
@@ -1613,10 +1613,44 @@
             <span id="tx-emp-status-badge"
               class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">Pilih Karyawan</span>
           </div>
-          <select id="tx-select-emp" required onchange="onTxEmployeeSelected(this.value)"
-            class="w-full bg-white border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 outline-none">
+          
+          <!-- Hidden Native Select (For validation and backwards compatibility) -->
+          <select id="tx-select-emp" required onchange="onTxEmployeeSelected(this.value)" class="hidden">
             <option value="">-- Pilih Calon Karyawan atau Pegawai Aktif --</option>
           </select>
+
+          <!-- Searchable Input & Dropdown -->
+          <div class="relative" id="tx-emp-search-container">
+            <div class="relative flex items-center">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+              <input
+                type="text"
+                id="tx-emp-search-input"
+                placeholder="Ketik NIP, Nama, Jabatan, atau Status..."
+                autocomplete="off"
+                onfocus="openTxEmpSearchDropdown()"
+                oninput="filterTxEmpSearchOptions(this.value)"
+                class="w-full bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition outline-none"
+              />
+              <button
+                type="button"
+                id="tx-emp-search-clear-btn"
+                onclick="clearTxEmpSelection()"
+                class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+                title="Hapus Pilihan"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+              <i id="tx-emp-search-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+            </div>
+
+            <div
+              id="tx-emp-search-dropdown"
+              class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto z-50 divide-y divide-slate-100"
+            >
+              <!-- Dropdown items rendered via JS -->
+            </div>
+          </div>
           <div id="tx-emp-selected-summary"
             class="hidden p-2.5 bg-white border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
             <div>
