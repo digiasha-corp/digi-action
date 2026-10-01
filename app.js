@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261001_v166";
+const APP_BUILD_VERSION = "20261001_v167";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -19090,14 +19090,16 @@ async function loadDossierPayrollDetails(emp) {
   if (elTunjKemahalan) elTunjKemahalan.innerText = allowKemahalan > 0 ? `Rp ${allowKemahalan.toLocaleString('id-ID')}` : (isCalon ? "N/A" : "Rp 0");
 
   // Bank, BPJS & Pajak
+  const bankName = txSalary?.bank_name || txSalary?.payroll_deductions_json?.bank_name || emp.bank_name || emp.payroll_deductions_json?.bank_name;
+  const bankAcc = txSalary?.bank_account_no || txSalary?.payroll_deductions_json?.bank_account_no || emp.bank_account_no || emp.payroll_deductions_json?.bank_account_no;
+  const bankHolder = txSalary?.bank_account_holder || txSalary?.payroll_deductions_json?.bank_account_holder || emp.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+
   const elBank = document.getElementById("dossier-bank-val");
-  if (elBank) elBank.innerText = txSalary?.bank_name || emp.bank_name || "N/A";
+  if (elBank) elBank.innerText = bankName || "N/A";
 
   const elRek = document.getElementById("dossier-rekening-val");
   if (elRek) {
-    const noRek = txSalary?.bank_account_no || emp.bank_account_no;
-    const an = txSalary?.bank_account_holder || emp.nama_lengkap || emp.nama || "";
-    elRek.innerText = noRek ? `${noRek} ${an ? `(a/n ${an})` : ''}`.trim() : "N/A";
+    elRek.innerText = bankAcc ? `${bankAcc} ${bankHolder ? `(a/n ${bankHolder})` : ''}`.trim() : "N/A";
   }
 
   const elBpjsKes = document.getElementById("dossier-bpjskes-val");
@@ -20677,6 +20679,12 @@ function resetTxBenefitDisplay() {
   const dispSal = document.getElementById("tx-prev-salary-display");
   if (dispSal) dispSal.innerText = "Rp 0";
 
+  const dispPrevBank = document.getElementById("tx-prev-bank-display");
+  if (dispPrevBank) dispPrevBank.innerText = "NA";
+
+  const dispPrevAcc = document.getElementById("tx-prev-account-display");
+  if (dispPrevAcc) dispPrevAcc.innerText = "NA";
+
   const allowIds = [
     "tx-prev-allow-jabatan", "tx-prev-allow-transport", "tx-prev-allow-komunikasi",
     "tx-prev-allow-tempattinggal", "tx-prev-allow-penempatan", "tx-prev-allow-kemahalan",
@@ -20692,6 +20700,10 @@ function resetTxBenefitDisplay() {
 
   const pphSelect = document.getElementById("tx-input-pph-scheme");
   if (pphSelect) pphSelect.value = "";
+
+  if (document.getElementById("tx-new-bank-name")) document.getElementById("tx-new-bank-name").value = "";
+  if (document.getElementById("tx-new-bank-holder")) document.getElementById("tx-new-bank-holder").value = "";
+  if (document.getElementById("tx-new-bank-account")) document.getElementById("tx-new-bank-account").value = "";
 }
 
 async function onTxEmployeeSelected(empId) {
@@ -20882,6 +20894,36 @@ async function onTxEmployeeSelected(empId) {
 
     const bpjsTkChk = document.getElementById("chk-deduct-bpjstk");
     if (bpjsTkChk) bpjsTkChk.checked = emp.payroll_deductions_json?.apply_bpjs_tk ?? true;
+
+    // Rekening Bank Payroll sebelumnya & input baru
+    const prevBankName = emp.bank_name || "";
+    const prevBankHolder = emp.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+    const prevBankAcc = emp.bank_account_no || "";
+
+    const dispPrevBank = document.getElementById("tx-prev-bank-display");
+    if (dispPrevBank) {
+      dispPrevBank.innerText = prevBankName ? prevBankName : "NA";
+    }
+
+    const dispPrevAcc = document.getElementById("tx-prev-account-display");
+    if (dispPrevAcc) {
+      if (prevBankAcc) {
+        dispPrevAcc.innerText = `${prevBankAcc} (a/n ${prevBankHolder})`.trim();
+      } else {
+        dispPrevAcc.innerText = "NA";
+      }
+    }
+
+    // Pre-fill input rekening baru
+    if (document.getElementById("tx-new-bank-name")) {
+      document.getElementById("tx-new-bank-name").value = prevBankName;
+    }
+    if (document.getElementById("tx-new-bank-holder")) {
+      document.getElementById("tx-new-bank-holder").value = prevBankHolder;
+    }
+    if (document.getElementById("tx-new-bank-account")) {
+      document.getElementById("tx-new-bank-account").value = prevBankAcc;
+    }
 
     // Auto-populate data pribadi (pre-filled) ke subform biodata
     await populateTxPersonalData(emp);
@@ -21683,12 +21725,24 @@ async function handleSubmitEmployeeTransaction(event) {
       new_allowance_insentif: isBenefit ? parseRupiah(document.getElementById("tx-new-allow-insentif")?.value) : parseFloat(emp.allowance_insentif || 0),
       payroll_period_type: isBenefit ? (periodVal === '1-30' ? 'BULANAN' : 'CUT_OFF') : (emp.payroll_period_type || 'CUT_OFF'),
       pph_scheme: isBenefit ? pphScheme : (emp.pph_scheme || 'Not Set'),
+      bank_name: isBenefit ? (document.getElementById("tx-new-bank-name")?.value.trim() || emp.bank_name || null) : (emp.bank_name || null),
+      bank_account_holder: isBenefit ? (document.getElementById("tx-new-bank-holder")?.value.trim() || emp.bank_account_holder || null) : (emp.bank_account_holder || null),
+      bank_account_no: isBenefit ? (document.getElementById("tx-new-bank-account")?.value.trim() || emp.bank_account_no || null) : (emp.bank_account_no || null),
       payroll_deductions_json: isBenefit ? {
         pph_scheme: pphScheme,
         apply_bpjs_kes: applyBpjsKes,
         apply_bpjs_tk: applyBpjsTk,
-        apply_pph21: document.getElementById("chk-deduct-pph21")?.checked || false
-      } : { ...(emp.payroll_deductions_json || {}), pph_scheme: emp.pph_scheme || emp.payroll_deductions_json?.pph_scheme || 'Not Set' },
+        apply_pph21: document.getElementById("chk-deduct-pph21")?.checked || false,
+        bank_name: document.getElementById("tx-new-bank-name")?.value.trim() || emp.bank_name || null,
+        bank_account_holder: document.getElementById("tx-new-bank-holder")?.value.trim() || emp.bank_account_holder || null,
+        bank_account_no: document.getElementById("tx-new-bank-account")?.value.trim() || emp.bank_account_no || null
+      } : { 
+        ...(emp.payroll_deductions_json || {}), 
+        pph_scheme: emp.pph_scheme || emp.payroll_deductions_json?.pph_scheme || 'Not Set',
+        bank_name: emp.bank_name || emp.payroll_deductions_json?.bank_name || null,
+        bank_account_holder: emp.bank_account_holder || emp.payroll_deductions_json?.bank_account_holder || null,
+        bank_account_no: emp.bank_account_no || emp.payroll_deductions_json?.bank_account_no || null
+      },
 
       // Pengakhiran Hubungan Kerja (Resign, PHK, Pensiun)
       uang_pisah: isExit ? parseRupiah(document.getElementById("tx-exit-uangpisah")?.value) : 0,
@@ -21716,10 +21770,13 @@ async function handleSubmitEmployeeTransaction(event) {
         .select("id")
         .single();
 
-      if (txInsertErr && (txInsertErr.message?.includes("pph_scheme") || txInsertErr.code === "PGRST204" || txInsertErr.code === "42703")) {
-        console.warn("[handleSubmitEmployeeTransaction] pph_scheme column not found in schema cache, retrying without direct column...", txInsertErr.message);
+      if (txInsertErr && (txInsertErr.message?.includes("column") || txInsertErr.code === "PGRST204" || txInsertErr.code === "42703")) {
+        console.warn("[handleSubmitEmployeeTransaction] Column not found in hr_employee_transactions schema cache, retrying with safe fallback...", txInsertErr.message);
         const retryPayload = { ...txPayload };
         delete retryPayload.pph_scheme;
+        delete retryPayload.bank_name;
+        delete retryPayload.bank_account_holder;
+        delete retryPayload.bank_account_no;
         const retryRes = await supabaseClient
           .from("hr_employee_transactions")
           .insert([retryPayload])
@@ -22018,6 +22075,21 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
               </div>
             </div>
           ` : ''}
+          ${(() => {
+            const bName = tx.bank_name || tx.payroll_deductions_json?.bank_name;
+            const bAcc = tx.bank_account_no || tx.payroll_deductions_json?.bank_account_no;
+            const bHolder = tx.bank_account_holder || tx.payroll_deductions_json?.bank_account_holder;
+            if (!bName && !bAcc) return '';
+            return `
+              <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100 text-[11px]">
+                <span class="text-slate-500">Rekening Payroll:</span>
+                <div class="text-right">
+                  <strong class="text-emerald-950 font-bold block">${bName || '-'}</strong>
+                  <span class="text-[10px] text-slate-600 font-mono">${bAcc || '-'} ${bHolder ? `(a/n ${bHolder})` : ''}</span>
+                </div>
+              </div>
+            `;
+          })()}
         ` : ''}
         ${allowances.length > 0 ? `
           <div class="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
@@ -22999,6 +23071,9 @@ async function applyApprovedTransactionToEmployee(tx) {
       previous_allowance_insentif: tx.prev_allowance_insentif ? parseFloat(tx.prev_allowance_insentif) : null,
       payroll_period_type: tx.payroll_period_type || 'CUT_OFF',
       pph_scheme: tx.pph_scheme || 'Gross',
+      bank_name: tx.bank_name || tx.payroll_deductions_json?.bank_name || null,
+      bank_account_no: tx.bank_account_no || tx.payroll_deductions_json?.bank_account_no || null,
+      bank_account_holder: tx.bank_account_holder || tx.payroll_deductions_json?.bank_account_holder || null,
       payroll_deductions_json: tx.payroll_deductions_json || {},
       created_at: now
     };
