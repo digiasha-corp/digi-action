@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20260929_v165";
+const APP_BUILD_VERSION = "20261001_v166";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -1816,6 +1816,13 @@ async function handleLoginSubmit(e) {
     return;
   }
 
+  // PROTEKSI CALON KARYAWAN:
+  // Calon karyawan (NIP sementara CAND-xxxx) belum resmi bergabung dan dilarang login ke aplikasi
+  if (identifier.toUpperCase().startsWith("CAND-")) {
+    alert("Akses Ditolak: Calon karyawan dengan NIP sementara belum dapat login ke sistem. Silakan tunggu proses penerimaan karyawan disetujui.");
+    return;
+  }
+
   const submitBtn = e.target.querySelector('button[type="submit"]');
   const originalText = submitBtn.innerHTML;
   submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Memverifikasi...';
@@ -1843,6 +1850,16 @@ async function handleLoginSubmit(e) {
             const passHash = String(emp.password_hash || emp.password || "").trim();
             if (passHash === password) {
               const rawStatus = String(emp.status_aktif || "AKTIF").toUpperCase();
+              const rawStatusKerja = String(emp.status_kerja || "").toUpperCase();
+              const empNip = String(emp.nip || "").toUpperCase();
+
+              if (empNip.startsWith("CAND-") || rawStatus === "CALON" || rawStatusKerja === "CALON") {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                alert("Akses Ditolak: Akun calon karyawan belum dapat login ke aplikasi hingga proses transaksi penerimaan disetujui.");
+                return;
+              }
+
               if (rawStatus === "INACTIVE" || rawStatus === "NON-ACTIVE" || rawStatus === "NONAKTIF" || rawStatus === "TIDAK AKTIF") {
                 submitBtn.innerHTML = originalText;
                 submitBtn.disabled = false;
@@ -1901,6 +1918,15 @@ async function handleLoginSubmit(e) {
         authUser = res.user;
         if (authUser.status_ganti_pass === undefined) {
           authUser.status_ganti_pass = (password === "Password123!");
+        }
+
+        const fbNip = String(authUser.nip || "").toUpperCase();
+        const fbStatus = String(authUser.status_aktif || authUser.status_kerja || "").toUpperCase();
+        if (fbNip.startsWith("CAND-") || fbStatus === "CALON") {
+          submitBtn.innerHTML = originalText;
+          submitBtn.disabled = false;
+          alert("Akses Ditolak: Akun calon karyawan belum dapat login ke aplikasi hingga proses transaksi penerimaan disetujui.");
+          return;
         }
       } else {
         submitBtn.innerHTML = originalText;
