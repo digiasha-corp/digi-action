@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261001_v168";
+const APP_BUILD_VERSION = "20261001_v169";
 const screenCache = {};
 
 // Sesi Pengguna Aktif (Disimpan di lo
@@ -20950,61 +20950,109 @@ async function onTxEmployeeSelected(empId) {
     const prevUnitMutasi = document.getElementById("tx-mutasi-prev-unit");
     if (prevUnitMutasi) prevUnitMutasi.value = emp.cabang || "N/A";
 
-    // Benefit sebelumnya
-    const bSalary = parseFloat(emp.basic_salary || emp.gaji_pokok || 0);
+    // AMBIL DATA BENEFIT AKTIF TERAKHIR DARI DATABASE SUPABASE (hr_employee_transactions / career_histories)
+    let latestBenefit = null;
+    if (supabaseClient) {
+      try {
+        const empQueryId = emp.id;
+        const empNip = emp.nip;
+        let txList = null;
+
+        if (empQueryId) {
+          const { data } = await supabaseClient
+            .from("hr_employee_transactions")
+            .select("*")
+            .eq("employee_id", empQueryId)
+            .eq("status", "APPROVED")
+            .order("effective_date", { ascending: false });
+          if (data && data.length > 0) txList = data;
+        }
+
+        if (!txList && empNip) {
+          const { data } = await supabaseClient
+            .from("hr_employee_transactions")
+            .select("*")
+            .eq("nip", empNip)
+            .eq("status", "APPROVED")
+            .order("effective_date", { ascending: false });
+          if (data && data.length > 0) txList = data;
+        }
+
+        if (txList && txList.length > 0) {
+          latestBenefit = txList.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || txList[0];
+        }
+
+        // Fallback ke hr_employee_career_histories
+        if (!latestBenefit && empQueryId) {
+          const { data: cList } = await supabaseClient
+            .from("hr_employee_career_histories")
+            .select("*")
+            .eq("employee_id", empQueryId)
+            .order("effective_date", { ascending: false });
+          if (cList && cList.length > 0) {
+            latestBenefit = cList.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || cList[0];
+          }
+        }
+      } catch (errTx) {
+        console.warn("[onTxEmployeeSelected] Error loading latest payroll tx:", errTx);
+      }
+    }
+
+    // Benefit sebelumnya (Prioritaskan transaksi approved terakhir, lalu atribut emp)
+    const bSalary = parseFloat(latestBenefit?.new_basic_salary ?? emp.basic_salary ?? emp.gaji_pokok ?? 0);
     const dispSal = document.getElementById("tx-prev-salary-display");
     if (dispSal) dispSal.innerText = `Rp ${bSalary.toLocaleString('id-ID')}`;
 
     // Periode dan PPh sebelumnya
-    const prevPeriod = emp.payroll_period_type;
-    const prevPph = emp.pph_scheme;
+    const prevPeriod = latestBenefit?.payroll_period_type || emp.payroll_period_type;
+    const prevPph = latestBenefit?.pph_scheme || latestBenefit?.payroll_deductions_json?.pph_scheme || emp.pph_scheme || emp.payroll_deductions_json?.pph_scheme;
     const dispPrevPeriod = document.getElementById("tx-prev-period-display");
     const dispPrevPph = document.getElementById("tx-prev-pph-display");
 
     // Tampilkan "NA" jika data tidak tersedia di database
     if (dispPrevPeriod) {
-      if (prevPeriod === null || prevPeriod === undefined || String(prevPeriod).trim() === '') {
+      if (!prevPeriod || String(prevPeriod).trim() === '') {
         dispPrevPeriod.innerText = 'NA';
       } else {
         dispPrevPeriod.innerText = prevPeriod === 'BULANAN' ? '1-30' : (prevPeriod === 'CUT_OFF' ? '16-15' : prevPeriod);
       }
     }
     if (dispPrevPph) {
-      if (prevPph === null || prevPph === undefined || String(prevPph).trim() === '') {
+      if (!prevPph || String(prevPph).trim() === '') {
         dispPrevPph.innerText = 'NA';
       } else {
         dispPrevPph.innerText = prevPph;
       }
     }
 
-    // Pre-select Periode Penggajian & PPh di dropdown dengan fallback kosong / NA jika belum ada data
+    // Pre-select Periode Penggajian & PPh di dropdown dengan fallback nilai sebelumnya
     const periodSelect = document.getElementById("tx-input-period-type");
     if (periodSelect) {
-      if (prevPeriod === null || prevPeriod === undefined || String(prevPeriod).trim() === '') {
-        periodSelect.value = ''; // Kosongkan agar HR memilih sendiri
+      if (!prevPeriod) {
+        periodSelect.value = '';
       } else {
-        periodSelect.value = prevPeriod === 'BULANAN' ? '1-30' : '16-15';
+        periodSelect.value = prevPeriod === 'BULANAN' ? '1-30' : (prevPeriod === 'CUT_OFF' ? '16-15' : prevPeriod);
       }
     }
     const pphSelect = document.getElementById("tx-input-pph-scheme");
     if (pphSelect) {
-      if (prevPph === null || prevPph === undefined || String(prevPph).trim() === '') {
-        pphSelect.value = ''; // Kosongkan agar HR memilih sendiri
+      if (!prevPph) {
+        pphSelect.value = '';
       } else {
         pphSelect.value = prevPph;
       }
     }
 
     // Tunjangan sebelumnya
-    const allowJabatan = parseFloat(emp.allowance_jabatan || 0);
-    const allowTransport = parseFloat(emp.allowance_transport || 0);
-    const allowKomunikasi = parseFloat(emp.allowance_komunikasi || 0);
-    const allowTempatTinggal = parseFloat(emp.allowance_tempat_tinggal || 0);
-    const allowPenempatan = parseFloat(emp.allowance_penempatan || 0);
-    const allowKemahalan = parseFloat(emp.allowance_kemahalan || 0);
-    const allowMakan = parseFloat(emp.allowance_makan || 0);
-    const allowKhusus = parseFloat(emp.allowance_khusus || 0);
-    const allowInsentif = parseFloat(emp.allowance_insentif || 0);
+    const allowJabatan = parseFloat(latestBenefit?.new_allowance_jabatan ?? emp.allowance_jabatan ?? 0);
+    const allowTransport = parseFloat(latestBenefit?.new_allowance_transport ?? emp.allowance_transport ?? 0);
+    const allowKomunikasi = parseFloat(latestBenefit?.new_allowance_komunikasi ?? emp.allowance_komunikasi ?? 0);
+    const allowTempatTinggal = parseFloat(latestBenefit?.new_allowance_tempat_tinggal ?? emp.allowance_tempat_tinggal ?? 0);
+    const allowPenempatan = parseFloat(latestBenefit?.new_allowance_penempatan ?? emp.allowance_penempatan ?? 0);
+    const allowKemahalan = parseFloat(latestBenefit?.new_allowance_kemahalan ?? emp.allowance_kemahalan ?? 0);
+    const allowMakan = parseFloat(latestBenefit?.new_allowance_makan ?? emp.allowance_makan ?? 0);
+    const allowKhusus = parseFloat(latestBenefit?.new_allowance_khusus ?? emp.allowance_khusus ?? 0);
+    const allowInsentif = parseFloat(latestBenefit?.new_allowance_insentif ?? emp.allowance_insentif ?? 0);
 
     const dispAllowJabatan = document.getElementById("tx-prev-allow-jabatan");
     if (dispAllowJabatan) dispAllowJabatan.innerText = `Rp ${allowJabatan.toLocaleString('id-ID')}`;
@@ -21025,22 +21073,49 @@ async function onTxEmployeeSelected(empId) {
     const dispAllowInsentif = document.getElementById("tx-prev-allow-insentif");
     if (dispAllowInsentif) dispAllowInsentif.innerText = `Rp ${allowInsentif.toLocaleString('id-ID')}`;
 
+    // PRE-FILL BENEFIT BARU SAMA DENGAN BENEFIT SEBELUMNYA (Agar user tidak mengulang input dari awal):
+    const inSalary = document.getElementById("tx-new-salary");
+    if (inSalary) inSalary.value = bSalary > 0 ? bSalary.toLocaleString('id-ID') : "0";
 
+    const inAllowJabatan = document.getElementById("tx-new-allow-jabatan");
+    if (inAllowJabatan) inAllowJabatan.value = allowJabatan > 0 ? allowJabatan.toLocaleString('id-ID') : "0";
 
-    const pphSchemeEl = document.getElementById("tx-input-pph-scheme");
-    if (pphSchemeEl && emp.pph_scheme) pphSchemeEl.value = emp.pph_scheme;
-    else if (pphSchemeEl && emp.payroll_deductions_json?.pph_scheme) pphSchemeEl.value = emp.payroll_deductions_json.pph_scheme;
+    const inAllowTransport = document.getElementById("tx-new-allow-transport");
+    if (inAllowTransport) inAllowTransport.value = allowTransport > 0 ? allowTransport.toLocaleString('id-ID') : "0";
 
+    const inAllowKomunikasi = document.getElementById("tx-new-allow-komunikasi");
+    if (inAllowKomunikasi) inAllowKomunikasi.value = allowKomunikasi > 0 ? allowKomunikasi.toLocaleString('id-ID') : "0";
+
+    const inAllowTempatTinggal = document.getElementById("tx-new-allow-tempattinggal");
+    if (inAllowTempatTinggal) inAllowTempatTinggal.value = allowTempatTinggal > 0 ? allowTempatTinggal.toLocaleString('id-ID') : "0";
+
+    const inAllowPenempatan = document.getElementById("tx-new-allow-penempatan");
+    if (inAllowPenempatan) inAllowPenempatan.value = allowPenempatan > 0 ? allowPenempatan.toLocaleString('id-ID') : "0";
+
+    const inAllowKemahalan = document.getElementById("tx-new-allow-kemahalan");
+    if (inAllowKemahalan) inAllowKemahalan.value = allowKemahalan > 0 ? allowKemahalan.toLocaleString('id-ID') : "0";
+
+    const inAllowMakan = document.getElementById("tx-new-allow-makan");
+    if (inAllowMakan) inAllowMakan.value = allowMakan > 0 ? allowMakan.toLocaleString('id-ID') : "0";
+
+    const inAllowKhusus = document.getElementById("tx-new-allow-khusus");
+    if (inAllowKhusus) inAllowKhusus.value = allowKhusus > 0 ? allowKhusus.toLocaleString('id-ID') : "0";
+
+    const inAllowInsentif = document.getElementById("tx-new-allow-insentif");
+    if (inAllowInsentif) inAllowInsentif.value = allowInsentif > 0 ? allowInsentif.toLocaleString('id-ID') : "0";
+
+    // Deductions & BPJS
+    const deductions = latestBenefit?.payroll_deductions_json || emp.payroll_deductions_json || {};
     const bpjsKesChk = document.getElementById("chk-deduct-bpjskes");
-    if (bpjsKesChk) bpjsKesChk.checked = emp.payroll_deductions_json?.apply_bpjs_kes ?? true;
+    if (bpjsKesChk) bpjsKesChk.checked = deductions.apply_bpjs_kes ?? true;
 
     const bpjsTkChk = document.getElementById("chk-deduct-bpjstk");
-    if (bpjsTkChk) bpjsTkChk.checked = emp.payroll_deductions_json?.apply_bpjs_tk ?? true;
+    if (bpjsTkChk) bpjsTkChk.checked = deductions.apply_bpjs_tk ?? true;
 
     // Rekening Bank Payroll sebelumnya & input baru
-    const prevBankName = emp.bank_name || "";
-    const prevBankHolder = emp.bank_account_holder || emp.nama_lengkap || emp.nama || "";
-    const prevBankAcc = emp.bank_account_no || "";
+    const prevBankName = latestBenefit?.bank_name || deductions.bank_name || emp.bank_name || "";
+    const prevBankHolder = latestBenefit?.bank_account_holder || deductions.bank_account_holder || emp.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+    const prevBankAcc = latestBenefit?.bank_account_no || deductions.bank_account_no || emp.bank_account_no || "";
 
     const dispPrevBank = document.getElementById("tx-prev-bank-display");
     if (dispPrevBank) {
