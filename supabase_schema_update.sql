@@ -166,3 +166,11 @@ COMMENT ON TABLE public.tr_absensi_log IS 'Tabel Rekapitulasi Presensi Kehadiran
 COMMENT ON TABLE public.tr_izin_log IS 'Tabel Pengajuan Izin Karyawan dan Pusat Approval PIC';
 COMMENT ON TABLE public.m_announcement IS 'Tabel Banner Informasi & Berita Slide Show Dashboard';
 
+
+-- 6. PEMBARUAN TABEL MASTER EMPLOYEE (REKENING)
+ALTER TABLE IF EXISTS public.m_employee ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);
+
+-- 7. PEMBARUAN TABEL TRANSAKSI (REKENING)
+ALTER TABLE IF EXISTS public.hr_employee_transactions ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);
+
+ALTER TABLE IF EXISTS public.hr_employee_career_histories ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);

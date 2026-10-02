@@ -18726,6 +18726,10 @@ async function loadDossierPersonalDetails(emp) {
   const elPribadiNama = document.getElementById("dossier-pribadi-nama-val");
   if (elPribadiNama) elPribadiNama.value = emp.nama_lengkap || emp.nama || emp.name || "-";
 
+  const elNpwpPribadi = document.getElementById("dossier-pribadi-npwp-val");
+  if (elNpwpPribadi) {
+    elNpwpPribadi.value = emp.npwp_number || "-";
+  }
   const pob = detail?.pob || detail?.tempat_lahir || jsonb.tempat_lahir || "-";
   const dob = detail?.dob || detail?.tanggal_lahir || emp.dob || "-";
   const elPob = document.getElementById("dossier-pob-val");
@@ -19092,7 +19096,7 @@ async function loadDossierPayrollDetails(emp) {
   // Bank, BPJS & Pajak
   const bankName = txSalary?.bank_name || txSalary?.payroll_deductions_json?.bank_name || emp.bank_name || emp.payroll_deductions_json?.bank_name;
   const bankAcc = txSalary?.bank_account_no || txSalary?.payroll_deductions_json?.bank_account_no || emp.bank_account_no || emp.payroll_deductions_json?.bank_account_no;
-  const bankHolder = txSalary?.bank_account_holder || txSalary?.payroll_deductions_json?.bank_account_holder || emp.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+  const bankHolder = txSalary?.bank_account_holder || txSalary?.payroll_deductions_json?.bank_account_holder || emp.bank_account_holder || "";
 
   const elBank = document.getElementById("dossier-bank-val");
   if (elBank) elBank.innerText = bankName || "N/A";
@@ -19105,13 +19109,19 @@ async function loadDossierPayrollDetails(emp) {
   const elBpjsKes = document.getElementById("dossier-bpjskes-val");
   if (elBpjsKes) {
     const v = txSalary?.bpjs_kesehatan_number || emp.bpjs_kesehatan_number;
-    elBpjsKes.innerText = v ? `Kes: ${v}` : "Kes: N/A";
+    const isKesActive = txSalary?.payroll_deductions_json?.apply_bpjs_kes ?? emp.payroll_deductions_json?.apply_bpjs_kes;
+    if (v) elBpjsKes.innerText = `Kes: ${v}`;
+    else if (isKesActive) elBpjsKes.innerText = "Kes: Aktif";
+    else elBpjsKes.innerText = "Kes: N/A";
   }
 
   const elBpjsTk = document.getElementById("dossier-bpjstk-val");
   if (elBpjsTk) {
     const v = txSalary?.bpjs_ketenagakerjaan_number || emp.bpjs_ketenagakerjaan_number;
-    elBpjsTk.innerText = v ? `TK: ${v}` : "TK: N/A";
+    const isTkActive = txSalary?.payroll_deductions_json?.apply_bpjs_tk ?? emp.payroll_deductions_json?.apply_bpjs_tk;
+    if (v) elBpjsTk.innerText = `TK: ${v}`;
+    else if (isTkActive) elBpjsTk.innerText = "TK: Aktif";
+    else elBpjsTk.innerText = "TK: N/A";
   }
 
   const elNpwp = document.getElementById("dossier-npwp-val");
@@ -19573,7 +19583,7 @@ function openEditEmployeeFullModal() {
   document.getElementById("edit-full-tunjangan").value = latestTx.new_allowances || "";
   document.getElementById("edit-full-bank").value = latestTx.bank_name || "BCA";
   document.getElementById("edit-full-rekening").value = latestTx.bank_account_no || "";
-  document.getElementById("edit-full-rek-name").value = latestTx.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+  document.getElementById("edit-full-rek-name").value = latestTx.bank_account_holder || "";
   document.getElementById("edit-full-bpjskes").value = latestTx.bpjs_kesehatan_number || "";
   document.getElementById("edit-full-bpjstk").value = latestTx.bpjs_ketenagakerjaan_number || "";
   document.getElementById("edit-full-npwp").value = latestTx.npwp_number || "";
@@ -20763,6 +20773,7 @@ async function populateTxPersonalData(emp) {
   };
   setVal("tx-bio-nama", nama);
   setVal("tx-bio-nik", nik);
+  setVal("tx-bio-npwp", emp.npwp_number || "");
   setVal("tx-bio-pob", pob);
   setVal("tx-bio-dob", dob);
   setVal("tx-bio-gender", gender);
@@ -21178,7 +21189,7 @@ async function onTxEmployeeSelected(empId) {
 
     // Rekening Bank Payroll sebelumnya
     const prevBankName = latestBenefit?.bank_name || deductions.bank_name || emp.bank_name || "";
-    const prevBankHolder = latestBenefit?.bank_account_holder || deductions.bank_account_holder || emp.bank_account_holder || emp.nama_lengkap || emp.nama || "";
+    const prevBankHolder = latestBenefit?.bank_account_holder || deductions.bank_account_holder || emp.bank_account_holder || "";
     const prevBankAcc = latestBenefit?.bank_account_no || deductions.bank_account_no || emp.bank_account_no || "";
 
     const dispPrevBank = document.getElementById("tx-prev-bank-display");
@@ -21935,6 +21946,7 @@ async function handleSubmitEmployeeTransaction(event) {
         nama_lengkap: document.getElementById("tx-bio-nama")?.value.trim() || null,
         ktp_number: document.getElementById("tx-bio-nik")?.value.trim() || null,
         nik_ktp: document.getElementById("tx-bio-nik")?.value.trim() || null,
+        npwp_number: document.getElementById("tx-bio-npwp")?.value.trim() || null,
         pob: document.getElementById("tx-bio-pob")?.value.trim() || null,
         dob: document.getElementById("tx-bio-dob")?.value || null,
         gender: document.getElementById("tx-bio-gender")?.value || "Laki-laki",
