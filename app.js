@@ -20369,23 +20369,6 @@ function parseRupiah(val) {
   return cleaned ? parseInt(cleaned, 10) : 0;
 }
 
-function generateNewEmployeeNIP() {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const yy = String(now.getFullYear()).slice(-2);
-  const prefix = `${mm}${yy}`;
-
-  const allEmps = (PERSONALIA_EMPLOYEES_DATA || []).concat(APP_STATE.employees || []);
-  const matching = allEmps.filter(e => String(e.nip || "").startsWith(prefix));
-  let maxSeq = 0;
-  matching.forEach(e => {
-    const seqPart = parseInt(String(e.nip).slice(4), 10);
-    if (!isNaN(seqPart) && seqPart > maxSeq) maxSeq = seqPart;
-  });
-  const nextSeq = String(maxSeq + 1).padStart(4, '0');
-  return `${prefix}${nextSeq}`;
-}
-
 async function openEmployeeTransactionModal(empNipOrId, initialType = null) {
   const modal = document.getElementById("modal-employee-transaction");
   if (!modal) return;
@@ -21909,7 +21892,7 @@ async function handleSubmitEmployeeTransaction(event) {
 
     // TRIGGER GENERATE NIP: Jika transaksi adalah Penerimaan Karyawan
     if (isPenerimaan) {
-      finalNip = generateNewEmployeeNIP();
+      finalNip = "AUTO_GENERATE";
     }
 
     // Hitung tanggal ulang tahun ke-50 jika Tetap (PKWTT)
