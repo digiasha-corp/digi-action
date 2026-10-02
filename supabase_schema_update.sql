@@ -46,22 +46,27 @@ CREATE TABLE IF NOT EXISTS public.tr_absensi_log (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tambahkan seluruh kolom jika tabel tr_absensi_log sudah pernah dibuat dengan skema lama
-ALTER TABLE IF EXISTS public.tr_absensi_log 
-ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
-ADD COLUMN IF NOT EXISTS nama_karyawan VARCHAR(150),
-ADD COLUMN IF NOT EXISTS jenis_absen VARCHAR(50),
-ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
-ADD COLUMN IF NOT EXISTS lat NUMERIC,
-ADD COLUMN IF NOT EXISTS long NUMERIC,
-ADD COLUMN IF NOT EXISTS nearest_office VARCHAR(150),
-ADD COLUMN IF NOT EXISTS distance_meter NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS status_geofence VARCHAR(50),
-ADD COLUMN IF NOT EXISTS menit_terlambat NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS status_kehadiran VARCHAR(50),
-ADD COLUMN IF NOT EXISTS selfie_photo_url TEXT,
-ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+-- Tambahkan seluruh kolom jika tabel tr_absensi_log sudah pernah dibuat dengan skema lama (Safe Block)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tr_absensi_log') THEN
+    ALTER TABLE public.tr_absensi_log 
+    ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS nama_karyawan VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS jenis_absen VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS lat NUMERIC,
+    ADD COLUMN IF NOT EXISTS long NUMERIC,
+    ADD COLUMN IF NOT EXISTS nearest_office VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS distance_meter NUMERIC DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS status_geofence VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS menit_terlambat NUMERIC DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS status_kehadiran VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS selfie_photo_url TEXT,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END $$;
 
 -- Index pencarian cepat untuk status harian per NIP
 CREATE INDEX IF NOT EXISTS idx_absensi_nip_timestamp ON public.tr_absensi_log (nip, timestamp DESC);
@@ -90,26 +95,31 @@ CREATE TABLE IF NOT EXISTS public.tr_izin_log (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tambahkan seluruh kolom jika tabel tr_izin_log sudah pernah dibuat sebelumnya
-ALTER TABLE IF EXISTS public.tr_izin_log 
-ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
-ADD COLUMN IF NOT EXISTS nama VARCHAR(150),
-ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
-ADD COLUMN IF NOT EXISTS jenis_izin VARCHAR(50),
-ADD COLUMN IF NOT EXISTS tgl_mulai DATE,
-ADD COLUMN IF NOT EXISTS tgl_selesai DATE,
-ADD COLUMN IF NOT EXISTS catatan TEXT,
-ADD COLUMN IF NOT EXISTS lat NUMERIC,
-ADD COLUMN IF NOT EXISTS long NUMERIC,
-ADD COLUMN IF NOT EXISTS selfie_url TEXT,
-ADD COLUMN IF NOT EXISTS pic_approval_nip VARCHAR(50),
-ADD COLUMN IF NOT EXISTS pic_approval_nama VARCHAR(150),
-ADD COLUMN IF NOT EXISTS status_approval VARCHAR(50) DEFAULT 'PENDING',
-ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS approved_by VARCHAR(150),
-ADD COLUMN IF NOT EXISTS catatan_approval TEXT,
-ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+-- Tambahkan seluruh kolom jika tabel tr_izin_log sudah pernah dibuat sebelumnya (Safe Block)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tr_izin_log') THEN
+    ALTER TABLE public.tr_izin_log 
+    ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS nama VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS jenis_izin VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS tgl_mulai DATE,
+    ADD COLUMN IF NOT EXISTS tgl_selesai DATE,
+    ADD COLUMN IF NOT EXISTS catatan TEXT,
+    ADD COLUMN IF NOT EXISTS lat NUMERIC,
+    ADD COLUMN IF NOT EXISTS long NUMERIC,
+    ADD COLUMN IF NOT EXISTS selfie_url TEXT,
+    ADD COLUMN IF NOT EXISTS pic_approval_nip VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS pic_approval_nama VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS status_approval VARCHAR(50) DEFAULT 'PENDING',
+    ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS approved_by VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS catatan_approval TEXT,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END $$;
 
 -- Index pencarian cepat untuk Approval Hub PIC
 CREATE INDEX IF NOT EXISTS idx_izin_pic_approval ON public.tr_izin_log (pic_approval_nip, status_approval);
@@ -165,7 +175,6 @@ COMMENT ON TABLE public.m_role_permission IS 'Tabel Konfigurasi Akses Menu Berda
 COMMENT ON TABLE public.tr_absensi_log IS 'Tabel Rekapitulasi Presensi Kehadiran dan Kepulangan Lapangan';
 COMMENT ON TABLE public.tr_izin_log IS 'Tabel Pengajuan Izin Karyawan dan Pusat Approval PIC';
 COMMENT ON TABLE public.m_announcement IS 'Tabel Banner Informasi & Berita Slide Show Dashboard';
-
 
 -- 6. PEMBARUAN TABEL MASTER EMPLOYEE (REKENING)
 ALTER TABLE IF EXISTS public.m_employee ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);
