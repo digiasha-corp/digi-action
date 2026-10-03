@@ -16,7 +16,7 @@ DECLARE
     v_lock_key bigint;
 BEGIN
     -- Hanya untuk transaksi Penerimaan Karyawan
-    IF ((NEW.transaction_types::text LIKE '%Penerimaan Karyawan%') OR NEW.is_new_hire = true) THEN
+    IF (NEW.transaction_types::text LIKE '%Penerimaan Karyawan%') THEN
         -- Jika NIP diset ke flag AUTO_GENERATE atau NIP lama kandidat, kita buat yang asli
         IF (NEW.nip IS NULL OR NEW.nip = '' OR NEW.nip = 'N/A' OR NEW.nip LIKE 'CAND-%' OR NEW.nip = 'AUTO_GENERATE') THEN
             
