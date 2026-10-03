@@ -186,7 +186,6 @@ ALTER TABLE IF EXISTS public.hr_employee_career_histories ADD COLUMN IF NOT EXIS
 
 -- 8. PEMBARUAN TABEL DATA PRIBADI (NPWP)
 ALTER TABLE IF EXISTS public.hr_employee_personal_details ADD COLUMN IF NOT EXISTS npwp_number VARCHAR(50);
-ALTER TABLE IF EXISTS public.m_employee ADD COLUMN IF NOT EXISTS npwp_number VARCHAR(50);
 
 -- ===========================================================================
 -- MIGRATION: Auto-Generate NIP using Postgres Trigger (Prevents Race Condition)
