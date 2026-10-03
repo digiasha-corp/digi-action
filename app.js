@@ -18717,34 +18717,36 @@ async function loadDossierPersonalDetails(emp) {
 
   CURRENT_DOSSIER_PERSONAL = detail;
   const jsonb = detail?.personal_details || {};
+  const latestTx = (CURRENT_DOSSIER_TX_LIST || [])[0];
+  const txBio = latestTx?.personal_data_updates || {};
 
   // NIK & Identitas Pokok
-  const nikVal = detail?.ktp_number || detail?.nik || jsonb.nik_ktp || emp.nik_ktp || "-";
+  const nikVal = detail?.ktp_number || detail?.nik || txBio.ktp_number || txBio.nik_ktp || jsonb.nik_ktp || emp.nik_ktp || "-";
   const elNik = document.getElementById("dossier-nik-val");
   if (elNik) elNik.value = nikVal;
 
   const elPribadiNama = document.getElementById("dossier-pribadi-nama-val");
-  if (elPribadiNama) elPribadiNama.value = emp.nama_lengkap || emp.nama || emp.name || "-";
+  if (elPribadiNama) elPribadiNama.value = emp.nama_lengkap || emp.nama || txBio.nama_lengkap || emp.name || "-";
 
   const elNpwpPribadi = document.getElementById("dossier-pribadi-npwp-val");
   if (elNpwpPribadi) {
-    elNpwpPribadi.value = emp.npwp_number || "-";
+    elNpwpPribadi.value = emp.npwp_number || detail?.npwp_number || txBio.npwp_number || "-";
   }
-  const pob = detail?.pob || detail?.tempat_lahir || jsonb.tempat_lahir || "-";
-  const dob = detail?.dob || detail?.tanggal_lahir || emp.dob || "-";
+  const pob = detail?.pob || detail?.tempat_lahir || txBio.pob || jsonb.tempat_lahir || "-";
+  const dob = detail?.dob || detail?.tanggal_lahir || txBio.dob || emp.dob || "-";
   const elPob = document.getElementById("dossier-pob-val");
   const elDob = document.getElementById("dossier-dob-val");
   if (elPob) elPob.value = pob;
   if (elDob) elDob.value = dob;
 
   const elGender = document.getElementById("dossier-gender-val");
-  if (elGender) elGender.value = detail?.gender || detail?.jenis_kelamin || emp.gender || "-";
+  if (elGender) elGender.value = detail?.gender || detail?.jenis_kelamin || txBio.gender || emp.gender || "-";
 
   const elMarital = document.getElementById("dossier-marital-val");
-  if (elMarital) elMarital.value = detail?.marital_status || detail?.status_pernikahan || emp.marital_status || "-";
+  if (elMarital) elMarital.value = detail?.marital_status || detail?.status_pernikahan || txBio.marital_status || emp.marital_status || "-";
 
   // Pasangan & Anak
-  const spouse = jsonb.spouse_name || detail?.spouse_name || "-";
+  const spouse = txBio.spouse_name || jsonb.spouse_name || detail?.spouse_name || "-";
   const elSpouse = document.getElementById("dossier-spouse-val");
   if (elSpouse) elSpouse.value = spouse;
 
@@ -18767,19 +18769,19 @@ async function loadDossierPersonalDetails(emp) {
   }
 
   // Kontak & Alamat
-  const phone = detail?.phone || jsonb.no_hp || emp.phone || "-";
+  const phone = txBio.phone || detail?.phone || jsonb.no_hp || emp.phone || "-";
   const elPhone = document.getElementById("dossier-phone-val");
   if (elPhone) elPhone.value = phone;
 
-  const wa = jsonb.no_wa || detail?.phone || emp.phone || "-";
+  const wa = txBio.wa || jsonb.no_wa || detail?.phone || emp.phone || "-";
   const elWa = document.getElementById("dossier-wa-val");
   if (elWa) elWa.value = wa;
 
-  const alamatKtp = detail?.address_ktp || detail?.alamat_ktp || jsonb.alamat_ktp || "-";
+  const alamatKtp = txBio.address_ktp || detail?.address_ktp || detail?.alamat_ktp || jsonb.alamat_ktp || "-";
   const elAlamatKtp = document.getElementById("dossier-alamatktp-val");
   if (elAlamatKtp) elAlamatKtp.value = alamatKtp;
 
-  const alamatDom = detail?.address_domicile || detail?.alamat_domisili || jsonb.alamat_domisili || alamatKtp;
+  const alamatDom = txBio.address_domicile || detail?.address_domicile || detail?.alamat_domisili || jsonb.alamat_domisili || alamatKtp;
   const elAlamatDom = document.getElementById("dossier-alamatdom-val");
   if (elAlamatDom) elAlamatDom.value = alamatDom;
 
@@ -18806,9 +18808,9 @@ async function loadDossierPersonalDetails(emp) {
   }
 
   // Kontak Darurat
-  const emergName = jsonb.kontak_darurat?.nama || detail?.emergency_contact_name || "-";
-  const emergRel = jsonb.kontak_darurat?.hubungan || detail?.emergency_contact_relation || "-";
-  const emergPhone = jsonb.kontak_darurat?.no_hp || detail?.emergency_contact_phone || "-";
+  const emergName = txBio.emergency_contact_name || jsonb.kontak_darurat?.nama || detail?.emergency_contact_name || "-";
+  const emergRel = txBio.emergency_contact_relation || jsonb.kontak_darurat?.hubungan || detail?.emergency_contact_relation || "-";
+  const emergPhone = txBio.emergency_contact_phone || jsonb.kontak_darurat?.no_hp || detail?.emergency_contact_phone || "-";
   const elEmergName = document.getElementById("dossier-emergency-name-val");
   const elEmergRel = document.getElementById("dossier-emergency-rel-val");
   const elEmergPhone = document.getElementById("dossier-emergency-phone-val");
