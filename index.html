@@ -1397,7 +1397,7 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
+          <div class="sm:col-span-2">
             <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap (Wajib Huruf Besar): <span
                 class="text-rose-500">*</span></label>
             <input type="text" id="cand-input-nama" required placeholder="CONTOH: AHMAD FAUZI RIDWAN"
@@ -1409,6 +1409,12 @@
             <label class="block font-semibold text-slate-700 mb-1">NIK KTP (16 Digit): <span
                 class="text-rose-500">*</span></label>
             <input type="text" id="cand-input-nik" required maxlength="16" placeholder="3201xxxxxxxxxxxx"
+              oninput="this.value = this.value.replace(/\D/g, '')"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor NPWP:</label>
+            <input type="text" id="cand-input-npwp" maxlength="16" placeholder="15/16 digit NPWP"
               oninput="this.value = this.value.replace(/\D/g, '')"
               class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none" />
           </div>

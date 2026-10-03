@@ -20113,6 +20113,7 @@ async function handleSaveCandidate(event) {
 
   const nama = String(document.getElementById("cand-input-nama")?.value || "").trim().toUpperCase();
   const nik = String(document.getElementById("cand-input-nik")?.value || "").trim();
+  const npwp = String(document.getElementById("cand-input-npwp")?.value || "").trim();
   const pob = String(document.getElementById("cand-input-pob")?.value || "").trim();
   const dob = document.getElementById("cand-input-dob")?.value;
   const gender = document.getElementById("cand-input-gender")?.value || "Laki-laki";
@@ -20170,6 +20171,7 @@ async function handleSaveCandidate(event) {
 
     const personalDetailsJsonb = {
       nik_ktp: nik,
+      npwp_number: npwp || null,
       tempat_lahir: pob || null,
       alamat_ktp: alamatKtp || null,
       alamat_domisili: alamatDom || null,
@@ -20229,6 +20231,7 @@ async function handleSaveCandidate(event) {
         name: nama,
         email: email,
         ktp_number: nik,
+        npwp_number: npwp || null,
         phone: phone || null,
         pob: pob || null,
         dob: dob || null,
