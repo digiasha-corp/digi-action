@@ -23208,7 +23208,7 @@ async function executeTransactionApproval(txId, stageId, actionType, notes) {
   }
 }
 
-async function applyApprovedTransactionToEmployee(tx) {
+async function applyApprovedTransactionToEmployee(tx, isFromEOD = false) {
   if (!supabaseClient || !tx) return;
   try {
     const empId = tx.employee_id;
@@ -23216,8 +23216,21 @@ async function applyApprovedTransactionToEmployee(tx) {
     const updatePayload = { updated_at: now };
     const types = Array.isArray(tx.transaction_types) ? tx.transaction_types : [tx.transaction_types || ""];
 
+    // Cek Tanggal Berlaku (Tunda jika masih di masa depan, biarkan EOD yang proses)
+    const isPenerimaan = types.includes("Penerimaan Karyawan") || tx.is_new_hire;
+    if (!isPenerimaan && tx.effective_date) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      if (tx.effective_date > todayStr) {
+        console.log(`[applyApprovedTransactionToEmployee] Menunda penerapan TX ${tx.id} ke master data karena effective_date (${tx.effective_date}) masih di masa depan.`);
+        if (!isFromEOD) {
+           await supabaseClient.from("hr_employee_transactions").update({ status: "APPROVED", updated_at: now }).eq("id", tx.id);
+        }
+        return; 
+      }
+    }
+
     // A. Penerimaan Karyawan (New Hire)
-    if (types.includes("Penerimaan Karyawan") || tx.is_new_hire) {
+    if (isPenerimaan) {
       if (tx.nip && tx.nip !== "N/A" && !tx.nip.startsWith("CAND-")) {
         updatePayload.nip = tx.nip;
       }
@@ -23348,10 +23361,10 @@ async function applyApprovedTransactionToEmployee(tx) {
       console.log(`[applyApprovedTransactionToEmployee] Sukses update hr_employees untuk ID ${empId}:`, updatePayload);
     }
 
-    // Update status transaksi menjadi APPLIED agar terdata telah diaktifkan ke core employee
+    // Update status transaksi menjadi APPROVED dan is_applied = true agar tidak diproses EOD lagi
     await supabaseClient
       .from("hr_employee_transactions")
-      .update({ status: "APPROVED", updated_at: now })
+      .update({ status: "APPROVED", is_applied: true, updated_at: now })
       .eq("id", tx.id);
 
     // Buat riwayat jejak di hr_employee_career_histories
@@ -23412,20 +23425,23 @@ async function applyApprovedTransactionToEmployee(tx) {
   }
 }
 
-// Fungsi sinkronisasi transaksi APPROVED yang belum teraplikasikan ke tabel hr_employees
+// Fungsi sinkronisasi transaksi APPROVED yang belum teraplikasikan ke tabel hr_employees (LAZY EOD)
 async function syncPendingApprovedTransactions() {
   if (!supabaseClient) return;
   try {
+    const today = new Date().toISOString().split("T")[0];
     const { data: approvedTxs, error } = await supabaseClient
       .from("hr_employee_transactions")
       .select("*")
-      .eq("status", "APPROVED");
+      .eq("status", "APPROVED")
+      .or('is_applied.eq.false,is_applied.is.null')
+      .lte("effective_date", today);
 
     if (error || !approvedTxs || approvedTxs.length === 0) return;
 
     for (const tx of approvedTxs) {
-      // Terapkan ke hr_employees
-      await applyApprovedTransactionToEmployee(tx);
+      // Terapkan ke hr_employees (ditandai dengan isFromEOD = true)
+      await applyApprovedTransactionToEmployee(tx, true);
     }
   } catch (e) {
     console.warn("[syncPendingApprovedTransactions] Warning:", e);
