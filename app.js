@@ -19135,7 +19135,7 @@ async function loadDossierPayrollDetails(emp) {
   const elPtkp = document.getElementById("dossier-ptkp-val");
   if (elPtkp) {
     const v = txSalary?.tax_status || emp.tax_status;
-    elPtkp.innerText = v ? `PTKP: ${v}` : "PTKP: N/A";
+    elPtkp.innerText = v ? `PTKP: ${v}` : "PTKP: Belum Diset";
   }
 }
 
