@@ -23299,6 +23299,7 @@ async function applyApprovedTransactionToEmployee(tx) {
         const detailPayload = {
           employee_id: empId,
           ktp_number: pu.ktp_number || pu.nik_ktp || null,
+          npwp_number: pu.npwp_number || null,
           pob: pu.pob || null,
           dob: pu.dob || null,
           gender: pu.gender || null,
