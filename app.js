@@ -20253,6 +20253,7 @@ async function handleSaveCandidate(event) {
       const personalPayloadWithJsonb = {
         employee_id: newEmpId,
         ktp_number: nik,
+        npwp_number: npwp || null,
         phone: phone || null,
         pob: pob || null,
         dob: dob || null,
@@ -20271,6 +20272,7 @@ async function handleSaveCandidate(event) {
       const personalPayloadBase = {
         employee_id: newEmpId,
         ktp_number: nik,
+        npwp_number: npwp || null,
         phone: phone || null,
         pob: pob || null,
         dob: dob || null,
