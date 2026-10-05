@@ -78,23 +78,8 @@ BEGIN
             WHERE ou.id_unit = v_curr_unit_id;
         END LOOP;
 
-        -- 3. FALLBACK: Jika tidak ada atasan di seluruh silsilah unit, 
-        -- cari atasan di unit mana saja secara global
-        SELECT e.id
-        INTO v_supervisor_id
-        FROM public.hr_employees e
-        WHERE e.position_id = v_parent_pos_id
-          AND e.deleted_at IS NULL
-          AND (e.status_kerja IS NULL OR UPPER(TRIM(e.status_kerja)) != 'CALON')
-        ORDER BY e.created_at ASC
-        LIMIT 1;
-
-        IF v_supervisor_id IS NOT NULL THEN
-            RETURN v_supervisor_id;
-        END IF;
-
-        -- Jika jabatan atasan benar-benar kosong (vacant) di seluruh perusahaan, 
-        -- naik ke hierarki jabatan di atasnya lagi
+        -- Jika jabatan atasan benar-benar kosong (vacant) di seluruh jalur unit ini,
+        -- naik ke hierarki jabatan di atasnya lagi (Mencari atasan dari atasan)
         v_curr_pos_id := v_parent_pos_id;
     END LOOP;
 
