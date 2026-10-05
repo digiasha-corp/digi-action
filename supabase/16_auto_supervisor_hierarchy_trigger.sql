@@ -51,32 +51,44 @@ BEGIN
             EXIT;
         END IF;
 
-        -- 2. Mulai pencarian atasan dari unit terkecil (lokasi saat ini) naik ke unit pusat
+        -- 2. Mulai pencarian atasan
         v_curr_unit_id := p_location_id;
         
-        WHILE v_curr_unit_id IS NOT NULL LOOP
-            -- Coba cari karyawan aktif dengan jabatan atasan tersebut DI UNIT INI
-            SELECT e.id
-            INTO v_supervisor_id
+        -- Jika bawahan tidak memiliki lokasi, kita jadikan loop berjalan minimal 1 kali (global search)
+        IF v_curr_unit_id IS NULL THEN
+            SELECT e.id INTO v_supervisor_id
             FROM public.hr_employees e
             WHERE e.position_id = v_parent_pos_id
-              AND e.location_id = v_curr_unit_id
               AND e.deleted_at IS NULL
               AND (e.status_kerja IS NULL OR UPPER(TRIM(e.status_kerja)) != 'CALON')
             ORDER BY e.created_at ASC
             LIMIT 1;
 
-            -- Jika ketemu atasan di unit ini (atau unit induknya), langsung return
             IF v_supervisor_id IS NOT NULL THEN
                 RETURN v_supervisor_id;
             END IF;
+        ELSE
+            -- Jika bawahan punya lokasi, naik dari unit terkecil ke pusat
+            WHILE v_curr_unit_id IS NOT NULL LOOP
+                SELECT e.id INTO v_supervisor_id
+                FROM public.hr_employees e
+                WHERE e.position_id = v_parent_pos_id
+                  -- Atasan bisa berada di unit ini, ATAU atasan berstatus 'pusat/global' (location_id IS NULL)
+                  AND (e.location_id = v_curr_unit_id OR e.location_id IS NULL)
+                  AND e.deleted_at IS NULL
+                  AND (e.status_kerja IS NULL OR UPPER(TRIM(e.status_kerja)) != 'CALON')
+                ORDER BY e.created_at ASC
+                LIMIT 1;
 
-            -- Jika tidak ketemu, naik satu level ke parent unit (dari Cabang ke Area, dsb)
-            SELECT ou.parent_unit_id
-            INTO v_curr_unit_id
-            FROM public.hr_organization_units ou
-            WHERE ou.id_unit = v_curr_unit_id;
-        END LOOP;
+                IF v_supervisor_id IS NOT NULL THEN
+                    RETURN v_supervisor_id;
+                END IF;
+
+                SELECT ou.parent_unit_id INTO v_curr_unit_id
+                FROM public.hr_organization_units ou
+                WHERE ou.id_unit = v_curr_unit_id;
+            END LOOP;
+        END IF;
 
         -- Jika jabatan atasan benar-benar kosong (vacant) di seluruh jalur unit ini,
         -- naik ke hierarki jabatan di atasnya lagi (Mencari atasan dari atasan)
