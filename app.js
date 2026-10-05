@@ -19767,7 +19767,7 @@ async function loadPersonaliaTransactionHistory() {
   try {
     const { data, error } = await supabaseClient
       .from('hr_employee_transactions')
-      .select('*, hr_employees(name, nip)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
       
@@ -19776,7 +19776,7 @@ async function loadPersonaliaTransactionHistory() {
     filterPersonaliaHistory();
   } catch (err) {
     console.error("[loadPersonaliaTransactionHistory] Gagal:", err);
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Gagal memuat riwayat transaksi.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Gagal memuat riwayat transaksi. ${err.message || ""}</td></tr>`;
   }
 }
 
@@ -19788,7 +19788,11 @@ function filterPersonaliaHistory() {
 
   const todayStr = new Date().toISOString().split("T")[0];
 
-  let filtered = PERSONALIA_HISTORY_DATA.filter(tx => {
+  let filtered = PERSONALIA_HISTORY_DATA.map(tx => {
+    // Client-side join dengan array master karyawan
+    const emp = PERSONALIA_EMPLOYEES_DATA.find(e => e.id === tx.employee_id);
+    return { ...tx, hr_employees: emp || { name: tx.nama_lengkap || 'Unknown', nip: tx.nip || '-' } };
+  }).filter(tx => {
     const empName = (tx.hr_employees?.name || "Unknown").toLowerCase();
     if (search && !empName.includes(search)) return false;
 
