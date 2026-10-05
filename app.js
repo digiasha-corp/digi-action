@@ -18717,7 +18717,9 @@ async function loadDossierPersonalDetails(emp) {
 
   CURRENT_DOSSIER_PERSONAL = detail;
   const jsonb = detail?.personal_details || {};
-  const latestTx = (CURRENT_DOSSIER_TX_LIST || [])[0];
+  const todayStr = new Date().toISOString().split("T")[0];
+  const activeTxs = (CURRENT_DOSSIER_TX_LIST || []).filter(t => t.status === "APPROVED" && (t.is_applied === true || (t.is_applied !== false && t.effective_date <= todayStr)));
+  const latestTx = activeTxs[0] || {};
   const txBio = latestTx?.personal_data_updates || {};
 
   // NIK & Identitas Pokok
@@ -18848,8 +18850,9 @@ async function loadDossierJobDetails(emp) {
 
   // 2. Evaluasi transaksi kepegawaian yang SUDAH DISETUJUI (APPROVED)
   let latestTx = null;
+  const todayStr = new Date().toISOString().split("T")[0];
   if (Array.isArray(CURRENT_DOSSIER_TX_LIST) && CURRENT_DOSSIER_TX_LIST.length > 0) {
-    latestTx = CURRENT_DOSSIER_TX_LIST.find(t => t.status === "APPROVED");
+    latestTx = CURRENT_DOSSIER_TX_LIST.find(t => t.status === "APPROVED" && (t.is_applied === true || (t.is_applied !== false && t.effective_date <= todayStr)));
   } else if (supabaseClient && (emp?.id || emp?.nip)) {
     try {
       const empFilter = emp.id ? `employee_id.eq.${emp.id},nip.eq.${emp.nip}` : `nip.eq.${emp.nip}`;
@@ -18860,7 +18863,7 @@ async function loadDossierJobDetails(emp) {
         .eq("status", "APPROVED")
         .order("effective_date", { ascending: false });
       if (txList && txList.length > 0) {
-        latestTx = txList[0];
+        latestTx = txList.find(t => t.is_applied === true || (t.is_applied !== false && t.effective_date <= todayStr));
       }
     } catch (e) { }
   }
@@ -19042,7 +19045,9 @@ async function loadDossierPayrollDetails(emp) {
           .order("effective_date", { ascending: false });
 
         if (txList && txList.length > 0) {
-          txSalary = txList.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || txList[0];
+          const todayStr = new Date().toISOString().split("T")[0];
+          const activeTxs = txList.filter(t => t.is_applied === true || (t.is_applied !== false && t.effective_date <= todayStr));
+          txSalary = activeTxs.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || activeTxs[0];
         }
 
         // Fallback ke employee_career_histories
