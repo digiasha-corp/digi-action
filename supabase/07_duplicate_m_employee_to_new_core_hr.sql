@@ -89,9 +89,15 @@ ON CONFLICT (nip) DO NOTHING;
 -- 6. SAMBUNGKAN ATASAN LANGSUNG (SUPERVISOR) BERDASARKAN atasan_nip
 UPDATE public.hr_employees e
 SET supervisor_id = atasan.id
-FROM public.m_employee m
-JOIN public.hr_employees atasan ON atasan.nip = m.atasan_nip
-WHERE e.nip = m.nip AND m.atasan_nip IS NOT NULL AND m.atasan_nip <> '';
+FROM (
+    SELECT DISTINCT ON (TRIM(nip)) nip, atasan_nip
+    FROM public.m_employee
+    WHERE nip IS NOT NULL AND TRIM(nip) <> '' 
+      AND atasan_nip IS NOT NULL AND TRIM(atasan_nip) <> ''
+    ORDER BY TRIM(nip), created_at DESC NULLS LAST
+) m
+JOIN public.hr_employees atasan ON TRIM(atasan.nip) = TRIM(m.atasan_nip)
+WHERE TRIM(e.nip) = TRIM(m.nip);
 
 
 -- 7. BUAT BARIS DATA PRIBADI SIPIL AWAL DI TABEL FISIK hr_employee_personal_details
