@@ -47,6 +47,12 @@ END $$;
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_organization_units' AND table_type = 'BASE TABLE') THEN
+        -- Pastikan HO-CORP (Head Office) eksis terlebih dahulu agar tidak ada error FK constraint
+        INSERT INTO public.hr_organization_units (id_unit, tipe_unit, nama_unit, parent_unit_id, is_active)
+        VALUES ('HO-CORP', 'HEAD_OFFICE', 'Kantor Pusat Digiasha', NULL, TRUE)
+        ON CONFLICT (id_unit) DO NOTHING;
+
+        -- Salin unit dari m_employee
         INSERT INTO public.hr_organization_units (id_unit, tipe_unit, nama_unit, parent_unit_id, is_active)
         SELECT 
             u.id_unit,
