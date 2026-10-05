@@ -19838,7 +19838,7 @@ function filterPersonaliaHistory() {
     const dEffective = tx.effective_date ? new Date(tx.effective_date).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric'}) : '-';
 
     html += `
-      <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="openDossierModal('${tx.employee_id}', 'history')">
+      <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="openCareerTransactionDetailModal('${tx.id}')">
         <td class="p-3 align-top">
           <div class="font-bold text-slate-800">${dCreate}</div>
           <div class="text-[10px] text-slate-500 line-clamp-1 max-w-[120px]">${tTypes}</div>
@@ -19854,7 +19854,7 @@ function filterPersonaliaHistory() {
           ${statusBadge}
         </td>
         <td class="p-3 align-top text-right">
-          <button type="button" class="text-indigo-600 hover:text-indigo-800 font-semibold text-[10px]"><i class="fa-solid fa-folder-open mr-1"></i>Dossier</button>
+          <button type="button" class="text-indigo-600 hover:text-indigo-800 font-semibold text-[10px]"><i class="fa-solid fa-magnifying-glass mr-1"></i>Review</button>
         </td>
       </tr>
     `;
