@@ -84,6 +84,11 @@ BEGIN
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_job_positions' AND table_type = 'BASE TABLE') THEN
+        -- Pastikan fallback position (POS-SPV-FAC) tersedia
+        INSERT INTO public.hr_job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
+        VALUES ('POS-SPV-FAC', 'Supervisor / Fallback', 'L-04', 'HO-CORP', TRUE)
+        ON CONFLICT (id_position) DO NOTHING;
+
         INSERT INTO public.hr_job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
         SELECT 
             p.id_position,
