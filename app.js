@@ -22380,26 +22380,26 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <span>${titleText}</span>
         </div>
         ${tx.new_level_id ? `
-          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-black/5 mt-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5">
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Level Sebelumnya:</span>
-              <span class="text-slate-500 text-[11px]">${prevLvl ? getLvlName(prevLvl) : '-'}</span>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Level Sebelumnya:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${prevLvl ? getLvlName(prevLvl) : '-'}" />
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Level Baru:</span>
-              <strong class="text-indigo-900 text-[11px] font-bold">${getLvlName(tx.new_level_id)}</strong>
+              <label class="block font-bold text-amber-700 text-[11px] mb-1">Level Baru:</label>
+              <input type="text" disabled class="w-full bg-white border border-amber-300 rounded-lg p-2 font-bold text-amber-900 text-xs shadow-sm cursor-not-allowed" value="${getLvlName(tx.new_level_id)}" />
             </div>
           </div>
         ` : ''}
         ${tx.new_position_id ? `
-          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-black/5 mt-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5">
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Sebelumnya:</span>
-              <span class="text-slate-500 text-[11px]">${prevPos ? getPosName(prevPos) : '-'}</span>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Jabatan Sebelumnya:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${prevPos ? getPosName(prevPos) : '-'}" />
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Baru:</span>
-              <strong class="text-indigo-900 text-[11px] font-bold">${getPosName(tx.new_position_id)}</strong>
+              <label class="block font-bold text-amber-700 text-[11px] mb-1">Jabatan Baru:</label>
+              <input type="text" disabled class="w-full bg-white border border-amber-300 rounded-lg p-2 font-bold text-amber-900 text-xs shadow-sm cursor-not-allowed" value="${getPosName(tx.new_position_id)}" />
             </div>
           </div>
         ` : ''}
@@ -22417,14 +22417,14 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <i class="fa-solid fa-arrows-rotate text-blue-600"></i>
           <span>Detail Rotasi Jabatan</span>
         </div>
-        <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-blue-100 mt-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5">
           <div>
-            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Sebelumnya:</span>
-            <span class="text-slate-500 text-[11px]">${prevPos ? getPosName(prevPos) : '-'}</span>
+            <label class="block font-semibold text-slate-500 text-[11px] mb-1">Jabatan Sebelumnya:</label>
+            <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${prevPos ? getPosName(prevPos) : '-'}" />
           </div>
           <div>
-            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Baru:</span>
-            <strong class="text-blue-900 text-[11px] font-bold">${getPosName(tx.new_position_id)}</strong>
+            <label class="block font-bold text-blue-700 text-[11px] mb-1">Jabatan Baru:</label>
+            <input type="text" disabled class="w-full bg-white border border-blue-300 rounded-lg p-2 font-bold text-blue-900 text-xs shadow-sm cursor-not-allowed" value="${getPosName(tx.new_position_id)}" />
           </div>
         </div>
       </div>
@@ -22444,26 +22444,26 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <span>Detail Mutasi Penempatan & Unit Kerja</span>
         </div>
         ${tx.new_location_id ? `
-          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-cyan-100 mt-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5">
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Lokasi Sebelumnya:</span>
-              <span class="text-slate-500 text-[11px]">${prevLoc ? getLocName(prevLoc) : '-'}</span>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Lokasi Sebelumnya:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${prevLoc ? getLocName(prevLoc) : '-'}" />
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Lokasi Baru:</span>
-              <strong class="text-cyan-950 text-[11px] font-bold">${getLocName(tx.new_location_id)}</strong>
+              <label class="block font-bold text-cyan-700 text-[11px] mb-1">Lokasi Baru:</label>
+              <input type="text" disabled class="w-full bg-white border border-cyan-300 rounded-lg p-2 font-bold text-cyan-900 text-xs shadow-sm cursor-not-allowed" value="${getLocName(tx.new_location_id)}" />
             </div>
           </div>
         ` : ''}
         ${tx.new_unit_id ? `
-          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-cyan-100 mt-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5">
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Unit Sebelumnya:</span>
-              <span class="text-slate-500 text-[11px]">${prevUnit ? getUnitName(prevUnit) : '-'}</span>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Unit Sebelumnya:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${prevUnit ? getUnitName(prevUnit) : '-'}" />
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Unit Baru:</span>
-              <strong class="text-cyan-950 text-[11px] font-bold">${getUnitName(tx.new_unit_id)}</strong>
+              <label class="block font-bold text-cyan-700 text-[11px] mb-1">Unit Baru:</label>
+              <input type="text" disabled class="w-full bg-white border border-cyan-300 rounded-lg p-2 font-bold text-cyan-900 text-xs shadow-sm cursor-not-allowed" value="${getUnitName(tx.new_unit_id)}" />
             </div>
           </div>
         ` : ''}
@@ -22496,61 +22496,50 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <span>Detail Penyesuaian Remunerasi & Benefit</span>
         </div>
         ${newSalary > 0 ? `
-          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-emerald-100 mb-1.5 mt-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5">
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Gaji Pokok Sebelumnya:</span>
-              <span class="text-slate-500 font-mono text-[11px]">${prevSalary > 0 ? `Rp ${prevSalary.toLocaleString('id-ID')}` : '-'}</span>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Gaji Pokok Sebelumnya:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-500 text-xs cursor-not-allowed" value="${prevSalary > 0 ? `Rp ${prevSalary.toLocaleString('id-ID')}` : '-'}" />
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Gaji Pokok Baru:</span>
-              <strong class="text-emerald-700 font-mono text-[12px]">Rp ${newSalary.toLocaleString('id-ID')}</strong>
+              <label class="block font-bold text-emerald-700 text-[11px] mb-1">Gaji Pokok Baru:</label>
+              <input type="text" disabled class="w-full bg-white border border-emerald-300 rounded-lg p-2 font-bold font-mono text-emerald-800 text-sm shadow-sm cursor-not-allowed" value="Rp ${newSalary.toLocaleString('id-ID')}" />
             </div>
           </div>
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
-            <span class="text-[11px] text-slate-500">Periode Penggajian:</span>
-            <strong class="text-indigo-900 font-semibold text-xs">${(tx.payroll_period_type === '1-30' || tx.payroll_period_type === 'BULANAN') ? '1-30' : '16-15'}</strong>
-          </div>
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
-            <span class="text-[11px] text-slate-500">Skema PPh:</span>
-            <strong class="text-indigo-900 font-semibold text-xs">${tx.pph_scheme || 'Gross'}</strong>
-          </div>
-          ${tx.payroll_deductions_json ? `
-            <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100 text-[11px]">
-              <span class="text-slate-500">Skema PPh & BPJS:</span>
-              <div class="flex items-center gap-1 font-semibold text-slate-700">
-                <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px]">PPh: ${tx.payroll_deductions_json.pph_scheme || 'Gross'}</span>
-                ${tx.payroll_deductions_json.apply_bpjs_kes ? '<span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px]">BPJS Kes</span>' : ''}
-                ${tx.payroll_deductions_json.apply_bpjs_tk ? '<span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px]">BPJS TK</span>' : ''}
-              </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Periode Penggajian Baru:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${(tx.payroll_period_type === '1-30' || tx.payroll_period_type === 'BULANAN') ? '1-30' : '16-15'}" />
             </div>
-          ` : ''}
+            <div>
+              <label class="block font-semibold text-slate-500 text-[11px] mb-1">Skema PPh Baru:</label>
+              <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold text-slate-600 text-xs cursor-not-allowed" value="${tx.pph_scheme || 'Gross'}" />
+            </div>
+          </div>
           ${(() => {
             const bName = tx.bank_name || tx.payroll_deductions_json?.bank_name;
             const bAcc = tx.bank_account_no || tx.payroll_deductions_json?.bank_account_no;
             const bHolder = tx.bank_account_holder || tx.payroll_deductions_json?.bank_account_holder;
             if (!bName && !bAcc) return '';
             return `
-              <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100 text-[11px]">
-                <span class="text-slate-500">Rekening Payroll:</span>
-                <div class="text-right">
-                  <strong class="text-emerald-950 font-bold block">${bName || '-'}</strong>
-                  <span class="text-[10px] text-slate-600 font-mono">${bAcc || '-'} ${bHolder ? `(a/n ${bHolder})` : ''}</span>
-                </div>
+              <div class="mt-3">
+                <label class="block font-semibold text-slate-500 text-[11px] mb-1">Rekening Payroll Baru:</label>
+                <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-600 text-xs cursor-not-allowed" value="${bName || '-'} - ${bAcc || '-'} ${bHolder ? `(a/n ${bHolder})` : ''}" />
               </div>
             `;
           })()}
         ` : ''}
         ${allowances.length > 0 ? `
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 text-[11px]">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
             ${allowances.map(a => `
-              <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-emerald-100">
+              <div class="space-y-3">
                 <div>
-                  <span class="text-slate-400 block text-[10px] uppercase font-semibold">${a.label} Sebelumnya:</span>
-                  <span class="text-slate-500 font-mono text-[10px]">${a.oldVal >= 0 ? `Rp ${a.oldVal.toLocaleString('id-ID')}` : '-'}</span>
+                  <label class="block font-semibold text-slate-500 text-[11px] mb-1">${a.label} Sebelumnya:</label>
+                  <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-500 text-xs cursor-not-allowed" value="${a.oldVal >= 0 ? `Rp ${a.oldVal.toLocaleString('id-ID')}` : '-'}" />
                 </div>
                 <div>
-                  <span class="text-slate-400 block text-[10px] uppercase font-semibold">${a.label} Baru:</span>
-                  <strong class="text-emerald-900 font-mono text-[11px]">Rp ${a.newVal.toLocaleString('id-ID')}</strong>
+                  <label class="block font-bold text-emerald-700 text-[11px] mb-1">${a.label} Baru:</label>
+                  <input type="text" disabled class="w-full bg-white border border-emerald-300 rounded-lg p-2 font-bold font-mono text-emerald-800 text-xs shadow-sm cursor-not-allowed" value="Rp ${a.newVal.toLocaleString('id-ID')}" />
                 </div>
               </div>
             `).join("")}
