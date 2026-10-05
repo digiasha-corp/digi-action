@@ -76,6 +76,13 @@ END $$;
 -- 4. PASTIKAN MASTER JABATAN TERISI DARI JABATAN m_employee (KE TABEL FISIK hr_job_positions)
 DO $$
 BEGIN
+    -- Pastikan L-04 eksis di hr_master_levels agar tidak error FK Constraint
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_master_levels' AND table_type = 'BASE TABLE') THEN
+        INSERT INTO public.hr_master_levels (id_level, nama_level, bobot_level, is_active)
+        VALUES ('L-04', 'Supervisor / Coordinator', 4, TRUE)
+        ON CONFLICT (id_level) DO NOTHING;
+    END IF;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_job_positions' AND table_type = 'BASE TABLE') THEN
         INSERT INTO public.hr_job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
         SELECT 
