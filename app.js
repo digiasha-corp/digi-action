@@ -22906,12 +22906,13 @@ async function openCareerTransactionDetailModal(txId) {
     } else {
       stagingContainer.innerHTML = stagings.map(s => {
         const isCurrent = s.stage_order === (tx.current_stage || 1) && isPending;
-        const isApproved = s.status === "APPROVED";
+        const isApproved = s.status === "APPROVED" || tx.status === "APPROVED";
         const isRejected = s.status === "REJECTED";
         let statusTag = `<span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">MENUNGGU</span>`;
         if (isApproved) statusTag = `<span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>DISETUJUI</span>`;
         else if (isRejected) statusTag = `<span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-xmark mr-1"></i>DITOLAK</span>`;
         else if (isCurrent) statusTag = `<span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">MENUNGGU RESPON</span>`;
+
 
         return `
           <div class="p-2 rounded-xl border ${isCurrent ? 'bg-amber-50/70 border-amber-200 shadow-2xs' : 'bg-white border-indigo-100'} flex items-center justify-between text-xs">
