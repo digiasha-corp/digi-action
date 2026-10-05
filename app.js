@@ -21114,6 +21114,28 @@ async function onTxEmployeeSelected(empId) {
       calcEndEl.innerText = "Ulang Tahun ke-50 (Menunggu DOB)";
     }
 
+    // Compute accurate Level/Grade
+    const posId = emp.position_id;
+    const posObj = (ORG_POSITIONS_DATA || []).find(p => p.id_position === posId);
+    let levelDisplay = "N/A";
+    const levelId = posObj?.level_id || emp.role_id;
+    if (levelId) {
+      const levelObj = (ORG_LEVELS_DATA || []).find(l => l.id_level === levelId);
+      if (levelObj) levelDisplay = `${levelObj.id_level} - ${levelObj.nama_level}`;
+      else levelDisplay = levelId;
+    } else if (emp.role) {
+      levelDisplay = emp.role;
+    }
+
+    // Compute accurate Location and Unit
+    const locId = emp.work_location_id;
+    const locObj = (ORG_WORK_LOCATIONS_DATA || []).find(l => l.id_work_location === locId);
+    const locDisplay = locObj?.nama_lokasi || emp.area_cover || "N/A";
+
+    const unitId = emp.unit_id;
+    const unitObj = (ORG_UNITS_DATA || []).find(u => u.id_unit === unitId);
+    const unitDisplay = unitObj?.nama_unit || emp.cabang || "N/A";
+
     // Auto-populate data sebelumnya ke subform rotasi, promosi, demosi, mutasi, benefit
     const prevPosRotasi = document.getElementById("tx-rotasi-prev-pos");
     if (prevPosRotasi) prevPosRotasi.value = emp.jabatan || "N/A";
@@ -21122,19 +21144,19 @@ async function onTxEmployeeSelected(empId) {
     if (prevPosPromosi) prevPosPromosi.value = emp.jabatan || "N/A";
 
     const prevLvlPromosi = document.getElementById("tx-promosi-prev-lvl");
-    if (prevLvlPromosi) prevLvlPromosi.value = emp.level_name || emp.role_id || "N/A";
+    if (prevLvlPromosi) prevLvlPromosi.value = emp.level_name || levelDisplay;
 
     const prevPosDemosi = document.getElementById("tx-demosi-prev-pos");
     if (prevPosDemosi) prevPosDemosi.value = emp.jabatan || "N/A";
 
     const prevLvlDemosi = document.getElementById("tx-demosi-prev-lvl");
-    if (prevLvlDemosi) prevLvlDemosi.value = emp.level_name || emp.role_id || "N/A";
+    if (prevLvlDemosi) prevLvlDemosi.value = emp.level_name || levelDisplay;
 
     const prevLocMutasi = document.getElementById("tx-mutasi-prev-loc");
-    if (prevLocMutasi) prevLocMutasi.value = emp.work_location_name || emp.area_cover || "N/A";
+    if (prevLocMutasi) prevLocMutasi.value = locDisplay;
 
     const prevUnitMutasi = document.getElementById("tx-mutasi-prev-unit");
-    if (prevUnitMutasi) prevUnitMutasi.value = emp.cabang || "N/A";
+    if (prevUnitMutasi) prevUnitMutasi.value = unitDisplay;
 
     // AMBIL DATA BENEFIT AKTIF TERAKHIR DARI DATABASE SUPABASE (hr_employee_transactions / career_histories)
     let latestBenefit = null;
@@ -22358,20 +22380,26 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <span>${titleText}</span>
         </div>
         ${tx.new_level_id ? `
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-black/5">
-            <span class="text-[11px] text-slate-500">Perubahan Level:</span>
-            <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${prevLvl ? `<span class="text-slate-400 line-through">${getLvlName(prevLvl)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
-              <strong class="text-indigo-900 font-bold">${getLvlName(tx.new_level_id)}</strong>
+          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-black/5 mt-1">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Level Sebelumnya:</span>
+              <span class="text-slate-500 text-[11px]">${prevLvl ? getLvlName(prevLvl) : '-'}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Level Baru:</span>
+              <strong class="text-indigo-900 text-[11px] font-bold">${getLvlName(tx.new_level_id)}</strong>
             </div>
           </div>
         ` : ''}
         ${tx.new_position_id ? `
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-black/5">
-            <span class="text-[11px] text-slate-500">Perubahan Jabatan:</span>
-            <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${prevPos ? `<span class="text-slate-400 line-through">${getPosName(prevPos)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
-              <strong class="text-indigo-900 font-bold">${getPosName(tx.new_position_id)}</strong>
+          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-black/5 mt-1">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Sebelumnya:</span>
+              <span class="text-slate-500 text-[11px]">${prevPos ? getPosName(prevPos) : '-'}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Baru:</span>
+              <strong class="text-indigo-900 text-[11px] font-bold">${getPosName(tx.new_position_id)}</strong>
             </div>
           </div>
         ` : ''}
@@ -22389,11 +22417,14 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <i class="fa-solid fa-arrows-rotate text-blue-600"></i>
           <span>Detail Rotasi Jabatan</span>
         </div>
-        <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-blue-100">
-          <span class="text-[11px] text-slate-500">Perubahan Jabatan:</span>
-          <div class="flex items-center space-x-1.5 text-xs font-semibold">
-            ${prevPos ? `<span class="text-slate-400 line-through">${getPosName(prevPos)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
-            <strong class="text-blue-900 font-bold">${getPosName(tx.new_position_id)}</strong>
+        <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-blue-100 mt-1">
+          <div>
+            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Sebelumnya:</span>
+            <span class="text-slate-500 text-[11px]">${prevPos ? getPosName(prevPos) : '-'}</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Jabatan Baru:</span>
+            <strong class="text-blue-900 text-[11px] font-bold">${getPosName(tx.new_position_id)}</strong>
           </div>
         </div>
       </div>
@@ -22413,20 +22444,26 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <span>Detail Mutasi Penempatan & Unit Kerja</span>
         </div>
         ${tx.new_location_id ? `
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-cyan-100">
-            <span class="text-[11px] text-slate-500">Lokasi Kerja:</span>
-            <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${prevLoc ? `<span class="text-slate-400 line-through">${getLocName(prevLoc)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
-              <strong class="text-cyan-950 font-bold">${getLocName(tx.new_location_id)}</strong>
+          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-cyan-100 mt-1">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Lokasi Sebelumnya:</span>
+              <span class="text-slate-500 text-[11px]">${prevLoc ? getLocName(prevLoc) : '-'}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Lokasi Baru:</span>
+              <strong class="text-cyan-950 text-[11px] font-bold">${getLocName(tx.new_location_id)}</strong>
             </div>
           </div>
         ` : ''}
         ${tx.new_unit_id ? `
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-cyan-100">
-            <span class="text-[11px] text-slate-500">Unit Kerja:</span>
-            <div class="flex items-center space-x-1.5 text-xs font-semibold">
-              ${prevUnit ? `<span class="text-slate-400 line-through">${getUnitName(prevUnit)}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
-              <strong class="text-cyan-950 font-bold">${getUnitName(tx.new_unit_id)}</strong>
+          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-cyan-100 mt-1">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Unit Sebelumnya:</span>
+              <span class="text-slate-500 text-[11px]">${prevUnit ? getUnitName(prevUnit) : '-'}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Unit Baru:</span>
+              <strong class="text-cyan-950 text-[11px] font-bold">${getUnitName(tx.new_unit_id)}</strong>
             </div>
           </div>
         ` : ''}
@@ -22459,11 +22496,14 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           <span>Detail Penyesuaian Remunerasi & Benefit</span>
         </div>
         ${newSalary > 0 ? `
-          <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
-            <span class="text-[11px] text-slate-500">Gaji Pokok Baru:</span>
-            <div class="flex items-center space-x-1.5 text-xs font-mono font-bold">
-              ${prevSalary > 0 ? `<span class="text-slate-400 line-through text-[11px]">Rp ${prevSalary.toLocaleString('id-ID')}</span><i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>` : ''}
-              <strong class="text-emerald-700">Rp ${newSalary.toLocaleString('id-ID')}</strong>
+          <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-emerald-100 mb-1.5 mt-1">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Gaji Pokok Sebelumnya:</span>
+              <span class="text-slate-500 font-mono text-[11px]">${prevSalary > 0 ? `Rp ${prevSalary.toLocaleString('id-ID')}` : '-'}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-semibold block">Gaji Pokok Baru:</span>
+              <strong class="text-emerald-700 font-mono text-[12px]">Rp ${newSalary.toLocaleString('id-ID')}</strong>
             </div>
           </div>
           <div class="flex items-center justify-between bg-white/80 p-1.5 rounded-lg border border-emerald-100">
@@ -22501,13 +22541,16 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
           })()}
         ` : ''}
         ${allowances.length > 0 ? `
-          <div class="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 text-[11px]">
             ${allowances.map(a => `
-              <div class="bg-white/80 p-1.5 rounded-lg border border-emerald-100">
-                <span class="text-slate-400 block text-[10px]">${a.label}:</span>
-                <div class="flex items-center space-x-1.5 font-mono">
-                  ${a.oldVal >= 0 && a.oldVal !== a.newVal ? `<span class="text-slate-400 line-through text-[10px]">Rp ${a.oldVal.toLocaleString('id-ID')}</span><i class="fa-solid fa-arrow-right text-[9px] text-slate-400"></i>` : ''}
-                  <strong class="text-emerald-900 text-[11px]">Rp ${a.newVal.toLocaleString('id-ID')}</strong>
+              <div class="grid grid-cols-2 gap-2 bg-white/80 p-2 rounded-lg border border-emerald-100">
+                <div>
+                  <span class="text-slate-400 block text-[10px] uppercase font-semibold">${a.label} Sebelumnya:</span>
+                  <span class="text-slate-500 font-mono text-[10px]">${a.oldVal >= 0 ? `Rp ${a.oldVal.toLocaleString('id-ID')}` : '-'}</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 block text-[10px] uppercase font-semibold">${a.label} Baru:</span>
+                  <strong class="text-emerald-900 font-mono text-[11px]">Rp ${a.newVal.toLocaleString('id-ID')}</strong>
                 </div>
               </div>
             `).join("")}
