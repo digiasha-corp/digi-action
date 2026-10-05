@@ -22915,20 +22915,23 @@ async function openCareerTransactionDetailModal(txId) {
 
 
         return `
-          <div class="p-2 rounded-xl border ${isCurrent ? 'bg-amber-50/70 border-amber-200 shadow-2xs' : 'bg-white border-indigo-100'} flex items-center justify-between text-xs">
-            <div class="flex items-center space-x-2 min-w-0">
-              <span class="w-5 h-5 rounded-full ${isApproved ? 'bg-emerald-600 text-white' : (isCurrent ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600')} text-[10px] font-bold flex items-center justify-center shrink-0">
-                ${s.stage_order}
-              </span>
-              <div class="min-w-0">
-                <strong class="text-slate-900 block truncate">${s.approver_role || 'Approver Staging ' + s.stage_order}</strong>
-                <span class="text-[10px] text-slate-400 font-mono">NIP: ${s.approver_nip || '-'}</span>
+          <div class="p-2.5 rounded-xl border ${isCurrent ? 'bg-amber-50/70 border-amber-200 shadow-2xs' : 'bg-white border-indigo-100'} flex flex-col text-xs gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2 min-w-0">
+                <span class="w-5 h-5 rounded-full ${isApproved ? 'bg-emerald-600 text-white' : (isCurrent ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600')} text-[10px] font-bold flex items-center justify-center shrink-0">
+                  ${s.stage_order}
+                </span>
+                <div class="min-w-0">
+                  <strong class="text-slate-900 block truncate">${s.approver_role || 'Approver Staging ' + s.stage_order}</strong>
+                  <span class="text-[10px] text-slate-400 font-mono">NIP: ${s.approver_nip || '-'}</span>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                ${statusTag}
+                ${s.approved_at ? `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">${s.approved_at.slice(0, 16).replace('T', ' ')}</span>` : ''}
               </div>
             </div>
-            <div class="text-right shrink-0">
-              ${statusTag}
-              ${s.approved_at ? `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">${s.approved_at.slice(0, 16)}</span>` : ''}
-            </div>
+            ${s.notes ? `<div class="p-2 bg-slate-50 rounded-lg border border-slate-200 text-[10px] text-slate-600 italic"><span class="font-semibold not-italic">Catatan:</span> "${s.notes}"</div>` : ''}
           </div>
         `;
       }).join("");
