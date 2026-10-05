@@ -21410,7 +21410,7 @@ function resetFormContents(container) {
     if (input.type === 'checkbox' || input.type === 'radio') {
       input.checked = false;
     } else {
-      input.value = '';
+      if (!input.readOnly) input.value = '';
     }
   });
 
@@ -22505,7 +22505,10 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
             ${allowances.map(a => `
               <div class="bg-white/80 p-1.5 rounded-lg border border-emerald-100">
                 <span class="text-slate-400 block text-[10px]">${a.label}:</span>
-                <strong class="text-emerald-900 font-mono">Rp ${a.newVal.toLocaleString('id-ID')}</strong>
+                <div class="flex items-center space-x-1.5 font-mono">
+                  ${a.oldVal >= 0 && a.oldVal !== a.newVal ? `<span class="text-slate-400 line-through text-[10px]">Rp ${a.oldVal.toLocaleString('id-ID')}</span><i class="fa-solid fa-arrow-right text-[9px] text-slate-400"></i>` : ''}
+                  <strong class="text-emerald-900 text-[11px]">Rp ${a.newVal.toLocaleString('id-ID')}</strong>
+                </div>
               </div>
             `).join("")}
           </div>
