@@ -112,7 +112,6 @@ INSERT INTO public.hr_employees (
     email,
     location_id,
     position_id,
-    role_id,
     status_kerja,
     tanggal_masuk,
     deleted_at,
@@ -138,7 +137,6 @@ SELECT
         (SELECT id_position FROM public.hr_job_positions WHERE LOWER(nama_jabatan) = LOWER(TRIM(m.jabatan)) LIMIT 1),
         'POS-SPV-FAC'
     ),
-    COALESCE(m.role_id, 'R-04'),
     'PKWTT',
     COALESCE(m.created_at::date, CURRENT_DATE),
     CASE WHEN m.status_aktif = 'NONAKTIF' THEN NOW() ELSE NULL END,
