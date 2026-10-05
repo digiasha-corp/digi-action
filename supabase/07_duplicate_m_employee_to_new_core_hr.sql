@@ -43,70 +43,6 @@ BEGIN
 END $$;
 
 
--- 3. PASTIKAN MASTER UNIT TERISI DARI CABANG m_employee (KE TABEL FISIK hr_organization_units)
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_organization_units' AND table_type = 'BASE TABLE') THEN
-        -- Pastikan HO-CORP (Head Office) eksis terlebih dahulu agar tidak ada error FK constraint
-        INSERT INTO public.hr_organization_units (id_unit, tipe_unit, nama_unit, parent_unit_id, is_active)
-        VALUES ('HO-CORP', 'HO', 'Kantor Pusat Digiasha', NULL, TRUE)
-        ON CONFLICT (id_unit) DO NOTHING;
-
-        -- Salin unit dari m_employee
-        INSERT INTO public.hr_organization_units (id_unit, tipe_unit, nama_unit, parent_unit_id, is_active)
-        SELECT 
-            u.id_unit,
-            'CABANG' AS tipe_unit,
-            u.nama_unit,
-            'HO-CORP' AS parent_unit_id,
-            TRUE AS is_active
-        FROM (
-            SELECT 
-                'UNIT-' || UPPER(REGEXP_REPLACE(TRIM(cabang), '[^a-zA-Z0-9]+', '-', 'g')) AS id_unit,
-                MIN(TRIM(cabang)) AS nama_unit
-            FROM public.m_employee
-            WHERE cabang IS NOT NULL AND TRIM(cabang) <> ''
-            GROUP BY 'UNIT-' || UPPER(REGEXP_REPLACE(TRIM(cabang), '[^a-zA-Z0-9]+', '-', 'g'))
-        ) u
-        ON CONFLICT (id_unit) DO NOTHING;
-    END IF;
-END $$;
-
-
--- 4. PASTIKAN MASTER JABATAN TERISI DARI JABATAN m_employee (KE TABEL FISIK hr_job_positions)
-DO $$
-BEGIN
-    -- Pastikan L-04 eksis di hr_master_levels agar tidak error FK Constraint
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_master_levels' AND table_type = 'BASE TABLE') THEN
-        INSERT INTO public.hr_master_levels (id_level, nama_level, bobot_level, is_active)
-        VALUES ('L-04', 'Supervisor / Coordinator', 4, TRUE)
-        ON CONFLICT (id_level) DO NOTHING;
-    END IF;
-
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_job_positions' AND table_type = 'BASE TABLE') THEN
-        -- Pastikan fallback position (POS-SPV-FAC) tersedia
-        INSERT INTO public.hr_job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
-        VALUES ('POS-SPV-FAC', 'Supervisor / Fallback', 'L-04', 'HO-CORP', TRUE)
-        ON CONFLICT (id_position) DO NOTHING;
-
-        INSERT INTO public.hr_job_positions (id_position, nama_jabatan, level_id, unit_id, is_active)
-        SELECT 
-            p.id_position,
-            p.nama_jabatan,
-            'L-04' AS level_id,
-            'HO-CORP' AS unit_id,
-            TRUE AS is_active
-        FROM (
-            SELECT 
-                'POS-' || UPPER(REGEXP_REPLACE(TRIM(jabatan), '[^a-zA-Z0-9]+', '-', 'g')) AS id_position,
-                MIN(TRIM(jabatan)) AS nama_jabatan
-            FROM public.m_employee
-            WHERE jabatan IS NOT NULL AND TRIM(jabatan) <> ''
-            GROUP BY 'POS-' || UPPER(REGEXP_REPLACE(TRIM(jabatan), '[^a-zA-Z0-9]+', '-', 'g'))
-        ) p
-        ON CONFLICT (id_position) DO NOTHING;
-    END IF;
-END $$;
 
 
 -- 5. DUPLIKASI DATA KARYAWAN KE TABEL FISIK hr_employees
@@ -134,14 +70,8 @@ SELECT
         THEN LOWER(TRIM(m.email))
         ELSE LOWER(REGEXP_REPLACE(TRIM(m.nip), '[^a-zA-Z0-9]', '', 'g')) || '@digiasha.com'
     END AS email,
-    COALESCE(
-        (SELECT id_unit FROM public.hr_organization_units WHERE LOWER(nama_unit) = LOWER(TRIM(m.cabang)) LIMIT 1),
-        'HO-CORP'
-    ),
-    COALESCE(
-        (SELECT id_position FROM public.hr_job_positions WHERE LOWER(nama_jabatan) = LOWER(TRIM(m.jabatan)) LIMIT 1),
-        'POS-SPV-FAC'
-    ),
+    (SELECT id_unit FROM public.hr_organization_units WHERE LOWER(nama_unit) = LOWER(TRIM(m.cabang)) LIMIT 1) AS location_id,
+    (SELECT id_position FROM public.hr_job_positions WHERE LOWER(nama_jabatan) = LOWER(TRIM(m.jabatan)) LIMIT 1) AS position_id,
     'PKWTT',
     COALESCE(m.created_at::date, CURRENT_DATE),
     CASE WHEN m.status_aktif = 'NONAKTIF' THEN NOW() ELSE NULL END,
