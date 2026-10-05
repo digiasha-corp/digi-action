@@ -37,14 +37,14 @@ BEGIN
     END IF;
 
     -- Telusuri hierarki jabatan (reports_to_unit_id) ke atas secara bertahap
-    WHILE v_curr_pos_id IS NOT NULL AND v_loop_depth < v_max_depth LOOP
+    WHILE v_curr_pos_id IS NOT NULL AND TRIM(v_curr_pos_id) <> '' AND v_loop_depth < v_max_depth LOOP
         v_loop_depth := v_loop_depth + 1;
 
         -- 1. Cari jabatan atasan langsung dari jabatan saat ini
         SELECT jp.reports_to_unit_id
         INTO v_parent_pos_id
         FROM public.hr_job_positions jp
-        WHERE jp.id_position = v_curr_pos_id;
+        WHERE TRIM(jp.id_position) = TRIM(v_curr_pos_id);
 
         -- Jika tidak ada atasan lagi
         IF v_parent_pos_id IS NULL OR TRIM(v_parent_pos_id) = '' THEN
@@ -55,10 +55,10 @@ BEGIN
         v_curr_unit_id := p_location_id;
         
         -- Jika bawahan tidak memiliki lokasi, kita jadikan loop berjalan minimal 1 kali (global search)
-        IF v_curr_unit_id IS NULL THEN
+        IF v_curr_unit_id IS NULL OR TRIM(v_curr_unit_id) = '' THEN
             SELECT e.id INTO v_supervisor_id
             FROM public.hr_employees e
-            WHERE e.position_id = v_parent_pos_id
+            WHERE TRIM(e.position_id) = TRIM(v_parent_pos_id)
               AND e.deleted_at IS NULL
               AND (e.status_kerja IS NULL OR UPPER(TRIM(e.status_kerja)) != 'CALON')
             ORDER BY e.created_at ASC
@@ -69,12 +69,12 @@ BEGIN
             END IF;
         ELSE
             -- Jika bawahan punya lokasi, naik dari unit terkecil ke pusat
-            WHILE v_curr_unit_id IS NOT NULL LOOP
+            WHILE v_curr_unit_id IS NOT NULL AND TRIM(v_curr_unit_id) <> '' LOOP
                 SELECT e.id INTO v_supervisor_id
                 FROM public.hr_employees e
-                WHERE e.position_id = v_parent_pos_id
+                WHERE TRIM(e.position_id) = TRIM(v_parent_pos_id)
                   -- Atasan bisa berada di unit ini, ATAU atasan berstatus 'pusat/global' (location_id IS NULL)
-                  AND (e.location_id = v_curr_unit_id OR e.location_id IS NULL)
+                  AND (TRIM(e.location_id) = TRIM(v_curr_unit_id) OR e.location_id IS NULL OR TRIM(e.location_id) = '')
                   AND e.deleted_at IS NULL
                   AND (e.status_kerja IS NULL OR UPPER(TRIM(e.status_kerja)) != 'CALON')
                 ORDER BY e.created_at ASC
@@ -86,7 +86,7 @@ BEGIN
 
                 SELECT ou.parent_unit_id INTO v_curr_unit_id
                 FROM public.hr_organization_units ou
-                WHERE ou.id_unit = v_curr_unit_id;
+                WHERE TRIM(ou.id_unit) = TRIM(v_curr_unit_id);
             END LOOP;
         END IF;
 
