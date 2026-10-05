@@ -112,7 +112,7 @@ INSERT INTO public.hr_employees (
     email,
     location_id,
     position_id,
-    role,
+    role_id,
     status_kerja,
     tanggal_masuk,
     deleted_at,
