@@ -19729,36 +19729,133 @@ let CURRENT_PERSONALIA_TAB = "chart";
 function switchPersonaliaTab(tab) {
   CURRENT_PERSONALIA_TAB = tab;
   const isChart = tab === "chart";
+  const isDetail = tab === "detail";
+  const isHistory = tab === "history";
 
   const btnChart = document.getElementById("tab-btn-personalia-chart");
   const btnDetail = document.getElementById("tab-btn-personalia-detail");
+  const btnHistory = document.getElementById("tab-btn-personalia-history");
   const tabChart = document.getElementById("personalia-tab-chart");
   const tabDetail = document.getElementById("personalia-tab-detail");
+  const tabHistory = document.getElementById("personalia-tab-history");
 
-  if (btnChart) {
-    btnChart.className = isChart
-      ? "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2 font-bold"
-      : "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 font-bold";
-  }
-  if (btnDetail) {
-    btnDetail.className = !isChart
-      ? "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2 font-bold"
-      : "flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 font-bold";
-  }
+  const activeCls = "flex-1 min-w-fit py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2 shrink-0 font-bold";
+  const inactiveCls = "flex-1 min-w-fit py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 shrink-0 font-bold";
 
-  if (tabChart) {
-    if (isChart) tabChart.classList.remove("hidden");
-    else tabChart.classList.add("hidden");
-  }
-  if (tabDetail) {
-    if (!isChart) tabDetail.classList.remove("hidden");
-    else tabDetail.classList.add("hidden");
-  }
+  if (btnChart) btnChart.className = isChart ? activeCls : inactiveCls;
+  if (btnDetail) btnDetail.className = isDetail ? activeCls : inactiveCls;
+  if (btnHistory) btnHistory.className = isHistory ? activeCls : inactiveCls;
+
+  if (tabChart) { if (isChart) tabChart.classList.remove("hidden"); else tabChart.classList.add("hidden"); }
+  if (tabDetail) { if (isDetail) tabDetail.classList.remove("hidden"); else tabDetail.classList.add("hidden"); }
+  if (tabHistory) { if (isHistory) tabHistory.classList.remove("hidden"); else tabHistory.classList.add("hidden"); }
 
   if (isChart) {
     populateOrgFilterUnits();
     renderVisualOrgChartTree();
+  } else if (isHistory) {
+    loadPersonaliaTransactionHistory();
   }
+}
+let PERSONALIA_HISTORY_DATA = [];
+
+async function loadPersonaliaTransactionHistory() {
+  const tbody = document.getElementById("personalia-history-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat riwayat transaksi...</td></tr>`;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('hr_employee_transactions')
+      .select('*, hr_employees(name, nip)')
+      .order('created_at', { ascending: false })
+      .limit(200);
+      
+    if (error) throw error;
+    PERSONALIA_HISTORY_DATA = data || [];
+    filterPersonaliaHistory();
+  } catch (err) {
+    console.error("[loadPersonaliaTransactionHistory] Gagal:", err);
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Gagal memuat riwayat transaksi.</td></tr>`;
+  }
+}
+
+function filterPersonaliaHistory() {
+  const search = (document.getElementById("personalia-filter-history-search")?.value || "").toLowerCase();
+  const statusFilter = document.getElementById("personalia-filter-history-status")?.value || "ALL";
+  const tbody = document.getElementById("personalia-history-table-body");
+  if (!tbody) return;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  let filtered = PERSONALIA_HISTORY_DATA.filter(tx => {
+    const empName = (tx.hr_employees?.name || "Unknown").toLowerCase();
+    if (search && !empName.includes(search)) return false;
+
+    if (statusFilter !== "ALL") {
+      if (statusFilter === "PENDING" && tx.status !== "PENDING") return false;
+      if (statusFilter === "REJECTED" && tx.status !== "REJECTED") return false;
+      if (statusFilter === "APPLIED") {
+        if (!tx.is_applied) return false;
+      }
+      if (statusFilter === "APPROVED_WAITING") {
+        if (tx.status !== "APPROVED" || tx.is_applied) return false;
+      }
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Tidak ada data transaksi.</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach(tx => {
+    let statusBadge = "";
+    if (tx.status === "PENDING") {
+      statusBadge = `<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[10px] font-bold">Pending Approval</span>`;
+    } else if (tx.status === "REJECTED") {
+      statusBadge = `<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-md text-[10px] font-bold">Ditolak</span>`;
+    } else if (tx.status === "APPROVED") {
+      if (tx.is_applied) {
+        statusBadge = `<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Applied</span>`;
+      } else {
+        if (tx.effective_date && tx.effective_date > todayStr) {
+          statusBadge = `<span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-[10px] font-bold">Menunggu Tgl Berlaku</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md text-[10px] font-bold">Menunggu EOD Hari Ini</span>`;
+        }
+      }
+    }
+
+    const dCreate = new Date(tx.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric'});
+    const tTypes = Array.isArray(tx.transaction_types) ? tx.transaction_types.join(", ") : tx.transaction_types;
+    const dEffective = tx.effective_date ? new Date(tx.effective_date).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric'}) : '-';
+
+    html += `
+      <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="openDossierModal('${tx.employee_id}', 'history')">
+        <td class="p-3 align-top">
+          <div class="font-bold text-slate-800">${dCreate}</div>
+          <div class="text-[10px] text-slate-500 line-clamp-1 max-w-[120px]">${tTypes}</div>
+        </td>
+        <td class="p-3 align-top">
+          <div class="font-bold text-slate-800">${tx.hr_employees?.name || 'Unknown'}</div>
+          <div class="text-[10px] text-slate-500">NIP: ${tx.hr_employees?.nip || '-'}</div>
+        </td>
+        <td class="p-3 align-top font-medium text-slate-700">
+          ${dEffective}
+        </td>
+        <td class="p-3 align-top">
+          ${statusBadge}
+        </td>
+        <td class="p-3 align-top text-right">
+          <button type="button" class="text-indigo-600 hover:text-indigo-800 font-semibold text-[10px]"><i class="fa-solid fa-folder-open mr-1"></i>Dossier</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
 }
 
 async function initPersonaliaScreen() {

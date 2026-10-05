@@ -18,15 +18,19 @@
     </div>
   </div>
 
-  <!-- NAVIGASI 2 TAB UTAMA: TAB 1 BAGAN ORGANISASI, TAB 2 DETAIL KARYAWAN -->
-  <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold shadow-inner">
-    <button type="button" id="tab-btn-personalia-chart" onclick="switchPersonaliaTab('chart')" class="flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2">
+  <!-- NAVIGASI 3 TAB UTAMA: TAB 1 BAGAN, TAB 2 DETAIL, TAB 3 TRANSAKSI -->
+  <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold shadow-inner overflow-x-auto" style="scrollbar-width: none;">
+    <button type="button" id="tab-btn-personalia-chart" onclick="switchPersonaliaTab('chart')" class="flex-1 min-w-fit py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-slate-900 shadow-sm flex items-center justify-center space-x-2 shrink-0">
       <i class="fa-solid fa-sitemap text-indigo-600"></i>
       <span>Bagan Organisasi</span>
     </button>
-    <button type="button" id="tab-btn-personalia-detail" onclick="switchPersonaliaTab('detail')" class="flex-1 py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2">
+    <button type="button" id="tab-btn-personalia-detail" onclick="switchPersonaliaTab('detail')" class="flex-1 min-w-fit py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 shrink-0">
       <i class="fa-solid fa-id-card-clip text-emerald-600"></i>
-      <span>Detail Karyawan</span>
+      <span>Data Karyawan</span>
+    </button>
+    <button type="button" id="tab-btn-personalia-history" onclick="switchPersonaliaTab('history')" class="flex-1 min-w-fit py-2.5 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 flex items-center justify-center space-x-2 shrink-0">
+      <i class="fa-solid fa-timeline text-amber-500"></i>
+      <span>Riwayat Transaksi</span>
     </button>
   </div>
 
@@ -170,6 +174,61 @@
     <div id="personalia-employee-list-container" class="space-y-2.5">
       <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
         <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat data master personalia...
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 3: RIWAYAT TRANSAKSI HR (DAFTAR SEMUA TRANSAKSI)                       -->
+  <!-- ========================================================================= -->
+  <div id="personalia-tab-history" class="space-y-4 hidden">
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+        <div class="w-7 h-7 bg-amber-50 rounded-lg flex items-center justify-center text-amber-500 shrink-0">
+          <i class="fa-solid fa-timeline text-xs"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h4 class="font-bold text-slate-800 text-xs">Semua Riwayat Transaksi</h4>
+          <p class="text-[10px] text-slate-500">Pantau seluruh pengajuan, approval, dan eksekusi.</p>
+        </div>
+        <button type="button" onclick="loadPersonaliaTransactionHistory()" class="w-7 h-7 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition flex items-center justify-center">
+          <i class="fa-solid fa-rotate-right text-[10px]"></i>
+        </button>
+      </div>
+      <div class="flex items-center space-x-2">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+          <input type="text" id="personalia-filter-history-search" placeholder="Cari nama karyawan..." onkeyup="filterPersonaliaHistory()" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs font-semibold text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 transition" />
+        </div>
+        <select id="personalia-filter-history-status" onchange="filterPersonaliaHistory()" class="w-28 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+          <option value="ALL">Semua Status</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED_WAITING">Menunggu Tgl Berlaku</option>
+          <option value="APPLIED">Applied (Sukses)</option>
+          <option value="REJECTED">Ditolak</option>
+        </select>
+      </div>
+      
+      <!-- Tabel atau List History -->
+      <div class="overflow-x-auto hide-scrollbar rounded-xl border border-slate-200">
+        <table class="w-full text-left border-collapse min-w-[700px]">
+          <thead>
+            <tr class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+              <th class="p-3 whitespace-nowrap">Tanggal & Jenis</th>
+              <th class="p-3 whitespace-nowrap">Karyawan</th>
+              <th class="p-3 whitespace-nowrap">Tgl Berlaku</th>
+              <th class="p-3 whitespace-nowrap">Status EOD</th>
+              <th class="p-3 whitespace-nowrap text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="personalia-history-table-body" class="text-xs divide-y divide-slate-100 bg-white">
+            <tr>
+              <td colspan="5" class="p-6 text-center text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat riwayat transaksi...
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
