@@ -1110,33 +1110,13 @@ async function supabaseSubmitIzin(data) {
   }
 
   // ==== LIVE SUPERVISOR LOOKUP ====
+  // Gunakan data dari payload frontend yang sudah memanggil getLiveSupervisorForIzin()
   let finalPicNip = data.pic_approval_nip || "-";
   let finalPicNama = data.pic_approval_nama || "Atasan Langsung";
 
-  if (supabaseClient) {
-    try {
-      const { data: empData } = await supabaseClient
-        .from("hr_employees")
-        .select("supervisor_id")
-        .eq("nip", data.nip || CURRENT_USER?.nip)
-        .maybeSingle();
-      
-      if (empData && empData.supervisor_id) {
-        finalPicNip = empData.supervisor_id;
-        
-        const { data: spvData } = await supabaseClient
-          .from("hr_employees")
-          .select("name")
-          .eq("nip", finalPicNip)
-          .maybeSingle();
-          
-        if (spvData && spvData.name) {
-          finalPicNama = spvData.name;
-        }
-      }
-    } catch (e) {
-      console.warn("Gagal melacak atasan live:", e);
-    }
+  // Cegah masuknya UUID sebagai NIP jika terjadi fallback
+  if (finalPicNip.length > 20 && finalPicNip.includes("-")) {
+    finalPicNip = "-";
   }
 
   const payload = {
@@ -3415,7 +3395,8 @@ function selectIzinCategory(category) {
   }
 }
 
-// Handler Foto Selfie Izin -> Auto Submit untuk WFA & Datang Terlambatasync function getLiveSupervisorForIzin() {
+// Handler Foto Selfie Izin -> Auto Submit untuk WFA & Datang Terlambat
+async function getLiveSupervisorForIzin() {
   let liveAtasanNip = CURRENT_USER?.atasan_nip || "-";
   let liveAtasanNama = CURRENT_USER?.atasan_nama || "Atasan Langsung";
   if (supabaseClient && CURRENT_USER?.nip) {
@@ -23992,6 +23973,7 @@ async function handleSaveModulePermissions(actionType) {
     if (actionType === 'LEPASKAN') btnLepas.innerHTML = origHtml;
   }
 }
+
 
 
 
