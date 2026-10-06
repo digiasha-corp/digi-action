@@ -18359,32 +18359,15 @@ async function handleSavePositionPermissions() {
 
   try {
     if (supabaseClient) {
-      // 1. Hapus izin lama posisi ini
-      try {
-        await supabaseClient.from("hr_job_position_permissions").delete().eq("position_id", positionId);
-      } catch (e) { }
-      try {
-        await supabaseClient.from("job_position_permissions").delete().eq("position_id", positionId);
-      } catch (e) { }
-
-      // 2. Insert batch izin baru jika ada
-      if (permsArray.length > 0) {
-        const insertRows = permsArray.map(code => ({
-          position_id: positionId,
-          permission_code: code
-        }));
-
-        let inserted = false;
-        try {
-          const { error } = await supabaseClient.from("hr_job_position_permissions").insert(insertRows);
-          if (!error) inserted = true;
-        } catch (e) { }
-
-        if (!inserted) {
-          try {
-            await supabaseClient.from("job_position_permissions").insert(insertRows);
-          } catch (e) { }
-        }
+      // Call the RPC function we created in the database
+      const { error } = await supabaseClient.rpc('update_position_permissions', {
+        p_position_id: positionId,
+        p_permissions: permsArray
+      });
+      
+      if (error) {
+        console.error("Error saving permissions via RPC:", error);
+        throw error;
       }
     }
 
