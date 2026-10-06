@@ -609,10 +609,10 @@
 </div>
 
 <!-- ========================================================================= -->
-<!-- MODAL INVERSE: ATUR HAK AKSES PER MODUL -->
+<!-- MODAL INVERSE: ATUR HAK Akses per Modul (2 Halaman) -->
 <!-- ========================================================================= -->
 <div id="modal-module-permissions" class="fixed inset-0 bg-slate-900/60 z-[100] hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0">
-  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 transform scale-95 transition-transform duration-300">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col h-[85vh] border border-slate-200 transform scale-95 transition-transform duration-300">
     
     <!-- Header Modal -->
     <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
@@ -621,8 +621,8 @@
           <i class="fa-solid fa-layer-group text-lg"></i>
         </div>
         <div>
-          <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Atur Hak Akses per Modul</h3>
-          <p class="text-[10px] text-slate-500 font-medium">Pilih modul, lalu centang jabatan yang berhak mengaksesnya</p>
+          <h3 class="text-sm font-extrabold text-slate-800 tracking-tight" id="module-perm-modal-title">Pilih Modul / Fitur</h3>
+          <p class="text-[10px] text-slate-500 font-medium" id="module-perm-modal-subtitle">Langkah 1: Tentukan modul mana yang ingin diatur hak aksesnya</p>
         </div>
       </div>
       <button onclick="closeModulePermissionsModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 flex items-center justify-center transition">
@@ -630,31 +630,47 @@
       </button>
     </div>
 
-    <!-- Body Modal -->
-    <div class="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-4">
-      
-      <!-- Pilih Modul -->
-      <div>
-        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Pilih Modul / Fitur <span class="text-red-500">*</span></label>
-        <select id="select-permission-module" onchange="handleModuleSelectionChange()" class="w-full text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition font-medium text-slate-700">
-          <option value="">-- Pilih Modul / Fitur --</option>
-          <!-- Opsi akan dirender dari JS -->
-        </select>
+    <!-- HALAMAN 1: Pilih Modul -->
+    <div id="module-perm-page-1" class="flex-1 flex flex-col min-h-0 bg-slate-50/50">
+      <!-- Tabs Aplikasi -->
+      <div class="px-4 pt-3 border-b border-slate-200 flex space-x-2 overflow-x-auto custom-scrollbar shrink-0 bg-white" id="module-perm-app-tabs">
+        <!-- Rendered by JS -->
       </div>
-
-      <!-- Container Jabatan (Tersembunyi sampai modul dipilih) -->
-      <div id="module-positions-container" class="hidden space-y-2">
-        <div class="flex items-center justify-between mb-2 mt-4">
-          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Daftar Master Jabatan</label>
+      <!-- Daftar Modul -->
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="module-perm-list-container">
+          <!-- Rendered by JS -->
         </div>
-        
+      </div>
+    </div>
+
+    <!-- HALAMAN 2: Pilih Jabatan -->
+    <div id="module-perm-page-2" class="flex-1 flex flex-col min-h-0 hidden bg-slate-50/50">
+      <div class="px-6 py-4 border-b border-slate-200 bg-white shrink-0 flex items-center justify-between">
+        <div>
+          <h4 class="text-xs font-bold text-slate-800" id="module-perm-selected-name">Nama Modul</h4>
+          <p class="text-[10px] text-slate-500">Centang jabatan yang akan diberi akses</p>
+        </div>
+        <div class="flex space-x-4 text-[10px] font-bold bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-200">
+          <label class="flex items-center space-x-1.5 cursor-pointer text-slate-600 hover:text-indigo-600">
+            <input type="checkbox" id="check-all-module-view" onchange="toggleAllModulePerms('VIEW')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer">
+            <span>Pilih Semua (Lihat)</span>
+          </label>
+          <label class="flex items-center space-x-1.5 cursor-pointer text-slate-600 hover:text-indigo-600">
+            <input type="checkbox" id="check-all-module-edit" onchange="toggleAllModulePerms('EDIT')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer">
+            <span>Pilih Semua (Ubah)</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
         <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
           <table class="w-full text-left text-xs">
             <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
               <tr>
-                <th class="py-2 px-4 font-bold text-[10px]">Nama Posisi / Jabatan</th>
-                <th class="py-2 px-4 font-bold text-[10px] text-center w-20">Lihat</th>
-                <th class="py-2 px-4 font-bold text-[10px] text-center w-20">Ubah</th>
+                <th class="py-2.5 px-4 font-bold text-[10px]">Nama Posisi / Jabatan</th>
+                <th class="py-2.5 px-4 font-bold text-[10px] text-center w-24">Lihat</th>
+                <th class="py-2.5 px-4 font-bold text-[10px] text-center w-24">Ubah</th>
               </tr>
             </thead>
             <tbody id="module-positions-list" class="divide-y divide-slate-100 bg-white">
@@ -663,16 +679,29 @@
           </table>
         </div>
       </div>
-
     </div>
 
     <!-- Footer Modal -->
-    <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2 shrink-0">
-      <button type="button" onclick="closeModulePermissionsModal()" class="py-2.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Tutup</button>
-      <button type="button" id="btn-save-module-perms" onclick="handleSaveModulePermissions()" class="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5 opacity-50 pointer-events-none">
-        <i class="fa-solid fa-floppy-disk"></i>
-        <span>Terapkan ke Jabatan</span>
-      </button>
+    <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+      <div id="module-perm-footer-left">
+        <button type="button" id="btn-mod-perm-back" onclick="gotoModulePermPage1()" class="py-2.5 px-4 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs transition flex items-center space-x-1.5 hidden shadow-sm">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Kembali</span>
+        </button>
+      </div>
+      <div class="flex items-center space-x-2" id="module-perm-footer-right">
+        <button type="button" onclick="closeModulePermissionsModal()" class="py-2.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        
+        <!-- Tombol Terapkan & Lepaskan (Hanya muncul di Page 2) -->
+        <button type="button" id="btn-save-module-perms" onclick="handleSaveModulePermissions('TERAPKAN')" class="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5 hidden">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Terapkan Akses</span>
+        </button>
+        <button type="button" id="btn-revoke-module-perms" onclick="handleSaveModulePermissions('LEPASKAN')" class="py-2.5 px-5 bg-red-500 hover:bg-red-600 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5 hidden">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Lepaskan Akses</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>
