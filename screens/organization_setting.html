@@ -1,0 +1,724 @@
+<div class="space-y-4">
+  <!-- HEADER MODUL ORGANIZATION SETTING -->
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-700/80 flex justify-between items-center gap-3">
+    <div class="min-w-0">
+      <div class="flex items-center space-x-2">
+        <span class="px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-extrabold rounded-full bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
+          Core HR & SSO Hub
+        </span>
+        <span class="px-2 py-0.5 text-[9px] font-bold rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+          Digiasha Ecosystem
+        </span>
+      </div>
+      <h3 class="text-base sm:text-lg font-black mt-1.5 leading-tight truncate">Organization Setting</h3>
+      <p class="text-[11px] text-slate-300 truncate mt-0.5">Kelola Struktur Hirarki, Tempat Kerja Fisik, Matriks Akses & SSO Terpusat</p>
+    </div>
+    <div class="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center text-xl text-indigo-300 shrink-0 border border-white/10 shadow-inner">
+      <i class="fa-solid fa-sitemap"></i>
+    </div>
+  </div>
+
+  <!-- NAVIGASI 1 LEVEL SEMUA TAB ORGANIZATION SETTING -->
+  <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold overflow-x-auto shadow-inner no-scrollbar">
+    <button type="button" id="tab-btn-org-unit" onclick="switchOrgSettingTab('unit')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap bg-white text-indigo-700 shadow-sm border border-slate-200/80 font-bold shrink-0">
+      <i class="fa-solid fa-building mr-1.5 text-indigo-600"></i> Unit Organisasi
+    </button>
+    <button type="button" id="tab-btn-org-position" onclick="switchOrgSettingTab('position')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-user-tie mr-1.5 text-slate-500"></i> Master Jabatan
+    </button>
+    <button type="button" id="tab-btn-org-level" onclick="switchOrgSettingTab('level')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-layer-group mr-1.5 text-slate-500"></i> Master Level (Grade)
+    </button>
+    <button type="button" id="tab-btn-org-chart" onclick="switchOrgSettingTab('chart')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-diagram-project mr-1.5 text-indigo-500"></i> Bagan Visual
+    </button>
+    <button type="button" id="tab-btn-org-workloc" onclick="switchOrgSettingTab('workloc')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-building-shield mr-1.5 text-emerald-600"></i> Work Location
+    </button>
+    <button type="button" id="tab-btn-org-sso" onclick="switchOrgSettingTab('sso')" class="py-2 px-3.5 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold shrink-0">
+      <i class="fa-solid fa-key mr-1.5 text-amber-600"></i> Integrasi SSO
+    </button>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 1: UNIT ORGANISASI (HO, AREA, CABANG)                                 -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-unit" class="space-y-3">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h4 class="text-xs font-bold text-slate-800">Daftar Unit Organisasi</h4>
+        <p class="text-[10px] text-slate-500">Pusat kelola Head Office, Area Regional & Cabang</p>
+      </div>
+      <button type="button" onclick="openAddOrgUnitModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Unit</span>
+      </button>
+    </div>
+
+    <div id="org-units-list-container" class="space-y-2">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat data unit organisasi...
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 2: MASTER JABATAN & REPORTING LINE                                    -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-position" class="space-y-3 hidden">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <h4 class="text-xs font-bold text-slate-800">Master Posisi / Jabatan</h4>
+        <p class="text-[10px] text-slate-500">Atur hierarki pelaporan langsung & koordinasi jabatan</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="openModulePermissionsModal()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition whitespace-nowrap">
+          <i class="fa-solid fa-layer-group text-xs"></i>
+          <span>Atur per Modul</span>
+        </button>
+        <button type="button" onclick="openAddJobPositionModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition whitespace-nowrap">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Tambah Jabatan</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="job-positions-list-container" class="space-y-2">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat master posisi jabatan...
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 3: MASTER LEVEL (GRADE)                                               -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-level" class="space-y-3 hidden">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h4 class="text-xs font-bold text-slate-800">Master Tingkatan Level (Grade)</h4>
+        <p class="text-[10px] text-slate-500">Standarisasi bobot tingkatan kepegawaian (Bobot 1 = Tertinggi)</p>
+      </div>
+      <button type="button" onclick="openAddMasterLevelModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Level</span>
+      </button>
+    </div>
+
+    <div id="master-levels-list-container" class="space-y-2">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1 block"></i> Memuat master level...
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 4: BAGAN VISUAL STRUKTUR ORGANISASI                                   -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-chart" class="space-y-3 hidden">
+    <!-- Toolbar Kontrol Org Chart -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+        <label class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+          <i class="fa-solid fa-filter text-indigo-600"></i> Fokus Unit:
+        </label>
+        <select id="org-chart-filter-unit" onchange="renderVisualOrgChartTree()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-600">
+          <option value="ALL">Semua Unit (Seluruh Organisasi)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center space-x-1.5">
+        <button type="button" onclick="zoomOrgChart(1.15)" title="Perbesar Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-magnifying-glass-plus"></i>
+        </button>
+        <button type="button" onclick="zoomOrgChart(0.85)" title="Perkecil Bagan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-magnifying-glass-minus"></i>
+        </button>
+        <button type="button" onclick="resetOrgChartZoom()" title="Reset Tampilan" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold transition">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+        <button type="button" onclick="expandAllOrgTreeNodes(true)" class="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold border border-indigo-200 transition">
+          Buka Semua Cabang
+        </button>
+        <button type="button" onclick="loadScreen('personalia')" class="px-2.5 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 text-[10px] font-bold border border-purple-200 transition flex items-center gap-1">
+          <i class="fa-solid fa-users-viewfinder"></i> Menu Karyawan
+        </button>
+      </div>
+    </div>
+
+    <!-- Canvas Area Bagan Pohon Org Chart -->
+    <div id="org-chart-viewport" class="bg-slate-50/70 border border-slate-200 rounded-3xl p-4 sm:p-6 overflow-auto min-h-[480px] max-h-[70vh] relative shadow-inner">
+      <div id="org-chart-container" class="org-tree-root flex justify-center transition-transform duration-200 origin-top">
+        <div class="p-8 text-center text-xs text-slate-400">
+          <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-2 block"></i> Memuat Bagan Struktur Organisasi...
+        </div>
+      </div>
+    </div>
+    <p class="text-[10px] text-slate-400 text-center italic">
+      <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> Klik pada kartu jabatan/karyawan untuk melihat Detail Personalia & Riwayat Karir.
+    </p>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 2: WORK LOCATION SETTING (TEMPAT KERJA FISIK) -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-workloc" class="space-y-3.5 hidden">
+    <div class="flex items-center justify-between gap-2 bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-2xl flex-wrap">
+      <div>
+        <h4 class="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+          <i class="fa-solid fa-building-shield text-emerald-600"></i> Pengaturan Tempat Kerja Fisik (Work Location)
+        </h4>
+        <p class="text-[10px] text-emerald-700">1 Lokasi fisik dapat menaungi beberapa unit organisasi/cabang atau bergabung dengan Head Office (HO)</p>
+      </div>
+      <button type="button" onclick="openAddWorkLocationModal()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Tempat Kerja</span>
+      </button>
+    </div>
+
+    <div id="work-locations-list-container" class="space-y-2.5">
+      <div class="p-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-emerald-600 mb-1 block"></i> Memuat daftar tempat kerja fisik...
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- TAB 4: INTEGRASI SINGLE SIGN-ON (SSO) DIGIASHA -->
+  <!-- ========================================================================= -->
+  <div id="org-setting-tab-sso" class="space-y-3.5 hidden">
+    <!-- Banner Penjelasan SSO -->
+    <div class="bg-gradient-to-r from-amber-900 to-orange-950 text-white rounded-2xl p-4 shadow-sm border border-amber-800/80 flex justify-between items-center gap-3">
+      <div class="min-w-0">
+        <span class="px-2 py-0.5 text-[9px] uppercase tracking-wider font-extrabold rounded bg-amber-500/25 text-amber-300 border border-amber-500/30">
+          Identity Provider (IdP)
+        </span>
+        <h4 class="text-sm font-bold mt-1">Ekosistem Single Sign-On (SSO) Digiasha</h4>
+        <p class="text-[11px] text-amber-200 mt-0.5">Digi Active bertindak sebagai pusat identitas terpadu untuk login seluruh aplikasi Digiasha.</p>
+      </div>
+      <button type="button" onclick="openAddSsoClientModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shrink-0 shadow flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Tambah Klien App</span>
+      </button>
+    </div>
+
+    <!-- Daftar Aplikasi Terdaftar SSO -->
+    <div class="space-y-2">
+      <h5 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+        <i class="fa-solid fa-cubes text-amber-600"></i> Aplikasi Ekosistem Terdaftar:
+      </h5>
+      <div id="sso-clients-list-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div class="p-8 text-center text-xs text-slate-400 col-span-full bg-white rounded-2xl border border-slate-200">
+          <i class="fa-solid fa-circle-notch fa-spin text-base text-amber-600 mb-1 block"></i> Memuat daftar aplikasi SSO...
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOL: SSO LIVE VERIFIER & TOKEN TESTER -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div>
+          <h5 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            <i class="fa-solid fa-terminal text-indigo-600"></i> Simulator Live SSO Token & Handshake
+          </h5>
+          <p class="text-[10px] text-slate-500">Uji coba pembuatan token otentikasi dan respons JSON RPC untuk integrasi aplikasi satelit</p>
+        </div>
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">RPC: verify_sso_token</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilih Karyawan:</label>
+          <select id="sso-test-emp-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-semibold text-slate-800 outline-none"></select>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilih Klien Aplikasi:</label>
+          <select id="sso-test-client-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-semibold text-slate-800 outline-none">
+            <option value="digicore">DigiCore Enterprise System</option>
+            <option value="digi_workapp">Digi Workapp</option>
+            <option value="digi_spector">Digi Spector</option>
+            <option value="digi_active">Digi Active (Digi-Action)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="button" onclick="runSsoTokenSimulation()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-bolt text-xs"></i>
+          <span>Jalankan Simulasi Handshake</span>
+        </button>
+      </div>
+
+      <div id="sso-simulation-result" class="hidden p-3 bg-slate-950 text-emerald-400 font-mono text-[11px] rounded-xl overflow-x-auto max-h-44">
+        <!-- Hasil JSON SSO Simulation -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODALS ORGANIZATION SETTING -->
+<!-- ========================================================================= -->
+
+<!-- 1. MODAL TAMBAH / EDIT WORK LOCATION -->
+<div id="modal-workloc-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-3.5 bg-emerald-800 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-building-shield text-emerald-300"></i>
+        <h4 class="font-bold text-xs" id="workloc-modal-title">Tambah Tempat Kerja Fisik</h4>
+      </div>
+      <button type="button" onclick="closeWorkLocModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <form id="form-workloc-edit" onsubmit="handleSaveWorkLocation(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">ID Work Location: <span class="text-rose-500">*</span></label>
+        <input type="text" id="workloc-input-id" required placeholder="Contoh: WL-HO-01" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-slate-900 focus:border-emerald-600 outline-none uppercase" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Tempat Kerja: <span class="text-rose-500">*</span></label>
+        <input type="text" id="workloc-input-name" required placeholder="Contoh: Head Office Graha Digiasha" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800 focus:border-emerald-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Alamat Lengkap: <span class="text-rose-500">*</span></label>
+        <textarea id="workloc-input-address" required rows="2" placeholder="Tuliskan nama jalan, gedung, nomor..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 focus:border-emerald-600 outline-none"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Kota / Kabupaten:</label>
+          <input type="text" id="workloc-input-city" placeholder="Contoh: Jakarta Selatan" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 outline-none" />
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Provinsi:</label>
+          <input type="text" id="workloc-input-province" placeholder="Contoh: DKI Jakarta" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 outline-none" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Latitude: <span class="text-rose-500">*</span></label>
+          <input type="number" step="any" id="workloc-input-lat" required placeholder="-6.2146" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-800 outline-none" />
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Longitude: <span class="text-rose-500">*</span></label>
+          <input type="number" step="any" id="workloc-input-long" required placeholder="106.8214" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-800 outline-none" />
+        </div>
+      </div>
+      <div class="flex justify-between items-center pt-1">
+        <button type="button" onclick="detectCurrentGpsForWorkLoc()" class="text-emerald-700 hover:text-emerald-800 font-bold text-[11px] flex items-center space-x-1">
+          <i class="fa-solid fa-location-crosshairs text-xs"></i>
+          <span>Gunakan Lokasi GPS Saya Saat Ini</span>
+        </button>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Radius Geofence Presensi (Meter):</label>
+        <input type="number" min="20" max="1000" id="workloc-input-radius" value="100" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Status Keaktifan:</label>
+        <select id="workloc-input-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800">
+          <option value="true">AKTIF (Dapat Digunakan)</option>
+          <option value="false">NONAKTIF (Tidak Aktif / Arsip)</option>
+        </select>
+      </div>
+      <div class="pt-3 border-t border-slate-200 flex space-x-2">
+        <button type="button" id="btn-delete-workloc" onclick="handleDeleteWorkLocation(CURRENT_EDIT_WORKLOC_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeWorkLocModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-workloc" class="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Lokasi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 2. MODAL TAMBAH / EDIT UNIT ORGANISASI -->
+<div id="modal-orgunit-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-3.5 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-building text-indigo-300"></i>
+        <h4 class="font-bold text-xs" id="orgunit-modal-title">Tambah Unit Organisasi</h4>
+      </div>
+      <button type="button" onclick="closeOrgUnitModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="form-orgunit-edit" onsubmit="handleSaveOrgUnit(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">ID Unit: <span class="text-rose-500">*</span></label>
+        <input type="text" id="unit-input-id" required placeholder="Contoh: CAB-CILEGON" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold uppercase text-slate-900 focus:border-indigo-600 outline-none" />
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tipe Unit: <span class="text-rose-500">*</span></label>
+          <select id="unit-input-tipe" required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-indigo-700">
+            <option value="HO">HO (Head Office)</option>
+            <option value="AREA">AREA (Regional Area)</option>
+            <option value="CABANG">CABANG (Branch)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Unit Induk (Parent):</label>
+          <select id="unit-input-parent" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800">
+            <option value="">- Tidak Ada (Root) -</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Unit Organisasi: <span class="text-rose-500">*</span></label>
+        <input type="text" id="unit-input-name" required placeholder="Contoh: Cabang Cilegon" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800 focus:border-indigo-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Tempat Kerja Fisik (Work Location):</label>
+        <select id="unit-input-workloc" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800">
+          <option value="">- Pilih Work Location -</option>
+        </select>
+        <span class="text-[10px] text-slate-400 mt-0.5 block">Menentukan titik geofence presensi untuk staf pada unit ini</span>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Status Keaktifan:</label>
+        <select id="unit-input-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800">
+          <option value="true">AKTIF (Dapat Digunakan)</option>
+          <option value="false">NONAKTIF (Tidak Aktif / Arsip)</option>
+        </select>
+      </div>
+      <div class="pt-3 border-t border-slate-200 flex space-x-2">
+        <button type="button" id="btn-delete-unit" onclick="handleDeleteOrgUnit(CURRENT_EDIT_UNIT_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeOrgUnitModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-unit" class="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Unit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 3. MODAL TAMBAH / EDIT MASTER JABATAN -->
+<div id="modal-jobpos-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-3.5 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-user-tie text-indigo-300"></i>
+        <h4 class="font-bold text-xs" id="jobpos-modal-title">Tambah Posisi / Jabatan</h4>
+      </div>
+      <button type="button" onclick="closeJobPosModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="form-jobpos-edit" onsubmit="handleSaveJobPosition(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">ID Posisi / Jabatan: <span class="text-rose-500">*</span></label>
+        <input type="text" id="pos-input-id" required placeholder="Contoh: POS-SPV-OPS" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold uppercase text-slate-900 focus:border-indigo-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Jabatan: <span class="text-rose-500">*</span></label>
+        <input type="text" id="pos-input-name" required placeholder="Contoh: Supervisor Operasional" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800 focus:border-indigo-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Level (Grade):</label>
+        <select id="pos-input-level" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-indigo-700"></select>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Melapor Ke (Reports To / Atasan Langsung):</label>
+        <select id="pos-input-reportsto" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800">
+          <option value="">- Tidak Ada (Puncak / Direksi Utama) -</option>
+        </select>
+        <span class="text-[10px] text-slate-400 mt-0.5 block">Membentuk garis vertikal bagan pohon organisasi (*Org Chart*)</span>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Koordinasi Ke (Opsional):</label>
+        <select id="pos-input-coord" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800">
+          <option value="">- Tidak Ada Koordinasi -</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Status Keaktifan:</label>
+        <select id="pos-input-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800">
+          <option value="true">AKTIF (Dapat Digunakan)</option>
+          <option value="false">NONAKTIF (Tidak Aktif / Arsip)</option>
+        </select>
+      </div>
+      <div class="pt-3 border-t border-slate-200 flex space-x-2">
+        <button type="button" id="btn-delete-pos" onclick="handleDeleteJobPosition(CURRENT_EDIT_JOBPOS_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeJobPosModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-pos" class="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Jabatan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 4. MODAL TAMBAH / EDIT MASTER LEVEL -->
+<div id="modal-level-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div class="p-3.5 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-layer-group text-indigo-300"></i>
+        <h4 class="font-bold text-xs" id="level-modal-title">Tambah Master Level</h4>
+      </div>
+      <button type="button" onclick="closeMasterLevelModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="form-level-edit" onsubmit="handleSaveMasterLevel(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">ID Level: <span class="text-rose-500">*</span></label>
+        <input type="text" id="lvl-input-id" required placeholder="Contoh: L-08" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold uppercase text-slate-900 focus:border-indigo-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Level: <span class="text-rose-500">*</span></label>
+        <input type="text" id="lvl-input-name" required placeholder="Contoh: Junior Officer" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800 focus:border-indigo-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Bobot Level (1 = Tertinggi): <span class="text-rose-500">*</span></label>
+        <input type="number" min="1" max="99" id="lvl-input-bobot" required value="8" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Status Keaktifan:</label>
+        <select id="lvl-input-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800">
+          <option value="true">AKTIF (Dapat Digunakan)</option>
+          <option value="false">NONAKTIF (Tidak Aktif / Arsip)</option>
+        </select>
+      </div>
+      <div class="pt-3 border-t border-slate-200 flex space-x-2">
+        <button type="button" id="btn-delete-lvl" onclick="handleDeleteMasterLevel(CURRENT_EDIT_LEVEL_ID)" class="hidden py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200">
+          <i class="fa-solid fa-trash-can mr-1"></i>Hapus
+        </button>
+        <button type="button" onclick="closeMasterLevelModal()" class="flex-1 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-lvl" class="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Level</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 5. MODAL TAMBAH / EDIT KLIEN SSO -->
+<div id="modal-sso-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-3.5 bg-amber-800 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-key text-amber-300"></i>
+        <h4 class="font-bold text-xs" id="sso-modal-title">Daftarkan Aplikasi Satelit SSO</h4>
+      </div>
+      <button type="button" onclick="closeSsoClientModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="form-sso-edit" onsubmit="handleSaveSsoClient(event)" class="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Client ID: <span class="text-rose-500">*</span></label>
+        <input type="text" id="sso-input-id" required placeholder="Contoh: digi_finance" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold lowercase text-slate-900 focus:border-amber-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Aplikasi: <span class="text-rose-500">*</span></label>
+        <input type="text" id="sso-input-name" required placeholder="Contoh: Digi Finance System" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-800 focus:border-amber-600 outline-none" />
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Client Secret (API Key): <span class="text-rose-500">*</span></label>
+        <div class="flex space-x-2">
+          <input type="text" id="sso-input-secret" required placeholder="secret_..." class="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono text-slate-800 outline-none" />
+          <button type="button" onclick="generateRandomSsoSecret()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 font-bold rounded-xl text-slate-700 text-xs">Acak</button>
+        </div>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Deskripsi Ruang Lingkup:</label>
+        <textarea id="sso-input-desc" rows="2" placeholder="Fungsi dan kegunaan aplikasi ini dalam ekosistem Digiasha..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 outline-none"></textarea>
+      </div>
+      <div class="pt-3 border-t border-slate-200 flex space-x-2">
+        <button type="button" onclick="closeSsoClientModal()" class="w-1/3 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        <button type="submit" id="btn-save-sso" class="w-2/3 py-2.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-xl text-xs shadow transition">Simpan Klien SSO</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 6. MODAL MATRIKS HAK AKSES JABATAN (MULTI-APLIKASI) -->
+<div id="modal-position-permissions" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-100 animate-in fade-in zoom-in duration-200">
+    <!-- Header Modal -->
+    <div class="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-base shadow-xs">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div class="min-w-0">
+          <h3 class="font-bold text-sm sm:text-base text-slate-900 leading-snug truncate" id="perm-modal-title">Hak Akses: [Nama Jabatan]</h3>
+          <p class="text-[11px] font-mono text-slate-500 font-semibold" id="perm-modal-subtitle">ID Position: POS-BM-SERANG</p>
+        </div>
+      </div>
+      <button type="button" onclick="closePositionPermissionsModal()" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Tab Bar Multi-Aplikasi -->
+    <div class="bg-slate-50 px-4 pt-2.5 border-b border-slate-200 flex space-x-2 overflow-x-auto shrink-0" id="perm-app-tabs-container">
+      <button type="button" onclick="switchPositionPermAppTab('digi_active')" id="perm-tab-btn-digi_active" class="pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-indigo-600 text-indigo-700 whitespace-nowrap">
+        <i class="fa-solid fa-bolt text-amber-500"></i>
+        <span>Digi Active</span>
+      </button>
+      <button type="button" onclick="switchPositionPermAppTab('digicore')" id="perm-tab-btn-digicore" class="pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+        <i class="fa-solid fa-laptop text-indigo-600"></i>
+        <span>Digiasha Core</span>
+      </button>
+      <button type="button" onclick="switchPositionPermAppTab('digi_workapp')" id="perm-tab-btn-digi_workapp" class="pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+        <i class="fa-solid fa-mobile-screen text-emerald-600"></i>
+        <span>Digi Appwork</span>
+      </button>
+      <button type="button" onclick="switchPositionPermAppTab('digi_spector')" id="perm-tab-btn-digi_spector" class="pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+        <i class="fa-solid fa-magnifying-glass text-cyan-600"></i>
+        <span>Digispector</span>
+      </button>
+    </div>
+
+    <!-- Body Modal: Tabel Matriks Fitur / Modul -->
+    <div class="p-4 flex-1 overflow-y-auto space-y-3">
+      <div class="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-indigo-50/60 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
+              <th class="py-2.5 px-3">Nama Modul / Fitur</th>
+              <th class="py-2.5 px-3 text-center w-24">
+                <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                  <input type="checkbox" id="check-all-view" onchange="toggleCheckAllCurrentApp('view', this.checked)" class="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                  <span class="font-bold text-slate-700">👁️ Lihat</span>
+                </label>
+              </th>
+              <th class="py-2.5 px-3 text-center w-24">
+                <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                  <input type="checkbox" id="check-all-edit" onchange="toggleCheckAllCurrentApp('edit', this.checked)" class="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                  <span class="font-bold text-slate-700">✏️ Ubah</span>
+                </label>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="perm-module-rows-container" class="divide-y divide-slate-100 bg-white">
+            <!-- Baris modul per aplikasi di-render dinamis oleh JavaScript -->
+          </tbody>
+        </table>
+      </div>
+      <p class="text-[10px] text-slate-400 italic flex items-center space-x-1">
+        <i class="fa-solid fa-circle-info text-indigo-500"></i>
+        <span>Hak akses <strong>Ubah</strong> otomatis memberikan hak akses <strong>Lihat</strong>.</span>
+      </p>
+    </div>
+
+    <!-- Footer Modal -->
+    <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2 shrink-0">
+      <button type="button" onclick="closePositionPermissionsModal()" class="py-2.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+      <button type="button" id="btn-save-position-perms" onclick="handleSavePositionPermissions()" class="py-2.5 px-5 bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>Simpan Hak Akses</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL INVERSE: ATUR HAK Akses per Modul (2 Halaman) -->
+<!-- ========================================================================= -->
+<div id="modal-module-permissions" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+  <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-100 animate-in fade-in zoom-in duration-200">
+    
+    <!-- Header Modal -->
+    <div class="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 text-base shadow-xs">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div class="min-w-0">
+          <h3 class="font-bold text-sm sm:text-base text-slate-900 leading-snug truncate" id="module-perm-modal-title">Atur Hak Akses Massal</h3>
+          <p class="text-[11px] font-mono text-slate-500 font-semibold" id="module-perm-modal-subtitle">Langkah 1: Pilih Hak Akses Modul</p>
+        </div>
+      </div>
+      <button onclick="closeModulePermissionsModal()" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- HALAMAN 1: Pilih Modul (Checkboxes) -->
+    <div id="module-perm-page-1" class="flex-1 flex flex-col min-h-0 bg-white">
+      <!-- Tabs Aplikasi -->
+      <div class="bg-slate-50 px-4 pt-2.5 border-b border-slate-200 flex space-x-2 overflow-x-auto shrink-0" id="module-perm-app-tabs">
+        <!-- Rendered by JS -->
+      </div>
+      
+      <!-- Tabel Modul -->
+      <div class="p-4 flex-1 overflow-y-auto space-y-3">
+        <div class="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-emerald-50/60 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
+                <th class="py-2.5 px-3">Nama Modul / Fitur</th>
+                <th class="py-2.5 px-3 text-center w-24">
+                  <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                    <input type="checkbox" id="check-all-module-view" onchange="toggleAllModulePerms('view')" class="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" />
+                    <span class="font-bold text-slate-700">👁️ Lihat</span>
+                  </label>
+                </th>
+                <th class="py-2.5 px-3 text-center w-24">
+                  <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                    <input type="checkbox" id="check-all-module-edit" onchange="toggleAllModulePerms('edit')" class="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" />
+                    <span class="font-bold text-slate-700">✏️ Ubah</span>
+                  </label>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="module-perm-list-container" class="divide-y divide-slate-100 bg-white">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[10px] text-slate-400 italic flex items-center space-x-1">
+          <i class="fa-solid fa-circle-info text-emerald-500"></i>
+          <span>Pilih satu atau lebih hak akses modul yang akan diterapkan ke beberapa jabatan sekaligus.</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- HALAMAN 2: Pilih Jabatan -->
+    <div id="module-perm-page-2" class="flex-1 flex flex-col min-h-0 hidden bg-slate-50/50">
+      <div class="px-6 py-4 border-b border-slate-200 bg-white shrink-0 flex items-center justify-between">
+        <div>
+          <h4 class="text-xs font-bold text-slate-800">Daftar Jabatan</h4>
+          <p class="text-[10px] text-slate-500">Pilih jabatan yang akan menerima/dicabut hak aksesnya</p>
+        </div>
+        <div class="flex space-x-4 text-[10px] font-bold bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-200">
+          <label class="flex items-center space-x-1.5 cursor-pointer text-slate-600 hover:text-emerald-600">
+            <input type="checkbox" id="check-all-module-positions" onchange="toggleAllModulePositions()" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer">
+            <span>Pilih Semua Jabatan</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="module-positions-list">
+          <!-- Checkbox jabatan dirender dari JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Modal -->
+    <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+      <div id="module-perm-footer-left">
+        <button type="button" id="btn-mod-perm-back" onclick="gotoModulePermPage1()" class="py-2.5 px-4 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs transition flex items-center space-x-1.5 hidden shadow-sm">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Kembali</span>
+        </button>
+      </div>
+      <div class="flex items-center space-x-2" id="module-perm-footer-right">
+        <button type="button" onclick="closeModulePermissionsModal()" class="py-2.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+        
+        <!-- Tombol Lanjut (Page 1) -->
+        <button type="button" id="btn-goto-page-2" onclick="gotoModulePermPage2()" class="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5">
+          <span>Pilih Jabatan</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        
+        <!-- Tombol Terapkan & Lepaskan (Hanya muncul di Page 2) -->
+        <button type="button" id="btn-save-module-perms" onclick="handleSaveModulePermissions('TERAPKAN')" class="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5 hidden">
+          <i class="fa-solid fa-check"></i>
+          <span>Terapkan</span>
+        </button>
+        <button type="button" id="btn-revoke-module-perms" onclick="handleSaveModulePermissions('LEPASKAN')" class="py-2.5 px-4 bg-red-500 hover:bg-red-600 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5 hidden">
+          <i class="fa-solid fa-xmark"></i>
+          <span>Lepaskan</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

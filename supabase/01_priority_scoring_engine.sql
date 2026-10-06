@@ -87,24 +87,23 @@ BEGIN
       -- 4. Status Kontrak & Validitas IMEI
       (UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' 
        OR (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6)
-      ) AS is_eligible
+      ) AS is_eligible,
+
+      -- 5. Status Closed / Dormant dari Dealer Induk (Productivity: 7.Closed, 5. Dormant)
+      (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') AS is_dealer_closed_or_dormant
     FROM m_facility_unit u
+    LEFT JOIN m_dealer d ON LOWER(TRIM(u.dealer_name)) = LOWER(TRIM(d.dealer_name))
     LEFT JOIN (
       SELECT 
-        LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
-        REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
+        REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, ''))), '[\s\-_.]', '', 'g') AS unit_fasilitas_clean,
         priority_level AS concern_urgency,
         action_reason AS concern_note,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')), REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, 'UMUM'))), '[\s\-_.]', '', 'g') ORDER BY created_at DESC) as rn
+        ROW_NUMBER() OVER(PARTITION BY REGEXP_REPLACE(UPPER(TRIM(COALESCE(entity_id, ''))), '[\s\-_.]', '', 'g') ORDER BY created_at DESC) as rn
       FROM t_priority_action
-      WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR'
+      WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR' AND entity_type = 'UNIT'
     ) c ON (
-      (LOWER(TRIM(u.dealer_name)) = c.dealer_name_clean OR LOWER(REGEXP_REPLACE(TRIM(u.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean)
-      AND (
-        c.unit_fasilitas_clean = 'UMUM' 
-        OR c.unit_fasilitas_clean = '-'
-        OR REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
-      )
+      REGEXP_REPLACE(UPPER(TRIM(u.no_fasilitas)), '[\s\-_.]', '', 'g') = c.unit_fasilitas_clean
+      AND c.unit_fasilitas_clean <> ''
     ) AND c.rn = 1
   ),
   unit_scored AS (
@@ -114,6 +113,9 @@ BEGIN
       CASE
         -- Non-eligible contract check
         WHEN NOT uc.is_eligible AND uc.concern_urgency IS NULL THEN 0
+
+        -- Status Dealer Closed / Dormant: Jangan jadi prioritas otomatis kecuali ada assign concern
+        WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 0
 
         -- Level: SANGAT PENTING (Score 3)
         WHEN uc.concern_urgency = 'Sangat Penting' THEN 3
@@ -141,6 +143,9 @@ BEGIN
         -- Non-eligible contract
         WHEN NOT uc.is_eligible AND uc.concern_urgency IS NULL THEN 'Normal'
 
+        -- Status Dealer Closed / Dormant
+        WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 'Normal'
+
         WHEN uc.concern_urgency = 'Sangat Penting' THEN 'Sangat Penting'
         WHEN u.gps_status ILIKE ANY(ARRAY['%Pelepasan%', '%Offline%', '%Baterai Lemah%']) THEN 'Sangat Penting'
         WHEN uc.calc_aging_visit >= 22 AND COALESCE(u.lifetime_days, 0) > 90 THEN 'Sangat Penting'
@@ -161,6 +166,7 @@ BEGIN
 
       CASE
         WHEN uc.concern_urgency IS NOT NULL THEN 'Concern: ' || COALESCE(uc.concern_note, '-')
+        WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 'Normal (Mitra Closed / Dormant)'
         WHEN u.gps_status ILIKE ANY(ARRAY['%Pelepasan%', '%Offline%', '%Baterai Lemah%', '%Belum Lepas%', '%Belum Pasang%', '%Geser%']) THEN 'GPS Alert: ' || u.gps_status
         WHEN uc.calc_aging_visit >= 22 AND COALESCE(u.lifetime_days, 0) > 90 THEN 'Aging Visit >= 22 hr (' || uc.calc_aging_visit || ' hr) & Lifetime > 90 hr (' || COALESCE(u.lifetime_days, 0) || ' hr)'
         WHEN uc.calc_aging_visit >= 15 AND uc.is_h3_jto THEN 'Aging Visit >= 15 hr (' || uc.calc_aging_visit || ' hr) & H-3 JTO (' || TO_CHAR(u.jto_date, 'YYYY-MM-DD') || ')'
@@ -196,7 +202,8 @@ BEGIN
       COALESCE(
         MAX(CASE WHEN u.priority_score > 0 THEN u.priority_reason END), 
         'Normal'
-      ) AS unit_highest_reason
+      ) AS unit_highest_reason,
+      BOOL_OR(u.priority_reason LIKE 'Concern: %') AS has_assigned_unit_concern
     FROM m_facility_unit u
     WHERE UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' 
        OR (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6)
@@ -211,14 +218,16 @@ BEGIN
     FROM m_dealer d
     LEFT JOIN (
       SELECT 
+        COALESCE(entity_id, '') AS dealer_id_clean,
         LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) AS dealer_name_clean,
         priority_level AS concern_urgency,
         action_reason AS concern_note,
-        ROW_NUMBER() OVER(PARTITION BY LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', '')) ORDER BY created_at DESC) as rn
+        ROW_NUMBER() OVER(PARTITION BY COALESCE(NULLIF(entity_id, ''), LOWER(REGEXP_REPLACE(TRIM(entity_name), '\s*\([^)]*\)\s*$', ''))) ORDER BY created_at DESC) as rn
       FROM t_priority_action
       WHERE is_fu = false AND source = 'MANUAL_SUPERVISOR' AND entity_type = 'DEALER'
     ) c ON (
-      LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean 
+      (c.dealer_id_clean <> '' AND d.dealer_id = c.dealer_id_clean)
+      OR LOWER(TRIM(d.dealer_name)) = c.dealer_name_clean 
       OR LOWER(REGEXP_REPLACE(TRIM(d.dealer_name), '\s*\([^)]*\)\s*$', '')) = c.dealer_name_clean
     ) AND c.rn = 1
   ),
@@ -226,17 +235,21 @@ BEGIN
     SELECT 
       d.dealer_id,
       dc.calc_aging_visit,
+      (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') AS is_closed_or_dormant,
       CASE 
         WHEN dc.concern_urgency = 'Sangat Penting' THEN 3
         WHEN dc.concern_urgency = 'Penting' THEN 2
-        WHEN dc.calc_aging_visit >= 31 THEN 2
         WHEN dc.concern_urgency = 'Moderat' THEN 1
+        -- Abaikan aging visit jika Closed / Dormant
+        WHEN (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') THEN 0
+        WHEN dc.calc_aging_visit >= 31 THEN 2
         WHEN dc.calc_aging_visit >= 22 THEN 1
         ELSE 0
       END AS mitra_score,
 
       CASE 
         WHEN dc.concern_urgency IS NOT NULL THEN 'Concern Mitra: ' || COALESCE(dc.concern_note, '-')
+        WHEN (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') THEN 'Normal (Mitra Closed / Dormant)'
         WHEN dc.calc_aging_visit >= 31 THEN 'Aging Visit Mitra >= 31 hr (' || dc.calc_aging_visit || ' hr)'
         WHEN dc.calc_aging_visit >= 22 THEN 'Aging Visit Mitra >= 22 hr (' || dc.calc_aging_visit || ' hr)'
         ELSE 'Normal'
@@ -248,14 +261,20 @@ BEGIN
     SELECT 
       d.dealer_id,
       dmr.calc_aging_visit,
-      GREATEST(dmr.mitra_score, COALESCE(dua.max_unit_score, 0)) AS final_score,
       CASE 
+        -- Jika Closed / Dormant dan tidak ada concern dealer maupun unit concern yang di-assign: skor = 0 (Normal)
+        WHEN dmr.is_closed_or_dormant AND dc.concern_urgency IS NULL AND COALESCE(dua.has_assigned_unit_concern, false) = false THEN 0
+        ELSE GREATEST(dmr.mitra_score, COALESCE(dua.max_unit_score, 0))
+      END AS final_score,
+      CASE 
+        WHEN dmr.is_closed_or_dormant AND dc.concern_urgency IS NULL AND COALESCE(dua.has_assigned_unit_concern, false) = false THEN 'Normal (Mitra Closed / Dormant)'
         WHEN dmr.mitra_score >= COALESCE(dua.max_unit_score, 0) AND dmr.mitra_score > 0 THEN dmr.mitra_reason
         WHEN COALESCE(dua.max_unit_score, 0) > 0 THEN 'Pemicu Unit: ' || dua.unit_highest_reason
         ELSE 'Normal'
       END AS final_reason
     FROM m_dealer d
     JOIN dealer_mitra_rules dmr ON d.dealer_id = dmr.dealer_id
+    JOIN dealer_calc dc ON d.dealer_id = dc.dealer_id
     LEFT JOIN dealer_unit_agg dua ON LOWER(TRIM(d.dealer_name)) = dua.dealer_name_clean
   )
   UPDATE m_dealer d
@@ -368,6 +387,27 @@ BEGIN
       END IF;
     END LOOP;
 
+    -- C. Tutup tiket otomatis (AUTO_CALCULATE) untuk dealer atau unit yang skornya sudah 0 (misal: normal atau Closed/Dormant)
+    UPDATE t_priority_action
+    SET is_fu = true,
+        updated_at = NOW()
+    WHERE is_fu = false
+      AND source = 'AUTO_CALCULATE'
+      AND entity_type = 'DEALER'
+      AND entity_id IN (
+        SELECT dealer_id FROM m_dealer WHERE priority_score = 0
+      );
+
+    UPDATE t_priority_action
+    SET is_fu = true,
+        updated_at = NOW()
+    WHERE is_fu = false
+      AND source = 'AUTO_CALCULATE'
+      AND entity_type = 'UNIT'
+      AND entity_id IN (
+        SELECT no_fasilitas FROM m_facility_unit WHERE priority_score = 0
+      );
+
     -- Hitung total tiket aktif saat ini
     SELECT COUNT(*) INTO v_active_tasks FROM t_priority_action WHERE is_fu = false;
   EXCEPTION WHEN OTHERS THEN
@@ -428,16 +468,17 @@ GRANT EXECUTE ON FUNCTION mark_priority_fu TO anon, authenticated, service_role;
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'daily-priority-recalc-0300-wib') THEN
-    PERFORM cron.unschedule('daily-priority-recalc-0300-wib');
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'daily-priority-recalc-0300-wib') THEN
+      PERFORM cron.unschedule('daily-priority-recalc-0300-wib');
+    END IF;
+    PERFORM cron.schedule(
+      'daily-priority-recalc-0300-wib',
+      '0 20 * * *',
+      'SELECT recalculate_all_priorities()'
+    );
   END IF;
 END $$;
-
-SELECT cron.schedule(
-  'daily-priority-recalc-0300-wib',
-  '0 20 * * *',
-  $$SELECT recalculate_all_priorities()$$
-);
 
 
 -- ----------------------------------------------------------------------------

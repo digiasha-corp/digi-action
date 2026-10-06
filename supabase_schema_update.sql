@@ -46,22 +46,27 @@ CREATE TABLE IF NOT EXISTS public.tr_absensi_log (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tambahkan seluruh kolom jika tabel tr_absensi_log sudah pernah dibuat dengan skema lama
-ALTER TABLE IF EXISTS public.tr_absensi_log 
-ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
-ADD COLUMN IF NOT EXISTS nama_karyawan VARCHAR(150),
-ADD COLUMN IF NOT EXISTS jenis_absen VARCHAR(50),
-ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
-ADD COLUMN IF NOT EXISTS lat NUMERIC,
-ADD COLUMN IF NOT EXISTS long NUMERIC,
-ADD COLUMN IF NOT EXISTS nearest_office VARCHAR(150),
-ADD COLUMN IF NOT EXISTS distance_meter NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS status_geofence VARCHAR(50),
-ADD COLUMN IF NOT EXISTS menit_terlambat NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS status_kehadiran VARCHAR(50),
-ADD COLUMN IF NOT EXISTS selfie_photo_url TEXT,
-ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+-- Tambahkan seluruh kolom jika tabel tr_absensi_log sudah pernah dibuat dengan skema lama (Safe Block)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tr_absensi_log') THEN
+    ALTER TABLE public.tr_absensi_log 
+    ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS nama_karyawan VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS jenis_absen VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS lat NUMERIC,
+    ADD COLUMN IF NOT EXISTS long NUMERIC,
+    ADD COLUMN IF NOT EXISTS nearest_office VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS distance_meter NUMERIC DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS status_geofence VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS menit_terlambat NUMERIC DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS status_kehadiran VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS selfie_photo_url TEXT,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END $$;
 
 -- Index pencarian cepat untuk status harian per NIP
 CREATE INDEX IF NOT EXISTS idx_absensi_nip_timestamp ON public.tr_absensi_log (nip, timestamp DESC);
@@ -90,26 +95,31 @@ CREATE TABLE IF NOT EXISTS public.tr_izin_log (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tambahkan seluruh kolom jika tabel tr_izin_log sudah pernah dibuat sebelumnya
-ALTER TABLE IF EXISTS public.tr_izin_log 
-ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
-ADD COLUMN IF NOT EXISTS nama VARCHAR(150),
-ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
-ADD COLUMN IF NOT EXISTS jenis_izin VARCHAR(50),
-ADD COLUMN IF NOT EXISTS tgl_mulai DATE,
-ADD COLUMN IF NOT EXISTS tgl_selesai DATE,
-ADD COLUMN IF NOT EXISTS catatan TEXT,
-ADD COLUMN IF NOT EXISTS lat NUMERIC,
-ADD COLUMN IF NOT EXISTS long NUMERIC,
-ADD COLUMN IF NOT EXISTS selfie_url TEXT,
-ADD COLUMN IF NOT EXISTS pic_approval_nip VARCHAR(50),
-ADD COLUMN IF NOT EXISTS pic_approval_nama VARCHAR(150),
-ADD COLUMN IF NOT EXISTS status_approval VARCHAR(50) DEFAULT 'PENDING',
-ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS approved_by VARCHAR(150),
-ADD COLUMN IF NOT EXISTS catatan_approval TEXT,
-ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+-- Tambahkan seluruh kolom jika tabel tr_izin_log sudah pernah dibuat sebelumnya (Safe Block)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tr_izin_log') THEN
+    ALTER TABLE public.tr_izin_log 
+    ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS nip VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS nama VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS cabang VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS jenis_izin VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS tgl_mulai DATE,
+    ADD COLUMN IF NOT EXISTS tgl_selesai DATE,
+    ADD COLUMN IF NOT EXISTS catatan TEXT,
+    ADD COLUMN IF NOT EXISTS lat NUMERIC,
+    ADD COLUMN IF NOT EXISTS long NUMERIC,
+    ADD COLUMN IF NOT EXISTS selfie_url TEXT,
+    ADD COLUMN IF NOT EXISTS pic_approval_nip VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS pic_approval_nama VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS status_approval VARCHAR(50) DEFAULT 'PENDING',
+    ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS approved_by VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS catatan_approval TEXT,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END $$;
 
 -- Index pencarian cepat untuk Approval Hub PIC
 CREATE INDEX IF NOT EXISTS idx_izin_pic_approval ON public.tr_izin_log (pic_approval_nip, status_approval);
@@ -166,3 +176,73 @@ COMMENT ON TABLE public.tr_absensi_log IS 'Tabel Rekapitulasi Presensi Kehadiran
 COMMENT ON TABLE public.tr_izin_log IS 'Tabel Pengajuan Izin Karyawan dan Pusat Approval PIC';
 COMMENT ON TABLE public.m_announcement IS 'Tabel Banner Informasi & Berita Slide Show Dashboard';
 
+-- 6. PEMBARUAN TABEL MASTER EMPLOYEE (REKENING)
+ALTER TABLE IF EXISTS public.m_employee ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);
+
+-- 7. PEMBARUAN TABEL TRANSAKSI (REKENING)
+ALTER TABLE IF EXISTS public.hr_employee_transactions ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);
+
+ALTER TABLE IF EXISTS public.hr_employee_career_histories ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(100), ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(150);
+
+-- 8. PEMBARUAN TABEL DATA PRIBADI (NPWP)
+ALTER TABLE IF EXISTS public.hr_employee_personal_details ADD COLUMN IF NOT EXISTS npwp_number VARCHAR(50);
+
+-- ===========================================================================
+-- MIGRATION: Auto-Generate NIP using Postgres Trigger (Prevents Race Condition)
+-- ===========================================================================
+
+-- 1. Create a function to generate NIP sequentially and thread-safe
+CREATE OR REPLACE FUNCTION trg_hr_transaction_generate_nip()
+RETURNS trigger AS $$
+DECLARE
+    v_join_date date;
+    v_yy text;
+    v_mm text;
+    v_max_seq int;
+    v_next_seq int;
+    v_prefix text;
+    v_lock_key bigint;
+    v_types jsonb;
+BEGIN
+    -- Hanya untuk transaksi Penerimaan Karyawan
+    v_types := NEW.transaction_types;
+    
+    IF ((v_types IS NOT NULL AND v_types ? 'Penerimaan Karyawan') OR NEW.is_new_hire = true) THEN
+        -- Jika NIP diset ke flag AUTO_GENERATE atau NIP lama kandidat, kita buat yang asli
+        IF (NEW.nip IS NULL OR NEW.nip = '' OR NEW.nip = 'N/A' OR NEW.nip LIKE 'CAND-%' OR NEW.nip = 'AUTO_GENERATE') THEN
+            
+            v_join_date := COALESCE(NEW.join_date, CURRENT_DATE);
+            v_yy := to_char(v_join_date, 'YY');
+            v_mm := to_char(v_join_date, 'MM');
+            v_prefix := v_mm || v_yy;
+            
+            -- Gunakan advisory lock berdasarkan tahun untuk mencegah race condition (duplikat NIP)
+            -- Misalnya tahun 2026 -> 2026
+            v_lock_key := to_char(v_join_date, 'YYYY')::bigint;
+            PERFORM pg_advisory_xact_lock(v_lock_key);
+
+            -- Cari NIP paling maksimal di tahun yang sama pada tabel m_employee dan hr_employee_transactions
+            SELECT COALESCE(MAX(SUBSTRING(nip FROM 5 FOR 4)::int), 0) INTO v_max_seq
+            FROM (
+                SELECT nip FROM m_employee
+                UNION ALL
+                SELECT nip FROM hr_employee_transactions 
+                WHERE nip IS NOT NULL AND nip NOT LIKE 'CAND-%' AND id != NEW.id
+            ) all_nips
+            WHERE nip LIKE '__' || v_yy || '%' AND LENGTH(nip) >= 8;
+
+            v_next_seq := v_max_seq + 1;
+            NEW.nip := v_prefix || lpad(v_next_seq::text, 4, '0');
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Drop existing trigger if any and create a new one
+DROP TRIGGER IF EXISTS trg_generate_nip_before_insert ON hr_employee_transactions;
+CREATE TRIGGER trg_generate_nip_before_insert
+BEFORE INSERT ON hr_employee_transactions
+FOR EACH ROW
+EXECUTE FUNCTION trg_hr_transaction_generate_nip();
