@@ -71,11 +71,16 @@
         <h4 class="text-xs font-bold text-slate-800">Master Posisi / Jabatan</h4>
         <p class="text-[10px] text-slate-500">Atur hierarki pelaporan langsung & koordinasi jabatan</p>
       </div>
-      <button type="button" onclick="openAddJobPositionModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
-        <i class="fa-solid fa-plus text-xs"></i>
-        <span>Tambah Jabatan</span>
-      </button>
-    </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="openModulePermissionsModal()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-layer-group text-xs"></i>
+          <span>Atur per Modul</span>
+        </button>
+        <button type="button" onclick="openAddJobPositionModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Tambah Jabatan</span>
+        </button>
+      </div>
 
     <div id="job-positions-list-container" class="space-y-2">
       <div class="p-8 text-center text-xs text-slate-400">
@@ -597,6 +602,75 @@
       <button type="button" id="btn-save-position-perms" onclick="handleSavePositionPermissions()" class="py-2.5 px-5 bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5">
         <i class="fa-solid fa-floppy-disk"></i>
         <span>Simpan Hak Akses</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL INVERSE: ATUR HAK AKSES PER MODUL -->
+<!-- ========================================================================= -->
+<div id="modal-module-permissions" class="fixed inset-0 bg-slate-900/60 z-[100] hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 transform scale-95 transition-transform duration-300">
+    
+    <!-- Header Modal -->
+    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-200">
+          <i class="fa-solid fa-layer-group text-lg"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Atur Hak Akses per Modul</h3>
+          <p class="text-[10px] text-slate-500 font-medium">Pilih modul, lalu centang jabatan yang berhak mengaksesnya</p>
+        </div>
+      </div>
+      <button onclick="closeModulePermissionsModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Body Modal -->
+    <div class="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+      
+      <!-- Pilih Modul -->
+      <div>
+        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Pilih Modul / Fitur <span class="text-red-500">*</span></label>
+        <select id="select-permission-module" onchange="handleModuleSelectionChange()" class="w-full text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition font-medium text-slate-700">
+          <option value="">-- Pilih Modul / Fitur --</option>
+          <!-- Opsi akan dirender dari JS -->
+        </select>
+      </div>
+
+      <!-- Container Jabatan (Tersembunyi sampai modul dipilih) -->
+      <div id="module-positions-container" class="hidden space-y-2">
+        <div class="flex items-center justify-between mb-2 mt-4">
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Daftar Master Jabatan</label>
+        </div>
+        
+        <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
+              <tr>
+                <th class="py-2 px-4 font-bold text-[10px]">Nama Posisi / Jabatan</th>
+                <th class="py-2 px-4 font-bold text-[10px] text-center w-20">Lihat</th>
+                <th class="py-2 px-4 font-bold text-[10px] text-center w-20">Ubah</th>
+              </tr>
+            </thead>
+            <tbody id="module-positions-list" class="divide-y divide-slate-100 bg-white">
+              <!-- Baris jabatan dirender dari JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer Modal -->
+    <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2 shrink-0">
+      <button type="button" onclick="closeModulePermissionsModal()" class="py-2.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Tutup</button>
+      <button type="button" id="btn-save-module-perms" onclick="handleSaveModulePermissions()" class="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5 opacity-50 pointer-events-none">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>Terapkan ke Jabatan</span>
       </button>
     </div>
   </div>

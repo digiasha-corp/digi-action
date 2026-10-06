@@ -23614,3 +23614,199 @@ document.addEventListener("click", function (e) {
     closeEmpAtasanSearchDropdown();
   }
 });
+
+// =========================================================================
+// INVERSE RBAC (Atur Hak Akses per Modul)
+// =========================================================================
+let CURRENT_MODULE_PERMISSION = "";
+
+function openModulePermissionsModal() {
+  const modal = document.getElementById("modal-module-permissions");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+  setTimeout(() => {
+    modal.classList.remove("opacity-0");
+    modal.querySelector(".bg-white").classList.remove("scale-95");
+  }, 10);
+  
+  // Ambil semua daftar modul dari MASTER_PERMISSION_MODULES (harusnya ada dari config)
+  // Kalau tidak ada, kita generate dari data ORG_POSITION_PERMS_DATA
+  populatePermissionModulesDropdown();
+}
+
+function closeModulePermissionsModal() {
+  const modal = document.getElementById("modal-module-permissions");
+  if (!modal) return;
+  modal.classList.add("opacity-0");
+  modal.querySelector(".bg-white").classList.add("scale-95");
+  setTimeout(() => {
+    modal.classList.remove("flex");
+    modal.classList.add("hidden");
+    
+    document.getElementById("select-permission-module").value = "";
+    document.getElementById("module-positions-container").classList.add("hidden");
+    CURRENT_MODULE_PERMISSION = "";
+  }, 300);
+}
+
+function populatePermissionModulesDropdown() {
+  const select = document.getElementById("select-permission-module");
+  select.innerHTML = '<option value="">-- Pilih Modul / Fitur --</option>';
+  
+  // Kumpulkan semua permission code yang pernah ada atau didefinisikan
+  let allPerms = new Set();
+  if (typeof MASTER_PERMISSION_MODULES !== "undefined") {
+    MASTER_PERMISSION_MODULES.forEach(app => {
+      app.modules.forEach(mod => {
+        allPerms.add(`${app.appCode}.${mod.code}`);
+      });
+    });
+  } else {
+    // Fallback: collect dari existing ORG_POSITION_PERMS_DATA
+    Object.values(ORG_POSITION_PERMS_DATA || {}).forEach(perms => {
+      perms.forEach(p => {
+        const base = p.replace(/\.(VIEW|EDIT)$/i, "");
+        allPerms.add(base);
+      });
+    });
+  }
+  
+  Array.from(allPerms).sort().forEach(code => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = code;
+    select.appendChild(opt);
+  });
+}
+
+function handleModuleSelectionChange() {
+  const val = document.getElementById("select-permission-module").value;
+  CURRENT_MODULE_PERMISSION = val;
+  const container = document.getElementById("module-positions-container");
+  const btn = document.getElementById("btn-save-module-perms");
+  
+  if (!val) {
+    container.classList.add("hidden");
+    btn.classList.add("opacity-50", "pointer-events-none");
+    return;
+  }
+  
+  container.classList.remove("hidden");
+  btn.classList.remove("opacity-50", "pointer-events-none");
+  
+  renderModulePositionsList(val);
+}
+
+function renderModulePositionsList(moduleCode) {
+  const tbody = document.getElementById("module-positions-list");
+  tbody.innerHTML = "";
+  
+  const positions = ORG_POSITIONS_DATA || [];
+  positions.sort((a,b) => a.nama_jabatan.localeCompare(b.nama_jabatan)).forEach(pos => {
+    const perms = ORG_POSITION_PERMS_DATA[pos.id_position] || [];
+    const hasView = perms.includes(`${moduleCode}.VIEW`);
+    const hasEdit = perms.includes(`${moduleCode}.EDIT`);
+    
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="py-2.5 px-4">
+        <div class="font-bold text-slate-800 text-xs">${pos.nama_jabatan}</div>
+        <div class="text-[10px] text-slate-400 font-mono mt-0.5">${pos.id_position}</div>
+      </td>
+      <td class="py-2.5 px-4 text-center">
+        <input type="checkbox" data-pos="${pos.id_position}" data-type="VIEW" class="mod-perm-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" ${hasView ? 'checked' : ''} onchange="handleModPermCbChange(this)">
+      </td>
+      <td class="py-2.5 px-4 text-center">
+        <input type="checkbox" data-pos="${pos.id_position}" data-type="EDIT" class="mod-perm-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" ${hasEdit ? 'checked' : ''} onchange="handleModPermCbChange(this)">
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function handleModPermCbChange(el) {
+  const type = el.dataset.type;
+  const pos = el.dataset.pos;
+  if (type === 'EDIT' && el.checked) {
+    const viewCb = document.querySelector(`input.mod-perm-cb[data-pos="${pos}"][data-type="VIEW"]`);
+    if (viewCb) viewCb.checked = true;
+  }
+  if (type === 'VIEW' && !el.checked) {
+    const editCb = document.querySelector(`input.mod-perm-cb[data-pos="${pos}"][data-type="EDIT"]`);
+    if (editCb) editCb.checked = false;
+  }
+}
+
+function toggleAllModulePerms(type) {
+  const isChecked = document.getElementById(`check-all-module-${type.toLowerCase()}`).checked;
+  const checkboxes = document.querySelectorAll(`input.mod-perm-cb[data-type="${type}"]`);
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+    handleModPermCbChange(cb);
+  });
+}
+
+async function handleSaveModulePermissions() {
+  if (!CURRENT_MODULE_PERMISSION) return;
+  
+  const btn = document.getElementById("btn-save-module-perms");
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menerapkan...';
+  
+  const viewCode = CURRENT_MODULE_PERMISSION + ".VIEW";
+  const editCode = CURRENT_MODULE_PERMISSION + ".EDIT";
+  
+  const viewPosIds = [];
+  const editPosIds = [];
+  
+  document.querySelectorAll('input.mod-perm-cb[data-type="VIEW"]').forEach(cb => {
+    if (cb.checked) viewPosIds.push(cb.dataset.pos);
+  });
+  
+  document.querySelectorAll('input.mod-perm-cb[data-type="EDIT"]').forEach(cb => {
+    if (cb.checked) editPosIds.push(cb.dataset.pos);
+  });
+  
+  try {
+    if (supabaseClient) {
+      await supabaseClient.rpc('update_permission_for_positions', {
+        p_permission_code: viewCode,
+        p_position_ids: viewPosIds
+      });
+      await supabaseClient.rpc('update_permission_for_positions', {
+        p_permission_code: editCode,
+        p_position_ids: editPosIds
+      });
+    }
+    
+    // Update local ORG_POSITION_PERMS_DATA
+    const positions = ORG_POSITIONS_DATA || [];
+    positions.forEach(pos => {
+      const pId = pos.id_position;
+      if (!ORG_POSITION_PERMS_DATA[pId]) ORG_POSITION_PERMS_DATA[pId] = [];
+      
+      // Remove old view/edit for this module
+      ORG_POSITION_PERMS_DATA[pId] = ORG_POSITION_PERMS_DATA[pId].filter(x => x !== viewCode && x !== editCode);
+      
+      if (viewPosIds.includes(pId)) ORG_POSITION_PERMS_DATA[pId].push(viewCode);
+      if (editPosIds.includes(pId)) ORG_POSITION_PERMS_DATA[pId].push(editCode);
+    });
+    
+    if (typeof renderOrgRolePermissions === "function") {
+      renderOrgRolePermissions(CURRENT_ROLE_FILTER_KEYWORD || "");
+    }
+    
+    closeModulePermissionsModal();
+    if (typeof showToast === "function") {
+      showToast(`Hak akses untuk modul "${CURRENT_MODULE_PERMISSION}" berhasil diterapkan!`, "success", 2000);
+    }
+  } catch (err) {
+    console.error("Error saving module perms:", err);
+    alert("Terjadi kesalahan saat menyimpan hak akses modul.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+  }
+}
