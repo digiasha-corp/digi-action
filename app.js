@@ -18359,15 +18359,32 @@ async function handleSavePositionPermissions() {
 
   try {
     if (supabaseClient) {
-      // Call the RPC function we created in the database
-      const { error } = await supabaseClient.rpc('update_position_permissions', {
-        p_position_id: positionId,
-        p_permissions: permsArray
-      });
+      // 1. Delete all existing permissions for this position
+      const { error: delError } = await supabaseClient
+        .from('hr_job_position_permissions')
+        .delete()
+        .eq('position_id', positionId);
+        
+      if (delError) {
+        console.error("Error deleting old permissions:", delError);
+        throw delError;
+      }
       
-      if (error) {
-        console.error("Error saving permissions via RPC:", error);
-        throw error;
+      // 2. Insert new permissions if any
+      if (permsArray.length > 0) {
+        const inserts = permsArray.map(code => ({
+          position_id: positionId,
+          permission_code: code
+        }));
+        
+        const { error: insError } = await supabaseClient
+          .from('hr_job_position_permissions')
+          .insert(inserts);
+          
+        if (insError) {
+          console.error("Error inserting new permissions:", insError);
+          throw insError;
+        }
       }
     }
 
