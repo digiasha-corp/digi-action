@@ -546,7 +546,7 @@ async function supabaseGetMasterData() {
   if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
 
   const [resLoc, resDlr, resFac, resGps] = await Promise.all([
-    supabaseClient.from("m_work_location").select("*"),
+    supabaseClient.from("hr_work_locations").select("*"),
     supabaseClient.from("m_dealer").select("*").order("dealer_name"),
     supabaseClient.from("m_facility_unit").select("*").order("dealer_name"),
     supabaseClient.from("m_gps_device").select("*")
@@ -589,12 +589,12 @@ async function supabaseGetMasterData() {
   }
 
   const workLocations = (resLoc.data || []).map(l => ({
-    location_id: l.location_id,
-    name: l.name || l.location_name,
-    lat: parseFloat(l.lat || l.latitude),
-    long: parseFloat(l.long || l.longitude),
-    maxRadiusMeter: parseInt(l.max_radius_meter || l.radius_meter || 100),
-    address: l.address || l.alamat || ""
+    location_id: l.id_work_location,
+    name: l.nama_lokasi,
+    lat: parseFloat(l.latitude),
+    long: parseFloat(l.longitude),
+    maxRadiusMeter: parseInt(l.radius_meter || 100),
+    address: l.alamat_lengkap || ""
   }));
 
   const now = new Date();
@@ -10893,18 +10893,18 @@ async function loadOfficeLocationsForSettings() {
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient
-        .from("m_work_location")
+        .from("hr_work_locations")
         .select("*")
-        .order("name");
+        .order("nama_lokasi");
 
       if (!error && data) {
         OFFICE_LOCATIONS = data.map(l => ({
-          location_id: l.location_id,
-          name: l.name || l.location_name,
-          lat: parseFloat(l.lat || l.latitude),
-          long: parseFloat(l.long || l.longitude),
-          maxRadiusMeter: parseInt(l.max_radius_meter || l.radius_meter || 100),
-          address: l.address || l.alamat || ""
+          location_id: l.id_work_location,
+          name: l.nama_lokasi,
+          lat: parseFloat(l.latitude),
+          long: parseFloat(l.longitude),
+          maxRadiusMeter: parseInt(l.radius_meter || 100),
+          address: l.alamat_lengkap || ""
         }));
         renderOfficeLocationsList(OFFICE_LOCATIONS);
         return;
@@ -11010,19 +11010,19 @@ async function handleSaveOffice(e) {
 
   try {
     const payload = {
-      location_id: locId,
-      name: name,
-      lat: lat,
-      long: long,
-      max_radius_meter: radius,
-      address: address,
+      id_work_location: locId,
+      nama_lokasi: name,
+      latitude: lat,
+      longitude: long,
+      radius_meter: radius,
+      alamat_lengkap: address,
       updated_at: new Date().toISOString()
     };
 
     if (supabaseClient) {
       const { error } = await supabaseClient
-        .from("m_work_location")
-        .upsert(payload, { onConflict: "location_id" });
+        .from("hr_work_locations")
+        .upsert(payload, { onConflict: "id_work_location" });
 
       if (error) throw error;
     }
@@ -16343,7 +16343,7 @@ async function loadWorkLocations() {
   if (!data || data.length === 0) {
     if (supabaseClient) {
       try {
-        const { data: legacyLocs } = await supabaseClient.from("m_work_location").select("*");
+        const { data: legacyLocs } = await supabaseClient.from("hr_work_locations").select("*");
         if (legacyLocs && legacyLocs.length > 0) {
           data = legacyLocs.map(l => ({
             id_work_location: l.location_id || l.id_work_location,
