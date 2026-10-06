@@ -473,7 +473,7 @@ async function supabaseLogin(identifier, password) {
     .from("hr_employees")
     .select(`
       *,
-      hr_job_positions ( nama_jabatan, is_leader, bobot_level ),
+      hr_job_positions ( nama_jabatan ),
       hr_organization_units ( nama_unit )
     `)
     .eq("user_id", authData.user.id)
@@ -23929,5 +23929,6 @@ async function handleSaveModulePermissions(actionType) {
     if (actionType === 'LEPASKAN') btnLepas.innerHTML = origHtml;
   }
 }
+
 
 
