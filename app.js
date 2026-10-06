@@ -495,11 +495,11 @@ async function supabaseLogin(identifier, password) {
     try {
       const { data: jobPerms } = await supabaseClient
         .from("hr_job_position_permissions")
-        .select("action_code")
+        .select("permission_code")
         .eq("position_id", emp.position_id);
       
       if (jobPerms && jobPerms.length > 0) {
-        permissions = jobPerms.map(p => p.action_code);
+        permissions = jobPerms.map(p => p.permission_code);
       }
     } catch (e) {
       console.warn("Gagal menarik job permissions", e);
@@ -23929,6 +23929,7 @@ async function handleSaveModulePermissions(actionType) {
     if (actionType === 'LEPASKAN') btnLepas.innerHTML = origHtml;
   }
 }
+
 
 
 
