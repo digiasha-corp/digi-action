@@ -20070,6 +20070,9 @@ function renderPersonaliaEmployees(list) {
 
         <!-- Tombol Aksi Personalia & Dossier -->
         <div class="flex items-center space-x-2 shrink-0 border-t sm:border-t-0 pt-2.5 sm:pt-0 border-slate-100 justify-end">
+          <button type="button" onclick="adminResetEmployeePassword('${emp.nip}', '${emp.nama_lengkap || emp.nama || "-"}')" title="Reset Sandi (Default: Password123!)" class="px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 rounded-xl font-bold text-xs flex items-center shadow-sm transition">
+            <i class="fa-solid fa-key"></i>
+          </button>
           <button type="button" onclick="openEmployeeDossierModal('${emp.nip}')" title="Buka Detail Personalia & Buku Induk" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-sm transition">
             <i class="fa-solid fa-id-badge text-indigo-200"></i>
             <span>Detail Personalia</span>
@@ -20078,6 +20081,27 @@ function renderPersonaliaEmployees(list) {
       </div>
     `;
   }).join("");
+}
+
+window.adminResetEmployeePassword = async function(nip, nama) {
+  if (!confirm(`PERINGATAN: Anda akan mereset kata sandi milik karyawan: \n\nNIP: ${nip}\nNama: ${nama}\n\nSandi akan direset kembali menjadi default: Password123! \nKaryawan akan dipaksa mengganti sandinya saat login berikutnya.\n\nApakah Anda yakin?`)) return;
+  
+  try {
+    showToast("Memproses reset sandi...", "info", 2000);
+    const { data, error } = await supabaseClient.rpc("admin_reset_employee_password", { target_nip: nip });
+    
+    if (error) throw error;
+    
+    showToast(`Kata sandi untuk ${nama} berhasil direset!`, "success", 3000);
+    
+    // Refresh employee list if necessary
+    if (typeof loadPersonaliaEmployees === "function") {
+      loadPersonaliaEmployees();
+    }
+  } catch (err) {
+    console.error("Gagal reset sandi:", err);
+    alert(`Gagal mereset sandi: ${err.message || JSON.stringify(err)}`);
+  }
 }
 
 function openAddCareerTransactionModalFor(nip) {
