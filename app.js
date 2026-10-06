@@ -2158,7 +2158,7 @@ async function initDashboard() {
   // Render & filter seluruh modul aplikasi sesuai hak akses role (21 modul)
   const allModulesList = [
     "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
-    "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji",
+    "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji", "personalia",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
     "sop_management", "organization_setting", "settings"
   ];
