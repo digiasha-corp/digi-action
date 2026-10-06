@@ -433,58 +433,82 @@ async function supabaseLogin(identifier, password) {
   const idTrim = String(identifier).trim();
   const passTrim = String(password).trim();
 
-  const { data: users, error } = await supabaseClient
-    .from("m_employee")
-    .select("*")
-    .or(`nip.eq.${idTrim},email.eq.${idTrim}`)
+  // 1. Format Identifier: Jika yang dimasukkan NIP, jadikan nip@digiasha.com
+  let emailToLogin = idTrim;
+  if (!emailToLogin.includes("@")) {
+    emailToLogin = `${emailToLogin.toLowerCase()}@digiasha.com`;
+  }
+
+  // 2. Autentikasi dengan Native Supabase Auth
+  const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+    email: emailToLogin,
+    password: passTrim
+  });
+
+  if (authError || !authData.user) {
+    console.error("Login Error:", authError);
+    return { success: false, message: "Kredensial tidak valid atau akun tidak ditemukan." };
+  }
+
+  // 3. Ambil data profil dari hr_employees beserta relasinya
+  const { data: employees, error: empError } = await supabaseClient
+    .from("hr_employees")
+    .select(`
+      *,
+      hr_job_positions ( nama_jabatan, is_leader, bobot_level ),
+      hr_organization_units ( nama_unit )
+    `)
+    .eq("user_id", authData.user.id)
     .limit(1);
 
-  if (error || !users || users.length === 0) {
-    return { success: false, message: "Akun tidak ditemukan. Periksa NIP atau Email Anda." };
+  if (empError || !employees || employees.length === 0) {
+    return { success: false, message: "Profil karyawan tidak ditemukan untuk akun ini." };
   }
 
-  const user = users[0];
-  if (user.password_hash !== passTrim) {
-    return { success: false, message: "Kata sandi yang Anda masukkan salah." };
-  }
+  const emp = employees[0];
 
-  if (user.status_aktif && user.status_aktif !== "AKTIF" && user.status_aktif !== true) {
+  if (emp.status_kerja === "NONAKTIF" || emp.deleted_at !== null) {
     return { success: false, message: "Akun Anda saat ini berstatus NONAKTIF. Hubungi Administrator." };
   }
 
-  let permissions = getPermissionsForRole(user.role_id, user);
-  try {
-    const { data: rolePerms } = await supabaseClient
-      .from("m_role_permission")
-      .select("*")
-      .eq("role_id", user.role_id || "R-01")
-      .limit(1);
-    if (rolePerms && rolePerms.length > 0) {
-      const parsed = parseRolePermissions(rolePerms[0].permissions || rolePerms[0].permission_keys);
-      if (parsed.length > 0) permissions = parsed;
+  // 4. Ambil Job Permissions (Pengganti role_id)
+  let permissions = [];
+  if (emp.position_id) {
+    try {
+      const { data: jobPerms } = await supabaseClient
+        .from("hr_job_position_permissions")
+        .select("action_code")
+        .eq("position_id", emp.position_id);
+      
+      if (jobPerms && jobPerms.length > 0) {
+        permissions = jobPerms.map(p => p.action_code);
+      }
+    } catch (e) {
+      console.warn("Gagal menarik job permissions", e);
     }
-  } catch (e) { }
+  }
 
-  const roleNameMap = {
-    "R-01": "Super Admin",
-    "R-02": "Branch Manager",
-    "R-03": "FAC",
-    "R-04": "Field PIC"
-  };
+  if (permissions.length === 0) {
+    permissions = ["app.home.view"];
+  }
+
+  const jabatanName = emp.hr_job_positions?.nama_jabatan || "Karyawan";
+  const unitName = emp.hr_organization_units?.nama_unit || "Pusat";
 
   return {
     success: true,
     user: {
-      nip: user.nip,
-      email: user.email,
-      nama: user.nama_lengkap,
-      jabatan: user.jabatan,
-      cabang: user.cabang,
-      area_cover: user.area_cover || "",
-      role: roleNameMap[user.role_id] || user.role_id || "Field PIC",
-      role_id: user.role_id,
-      status_ganti_pass: user.status_ganti_pass === true || String(user.status_ganti_pass).toLowerCase() === "true",
-      permissions: permissions
+      nip: emp.nip,
+      email: emp.email || emailToLogin,
+      nama: emp.name,
+      jabatan: jabatanName,
+      cabang: unitName,
+      area_cover: "",
+      role: jabatanName,
+      role_id: emp.position_id, // Disimpan agar form/menu lama yang mengecek role_id tidak crash
+      status_ganti_pass: emp.must_change_password === true,
+      permissions: permissions,
+      user_id: authData.user.id
     }
   };
 }
@@ -1056,6 +1080,36 @@ async function supabaseSubmitIzin(data) {
     }
   }
 
+  // ==== LIVE SUPERVISOR LOOKUP ====
+  let finalPicNip = data.pic_approval_nip || "-";
+  let finalPicNama = data.pic_approval_nama || "Atasan Langsung";
+
+  if (supabaseClient) {
+    try {
+      const { data: empData } = await supabaseClient
+        .from("hr_employees")
+        .select("supervisor_id")
+        .eq("nip", data.nip || CURRENT_USER?.nip)
+        .maybeSingle();
+      
+      if (empData && empData.supervisor_id) {
+        finalPicNip = empData.supervisor_id;
+        
+        const { data: spvData } = await supabaseClient
+          .from("hr_employees")
+          .select("name")
+          .eq("nip", finalPicNip)
+          .maybeSingle();
+          
+        if (spvData && spvData.name) {
+          finalPicNama = spvData.name;
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal melacak atasan live:", e);
+    }
+  }
+
   const payload = {
     izin_id: izinId,
     timestamp: now.toISOString(),
@@ -1069,8 +1123,8 @@ async function supabaseSubmitIzin(data) {
     lat: Number(data.lat || 0),
     long: Number(data.long || 0),
     selfie_url: selfieUrl,
-    pic_approval_nip: data.pic_approval_nip || "-",
-    pic_approval_nama: data.pic_approval_nama || "Atasan Langsung",
+    pic_approval_nip: finalPicNip,
+    pic_approval_nama: finalPicNama,
     status_approval: "PENDING"
   };
 
@@ -4406,16 +4460,20 @@ function setupRekapTeamFilter() {
         selectEl.appendChild(opt);
       }
     });
-  } else if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-    fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_employee?select=nip,nama_lengkap,cabang&order=nama_lengkap.asc`, {
-      headers: {
-        "apikey": CONFIG.SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
-      }
-    }).then(res => res.json()).then(list => {
-      if (Array.isArray(list)) {
-        window.ALL_EMPLOYEES_CACHE = list.map(e => ({ nip: e.nip, nama: e.nama_lengkap, cabang: e.cabang }));
-        list.forEach(emp => {
+  } else if (supabaseClient) {
+    supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id").order("name", { ascending: true })
+    .then(({ data: list, error }) => {
+      if (!error && Array.isArray(list)) {
+        const mapped = list.map(e => ({
+           nip: e.nip, 
+           nama_lengkap: e.name, 
+           nama: e.name,
+           cabang: e.hr_organization_units?.nama_unit || "",
+           jabatan: e.hr_job_positions?.nama_jabatan || "",
+           role_id: e.position_id
+        }));
+        window.ALL_EMPLOYEES_CACHE = mapped;
+        mapped.forEach(emp => {
           if (emp.nip !== CURRENT_USER.nip) {
             const opt = document.createElement("option");
             opt.value = emp.nip;
@@ -5112,18 +5170,18 @@ async function loadRekapTimPicOptions() {
 
     if (Array.isArray(window.ALL_EMPLOYEES_CACHE) && window.ALL_EMPLOYEES_CACHE.length > 0) {
       list = window.ALL_EMPLOYEES_CACHE;
-    } else if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_employee?select=nip,nama_lengkap,jabatan,cabang,atasan_nip,role_id&order=nama_lengkap.asc`, {
-        headers: {
-          "apikey": CONFIG.SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
-        }
-      });
-      if (res.ok) {
-        list = await res.json();
-        if (Array.isArray(list)) {
-          window.ALL_EMPLOYEES_CACHE = list;
-        }
+    } else if (supabaseClient) {
+      const { data: rawList, error } = await supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id, supervisor_id").order("name", { ascending: true });
+      if (!error && Array.isArray(rawList)) {
+        list = rawList.map(e => ({
+           nip: e.nip, 
+           nama_lengkap: e.name,
+           cabang: e.hr_organization_units?.nama_unit || "",
+           jabatan: e.hr_job_positions?.nama_jabatan || "",
+           role_id: e.position_id,
+           atasan_nip: e.supervisor_id
+        }));
+        window.ALL_EMPLOYEES_CACHE = list;
       }
     }
 
@@ -10417,12 +10475,21 @@ async function loadEmployeesForSettings() {
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient
-        .from("m_employee")
-        .select("*")
-        .order("nama_lengkap");
+        .from("hr_employees")
+        .select("*, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan)")
+        .order("name", { ascending: true });
 
       if (!error && data) {
-        SETTINGS_EMPLOYEES_DATA = data;
+        SETTINGS_EMPLOYEES_DATA = data.map(e => ({
+           nip: e.nip, 
+           nama_lengkap: e.name,
+           email: e.email,
+           cabang: e.hr_organization_units?.nama_unit || "",
+           jabatan: e.hr_job_positions?.nama_jabatan || "",
+           role_id: e.position_id,
+           status_aktif: e.status_kerja,
+           area_cover: ""
+        }));
         renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
         return;
       }
@@ -10700,31 +10767,27 @@ async function handleSaveEmployee(e) {
 
     const payload = {
       nip: nip,
-      nama_lengkap: nama,
+      name: nama,
       email: email || `${nip}@digiasha.com`,
-      cabang: cabang,
-      role_id: roleId,
-      area_cover: areaCover,
-      status_aktif: status,
-      atasan_nip: atasanNip || null,
-      atasan_nama: atasanNama || null,
-      password_hash: pass || existingEmp?.password_hash || "Password123!",
-      status_ganti_pass: shouldRequirePasswordChange,
+      position_id: roleId,
+      status_kerja: status === "AKTIF" ? "PKWTT" : "NONAKTIF",
+      must_change_password: shouldRequirePasswordChange,
       updated_at: new Date().toISOString()
     };
 
     if (supabaseClient) {
       if (existingEmp) {
         const { error } = await supabaseClient
-          .from("m_employee")
+          .from("hr_employees")
           .update(payload)
           .eq("nip", nip);
         if (error) throw error;
       } else {
         const { error } = await supabaseClient
-          .from("m_employee")
+          .from("hr_employees")
           .upsert(payload, { onConflict: "nip" });
         if (error) throw error;
+        alert("Catatan: Jika karyawan baru, Administrator harus menambahkan email user ini ke sistem Auth Supabase secara manual (Admin Auth) agar bisa login.");
       }
     }
 
@@ -13977,15 +14040,17 @@ async function handleForceChangePasswordSubmit(e) {
 
   try {
     if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("m_employee")
+      const { error: authError } = await supabaseClient.auth.updateUser({ password: newPass });
+      if (authError) throw authError;
+
+      const { error: updateError } = await supabaseClient
+        .from("hr_employees")
         .update({
-          password_hash: newPass,
-          status_ganti_pass: false,
+          must_change_password: false,
           updated_at: new Date().toISOString()
         })
-        .eq("nip", CURRENT_USER.nip);
-      if (error) throw error;
+        .eq("user_id", CURRENT_USER.user_id);
+      if (updateError) console.warn("Failed to clear must_change_password flag:", updateError);
     }
 
     CURRENT_USER.status_ganti_pass = false;
@@ -14067,15 +14132,16 @@ async function loadActivityFilterDropdowns() {
     let empList = [];
     if (Array.isArray(window.ALL_EMPLOYEES_CACHE) && window.ALL_EMPLOYEES_CACHE.length > 0) {
       empList = window.ALL_EMPLOYEES_CACHE;
-    } else if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/m_employee?select=nip,nama_lengkap,jabatan,cabang,role_id&order=nama_lengkap.asc`, {
-        headers: {
-          "apikey": CONFIG.SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
-        }
-      });
-      if (res.ok) {
-        empList = await res.json();
+    } else if (supabaseClient) {
+      const { data: rawList, error } = await supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id").order("name", { ascending: true });
+      if (!error && Array.isArray(rawList)) {
+        empList = rawList.map(e => ({
+           nip: e.nip, 
+           nama_lengkap: e.name,
+           cabang: e.hr_organization_units?.nama_unit || "",
+           jabatan: e.hr_job_positions?.nama_jabatan || "",
+           role_id: e.position_id
+        }));
         window.ALL_EMPLOYEES_CACHE = empList;
       }
     }
@@ -18438,14 +18504,6 @@ async function openEmployeeDossierModal(nipOrId) {
           cabang: eRow.organization_units?.nama_unit || eRow.cabang || (isCalon ? "N/A" : "N/A"),
           jabatan: eRow.job_positions?.nama_jabatan || eRow.jabatan || (isCalon ? "Calon Karyawan" : "N/A")
         };
-      } else {
-        // 2. Fallback cari di m_employee
-        const { data: mRow } = await supabaseClient
-          .from("m_employee")
-          .select("*")
-          .eq("nip", nipOrId)
-          .maybeSingle();
-        if (mRow) emp = mRow;
       }
     } catch (e) {
       console.warn("[Dossier] Query employee error:", e);
