@@ -213,7 +213,18 @@ function getPermissionsForRole(roleKey, userObj = null) {
   }
 
   if (userObj && Array.isArray(userObj.permissions) && userObj.permissions.length > 0) {
-    return userObj.permissions;
+    const extractedPerms = new Set();
+    userObj.permissions.forEach(p => {
+      const parts = p.split(":");
+      if (parts.length >= 2) extractedPerms.add(parts[1]);
+      else extractedPerms.add(p);
+    });
+    const permStr = userObj.permissions.join(" ");
+    if (permStr.includes("payslip")) extractedPerms.add("slip_gaji");
+    if (permStr.includes("leave_permit")) extractedPerms.add("izin");
+    if (permStr.includes("visit_dealer")) extractedPerms.add("visit");
+    if (permStr.includes("task_assignment")) extractedPerms.add("assignment");
+    return Array.from(extractedPerms);
   }
 
   return DEFAULT_ROLE_PERMISSIONS["R-04"].permissions;
