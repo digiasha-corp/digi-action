@@ -1885,112 +1885,32 @@ async function handleLoginSubmit(e) {
   try {
     let authUser = null;
 
-    // 1. Coba Autentikasi Langsung ke Supabase REST API (Cepat & Realtime)
+        // 1. Autentikasi menggunakan Supabase Auth (Native)
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
       try {
-        const cleanId = encodeURIComponent(identifier);
-        const url = `${CONFIG.SUPABASE_URL}/rest/v1/m_employee?or=(nip.eq.${cleanId},email.eq.${cleanId})`;
-        const sbRes = await fetch(url, {
-          method: "GET",
-          headers: {
-            "apikey": CONFIG.SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
-          }
-        });
-        if (sbRes.ok) {
-          const empList = await sbRes.json();
-          if (Array.isArray(empList) && empList.length > 0) {
-            const emp = empList[0];
-            const passHash = String(emp.password_hash || emp.password || "").trim();
-            if (passHash === password) {
-              const rawStatus = String(emp.status_aktif || "AKTIF").toUpperCase();
-              const rawStatusKerja = String(emp.status_kerja || "").toUpperCase();
-              const empNip = String(emp.nip || "").toUpperCase();
-
-              if (empNip.startsWith("CAND-") || rawStatus === "CALON" || rawStatusKerja === "CALON") {
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-                alert("Akses Ditolak: Akun calon karyawan belum dapat login ke aplikasi hingga proses transaksi penerimaan disetujui.");
-                return;
-              }
-
-              if (rawStatus === "INACTIVE" || rawStatus === "NON-ACTIVE" || rawStatus === "NONAKTIF" || rawStatus === "TIDAK AKTIF") {
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-                alert("Gagal Login: Akun Anda berstatus non-aktif. Hubungi Administrator.");
-                return;
-              }
-
-              const rawRoleId = String(emp.role_id || "R-01").trim();
-              let resolvedRoleName = emp.jabatan || rawRoleId;
-
-              if (rawRoleId === "R-01" || rawRoleId.toLowerCase().includes("admin")) {
-                resolvedRoleName = "Admin";
-              } else if (rawRoleId === "R-02" || rawRoleId.toLowerCase().includes("branch manager") || rawRoleId.toLowerCase().includes("bm")) {
-                resolvedRoleName = "Branch Manager";
-              } else if (rawRoleId === "R-03" || rawRoleId.toLowerCase().includes("fac")) {
-                resolvedRoleName = "FAC";
-              } else if (rawRoleId === "R-04" || rawRoleId.toLowerCase().includes("other")) {
-                resolvedRoleName = "Other";
-              }
-
-              let resolvedPerms = getPermissionsForRole(rawRoleId, emp);
-
-              const isMustChangePass = (
-                emp.status_ganti_pass === true ||
-                String(emp.status_ganti_pass).toLowerCase() === "true" ||
-                passHash === "Password123!" ||
-                password === "Password123!"
-              );
-
-              authUser = {
-                nip: emp.nip || "-",
-                nama: emp.nama_lengkap || "Karyawan Digiasha",
-                email: emp.email || "",
-                jabatan: emp.jabatan || "-",
-                role_id: rawRoleId,
-                role: resolvedRoleName,
-                permissions: resolvedPerms,
-                cabang: emp.cabang || "HEAD OFFICE",
-                area_cover: emp.area_cover || "",
-                atasan_nip: emp.atasan_nip || "",
-                atasan_nama: emp.atasan_nama || "",
-                status_ganti_pass: isMustChangePass
-              };
-            }
-          }
+        const loginRes = await supabaseLogin(identifier, password);
+        if (loginRes && loginRes.success) {
+           authUser = loginRes.user;
+        } else {
+           submitBtn.innerHTML = originalText;
+           submitBtn.disabled = false;
+           alert(loginRes?.message || "Kredensial tidak valid.");
+           return;
         }
       } catch (errSup) {
-        console.warn("Supabase direct auth skipped, falling back to GAS:", errSup);
-      }
-    }
-
-    // 2. Fallback ke Google Apps Script API jika belum berhasil lewat Supabase
-    if (!authUser) {
-      const res = await callApi("login", { identifier, password });
-      if (res && res.success && res.user) {
-        authUser = res.user;
-        if (authUser.status_ganti_pass === undefined) {
-          authUser.status_ganti_pass = (password === "Password123!");
-        }
-
-        const fbNip = String(authUser.nip || "").toUpperCase();
-        const fbStatus = String(authUser.status_aktif || authUser.status_kerja || "").toUpperCase();
-        if (fbNip.startsWith("CAND-") || fbStatus === "CALON") {
-          submitBtn.innerHTML = originalText;
-          submitBtn.disabled = false;
-          alert("Akses Ditolak: Akun calon karyawan belum dapat login ke aplikasi hingga proses transaksi penerimaan disetujui.");
-          return;
-        }
-      } else {
+        console.warn("Supabase login error:", errSup);
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
-        alert("Gagal Login: " + (res?.message || "Akun tidak terdaftar atau kata sandi salah."));
+        alert("Terjadi kesalahan saat menghubungi server otentikasi.");
         return;
       }
+    } else {
+       submitBtn.innerHTML = originalText;
+       submitBtn.disabled = false;
+       alert("Gagal Login: Sistem otentikasi belum terkonfigurasi dengan benar (Kunci Supabase hilang).");
+       return;
     }
-
-    submitBtn.innerHTML = originalText;
+submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
 
     CURRENT_USER = authUser;
