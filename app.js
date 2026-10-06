@@ -23693,7 +23693,7 @@ function renderModulePermAppTabs() {
   
   appKeys.forEach(key => {
     const isActive = key === CURRENT_MODULE_PERM_APP_TAB;
-    const conf = ORG_APPS_CONFIG[key] || { label: key };
+    const conf = ORG_APPS_CONFIG[key] || { name: key };
     const classes = isActive 
       ? "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-emerald-600 text-emerald-700 whitespace-nowrap cursor-pointer"
       : "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer";
@@ -23701,7 +23701,7 @@ function renderModulePermAppTabs() {
     html += `
       <div class="${classes}" onclick="switchModulePermAppTab('${key}')">
         <i class="fa-solid fa-${conf.icon || 'box'}"></i>
-        <span>${conf.label}</span>
+        <span>${conf.name}</span>
       </div>
     `;
   });
