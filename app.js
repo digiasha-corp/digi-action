@@ -23660,10 +23660,11 @@ function gotoModulePermPage1() {
   renderModulePermAppTabs();
 }
 
-function gotoModulePermPage2(appKey, modKey, modLabel) {
+function gotoModulePermPage2(appKey, modKey, modLabel, actionName) {
+  const actionCode = actionName === 'Lihat' ? 'view' : 'edit';
   CURRENT_MODULE_PERMISSION_FULL = {
-    code: `${appKey}:${modKey}`, // base code without :view or :edit
-    name: modLabel
+    code: `${appKey}:${modKey}:${actionCode}`, // base code with :view or :edit
+    name: `${modLabel} (${actionName})`
   };
   
   document.getElementById("module-perm-page-1").classList.add("hidden");
@@ -23676,11 +23677,11 @@ function gotoModulePermPage2(appKey, modKey, modLabel) {
   document.getElementById("module-perm-modal-title").textContent = "Terapkan ke Jabatan";
   document.getElementById("module-perm-modal-subtitle").textContent = "Langkah 2: Pilih jabatan yang akan diberi/dicabut hak aksesnya";
   
-  document.getElementById("module-perm-selected-name").textContent = modLabel;
+  document.getElementById("module-perm-selected-name").textContent = CURRENT_MODULE_PERMISSION_FULL.name;
   
   // Reset select all
-  document.getElementById("check-all-module-view").checked = false;
-  document.getElementById("check-all-module-edit").checked = false;
+  const chkAll = document.getElementById("check-all-module-positions");
+  if (chkAll) chkAll.checked = false;
   
   renderModulePositionsList();
 }
@@ -23722,81 +23723,60 @@ function renderModulePermList() {
   
   const appConfig = ORG_APPS_CONFIG[CURRENT_MODULE_PERM_APP_TAB];
   if (!appConfig || !appConfig.modules || appConfig.modules.length === 0) {
-    container.innerHTML = `<div class="col-span-full p-6 text-center text-xs text-slate-400">Belum ada modul di aplikasi ini.</div>`;
+    container.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-xs text-slate-400">Belum ada modul di aplikasi ini.</td></tr>`;
     return;
   }
   
   let html = "";
   appConfig.modules.forEach(mod => {
+    const safeLabel = mod.label.replace(/'/g, "\\'");
     html += `
-      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-emerald-300 hover:shadow-md transition cursor-pointer flex flex-col justify-between" onclick="gotoModulePermPage2('${CURRENT_MODULE_PERM_APP_TAB}', '${mod.key}', '${mod.label.replace(/'/g, "\\'")}')">
-        <div>
-          <div class="text-[10px] font-bold text-emerald-600 mb-1 tracking-wide uppercase">${appConfig.label}</div>
-          <h4 class="text-xs font-bold text-slate-800">${mod.label}</h4>
-        </div>
-        <div class="mt-4 flex justify-end">
-          <span class="text-[10px] font-bold text-slate-500 flex items-center space-x-1 group-hover:text-emerald-600 transition">
-            <span>Atur Jabatan</span>
-            <i class="fa-solid fa-arrow-right"></i>
-          </span>
-        </div>
-      </div>
+      <tr class="hover:bg-slate-50/80 transition">
+        <td class="py-2.5 px-4 font-semibold text-slate-800 text-xs">
+          ${mod.label}
+        </td>
+        <td class="py-2.5 px-4 text-center">
+          <button type="button" onclick="gotoModulePermPage2('${CURRENT_MODULE_PERM_APP_TAB}', '${mod.key}', '${safeLabel}', 'Lihat')" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-[10px] font-bold border border-indigo-200 transition">Atur</button>
+        </td>
+        <td class="py-2.5 px-4 text-center">
+          <button type="button" onclick="gotoModulePermPage2('${CURRENT_MODULE_PERM_APP_TAB}', '${mod.key}', '${safeLabel}', 'Ubah')" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-[10px] font-bold border border-emerald-200 transition">Atur</button>
+        </td>
+      </tr>
     `;
   });
   container.innerHTML = html;
 }
 
 function renderModulePositionsList() {
-  const tbody = document.getElementById("module-positions-list");
-  if (!tbody) return;
-  tbody.innerHTML = "";
+  const container = document.getElementById("module-positions-list");
+  if (!container) return;
+  container.innerHTML = "";
   
-  const baseCode = CURRENT_MODULE_PERMISSION_FULL.code;
+  const targetCode = CURRENT_MODULE_PERMISSION_FULL.code;
   const positions = ORG_POSITIONS_DATA || [];
   
   positions.sort((a,b) => a.nama_jabatan.localeCompare(b.nama_jabatan)).forEach(pos => {
     const perms = ORG_POSITION_PERMS_DATA[pos.id_position] || [];
-    // Just to show current status in UI visually (optional), but checkboxes start unchecked for bulk action, OR checked if they already have it.
-    // Usually bulk action checkboxes start unchecked. But since the user wants to see who has it, let's set it to current state.
-    const hasView = perms.includes(`${baseCode}:view`);
-    const hasEdit = perms.includes(`${baseCode}:edit`);
+    const hasPerm = perms.includes(targetCode);
     
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="py-2.5 px-4">
+    const div = document.createElement("label");
+    div.className = "flex items-center p-3 border border-slate-200 rounded-xl bg-white hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer transition space-x-3";
+    div.innerHTML = `
+      <input type="checkbox" data-pos="${pos.id_position}" class="mod-perm-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" ${hasPerm ? 'checked' : ''}>
+      <div>
         <div class="font-bold text-slate-800 text-xs">${pos.nama_jabatan}</div>
         <div class="text-[10px] text-slate-400 font-mono mt-0.5">${pos.id_position}</div>
-      </td>
-      <td class="py-2.5 px-4 text-center">
-        <input type="checkbox" data-pos="${pos.id_position}" data-type="VIEW" class="mod-perm-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" ${hasView ? 'checked' : ''} onchange="handleModPermCbChange(this)">
-      </td>
-      <td class="py-2.5 px-4 text-center">
-        <input type="checkbox" data-pos="${pos.id_position}" data-type="EDIT" class="mod-perm-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" ${hasEdit ? 'checked' : ''} onchange="handleModPermCbChange(this)">
-      </td>
+      </div>
     `;
-    tbody.appendChild(tr);
+    container.appendChild(div);
   });
 }
 
-function handleModPermCbChange(el) {
-  const type = el.dataset.type;
-  const pos = el.dataset.pos;
-  if (type === 'EDIT' && el.checked) {
-    const viewCb = document.querySelector(`input.mod-perm-cb[data-pos="${pos}"][data-type="VIEW"]`);
-    if (viewCb) viewCb.checked = true;
-  }
-  if (type === 'VIEW' && !el.checked) {
-    const editCb = document.querySelector(`input.mod-perm-cb[data-pos="${pos}"][data-type="EDIT"]`);
-    if (editCb) editCb.checked = false;
-  }
-}
-
-function toggleAllModulePerms(type) {
-  const isChecked = document.getElementById(`check-all-module-${type.toLowerCase()}`).checked;
-  const checkboxes = document.querySelectorAll(`input.mod-perm-cb[data-type="${type}"]`);
+function toggleAllModulePositions() {
+  const isChecked = document.getElementById('check-all-module-positions').checked;
+  const checkboxes = document.querySelectorAll('input.mod-perm-cb');
   checkboxes.forEach(cb => {
     cb.checked = isChecked;
-    handleModPermCbChange(cb);
   });
 }
 
@@ -23804,19 +23784,12 @@ function toggleAllModulePerms(type) {
 async function handleSaveModulePermissions(actionType) {
   if (!CURRENT_MODULE_PERMISSION_FULL) return;
   
-  const baseCode = CURRENT_MODULE_PERMISSION_FULL.code;
-  const viewCode = `${baseCode}:view`;
-  const editCode = `${baseCode}:edit`;
+  const targetCode = CURRENT_MODULE_PERMISSION_FULL.code;
   
   // Kumpulkan jabatan yang DICENTANG di UI
-  const viewPosIds = [];
-  const editPosIds = [];
-  
-  document.querySelectorAll('input.mod-perm-cb[data-type="VIEW"]').forEach(cb => {
-    if (cb.checked) viewPosIds.push(cb.dataset.pos);
-  });
-  document.querySelectorAll('input.mod-perm-cb[data-type="EDIT"]').forEach(cb => {
-    if (cb.checked) editPosIds.push(cb.dataset.pos);
+  const selectedPosIds = [];
+  document.querySelectorAll('input.mod-perm-cb').forEach(cb => {
+    if (cb.checked) selectedPosIds.push(cb.dataset.pos);
   });
   
   // Konfirmasi
@@ -23834,30 +23807,29 @@ async function handleSaveModulePermissions(actionType) {
   if (actionType === 'LEPASKAN') btnLepas.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Mencabut...';
   
   try {
-    if (supabaseClient) {
+    if (supabaseClient && selectedPosIds.length > 0) {
       if (actionType === 'TERAPKAN') {
-        // TERAPKAN: Insert ke database untuk posisi yang dicentang
-        // Karena ada fungsi RPC update_permission_for_positions yang kita buat sebelumnya yang me-REPLACE semua,
-        // Tapi pengguna maunya "bulk action" Terapkan vs Lepaskan pada pilihan yang dicentang!
-        // Kalau begitu kita jangan pakai RPC update_permission_for_positions yang mendelete semuanya.
-        // Kita cukup lakukan INSERT biasa, atau panggil API supabase standard.
+        const inserts = selectedPosIds.map(p => ({ position_id: p, permission_code: targetCode }));
         
-        if (viewPosIds.length > 0) {
-          const insertView = viewPosIds.map(p => ({ position_id: p, permission_code: viewCode }));
-          await supabaseClient.from("hr_job_position_permissions").insert(insertView).select();
-        }
-        if (editPosIds.length > 0) {
-          const insertEdit = editPosIds.map(p => ({ position_id: p, permission_code: editCode }));
-          await supabaseClient.from("hr_job_position_permissions").insert(insertEdit).select();
+        // Kita menggunakan single-insert per record atau upsert jika backend mendukung, 
+        // Supabase secara default throw error kalau unik constraint dilanggar di bulk insert biasa,
+        // jadi lebih aman menggunakan upsert
+        await supabaseClient.from("hr_job_position_permissions").upsert(inserts, { onConflict: 'position_id, permission_code' });
+        
+        // Aturan khusus: Jika memberi hak akses EDIT, otomatis harus memberi VIEW juga
+        if (targetCode.endsWith(":edit")) {
+          const viewCode = targetCode.replace(":edit", ":view");
+          const viewInserts = selectedPosIds.map(p => ({ position_id: p, permission_code: viewCode }));
+          await supabaseClient.from("hr_job_position_permissions").upsert(viewInserts, { onConflict: 'position_id, permission_code' });
         }
         
       } else if (actionType === 'LEPASKAN') {
-        // LEPASKAN: Delete dari database untuk posisi yang dicentang
-        if (viewPosIds.length > 0) {
-          await supabaseClient.from("hr_job_position_permissions").delete().eq("permission_code", viewCode).in("position_id", viewPosIds);
-        }
-        if (editPosIds.length > 0) {
-          await supabaseClient.from("hr_job_position_permissions").delete().eq("permission_code", editCode).in("position_id", editPosIds);
+        await supabaseClient.from("hr_job_position_permissions").delete().eq("permission_code", targetCode).in("position_id", selectedPosIds);
+        
+        // Aturan khusus: Jika mencabut hak akses VIEW, otomatis harus cabut EDIT juga
+        if (targetCode.endsWith(":view")) {
+          const editCode = targetCode.replace(":view", ":edit");
+          await supabaseClient.from("hr_job_position_permissions").delete().eq("permission_code", editCode).in("position_id", selectedPosIds);
         }
       }
     }
@@ -23868,12 +23840,20 @@ async function handleSaveModulePermissions(actionType) {
       const pId = pos.id_position;
       if (!ORG_POSITION_PERMS_DATA[pId]) ORG_POSITION_PERMS_DATA[pId] = [];
       
-      if (actionType === 'TERAPKAN') {
-        if (viewPosIds.includes(pId) && !ORG_POSITION_PERMS_DATA[pId].includes(viewCode)) ORG_POSITION_PERMS_DATA[pId].push(viewCode);
-        if (editPosIds.includes(pId) && !ORG_POSITION_PERMS_DATA[pId].includes(editCode)) ORG_POSITION_PERMS_DATA[pId].push(editCode);
-      } else {
-        if (viewPosIds.includes(pId)) ORG_POSITION_PERMS_DATA[pId] = ORG_POSITION_PERMS_DATA[pId].filter(x => x !== viewCode);
-        if (editPosIds.includes(pId)) ORG_POSITION_PERMS_DATA[pId] = ORG_POSITION_PERMS_DATA[pId].filter(x => x !== editCode);
+      if (selectedPosIds.includes(pId)) {
+        if (actionType === 'TERAPKAN') {
+          if (!ORG_POSITION_PERMS_DATA[pId].includes(targetCode)) ORG_POSITION_PERMS_DATA[pId].push(targetCode);
+          if (targetCode.endsWith(":edit")) {
+            const vCode = targetCode.replace(":edit", ":view");
+            if (!ORG_POSITION_PERMS_DATA[pId].includes(vCode)) ORG_POSITION_PERMS_DATA[pId].push(vCode);
+          }
+        } else {
+          ORG_POSITION_PERMS_DATA[pId] = ORG_POSITION_PERMS_DATA[pId].filter(x => x !== targetCode);
+          if (targetCode.endsWith(":view")) {
+            const eCode = targetCode.replace(":view", ":edit");
+            ORG_POSITION_PERMS_DATA[pId] = ORG_POSITION_PERMS_DATA[pId].filter(x => x !== eCode);
+          }
+        }
       }
     });
     

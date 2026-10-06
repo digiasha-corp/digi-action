@@ -636,10 +636,21 @@
       <div class="px-4 pt-3 border-b border-slate-200 flex space-x-2 overflow-x-auto custom-scrollbar shrink-0 bg-white" id="module-perm-app-tabs">
         <!-- Rendered by JS -->
       </div>
-      <!-- Daftar Modul -->
+      <!-- Daftar Modul (Table format) -->
       <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="module-perm-list-container">
-          <!-- Rendered by JS -->
+        <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
+              <tr>
+                <th class="py-2.5 px-4 font-bold text-[10px]">Nama Modul / Fitur</th>
+                <th class="py-2.5 px-4 font-bold text-[10px] text-center w-28">Lihat</th>
+                <th class="py-2.5 px-4 font-bold text-[10px] text-center w-28">Ubah</th>
+              </tr>
+            </thead>
+            <tbody id="module-perm-list-container" class="divide-y divide-slate-100 bg-white">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -653,30 +664,15 @@
         </div>
         <div class="flex space-x-4 text-[10px] font-bold bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-200">
           <label class="flex items-center space-x-1.5 cursor-pointer text-slate-600 hover:text-indigo-600">
-            <input type="checkbox" id="check-all-module-view" onchange="toggleAllModulePerms('VIEW')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer">
-            <span>Pilih Semua (Lihat)</span>
-          </label>
-          <label class="flex items-center space-x-1.5 cursor-pointer text-slate-600 hover:text-indigo-600">
-            <input type="checkbox" id="check-all-module-edit" onchange="toggleAllModulePerms('EDIT')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer">
-            <span>Pilih Semua (Ubah)</span>
+            <input type="checkbox" id="check-all-module-positions" onchange="toggleAllModulePositions()" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer">
+            <span>Pilih Semua Jabatan</span>
           </label>
         </div>
       </div>
       
       <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
-        <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
-              <tr>
-                <th class="py-2.5 px-4 font-bold text-[10px]">Nama Posisi / Jabatan</th>
-                <th class="py-2.5 px-4 font-bold text-[10px] text-center w-24">Lihat</th>
-                <th class="py-2.5 px-4 font-bold text-[10px] text-center w-24">Ubah</th>
-              </tr>
-            </thead>
-            <tbody id="module-positions-list" class="divide-y divide-slate-100 bg-white">
-              <!-- Baris jabatan dirender dari JS -->
-            </tbody>
-          </table>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" id="module-positions-list">
+          <!-- Checkbox jabatan dirender dari JS -->
         </div>
       </div>
     </div>
