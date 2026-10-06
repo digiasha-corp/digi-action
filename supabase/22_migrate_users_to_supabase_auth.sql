@@ -1,11 +1,9 @@
 -- =========================================================================
 -- MIGRATION: MIGRATE ALL HR_EMPLOYEES TO SUPABASE AUTH (auth.users)
 -- =========================================================================
--- Script ini akan mendaftarkan seluruh karyawan yang ada di hr_employees
--- ke dalam sistem keamanan Supabase (auth.users) secara otomatis,
--- lalu menautkan ID mereka kembali ke hr_employees.user_id.
--- Semua password di-reset menjadi: Password123!
--- =========================================================================
+
+-- 0. Wajib mengaktifkan ekstensi kriptografi untuk hashing password
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 DO $$
 DECLARE
@@ -15,7 +13,7 @@ DECLARE
 BEGIN
     -- Supabase menggunakan bcrypt untuk auth.users
     -- Membuat hash bcrypt untuk 'Password123!'
-    encrypted_pw := crypt('Password123!', gen_salt('bf'));
+    encrypted_pw := extensions.crypt('Password123!', extensions.gen_salt('bf'));
 
     FOR emp_record IN 
         SELECT id, nip, email, name 
@@ -49,9 +47,9 @@ BEGIN
                 
                 -- Insert ke auth.identities agar bisa login
                 INSERT INTO auth.identities (
-                    id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+                    id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
                 ) VALUES (
-                    gen_random_uuid(), new_user_id, format('{"sub":"%s","email":"%s"}', new_user_id::text, final_email)::jsonb, 'email', NULL, NOW(), NOW()
+                    gen_random_uuid(), new_user_id::text, new_user_id, format('{"sub":"%s","email":"%s"}', new_user_id::text, final_email)::jsonb, 'email', NULL, NOW(), NOW()
                 );
             ELSE
                 -- Jika email sudah ada di auth.users, kita paksa reset passwordnya ke default
@@ -62,9 +60,6 @@ BEGIN
             UPDATE public.hr_employees 
             SET user_id = new_user_id 
             WHERE id = emp_record.id;
-
-        EXCEPTION WHEN OTHERS THEN
-            RAISE NOTICE 'Gagal memigrasi NIP %: %', emp_record.nip, SQLERRM;
         END;
     END LOOP;
 END $$;

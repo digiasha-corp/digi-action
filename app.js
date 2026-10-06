@@ -3322,7 +3322,7 @@ function initIzinScreen() {
   if (userInfo) userInfo.innerText = `${CURRENT_USER.nama} (${CURRENT_USER.nip}) • ${CURRENT_USER.cabang}`;
 
   const approverEl = document.getElementById("izin-pic-approval-name");
-  if (approverEl) approverEl.innerText = CURRENT_USER.atasan_nama ? `${CURRENT_USER.atasan_nama} (${CURRENT_USER.atasan_nip || 'Atasan Langsung'})` : "Supervisor / Branch Manager";
+  if (approverEl) { approverEl.innerText = "Memuat data atasan..."; if (typeof getLiveSupervisorForIzin === "function") { getLiveSupervisorForIzin().then(spv => { approverEl.innerText = `${spv.nama} (${spv.nip})`; }).catch(() => { approverEl.innerText = "Supervisor / Branch Manager"; }); } else { approverEl.innerText = CURRENT_USER.atasan_nama ? `${CURRENT_USER.atasan_nama} (${CURRENT_USER.atasan_nip || 'Atasan Langsung'})` : "Supervisor / Branch Manager"; } }
 
   // Set default dates untuk date range
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -3415,7 +3415,34 @@ function selectIzinCategory(category) {
   }
 }
 
-// Handler Foto Selfie Izin -> Auto Submit untuk WFA & Datang Terlambat
+// Handler Foto Selfie Izin -> Auto Submit untuk WFA & Datang Terlambatasync function getLiveSupervisorForIzin() {
+  let liveAtasanNip = CURRENT_USER?.atasan_nip || "-";
+  let liveAtasanNama = CURRENT_USER?.atasan_nama || "Atasan Langsung";
+  if (supabaseClient && CURRENT_USER?.nip) {
+    try {
+      const { data: myData } = await supabaseClient
+        .from("hr_employees")
+        .select("supervisor_id")
+        .eq("nip", CURRENT_USER.nip)
+        .single();
+      if (myData && myData.supervisor_id) {
+        const { data: spvData } = await supabaseClient
+          .from("hr_employees")
+          .select("nip, name")
+          .eq("id", myData.supervisor_id)
+          .single();
+        if (spvData && spvData.nip) {
+          liveAtasanNip = spvData.nip;
+          liveAtasanNama = spvData.name || "Atasan Langsung";
+        }
+      }
+    } catch (err) {
+      console.warn("Gagal mendapatkan atasan live:", err);
+    }
+  }
+  return { nip: liveAtasanNip, nama: liveAtasanNama };
+}
+
 async function handleIzinSelfieSelected(input) {
   const catatan = document.getElementById("izin-input-catatan")?.value.trim();
   if (!catatan) {
@@ -3458,8 +3485,8 @@ async function handleIzinSelfieSelected(input) {
         lat: CURRENT_IZIN_GEO.lat || 0,
         long: CURRENT_IZIN_GEO.long || 0,
         selfie_base64: compressed,
-        pic_approval_nip: CURRENT_USER?.atasan_nip || "-",
-        pic_approval_nama: CURRENT_USER?.atasan_nama || "Atasan Langsung"
+        pic_approval_nip: (typeof getLiveSupervisorForIzin === "function") ? (await getLiveSupervisorForIzin()).nip : (CURRENT_USER?.atasan_nip || "-"),
+        pic_approval_nama: (typeof getLiveSupervisorForIzin === "function") ? (await getLiveSupervisorForIzin()).nama : (CURRENT_USER?.atasan_nama || "Atasan Langsung")
       });
 
       if (loadingOverlay) loadingOverlay.classList.add("hidden");
@@ -3528,8 +3555,8 @@ async function handleIzinManualSubmit(e) {
       lat: CURRENT_IZIN_GEO.lat || 0,
       long: CURRENT_IZIN_GEO.long || 0,
       selfie_base64: null,
-      pic_approval_nip: CURRENT_USER?.atasan_nip || "-",
-      pic_approval_nama: CURRENT_USER?.atasan_nama || "Atasan Langsung"
+      pic_approval_nip: (typeof getLiveSupervisorForIzin === "function") ? (await getLiveSupervisorForIzin()).nip : (CURRENT_USER?.atasan_nip || "-"),
+      pic_approval_nama: (typeof getLiveSupervisorForIzin === "function") ? (await getLiveSupervisorForIzin()).nama : (CURRENT_USER?.atasan_nama || "Atasan Langsung")
     });
 
     if (submitBtn) {
@@ -23964,6 +23991,7 @@ async function handleSaveModulePermissions(actionType) {
     if (actionType === 'LEPASKAN') btnLepas.innerHTML = origHtml;
   }
 }
+
 
 
 
