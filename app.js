@@ -433,10 +433,28 @@ async function supabaseLogin(identifier, password) {
   const idTrim = String(identifier).trim();
   const passTrim = String(password).trim();
 
-  // 1. Format Identifier: Jika yang dimasukkan NIP, jadikan nip@digiasha.com
+    // 1. Cari email asli di hr_employees berdasarkan identifier (NIP atau Email)
   let emailToLogin = idTrim;
-  if (!emailToLogin.includes("@")) {
-    emailToLogin = `${emailToLogin.toLowerCase()}@digiasha.com`;
+  try {
+    const { data: empLookup, error: lookupError } = await supabaseClient
+      .from("hr_employees")
+      .select("email, nip")
+      .or("nip.eq." + idTrim + ",email.eq." + idTrim)
+      .single();
+      
+    if (!lookupError && empLookup) {
+      if (empLookup.email && empLookup.email.includes("@")) {
+        emailToLogin = empLookup.email;
+      } else {
+        emailToLogin = (empLookup.nip).toLowerCase() + "@digiasha.com";
+      }
+    } else if (!emailToLogin.includes("@")) {
+      emailToLogin = emailToLogin.toLowerCase() + "@digiasha.com";
+    }
+  } catch (errLookup) {
+    if (!emailToLogin.includes("@")) {
+      emailToLogin = emailToLogin.toLowerCase() + "@digiasha.com";
+    }
   }
 
   // 2. Autentikasi dengan Native Supabase Auth
@@ -23911,3 +23929,5 @@ async function handleSaveModulePermissions(actionType) {
     if (actionType === 'LEPASKAN') btnLepas.innerHTML = origHtml;
   }
 }
+
+
