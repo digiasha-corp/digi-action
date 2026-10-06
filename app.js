@@ -4259,6 +4259,7 @@ async function executeCancelIzinAction() {
       catatan_approval: "Dibatalkan oleh pemohon"
     });
 
+    if (!res || !res.success) throw new Error(res?.message || "Gagal membatalkan pengajuan.");
     if (btnConfirm) {
       btnConfirm.innerHTML = origText;
       btnConfirm.disabled = false;
