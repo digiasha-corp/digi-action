@@ -4350,15 +4350,38 @@ async function executeApprovalAction() {
 }
 
 function openFotoPreviewModal(url) {
+  if (!url || url === "null" || url === "undefined") {
+    if (typeof showToast === "function") {
+      showToast("Foto selfie tidak tersedia / belum diunggah.", "info", 2500);
+    } else {
+      alert("Foto selfie tidak tersedia.");
+    }
+    return;
+  }
+
   const modal = document.getElementById("modal-preview-foto");
   const img = document.getElementById("img-modal-preview-full");
+  const linkNewTab = document.getElementById("btn-open-foto-newtab");
+
   if (img) img.src = url;
-  if (modal) modal.classList.remove("hidden");
+  if (linkNewTab) linkNewTab.href = url;
+
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  } else {
+    window.open(url, "_blank");
+  }
 }
 
 function closeFotoPreviewModal() {
   const modal = document.getElementById("modal-preview-foto");
-  if (modal) modal.classList.add("hidden");
+  const img = document.getElementById("img-modal-preview-full");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+  if (img) img.src = "";
 }
 
 // =========================================================================
@@ -5088,14 +5111,27 @@ let REKAP_TIM_ABSENSI_DATA = [];
 let REKAP_TIM_IZIN_DATA = [];
 let REKAP_TIM_DAYS_EVAL_MAP = {};
 
+let REKAP_TIM_SUMMARY_ITEMS = [];
+
 async function initRekapTimScreen() {
   if (!CURRENT_USER) return;
 
   // Pasang listener klik di luar dropdown untuk menutup dropdown
+  document.removeEventListener("click", handleRekapTimOutsideClick);
   document.addEventListener("click", handleRekapTimOutsideClick);
 
-  // Load daftar PIC yang berhak dipantau
+  // Set default tanggal hari ini pada filter rentang tanggal summary
+  const todayStr = new Date().toISOString().split("T")[0];
+  const startEl = document.getElementById("rekap-tim-start-date");
+  const endEl = document.getElementById("rekap-tim-end-date");
+  if (startEl && !startEl.value) startEl.value = todayStr;
+  if (endEl && !endEl.value) endEl.value = todayStr;
+
+  // Load daftar PIC yang berhak dipantau (Diri sendiri + Seluruh bawahan rekursif s.d level terendah)
   await loadRekapTimPicOptions();
+
+  // Load summary kehadiran seluruh tim
+  await refreshRekapTimSummary();
 
   // Jika sudah ada PIC yang dipilih sebelumnya, langsung render kalendernya
   if (REKAP_TIM_SELECTED_PIC) {
@@ -5124,50 +5160,58 @@ async function loadRekapTimPicOptions() {
   REKAP_TIM_ALL_PICS = [];
 
   try {
-    let list = [];
+    if (supabaseClient && CURRENT_USER) {
+      const { data: rawList, error } = await supabaseClient
+        .from("hr_employees")
+        .select("id, nip, name, supervisor_id, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan)")
+        .order("name", { ascending: true });
 
-    if (Array.isArray(window.ALL_EMPLOYEES_CACHE) && window.ALL_EMPLOYEES_CACHE.length > 0) {
-      list = window.ALL_EMPLOYEES_CACHE;
-    } else if (supabaseClient) {
-      const { data: rawList, error } = await supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id, supervisor_id").order("name", { ascending: true });
       if (!error && Array.isArray(rawList)) {
-        list = rawList.map(e => ({
-           nip: e.nip, 
-           nama_lengkap: e.name,
-           cabang: e.hr_organization_units?.nama_unit || "",
-           jabatan: e.hr_job_positions?.nama_jabatan || "",
-           role_id: e.position_id,
-           atasan_nip: e.supervisor_id
-        }));
-        window.ALL_EMPLOYEES_CACHE = list;
-      }
-    }
+        const myNip = String(CURRENT_USER.nip || "").trim();
+        const me = rawList.find(e => String(e.nip || "").trim() === myNip || e.id === CURRENT_USER.id);
 
-    if (Array.isArray(list)) {
-      const role = String(CURRENT_USER.role || "").toLowerCase();
-      const isSuperAdminOrBM = role.includes("admin") || role.includes("branch manager") || role.includes("supervisor") || role.includes("bm");
+        if (me) {
+          // Fungsi rekursif untuk mengambil bawahan s.d level terendah
+          function getRecursiveSubordinates(supervisorId, list) {
+            const direct = list.filter(e => e.supervisor_id === supervisorId);
+            let result = [...direct];
+            for (const sub of direct) {
+              result = result.concat(getRecursiveSubordinates(sub.id, list));
+            }
+            return result;
+          }
 
-      if (isSuperAdminOrBM) {
-        // Super Admin & BM bisa melihat semua PIC (kecuali diri sendiri jika ingin fokus pada staf lain, atau termasuk semua staf)
-        REKAP_TIM_ALL_PICS = list.map(e => ({
-          nip: e.nip,
-          nama: e.nama_lengkap || e.nama || e.nip,
-          jabatan: e.jabatan || e.role_id || "Karyawan",
-          cabang: e.cabang || "-"
-        }));
-      } else {
-        // Atasan / Supervisor membawahi PIC yang memiliki atasan_nip ke dirinya atau satu cabang
-        const subordinates = list.filter(e => e.atasan_nip === CURRENT_USER.nip || e.cabang === CURRENT_USER.cabang);
-        REKAP_TIM_ALL_PICS = (subordinates.length > 0 ? subordinates : list).map(e => ({
-          nip: e.nip,
-          nama: e.nama_lengkap || e.nama || e.nip,
-          jabatan: e.jabatan || e.role_id || "Karyawan",
-          cabang: e.cabang || "-"
-        }));
+          const subordinates = getRecursiveSubordinates(me.id, rawList);
+          const combined = [me, ...subordinates];
+
+          const seen = new Set();
+          REKAP_TIM_ALL_PICS = [];
+          for (const emp of combined) {
+            if (!seen.has(emp.nip)) {
+              seen.add(emp.nip);
+              REKAP_TIM_ALL_PICS.push({
+                id: emp.id,
+                nip: emp.nip,
+                nama: emp.name || emp.nip,
+                jabatan: emp.hr_job_positions?.nama_jabatan || "Karyawan",
+                cabang: emp.hr_organization_units?.nama_unit || "-"
+              });
+            }
+          }
+        }
       }
     }
   } catch (err) {
     console.warn("Gagal load PIC options untuk rekap tim:", err);
+  }
+
+  if (REKAP_TIM_ALL_PICS.length === 0 && CURRENT_USER) {
+    REKAP_TIM_ALL_PICS = [{
+      nip: CURRENT_USER.nip,
+      nama: CURRENT_USER.nama_lengkap || CURRENT_USER.nama || CURRENT_USER.nip,
+      jabatan: CURRENT_USER.role || CURRENT_USER.jabatan || "Karyawan",
+      cabang: CURRENT_USER.cabang || "-"
+    }];
   }
 
   renderRekapTimDropdown(REKAP_TIM_ALL_PICS);
@@ -5671,6 +5715,259 @@ function openRekapTimDayModal(dateStr) {
 function closeRekapTimDayModal() {
   const modal = document.getElementById("modal-rekap-tim-day-detail");
   if (modal) modal.classList.add("hidden");
+}
+
+// =========================================================================
+// SUMMARY PRESENSI TIM & SCORECARD ENGINE
+// =========================================================================
+async function refreshRekapTimSummary() {
+  const startEl = document.getElementById("rekap-tim-start-date");
+  const endEl = document.getElementById("rekap-tim-end-date");
+  if (!startEl || !endEl) return;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const startDateStr = startEl.value || todayStr;
+  const endDateStr = endEl.value || todayStr;
+
+  if (!REKAP_TIM_ALL_PICS || REKAP_TIM_ALL_PICS.length === 0) {
+    await loadRekapTimPicOptions();
+  }
+
+  const team = REKAP_TIM_ALL_PICS;
+  if (!team || team.length === 0) return;
+
+  const teamNips = team.map(p => p.nip);
+
+  // Set loading indikator
+  ["tepat-waktu", "terlambat", "belum-absen", "cuti", "sakit", "wfh"].forEach(id => {
+    const el = document.getElementById(`scorecard-${id}`);
+    if (el) el.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xs"></i>';
+  });
+
+  REKAP_TIM_SUMMARY_ITEMS = [];
+
+  try {
+    const [absenRes, izinRes] = await Promise.all([
+      supabaseClient
+        .from("hr_absensi_log")
+        .select("*")
+        .in("nip", teamNips)
+        .gte("timestamp", `${startDateStr}T00:00:00`)
+        .lte("timestamp", `${endDateStr}T23:59:59`)
+        .order("timestamp", { ascending: true }),
+      supabaseClient
+        .from("tr_izin_log")
+        .select("*")
+        .in("nip", teamNips)
+        .lte("tgl_mulai", endDateStr)
+        .gte("tgl_selesai", startDateStr)
+        .not("status_approval", "in", '("REJECTED","CANCELLED")')
+        .order("timestamp", { ascending: true })
+    ]);
+
+    const absensiList = Array.isArray(absenRes?.data) ? absenRes.data : [];
+    const izinList = Array.isArray(izinRes?.data) ? izinRes.data : [];
+
+    // Daftar tanggal rentang
+    const dates = [];
+    let curDate = new Date(startDateStr);
+    const stopDate = new Date(endDateStr);
+    while (curDate <= stopDate) {
+      dates.push(curDate.toISOString().split("T")[0]);
+      curDate.setDate(curDate.getDate() + 1);
+    }
+
+    let countTepatWaktu = 0;
+    let countTerlambat = 0;
+    let countBelumAbsen = 0;
+    let countCuti = 0;
+    let countSakit = 0;
+    let countWfh = 0;
+
+    for (const dStr of dates) {
+      const dObj = new Date(dStr);
+      const isWeekend = dObj.getDay() === 0 || dObj.getDay() === 6;
+      const isFuture = dStr > todayStr;
+
+      for (const member of team) {
+        // Cek izin terlebih dahulu
+        const izin = izinList.find(iz => {
+          if (iz.nip !== member.nip) return false;
+          const s = iz.tgl_mulai ? iz.tgl_mulai.split("T")[0] : "";
+          const e = iz.tgl_selesai ? iz.tgl_selesai.split("T")[0] : s;
+          return dStr >= s && dStr <= e;
+        });
+
+        if (izin) {
+          const jenis = String(izin.jenis_izin || "").toLowerCase();
+          if (jenis.includes("cuti")) {
+            countCuti++;
+            REKAP_TIM_SUMMARY_ITEMS.push({
+              kategori: "CUTI",
+              tanggal: dStr,
+              nip: member.nip,
+              nama: member.nama,
+              catatan: `Cuti (${izin.status_approval || 'Disetujui'}): ${izin.catatan || '-'}`,
+              foto: izin.selfie_url || null
+            });
+          } else if (jenis.includes("sakit")) {
+            countSakit++;
+            REKAP_TIM_SUMMARY_ITEMS.push({
+              kategori: "SAKIT",
+              tanggal: dStr,
+              nip: member.nip,
+              nama: member.nama,
+              catatan: `Sakit: ${izin.catatan || '-'}`,
+              foto: izin.selfie_url || null
+            });
+          } else if (jenis.includes("wfa") || jenis.includes("wfh") || jenis.includes("dinas")) {
+            countWfh++;
+            REKAP_TIM_SUMMARY_ITEMS.push({
+              kategori: "WFH",
+              tanggal: dStr,
+              nip: member.nip,
+              nama: member.nama,
+              catatan: `${izin.jenis_izin}: ${izin.catatan || '-'}`,
+              foto: izin.selfie_url || null
+            });
+          }
+          continue;
+        }
+
+        // Cek absensi datang
+        const absenMasuk = absensiList.find(ab => {
+          if (ab.nip !== member.nip) return false;
+          const abDate = (ab.timestamp || ab.created_at || "").split("T")[0];
+          const isDatang = String(ab.jenis_absen || "").toLowerCase().includes("datang");
+          return abDate === dStr && isDatang;
+        });
+
+        if (absenMasuk) {
+          const isTerlambat = String(absenMasuk.status_kehadiran || "").toUpperCase() === "TERLAMBAT" || (absenMasuk.menit_terlambat && absenMasuk.menit_terlambat > 0);
+          const timeStr = absenMasuk.timestamp ? new Date(absenMasuk.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : "-";
+
+          if (isTerlambat) {
+            countTerlambat++;
+            REKAP_TIM_SUMMARY_ITEMS.push({
+              kategori: "TERLAMBAT",
+              tanggal: dStr,
+              nip: member.nip,
+              nama: member.nama,
+              catatan: `Terlambat ${absenMasuk.menit_terlambat || 0} menit (Masuk: ${timeStr})`,
+              foto: absenMasuk.selfie_photo_url || null
+            });
+          } else {
+            countTepatWaktu++;
+            REKAP_TIM_SUMMARY_ITEMS.push({
+              kategori: "TEPAT_WAKTU",
+              tanggal: dStr,
+              nip: member.nip,
+              nama: member.nama,
+              catatan: `Tepat Waktu (Masuk: ${timeStr})`,
+              foto: absenMasuk.selfie_photo_url || null
+            });
+          }
+        } else {
+          if (!isWeekend && !isFuture) {
+            countBelumAbsen++;
+            REKAP_TIM_SUMMARY_ITEMS.push({
+              kategori: "BELUM_ABSEN",
+              tanggal: dStr,
+              nip: member.nip,
+              nama: member.nama,
+              catatan: "Belum melakukan presensi / tidak ada perizinan",
+              foto: null
+            });
+          }
+        }
+      }
+    }
+
+    const elTepat = document.getElementById("scorecard-tepat-waktu");
+    const elTerlambat = document.getElementById("scorecard-terlambat");
+    const elBelum = document.getElementById("scorecard-belum-absen");
+    const elCuti = document.getElementById("scorecard-cuti");
+    const elSakit = document.getElementById("scorecard-sakit");
+    const elWfh = document.getElementById("scorecard-wfh");
+
+    if (elTepat) elTepat.innerText = countTepatWaktu;
+    if (elTerlambat) elTerlambat.innerText = countTerlambat;
+    if (elBelum) elBelum.innerText = countBelumAbsen;
+    if (elCuti) elCuti.innerText = countCuti;
+    if (elSakit) elSakit.innerText = countSakit;
+    if (elWfh) elWfh.innerText = countWfh;
+
+  } catch (err) {
+    console.error("Gagal refresh summary:", err);
+  }
+}
+
+function openRekapTimModal(catKey) {
+  const modal = document.getElementById("modal-scorecard-detail");
+  const titleEl = document.getElementById("scorecard-detail-title");
+  const tbody = document.getElementById("scorecard-detail-tbody");
+  const emptyEl = document.getElementById("scorecard-detail-empty");
+  if (!modal) return;
+
+  const titles = {
+    "TEPAT_WAKTU": "Tepat Waktu",
+    "TERLAMBAT": "Terlambat",
+    "BELUM_ABSEN": "Belum Absen",
+    "CUTI": "Cuti",
+    "SAKIT": "Sakit",
+    "WFH": "WFH / Dinas"
+  };
+
+  if (titleEl) titleEl.innerText = titles[catKey] || catKey;
+
+  const filtered = REKAP_TIM_SUMMARY_ITEMS.filter(it => it.kategori === catKey);
+
+  if (!filtered || filtered.length === 0) {
+    if (tbody) tbody.innerHTML = "";
+    if (emptyEl) emptyEl.classList.remove("hidden");
+  } else {
+    if (emptyEl) emptyEl.classList.add("hidden");
+    if (tbody) {
+      tbody.innerHTML = filtered.map(row => {
+        const fotoBtn = row.foto ? `
+          <button type="button" onclick="openPhotoLightbox('${row.foto}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-image mr-1"></i>Lihat
+          </button>
+        ` : `<span class="text-slate-300 text-xs">-</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap">${row.tanggal}</td>
+            <td class="px-3 py-2.5 text-xs font-bold text-slate-800">
+              <div>${row.nama}</div>
+              <div class="text-[10px] font-normal text-slate-400">NIP: ${row.nip}</div>
+            </td>
+            <td class="px-3 py-2.5 text-xs text-slate-600 leading-relaxed">${row.catatan}</td>
+            <td class="px-3 py-2.5 text-center">${fotoBtn}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+  }
+
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+}
+
+function closeRekapTimModal() {
+  const modal = document.getElementById("modal-scorecard-detail");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+}
+
+function openPhotoLightbox(url) {
+  openFotoPreviewModal(url);
+}
+
+function closePhotoLightbox() {
+  closeFotoPreviewModal();
 }
 
 

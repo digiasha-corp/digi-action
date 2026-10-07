@@ -1,0 +1,102 @@
+<div class="space-y-4">
+  <!-- Header Title -->
+  <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+    <i class="fa-solid fa-user-circle text-xl text-slate-700"></i>
+    <h2 class="text-lg font-bold text-slate-800">Profil Saya</h2>
+  </div>
+
+  <!-- Foto Profil Section -->
+  <div class="flex flex-col items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <div class="relative group cursor-pointer" onclick="document.getElementById('profile-photo-input').click()">
+      <div class="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-100 shadow-sm bg-slate-200 flex items-center justify-center">
+        <img id="profile-photo-img" src="https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff" alt="Foto Profil" class="w-full h-full object-cover" />
+      </div>
+      <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+        <i class="fa-solid fa-camera text-white text-xl"></i>
+      </div>
+      <div class="absolute bottom-0 right-0 bg-emerald-500 text-white p-1.5 rounded-full shadow border-2 border-white">
+        <i class="fa-solid fa-pen text-[10px]"></i>
+      </div>
+    </div>
+    <input type="file" id="profile-photo-input" accept="image/*" class="hidden" onchange="handleProfilePhotoUpload(this)" />
+    <p class="text-[10px] text-slate-500 mt-2 text-center max-w-[200px]">Ketuk foto untuk mengunggah atau mengganti foto profil Anda.</p>
+  </div>
+
+  <!-- Data Kepegawaian (Read-Only) -->
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+    <h3 class="font-bold text-slate-700 text-sm mb-2 border-b border-slate-100 pb-1">Dossier Kepegawaian</h3>
+    
+    <div>
+      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIP</label>
+      <div id="profile-nip" class="text-sm font-semibold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-100">-</div>
+    </div>
+    
+    <div>
+      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
+      <div id="profile-name" class="text-sm font-semibold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-100">-</div>
+    </div>
+    
+    <div>
+      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jabatan</label>
+      <div id="profile-jabatan" class="text-sm font-semibold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-100">-</div>
+    </div>
+    
+    <div>
+      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Unit Organisasi</label>
+      <div id="profile-org" class="text-sm font-semibold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-100">-</div>
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Lokasi Kerja</label>
+      <div id="profile-lokasi" class="text-sm font-semibold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-100">-</div>
+    </div>
+  </div>
+
+  <!-- Keamanan -->
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+    <h3 class="font-bold text-slate-700 text-sm mb-2 border-b border-slate-100 pb-1">Keamanan Akun</h3>
+    <button type="button" onclick="openChangePasswordModal()" class="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-200 transition">
+      <div class="flex items-center space-x-3 text-slate-700">
+        <div class="bg-rose-100 text-rose-600 w-8 h-8 rounded-lg flex items-center justify-center">
+          <i class="fa-solid fa-key"></i>
+        </div>
+        <div class="text-left">
+          <p class="text-xs font-bold">Ganti Password</p>
+          <p class="text-[10px] text-slate-500">Perbarui kata sandi akun Anda</p>
+        </div>
+      </div>
+      <i class="fa-solid fa-chevron-right text-slate-400 text-xs"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Modal Ganti Password -->
+<div id="modal-change-password" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex-col items-center justify-center p-4">
+  <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
+    <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+      <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-lock mr-2 text-rose-500"></i>Ganti Password</h3>
+      <button onclick="closeChangePasswordModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="p-4 space-y-3">
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Password Baru</label>
+        <div class="relative">
+          <i class="fa-solid fa-key absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="password" id="input-new-password" placeholder="Minimal 6 karakter" class="w-full pl-8 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Ulangi Password Baru</label>
+        <div class="relative">
+          <i class="fa-solid fa-check-double absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="password" id="input-confirm-password" placeholder="Ulangi password di atas" class="w-full pl-8 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
+        </div>
+      </div>
+      <p id="change-pwd-err" class="text-rose-600 text-[10px] font-semibold hidden"></p>
+    </div>
+    <div class="p-3 bg-slate-50 border-t border-slate-200 flex space-x-2">
+      <button onclick="closeChangePasswordModal()" class="flex-1 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Batal</button>
+      <button id="btn-submit-change-pwd" onclick="submitChangePassword()" class="flex-1 py-2 text-xs font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm shadow-rose-200">Simpan Password</button>
+    </div>
+  </div>
+</div>
