@@ -3020,10 +3020,23 @@
     }
   </script>
 
-  <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS -->
+  <!-- LOAD SUPABASE JS SDK & LOCAL SCRIPTS (DYNAMIC AUTO-VERSIONING CACHE BUSTER) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/config.js?v=20260915_v102"></script>
-  <script src="/app.js?v=20260919_v156"></script>
+  <script>
+    (() => {
+      // Versioning otomatis harian (YYYYMMDD) agar asset selalu fresh setiap hari berganti
+      const d = new Date();
+      const dailyVer = d.getFullYear() + "" + String(d.getMonth() + 1).padStart(2, "0") + "" + String(d.getDate()).padStart(2, "0");
+      
+      const scConfig = document.createElement("script");
+      scConfig.src = "/config.js?v=" + dailyVer;
+      document.body.appendChild(scConfig);
+
+      const scApp = document.createElement("script");
+      scApp.src = "/app.js?v=" + dailyVer + "_v180";
+      document.body.appendChild(scApp);
+    })();
+  </script>
 </body>
 
 </html>

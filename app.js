@@ -1,8 +1,71 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261001_v170";
+const APP_BUILD_VERSION = "20261007_v180";
 const screenCache = {};
+
+/**
+ * =========================================================================
+ * DAILY AUTO-RESET & CACHE INVALIDATION ENGINE (OPSI 1)
+ * Membersihkan cache file, temporary data, dan storage lama setiap hari baru.
+ * Tetap mempertahankan sesi login aktif karyawan (DIGIASHA_AUTH_USER).
+ * =========================================================================
+ */
+(() => {
+  try {
+    const today = new Date();
+    // Gunakan tanggal lokal YYYY-MM-DD
+    const todayStr = today.getFullYear() + "-" +
+      String(today.getMonth() + 1).padStart(2, "0") + "-" +
+      String(today.getDate()).padStart(2, "0");
+
+    const lastResetDate = localStorage.getItem("DIGIASHA_LAST_DAILY_RESET");
+
+    if (lastResetDate !== todayStr) {
+      console.log("[DailyReset] Hari baru terdeteksi (" + todayStr + "). Membersihkan cache temporary...");
+
+      // 1. Bersihkan Cache Storage browser (Service Worker / PWA / Cache API)
+      if ("caches" in window && typeof caches.keys === "function") {
+        caches.keys().then(names => {
+          names.forEach(name => caches.delete(name));
+        }).catch(() => {});
+      }
+
+      // 2. Bersihkan Session Storage
+      try {
+        sessionStorage.clear();
+      } catch (e) {}
+
+      // 3. Bersihkan data cache temporary di Local Storage
+      // DAFTAR KUNCI YANG DIBERSIHKAN:
+      const tempKeysToClear = [
+        "DIGIASHA_KETENTUAN_DATA",
+        "DIGIASHA_ROLE_PERMS"
+      ];
+
+      tempKeysToClear.forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+
+      // Hapus seluruh cache status absensi hari-hari kemarin yang tersimpan di localStorage (format: YYYY-MM-DD_*)
+      try {
+        const allKeys = Object.keys(localStorage);
+        allKeys.forEach(k => {
+          // Pola: key diawali YYYY-MM-DD tapi bukan tanggal hari ini
+          if (/^\d{4}-\d{2}-\d{2}/.test(k) && !k.startsWith(todayStr)) {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch (e) {}
+
+      // 4. Update penanda tanggal reset hari ini
+      localStorage.setItem("DIGIASHA_LAST_DAILY_RESET", todayStr);
+      console.log("[DailyReset] Pembersihan cache harian selesai.");
+    }
+  } catch (err) {
+    console.warn("[DailyReset] Gagal menjalankan reset harian:", err);
+  }
+})();
 
 // Sesi Pengguna Aktif (Disimpan di lo
 // calStorage)
