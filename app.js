@@ -1759,6 +1759,7 @@ async function loadScreen(screenName, updateHistory = true) {
     rekap_absen: "Rekap Presensi & Kalender",
     attendance_summary: "Rekap Presensi & Kalender",
     rekap_tim: "Presensi Tim & Monitoring PIC",
+    profile: "Profil Saya",
     slip_gaji: "E-Slip Gaji Karyawan",
     personalia: "Data Karyawan & Personalia",
     laporan_activity: "Laporan Activity & Monitoring Kunjungan",
@@ -1808,6 +1809,7 @@ async function loadScreen(screenName, updateHistory = true) {
 
     // Inisialisasi controller tiap modul
     if (screenName === "dashboard") initDashboard();
+    if (screenName === "profile") initProfileScreen();
     if (screenName === "priority") {
       renderPriorityList();
       // Silently sync di background untuk memastikan assign concern atau status visit terbaru selalu termuat
@@ -24341,3 +24343,179 @@ async function handleSaveModulePermissions(actionType) {
 
 
 
+
+
+// =========================================================================
+// PROFILE SCREEN CONTROLLER & HANDLER
+// =========================================================================
+async function initProfileScreen() {
+  const nipEl = document.getElementById("profile-nip");
+  const nameEl = document.getElementById("profile-name");
+  const jabEl = document.getElementById("profile-jabatan");
+  const orgEl = document.getElementById("profile-org");
+  const locEl = document.getElementById("profile-lokasi");
+  const photoEl = document.getElementById("profile-photo-img");
+
+  if (!CURRENT_USER) return;
+
+  const myNip = String(CURRENT_USER.nip || "").trim();
+
+  // Tampilkan data lokal sementara agar user tidak menunggu kosong
+  if (nipEl) nipEl.innerText = myNip || "-";
+  if (nameEl) nameEl.innerText = CURRENT_USER.nama || CURRENT_USER.nama_lengkap || "-";
+  if (jabEl) jabEl.innerText = CURRENT_USER.role || CURRENT_USER.jabatan || "-";
+  if (orgEl) orgEl.innerText = CURRENT_USER.cabang || "-";
+
+  if (!supabaseClient) return;
+
+  try {
+    const { data: emp, error } = await supabaseClient
+      .from("hr_employees")
+      .select(`
+        id, nip, name,
+        hr_job_positions ( nama_jabatan ),
+        hr_organization_units ( nama_unit, hr_work_locations ( nama_lokasi ) ),
+        hr_employee_personal_details ( foto_profile_url )
+      `)
+      .eq("nip", myNip)
+      .single();
+
+    if (!error && emp) {
+      window.CURRENT_PROFILE_EMP_ID = emp.id;
+
+      if (nipEl) nipEl.innerText = emp.nip || "-";
+      if (nameEl) nameEl.innerText = emp.name || "-";
+      if (jabEl) jabEl.innerText = emp.hr_job_positions?.nama_jabatan || CURRENT_USER.role || "-";
+      if (orgEl) orgEl.innerText = emp.hr_organization_units?.nama_unit || "-";
+      if (locEl) locEl.innerText = emp.hr_organization_units?.hr_work_locations?.nama_lokasi || CURRENT_USER.area_cover || "-";
+
+      const pUrl = emp.hr_employee_personal_details?.foto_profile_url ||
+                   (Array.isArray(emp.hr_employee_personal_details) && emp.hr_employee_personal_details[0]?.foto_profile_url) || null;
+
+      if (photoEl) {
+        if (pUrl) {
+          photoEl.src = pUrl;
+        } else {
+          photoEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || 'User')}&background=0D8ABC&color=fff`;
+        }
+      }
+    } else {
+      console.warn("Profil karyawan tidak ditemukan di Supabase untuk NIP:", myNip, error);
+    }
+  } catch (err) {
+    console.error("Gagal memuat profil karyawan:", err);
+  }
+}
+
+async function handleProfilePhotoUpload(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+
+  const loadingId = typeof showToast === "function" ? showToast("Mengunggah foto...", "info", 0) : null;
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `avatar_${CURRENT_USER.nip || 'user'}_${Date.now()}.${fileExt}`;
+    let publicUrl = "";
+
+    // Unggah ke bucket storage
+    const { data: uploadData, error: uploadError } = await supabaseClient
+      .storage
+      .from("digiasha-media")
+      .upload("avatars/" + fileName, file, { upsert: true });
+
+    if (uploadError) {
+      // Fallback bucket employee_docs jika digiasha-media bermasalah
+      const { data: up2, error: err2 } = await supabaseClient
+        .storage
+        .from("employee_docs")
+        .upload("avatars/" + fileName, file, { upsert: true });
+      if (err2) throw err2;
+      const { data: pubData } = supabaseClient.storage.from("employee_docs").getPublicUrl("avatars/" + fileName);
+      publicUrl = pubData.publicUrl;
+    } else {
+      const { data: pubData } = supabaseClient.storage.from("digiasha-media").getPublicUrl("avatars/" + fileName);
+      publicUrl = pubData.publicUrl;
+    }
+
+    if (!window.CURRENT_PROFILE_EMP_ID) {
+      // Lookup ID karyawan jika belum tersimpan
+      const { data: me } = await supabaseClient.from("hr_employees").select("id").eq("nip", CURRENT_USER.nip).single();
+      if (me) window.CURRENT_PROFILE_EMP_ID = me.id;
+    }
+
+    if (window.CURRENT_PROFILE_EMP_ID) {
+      await supabaseClient
+        .from("hr_employee_personal_details")
+        .update({ foto_profile_url: publicUrl })
+        .eq("employee_id", window.CURRENT_PROFILE_EMP_ID);
+    }
+
+    const photoEl = document.getElementById("profile-photo-img");
+    if (photoEl) photoEl.src = publicUrl;
+
+    if (loadingId && typeof hideToast === "function") hideToast(loadingId);
+    if (typeof showToast === "function") showToast("Foto profil berhasil diperbarui!", "success", 3000);
+  } catch (err) {
+    if (loadingId && typeof hideToast === "function") hideToast(loadingId);
+    if (typeof showToast === "function") showToast("Gagal mengunggah foto: " + (err.message || ""), "error", 4000);
+  }
+}
+
+function openChangePasswordModal() {
+  const modal = document.getElementById("modal-change-password");
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  }
+}
+
+function closeChangePasswordModal() {
+  const modal = document.getElementById("modal-change-password");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+}
+
+async function submitChangePassword() {
+  const newPwd = document.getElementById("input-new-password")?.value;
+  const confPwd = document.getElementById("input-confirm-password")?.value;
+  const errEl = document.getElementById("change-pwd-err");
+  const btn = document.getElementById("btn-submit-change-pwd");
+
+  if (errEl) errEl.classList.add("hidden");
+
+  if (!newPwd || newPwd.length < 6) {
+    if (errEl) { errEl.innerText = "Password minimal 6 karakter."; errEl.classList.remove("hidden"); }
+    return;
+  }
+  if (newPwd !== confPwd) {
+    if (errEl) { errEl.innerText = "Konfirmasi password tidak cocok."; errEl.classList.remove("hidden"); }
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    const { error } = await supabaseClient.auth.updateUser({ password: newPwd });
+    if (error) throw error;
+
+    if (CURRENT_USER && CURRENT_USER.nip) {
+      await supabaseClient.from("hr_employees").update({ must_change_password: false }).eq("nip", CURRENT_USER.nip);
+    }
+
+    closeChangePasswordModal();
+    if (typeof showToast === "function") showToast("Password berhasil diubah!", "success", 3000);
+  } catch (err) {
+    console.error("Change password error:", err);
+    if (errEl) { errEl.innerText = err.message || "Gagal mengubah password."; errEl.classList.remove("hidden"); }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = 'Simpan Password';
+    }
+  }
+}
