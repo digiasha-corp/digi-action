@@ -4350,15 +4350,38 @@ async function executeApprovalAction() {
 }
 
 function openFotoPreviewModal(url) {
+  if (!url || url === "null" || url === "undefined") {
+    if (typeof showToast === "function") {
+      showToast("Foto selfie tidak tersedia / belum diunggah.", "info", 2500);
+    } else {
+      alert("Foto selfie tidak tersedia.");
+    }
+    return;
+  }
+
   const modal = document.getElementById("modal-preview-foto");
   const img = document.getElementById("img-modal-preview-full");
+  const linkNewTab = document.getElementById("btn-open-foto-newtab");
+
   if (img) img.src = url;
-  if (modal) modal.classList.remove("hidden");
+  if (linkNewTab) linkNewTab.href = url;
+
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  } else {
+    window.open(url, "_blank");
+  }
 }
 
 function closeFotoPreviewModal() {
   const modal = document.getElementById("modal-preview-foto");
-  if (modal) modal.classList.add("hidden");
+  const img = document.getElementById("img-modal-preview-full");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+  if (img) img.src = "";
 }
 
 // =========================================================================
@@ -5940,23 +5963,11 @@ function closeRekapTimModal() {
 }
 
 function openPhotoLightbox(url) {
-  const modal = document.getElementById("modal-photo-lightbox");
-  const img = document.getElementById("lightbox-img");
-  if (modal && img) {
-    img.src = url;
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
-  }
+  openFotoPreviewModal(url);
 }
 
 function closePhotoLightbox() {
-  const modal = document.getElementById("modal-photo-lightbox");
-  const img = document.getElementById("lightbox-img");
-  if (modal) {
-    modal.classList.add("hidden");
-    modal.classList.remove("flex");
-    if (img) img.src = "";
-  }
+  closeFotoPreviewModal();
 }
 
 
