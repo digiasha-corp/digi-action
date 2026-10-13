@@ -16,6 +16,11 @@
 -- Pastikan pgcrypto aktif untuk enkripsi password bcrypt
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
+-- Ubah nilai default kolom must_change_password pada hr_employees menjadi TRUE
+-- agar setiap pendaftaran karyawan baru selalu mewajibkan ganti password saat login pertama
+ALTER TABLE public.hr_employees 
+ALTER COLUMN must_change_password SET DEFAULT TRUE;
+
 -- -------------------------------------------------------------------------
 -- 1. FUNGSI TRIGGER SINKRONISASI SEBELUM/SETELAH INSERT/UPDATE/DELETE
 -- -------------------------------------------------------------------------
@@ -42,10 +47,14 @@ BEGIN
         RETURN OLD;
     END IF;
 
-    -- Evaluasi apakah karyawan berstatus tidak aktif atau sudah dihapus (soft-delete)
+    -- Evaluasi apakah karyawan berstatus tidak aktif, calon karyawan, atau sudah dihapus (soft-delete)
+    -- Catatan:
+    -- - Calon Karyawan memiliki status_kerja = 'CALON' atau NIP diawali 'CAND-'. Calon karyawan BELUM boleh memiliki akun auth sampai resmi diangkat/diterima (misal PKWT/PKWTT/PROBATION/INTERNSHIP).
+    -- - Karyawan tidak aktif memiliki deleted_at IS NOT NULL atau status_kerja RESIGNED/TERMINATED/NONAKTIF.
     v_is_inactive := (
         NEW.deleted_at IS NOT NULL 
-        OR LOWER(COALESCE(NEW.status_kerja, '')) IN ('resigned', 'terminated', 'non-aktif', 'inactive')
+        OR UPPER(TRIM(COALESCE(NEW.status_kerja, ''))) IN ('CALON', 'RESIGNED', 'TERMINATED', 'NONAKTIF', 'NON-AKTIF', 'INACTIVE')
+        OR UPPER(TRIM(COALESCE(NEW.nip, ''))) LIKE 'CAND-%'
     );
 
     -- [KASUS 2: KARYAWAN TIDAK AKTIF / DIHAPUS (SOFT-DELETE)]
@@ -107,6 +116,8 @@ BEGIN
         );
 
         NEW.user_id := v_new_user_id;
+        -- Karyawan baru wajib ganti password pada login pertama
+        NEW.must_change_password := TRUE;
     ELSE
         -- Jika akun auth sudah ada, sinkronkan data email / metadata jika ada perubahan
         UPDATE auth.users 
@@ -157,12 +168,13 @@ DECLARE
 BEGIN
     v_encrypted_pw := extensions.crypt('Password123!', extensions.gen_salt('bf'));
 
-    -- A. HAPUS DARI AUTH.USERS UNTUK SEMUA KARYAWAN YANG SUDAH DELETED ATAU TIDAK AKTIF
+    -- A. HAPUS DARI AUTH.USERS UNTUK SEMUA CALON KARYAWAN & KARYAWAN YANG SUDAH DELETED / NONAKTIF
     FOR emp IN 
         SELECT id, nip, email, user_id 
         FROM public.hr_employees 
         WHERE deleted_at IS NOT NULL 
-           OR LOWER(COALESCE(status_kerja, '')) IN ('resigned', 'terminated', 'non-aktif', 'inactive')
+           OR UPPER(TRIM(COALESCE(status_kerja, ''))) IN ('CALON', 'RESIGNED', 'TERMINATED', 'NONAKTIF', 'NON-AKTIF', 'INACTIVE')
+           OR UPPER(TRIM(COALESCE(nip, ''))) LIKE 'CAND-%'
     LOOP
         IF emp.user_id IS NOT NULL THEN
             DELETE FROM auth.users WHERE id = emp.user_id;
@@ -174,12 +186,13 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- B. BUATKAN / SINKRONKAN AKUN AUTH UNTUK SEMUA KARYAWAN AKTIF YANG BELUM PUNYA AUTH
+    -- B. BUATKAN / SINKRONKAN AKUN AUTH HANYA UNTUK KARYAWAN AKTIF (BUKAN CALON & BUKAN NONAKTIF)
     FOR emp IN 
         SELECT id, nip, email, name, user_id 
         FROM public.hr_employees 
         WHERE deleted_at IS NULL 
-          AND LOWER(COALESCE(status_kerja, '')) NOT IN ('resigned', 'terminated', 'non-aktif', 'inactive')
+          AND UPPER(TRIM(COALESCE(status_kerja, ''))) NOT IN ('CALON', 'RESIGNED', 'TERMINATED', 'NONAKTIF', 'NON-AKTIF', 'INACTIVE')
+          AND UPPER(TRIM(COALESCE(nip, ''))) NOT LIKE 'CAND-%'
     LOOP
         v_final_email := LOWER(TRIM(COALESCE(NULLIF(TRIM(emp.email), ''), TRIM(emp.nip) || '@digiasha.com')));
         v_target_user_id := NULL;
@@ -217,6 +230,16 @@ BEGIN
                 format('{"sub":"%s","email":"%s"}', v_target_user_id::text, v_final_email)::jsonb, 
                 'email', NULL, NOW(), NOW()
             );
+
+            -- Tandai karyawan yang baru dibuatkan akun auth agar wajib ganti password
+            UPDATE public.hr_employees 
+            SET must_change_password = TRUE 
+            WHERE id = emp.id;
+        END IF;
+
+        -- Khusus DUMMY DUN (atau karyawan baru yang belum pernah login), pastikan must_change_password bernilai TRUE
+        IF emp.nip = '10260001' THEN
+            UPDATE public.hr_employees SET must_change_password = TRUE WHERE id = emp.id;
         END IF;
 
         -- Tautkan user_id ke hr_employees jika belum tertaut

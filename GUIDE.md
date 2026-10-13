@@ -412,10 +412,36 @@ await supabaseClient
 | `13_sync_approved_transactions_and_fix_dossier.sql` | ⏳ SIAP DIJALANKAN | Sinkronisasi NIP resmi & data kepegawaian dari transaksi APPROVED ke hr_employees |
 | `14_add_applied_status.sql` | ⏳ PLANNED | Tambah applied_at + status APPLIED |
 | `15_payroll_setup_and_allowances.sql` | ⏳ SIAP DIJALANKAN | Setup parameter payroll & tambah tunjangan baru (makan, khusus, insentif) + payroll period type |
+| `18_update_trigger_generate_nip.sql` | ⏳ SIAP DIJALANKAN | Penentuan NIP otomatis sepenuhnya merujuk ke hr_employees (tahunan YY) |
+| `19_update_priority_scoring_fac.sql` | ⏳ SIAP DIJALANKAN | Penyempurnaan parameter prioritas FAC: SP Terbit (OVD 3/6/9), Aging >= 3 & OVD >= 11, Aging visit diler (>= 61, >= 31, >= 21) |
+| `20_create_cover_area_management.sql` | ⏳ SIAP DIJALANKAN | Tabel m_cover_area (id_area, nama_area, unit_id, pic_id, is_active) & relasi cover_area_id di m_dealer |
+
+> ✅ UPDATE: Fitur 'Lihat Mitra' dalam bentuk pop-up modal ditambahkan pada kartu Cover Area (tersedia melalui tombol 'Lihat Mitra' dan klik pada badge jumlah mitra). Dilengkapi tabel detail mitra terdaftar, fitur pencarian, dan tombol 'Lepas' (unassign mitra) langsung dari area.
+
+> ✅ UPDATE: Normalisasi pencocokan cabang di modul Cover Area ditingkatkan. Sistem kini otomatis mencocokkan format nama cabang dengan atau tanpa prefix 'Cabang ' (misal: 'Cabang Tangerang 1' di organization_units otomatis cocok dengan 'Tangerang 1' di m_dealer/datacore).
+
+> ✅ UPDATE: Fitur Hapus Cover Area ditambahkan pada kartu area. Dilengkapi validasi proteksi ganda: area tidak dapat dihapus jika masih memiliki PIC yang ditugaskan atau mitra yang terhubung, guna menjaga integritas data relasional.
+
+> ✅ UPDATE: UI Tab 1 Manajemen Cover Area disederhanakan. Tombol '+ Kelola Mitra' dipindahkan ke scorecard. Modal Kelola Mitra dirombak menjadi model tabel (checkbox row-click) untuk memilih mitra yang belum memiliki area (`cover_area_id IS NULL`), dilengkapi fitur Bulk Update.
+
+> ✅ UPDATE: Modul 'Manajemen Cover Area' diperbarui. Pengguna kini dapat melihat dan membuat Cover Area untuk unit organisasi (Cabang) yang berada di bawah garis komandonya secara rekursif (downline branches).
+
+> ✅ UPDATE: Modul 'Manajemen Cover Area' berhasil ditambahkan. Tabel `m_cover_area` dibuat. Penugasan PIC tidak lagi hardcode jabatan FAC, melainkan menarik seluruh karyawan dalam garis komando (hierarki) bawahan secara rekursif.
+
+> ✅ UPDATE: Penghapusan file GAS legacy (`00_Config.gs`, `01_ApiRouter.gs`, `02_Auth.gs`, `03_DriveUpload.gs`) berhasil dilakukan. Script `05_SupabaseSync.gs` dan `06_PeriodicSourceSync.gs` telah diperbarui agar mandiri (standalone) dengan menyertakan konfigurasi hardcode Spreadsheet ID.
+
+> ✅ UPDATE: Sinkronisasi HR di GAS telah dimatikan secara permanen. File `04_Transactions.gs`, `05_SupabaseSync.gs`, dan `06_PeriodicSourceSync.gs` telah dirombak. GAS kini bertindak murni sebagai ETL Kurir untuk M-Dealer dan M-Unit ke Supabase.
+
+> ✅ UPDATE: Parameter `recalculate_all_priorities` untuk kunjungan FAC telah disempurnakan.
+- **Priority by Unit:** Penambahan trigger otomatis Skor 3 saat SP Terbit (OVD 3, 6, 9 hari). Syarat Skor 2 untuk OVD disesuaikan menjadi Aging >= 3 hari dan OVD >= 11 hari.
+- **Priority by Dealer:** Aging visit disesuaikan menjadi >= 61 hari (Skor 3), >= 31 hari (Skor 2), dan >= 21 hari (Skor 1). Diler 7.Closed dan 5.Dormant tetap dipisahkan dari kalkulasi otomatis (Skor 0).
+
+> ✅ UPDATE: Fungsi `trg_hr_transaction_generate_nip` telah diperbarui. Penentuan urutan NIP otomatis kini sepenuhnya merujuk pada tabel `hr_employees` (dan `hr_employee_transactions`), meninggalkan tabel legacy `m_employee`. Logika sekuensial tetap dihitung secara tahunan (YY).
 
 ---
 
-*Last updated: 2026-09-22 15:30 WIB*
+*Last updated: 2026-10-11 21:05 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `feature/fac-workflow` (development) → `main` (production)*
+
 

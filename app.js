@@ -4,6 +4,16 @@
 const APP_BUILD_VERSION = "20261007_v180";
 const screenCache = {};
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 /**
  * =========================================================================
  * DAILY AUTO-RESET & CACHE INVALIDATION ENGINE (OPSI 1)
@@ -107,7 +117,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     badgeBg: "bg-purple-100 text-purple-800 border border-purple-200",
     desc: "Akses penuh seluruh modul operasional, presensi, persetujuan, support, ketentuan, SOP management, dan pengaturan sistem.",
     permissions: [
-      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity", "cover_area_management",
       "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji", "personalia",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
       "sop_management", "organization_setting", "settings"
@@ -120,7 +130,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     badgeBg: "bg-blue-100 text-blue-800 border border-blue-200",
     desc: "Monitoring cabang, kelola prioritas, penugasan concern, persetujuan, ketentuan, dan layanan support karyawan.",
     permissions: [
-      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "laporan_activity",
+      "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "history", "laporan_activity", "cover_area_management",
       "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji", "personalia",
       "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan"
     ]
@@ -162,6 +172,7 @@ const ALL_APP_MODULES = [
   { key: "assignment", title: "Assign", desc: "Tandai concern visit mitra", icon: "fa-bullhorn", category: "Operasional Lapangan" },
   { key: "history", title: "Riwayat", desc: "Log visit, calon mitra & GPS", icon: "fa-clock-rotate-left", category: "Operasional Lapangan" },
   { key: "laporan_activity", title: "Laporan Activity", desc: "Monitoring kunjungan PIC & cabang", icon: "fa-chart-line", category: "Operasional Lapangan" },
+  { key: "cover_area_management", title: "Manajemen Cover Area", desc: "Kelola wilayah cabang & assign Mitra/PIC", icon: "fa-map-location-dot", category: "Operasional Lapangan" },
 
   // 2. Personalia
   { key: "izin", title: "Pengajuan Izin", desc: "Permohonan WFA, Cuti, Sakit, Terlambat", icon: "fa-file-signature", category: "Personalia" },
@@ -211,10 +222,14 @@ let ROLE_PERMISSIONS_STATE = (() => {
           if (k === "R-01" && perms.length < 15) {
             perms = Array.from(new Set([...perms, ...DEFAULT_ROLE_PERMISSIONS["R-01"].permissions]));
           }
+          if (k === "R-01") {
+            if (!perms.includes("cover_area_management")) perms.push("cover_area_management");
+          }
           if (k === "R-02") {
             if (!perms.includes("rekap_tim")) perms.push("rekap_tim");
             if (!perms.includes("attendance_summary")) perms.push("attendance_summary");
             if (!perms.includes("persetujuan")) perms.push("persetujuan");
+            if (!perms.includes("cover_area_management")) perms.push("cover_area_management");
           }
           merged[k].permissions = perms;
           if (parsed[k].name) merged[k].name = parsed[k].name;
@@ -234,13 +249,30 @@ let ROLE_PERMISSIONS_STATE = (() => {
 })();
 
 function getPermissionsForRole(roleKey, userObj = null) {
-  const positionId = String(userObj?.position_id || userObj?.id_position || userObj?.jabatan_id || "").trim();
+  const positionId = String(
+    userObj?.position_id ||
+    userObj?.id_position ||
+    userObj?.jabatan_id ||
+    (userObj?.role_id && userObj?.role_id.startsWith("POS-") ? userObj.role_id : "") ||
+    (userObj?.role_id && !userObj?.role_id.startsWith("R-") ? userObj.role_id : "") ||
+    ""
+  ).trim();
 
   // 0. Prioritaskan Hak Akses Terpusat Berbasis Jabatan (Digi Active Multi-App RBAC)
   if (positionId && typeof ORG_POSITION_PERMS_DATA !== "undefined" && ORG_POSITION_PERMS_DATA[positionId]) {
     const posPerms = ORG_POSITION_PERMS_DATA[positionId] || [];
     const activePerms = posPerms
       .filter(p => p.startsWith("digi_active:") && p.endsWith(":view"))
+      .map(p => p.replace("digi_active:", "").replace(":view", ""));
+    if (activePerms.length > 0) {
+      return activePerms;
+    }
+  }
+
+  // 0b. Cek jika userObj memiliki array permissions langsung dari login/database
+  if (userObj && Array.isArray(userObj.permissions) && userObj.permissions.length > 0) {
+    const activePerms = userObj.permissions
+      .filter(p => typeof p === "string" && p.startsWith("digi_active:") && p.endsWith(":view"))
       .map(p => p.replace("digi_active:", "").replace(":view", ""));
     if (activePerms.length > 0) {
       return activePerms;
@@ -1673,7 +1705,7 @@ async function syncMasterDataFromApi() {
 // =========================================================================
 const VALID_APP_SCREENS = [
   "dashboard", "priority", "assignment", "visit", "onboarding", "pipeline",
-  "gps", "fac", "history", "laporan_activity", "absensi", "izin",
+  "gps", "fac", "history", "laporan_activity", "cover_area_management", "absensi", "izin",
   "persetujuan", "attendance_summary", "rekap_absen", "rekap_tim",
   "slip_gaji", "personalia", "expense_claim", "internal_memo", "employee_loan", "helpdesk_support",
   "ketentuan", "sop_management", "organization_setting", "settings", "login"
@@ -1763,6 +1795,7 @@ async function loadScreen(screenName, updateHistory = true) {
     slip_gaji: "E-Slip Gaji Karyawan",
     personalia: "Data Karyawan & Personalia",
     laporan_activity: "Laporan Activity & Monitoring Kunjungan",
+    cover_area_management: "Manajemen Cover Area",
     expense_claim: "Klaim Biaya Operasional",
     internal_memo: "Memo Pengajuan Internal",
     employee_loan: "Pinjaman Karyawan (Kasbon)",
@@ -1843,6 +1876,7 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "slip_gaji" && typeof initSlipGajiScreen === "function") initSlipGajiScreen();
     if (screenName === "personalia" && typeof initPersonaliaScreen === "function") initPersonaliaScreen();
     if (screenName === "laporan_activity") initLaporanActivityScreen();
+    if (screenName === "cover_area_management" && typeof initCoverAreaManagementScreen === "function") initCoverAreaManagementScreen();
     if (screenName === "ketentuan" && typeof initKetentuanScreen === "function") initKetentuanScreen();
     if (screenName === "sop_management" && typeof initSopManagementScreen === "function") initSopManagementScreen();
     if (screenName === "organization_setting" && typeof initOrganizationSettingScreen === "function") initOrganizationSettingScreen();
@@ -2202,7 +2236,7 @@ async function initDashboard() {
 
   // Render & filter seluruh modul aplikasi sesuai hak akses role (21 modul)
   const allModulesList = [
-    "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity",
+    "priority", "assignment", "visit", "onboarding", "pipeline", "gps", "fac", "history", "laporan_activity", "cover_area_management",
     "izin", "persetujuan", "attendance_summary", "rekap_tim", "slip_gaji", "personalia",
     "expense_claim", "internal_memo", "employee_loan", "helpdesk_support", "ketentuan",
     "sop_management", "organization_setting", "settings"
@@ -3717,14 +3751,14 @@ async function fetchApprovalList() {
         if ((!PERSONALIA_EMPLOYEES_DATA || PERSONALIA_EMPLOYEES_DATA.length === 0) && supabaseClient) {
           try {
             const { data: emps } = await supabaseClient
-              .from("employees")
-              .select("id, nip, name, deleted_at, organization_units(nama_unit), job_positions(nama_jabatan)");
+              .from("hr_employees")
+              .select("id, nip, name, deleted_at, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan)");
             if (emps && emps.length > 0) {
               PERSONALIA_EMPLOYEES_DATA = emps.map(e => ({
                 ...e,
                 nama_lengkap: e.name || e.nip,
-                cabang: e.organization_units?.nama_unit || "Head Office",
-                jabatan: e.job_positions?.nama_jabatan || "Staff"
+                cabang: e.hr_organization_units?.nama_unit || "Head Office",
+                jabatan: e.hr_job_positions?.nama_jabatan || "Staff"
               }));
             }
           } catch (_) { }
@@ -16447,6 +16481,14 @@ async function initAppBootstrap() {
   }
 
   try {
+    if (typeof loadAllJobPositionPermissions === "function") {
+      await loadAllJobPositionPermissions();
+    }
+  } catch (err) {
+    console.warn("Load job position permissions error at bootstrap:", err);
+  }
+
+  try {
     const requestedScreen = getScreenFromUrl();
 
     if (CURRENT_USER) {
@@ -17127,12 +17169,7 @@ async function handleDeleteOrgUnit(id) {
       try {
         const { data: eData } = await supabaseClient.from("hr_employees").select("nip, name").eq("location_id", id).is("deleted_at", null);
         if (eData && eData.length > 0) employees = eData;
-      } catch (e) {
-        try {
-          const { data: eData } = await supabaseClient.from("employees").select("nip, name").eq("location_id", id).is("deleted_at", null);
-          if (eData && eData.length > 0) employees = eData;
-        } catch (err) { }
-      }
+      } catch (e) { }
     }
 
     const hasUsage = (childUnits.length > 0) || (positions.length > 0) || (employees.length > 0);
@@ -17425,12 +17462,7 @@ async function handleDeleteJobPosition(id) {
       try {
         const { data: empData } = await supabaseClient.from("hr_employees").select("id, nip, name").eq("position_id", id);
         if (empData && empData.length > 0) employees = empData;
-      } catch (e) {
-        try {
-          const { data: empData } = await supabaseClient.from("employees").select("id, nip, name").eq("position_id", id);
-          if (empData && empData.length > 0) employees = empData;
-        } catch (err) { }
-      }
+      } catch (e) { }
     }
 
     const isUsed = subordinates.length > 0 || employees.length > 0;
@@ -18105,6 +18137,7 @@ const ORG_APPS_CONFIG = {
       { key: "assignment", label: "Assign & Concern Visit Mitra" },
       { key: "history", label: "Riwayat (Log Visit, Mitra & GPS)" },
       { key: "laporan_activity", label: "Laporan Activity (Monitoring Kunjungan)" },
+      { key: "cover_area_management", label: "Manajemen Cover Area (Kelola Wilayah & PIC)" },
       { key: "izin", label: "Pengajuan Izin (WFA, Cuti, Sakit, Terlambat)" },
       { key: "persetujuan", label: "Persetujuan (Approval Hub Permohonan)" },
       { key: "attendance_summary", label: "Rekap Absen Mandiri (Kalender Presensi)" },
@@ -18177,6 +18210,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_active:assignment:view", "digi_active:assignment:edit",
     "digi_active:history:view", "digi_active:history:edit",
     "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:cover_area_management:view", "digi_active:cover_area_management:edit",
     "digi_active:izin:view", "digi_active:izin:edit",
     "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
     "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
@@ -18228,6 +18262,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_active:assignment:view", "digi_active:assignment:edit",
     "digi_active:history:view", "digi_active:history:edit",
     "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:cover_area_management:view", "digi_active:cover_area_management:edit",
     "digi_active:izin:view", "digi_active:izin:edit",
     "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
     "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
@@ -18261,6 +18296,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_active:assignment:view", "digi_active:assignment:edit",
     "digi_active:history:view", "digi_active:history:edit",
     "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:cover_area_management:view", "digi_active:cover_area_management:edit",
     "digi_active:izin:view", "digi_active:izin:edit",
     "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
     "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
@@ -18298,6 +18334,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_active:assignment:view", "digi_active:assignment:edit",
     "digi_active:history:view", "digi_active:history:edit",
     "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:cover_area_management:view", "digi_active:cover_area_management:edit",
     "digi_active:izin:view", "digi_active:izin:edit",
     "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
     "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
@@ -18335,6 +18372,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_active:assignment:view", "digi_active:assignment:edit",
     "digi_active:history:view", "digi_active:history:edit",
     "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:cover_area_management:view", "digi_active:cover_area_management:edit",
     "digi_active:izin:view", "digi_active:izin:edit",
     "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
     "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
@@ -18393,6 +18431,7 @@ const DEFAULT_POSITION_PERMISSIONS = {
     "digi_active:assignment:view", "digi_active:assignment:edit",
     "digi_active:history:view", "digi_active:history:edit",
     "digi_active:laporan_activity:view", "digi_active:laporan_activity:edit",
+    "digi_active:cover_area_management:view", "digi_active:cover_area_management:edit",
     "digi_active:izin:view", "digi_active:izin:edit",
     "digi_active:persetujuan:view", "digi_active:persetujuan:edit",
     "digi_active:attendance_summary:view", "digi_active:attendance_summary:edit",
@@ -18777,6 +18816,22 @@ async function handleSavePositionPermissions() {
     // Update in-memory storage
     ORG_POSITION_PERMS_DATA[positionId] = permsArray;
 
+    // Jika posisi yang diupdate adalah posisi user yang sedang login saat ini, sinkronkan sesi user langsung
+    if (CURRENT_USER && (
+      CURRENT_USER.position_id === positionId ||
+      CURRENT_USER.id_position === positionId ||
+      CURRENT_USER.jabatan_id === positionId ||
+      CURRENT_USER.role_id === positionId
+    )) {
+      CURRENT_USER.permissions = [...permsArray];
+      try {
+        localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+      } catch (e) { }
+      if (typeof initDashboard === "function") {
+        initDashboard();
+      }
+    }
+
     // Refresh view matriks
     renderOrgRolePermissions(CURRENT_ROLE_FILTER_KEYWORD);
     closePositionPermissionsModal();
@@ -18806,13 +18861,13 @@ async function openEmployeeDossierModal(nipOrId) {
 
   if (!emp && supabaseClient) {
     try {
-      // 1. Coba cari di hr_employees / employees
+      // 1. Cari di hr_employees
       const { data: eRow } = await supabaseClient
-        .from("employees")
+        .from("hr_employees")
         .select(`
           *,
-          organization_units (nama_unit),
-          job_positions (nama_jabatan)
+          hr_organization_units (nama_unit),
+          hr_job_positions (nama_jabatan)
         `)
         .or(`nip.eq.${nipOrId},id.eq.${nipOrId}`)
         .maybeSingle();
@@ -18821,12 +18876,12 @@ async function openEmployeeDossierModal(nipOrId) {
         const isCalon = eRow.status_kerja === "CALON" || String(eRow.nip || "").startsWith("CAND-");
         emp = {
           ...eRow,
-          cabang: eRow.organization_units?.nama_unit || eRow.cabang || (isCalon ? "N/A" : "N/A"),
-          jabatan: eRow.job_positions?.nama_jabatan || eRow.jabatan || (isCalon ? "Calon Karyawan" : "N/A")
+          cabang: eRow.hr_organization_units?.nama_unit || eRow.cabang || (isCalon ? "N/A" : "N/A"),
+          jabatan: eRow.hr_job_positions?.nama_jabatan || eRow.jabatan || (isCalon ? "Calon Karyawan" : "N/A")
         };
       }
     } catch (e) {
-      console.warn("[Dossier] Query employee error:", e);
+      console.warn("[Dossier] Query hr_employees error:", e);
     }
   }
 
@@ -19001,7 +19056,7 @@ async function handleDossierAvatarUpload(input) {
         // Cari employee_id
         let empId = emp.id;
         if (!empId || typeof empId === "number") {
-          const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", nip).maybeSingle();
+          const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", nip).maybeSingle();
           if (eRow?.id) empId = eRow.id;
         }
         if (empId) {
@@ -19014,8 +19069,8 @@ async function handleDossierAvatarUpload(input) {
             );
           if (dbErr) console.warn("[AvatarUpload] DB update error:", dbErr);
 
-          // Update juga di employees table jika ada kolom foto
-          await supabaseClient.from("employees").update({ foto_profile_url: photoUrl }).eq("id", empId);
+          // Update juga di hr_employees table jika ada kolom foto
+          await supabaseClient.from("hr_employees").update({ foto_profile_url: photoUrl }).eq("id", empId);
         }
       } catch (dbEx) {
         console.warn("[AvatarUpload] DB exception:", dbEx);
@@ -19067,25 +19122,16 @@ async function loadDossierPersonalDetails(emp) {
   if (supabaseClient) {
     try {
       if (!empId || typeof empId === "number") {
-        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", emp.nip).maybeSingle();
         if (eRow?.id) empId = eRow.id;
       }
       if (empId) {
-        // Coba query dari hr_employee_personal_details / employee_personal_details
-        let { data, error } = await supabaseClient
+        let { data } = await supabaseClient
           .from("hr_employee_personal_details")
           .select("*")
           .eq("employee_id", empId)
           .maybeSingle();
 
-        if (error || !data) {
-          const resFallback = await supabaseClient
-            .from("employee_personal_details")
-            .select("*")
-            .eq("employee_id", empId)
-            .maybeSingle();
-          if (!resFallback.error && resFallback.data) data = resFallback.data;
-        }
         if (data) detail = data;
       }
     } catch (e) {
@@ -19410,7 +19456,7 @@ async function loadDossierPayrollDetails(emp) {
   if (supabaseClient) {
     try {
       if (!empId || typeof empId === "number") {
-        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", emp.nip).maybeSingle();
         if (eRow?.id) empId = eRow.id;
       }
       if (empId) {
@@ -19428,10 +19474,10 @@ async function loadDossierPayrollDetails(emp) {
           txSalary = activeTxs.find(t => t.new_basic_salary && parseFloat(t.new_basic_salary) > 0) || activeTxs[0];
         }
 
-        // Fallback ke employee_career_histories
+        // Fallback ke hr_employee_career_histories
         if (!txSalary) {
           const { data: cList } = await supabaseClient
-            .from("employee_career_histories")
+            .from("hr_employee_career_histories")
             .select("*")
             .eq("employee_id", empId)
             .order("effective_date", { ascending: false });
@@ -19534,7 +19580,7 @@ async function loadDossierTransactionsHistory(emp) {
   if (supabaseClient) {
     try {
       if (!empId || typeof empId === "number") {
-        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", emp.nip).maybeSingle();
         if (eRow?.id) empId = eRow.id;
       }
       if (empId) {
@@ -19861,7 +19907,7 @@ async function handleSaveCareerTransaction(e) {
   let empId = CURRENT_DOSSIER_EMP.id;
   if (supabaseClient && (!empId || typeof empId === "number" || (typeof empId === "string" && empId.length < 20))) {
     try {
-      const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", CURRENT_DOSSIER_EMP.nip).maybeSingle();
+      const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", CURRENT_DOSSIER_EMP.nip).maybeSingle();
       if (eRow?.id) empId = eRow.id;
     } catch (_) { }
   }
@@ -19917,7 +19963,7 @@ async function handleSaveCareerTransaction(e) {
     if (supabaseClient && typeof empId === "string" && empId.length > 20) {
       payload.employee_id = empId;
       const { error } = await supabaseClient
-        .from("employee_career_histories")
+        .from("hr_employee_career_histories")
         .insert(payload);
       if (error) console.warn("Supabase save career history:", error);
     }
@@ -20017,11 +20063,11 @@ async function handleSaveEmployeeFull(event) {
   try {
     let empId = emp.id;
     if (supabaseClient && (!empId || typeof empId === "number")) {
-      const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+      const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", emp.nip).maybeSingle();
       if (eRow?.id) empId = eRow.id;
     }
 
-    // 1. Simpan Data Pribadi Sipil (employee_personal_details)
+    // 1. Simpan Data Pribadi Sipil (hr_employee_personal_details)
     const personalPayload = {
       employee_id: empId,
       ktp_number: document.getElementById("edit-full-nik").value.trim() || null,
@@ -20042,12 +20088,12 @@ async function handleSaveEmployeeFull(event) {
 
     if (supabaseClient && empId) {
       const { error: pErr } = await supabaseClient
-        .from("employee_personal_details")
+        .from("hr_employee_personal_details")
         .upsert([personalPayload], { onConflict: "employee_id" });
       if (pErr) console.warn("Upsert personal details warning:", pErr);
     }
 
-    // 2. Simpan Data Payroll / Remunerasi ke Transaksi Karir (employee_career_histories)
+    // 2. Simpan Data Payroll / Remunerasi ke Transaksi Karir (hr_employee_career_histories)
     const gajiVal = document.getElementById("edit-full-gaji").value ? parseFloat(document.getElementById("edit-full-gaji").value) : null;
     const tunjanganVal = document.getElementById("edit-full-tunjangan").value ? parseFloat(document.getElementById("edit-full-tunjangan").value) : null;
     const bankVal = document.getElementById("edit-full-bank").value;
@@ -20079,7 +20125,7 @@ async function handleSaveEmployeeFull(event) {
       };
 
       const { error: cErr } = await supabaseClient
-        .from("employee_career_histories")
+        .from("hr_employee_career_histories")
         .insert([careerPayload]);
       if (cErr) console.warn("Insert career history warning:", cErr);
     }
@@ -20268,13 +20314,13 @@ async function loadPersonaliaEmployees() {
 
   if (supabaseClient) {
     try {
-      // Load eksklusif dari master employees baru (Core HR New Database)
+      // Load eksklusif dari master hr_employees (Core HR Physical Table)
       const { data: empData, error: empErr } = await supabaseClient
-        .from("employees")
+        .from("hr_employees")
         .select(`
           *,
-          organization_units (nama_unit),
-          job_positions (nama_jabatan)
+          hr_organization_units (nama_unit),
+          hr_job_positions (nama_jabatan)
         `)
         .order("nip");
 
@@ -20284,8 +20330,8 @@ async function loadPersonaliaEmployees() {
           return {
             ...e,
             nama_lengkap: e.name || e.nama_lengkap || e.nip,
-            cabang: e.organization_units?.nama_unit || e.cabang || (isCalon ? "N/A" : "N/A"),
-            jabatan: e.job_positions?.nama_jabatan || e.jabatan || (isCalon ? "Calon Karyawan" : "N/A"),
+            cabang: e.hr_organization_units?.nama_unit || e.cabang || (isCalon ? "N/A" : "N/A"),
+            jabatan: e.hr_job_positions?.nama_jabatan || e.jabatan || (isCalon ? "Calon Karyawan" : "N/A"),
             status_aktif: isCalon ? "CALON" : (!e.deleted_at ? "AKTIF" : "NONAKTIF")
           };
         });
@@ -20294,10 +20340,10 @@ async function loadPersonaliaEmployees() {
         renderPersonaliaEmployees(PERSONALIA_EMPLOYEES_DATA);
         return;
       } else if (empErr) {
-        console.warn("[Personalia New DB] Query error:", empErr);
+        console.warn("[Personalia hr_employees] Query error:", empErr);
       }
     } catch (e) {
-      console.warn("[Personalia New DB] Exception:", e);
+      console.warn("[Personalia hr_employees] Exception:", e);
     }
   }
 
@@ -21227,15 +21273,11 @@ async function populateTxPersonalData(emp) {
   if (supabaseClient) {
     try {
       if (!empId || typeof empId === "number") {
-        const { data: eRow } = await supabaseClient.from("employees").select("id").eq("nip", emp.nip).maybeSingle();
+        const { data: eRow } = await supabaseClient.from("hr_employees").select("id").eq("nip", emp.nip).maybeSingle();
         if (eRow?.id) empId = eRow.id;
       }
       if (empId) {
         let { data } = await supabaseClient.from("hr_employee_personal_details").select("*").eq("employee_id", empId).maybeSingle();
-        if (!data) {
-          const resFallback = await supabaseClient.from("employee_personal_details").select("*").eq("employee_id", empId).maybeSingle();
-          if (resFallback?.data) data = resFallback.data;
-        }
         if (data) detail = data;
       }
     } catch (e) {
@@ -23899,11 +23941,6 @@ async function applyApprovedTransactionToEmployee(tx, isFromEOD = false) {
 
     if (empUpErr) {
       console.error("[applyApprovedTransactionToEmployee] Gagal update hr_employees:", empUpErr);
-      // Fallback coba view employees jika tabel base berbeda hak akses
-      await supabaseClient
-        .from("employees")
-        .update(updatePayload)
-        .eq("id", empId);
     } else {
       console.log(`[applyApprovedTransactionToEmployee] Sukses update hr_employees untuk ID ${empId}:`, updatePayload);
     }
@@ -23954,17 +23991,9 @@ async function applyApprovedTransactionToEmployee(tx, isFromEOD = false) {
     if (chErr && (chErr.message?.includes("pph_scheme") || chErr.code === "PGRST204" || chErr.code === "42703")) {
       const retryCareerPayload = { ...careerPayload };
       delete retryCareerPayload.pph_scheme;
-      const retryChRes = await supabaseClient
+      await supabaseClient
         .from("hr_employee_career_histories")
         .insert(retryCareerPayload);
-      chErr = retryChRes.error;
-    }
-
-    if (chErr) {
-      // Fallback ke view
-      await supabaseClient
-        .from("employee_career_histories")
-        .insert(careerPayload);
     }
 
   } catch (err) {
@@ -24519,3 +24548,1183 @@ async function submitChangePassword() {
     }
   }
 }
+
+// =========================================================================
+// MANAJEMEN COVER AREA CONTROLLER
+// =========================================================================
+let COVER_AREA_LIST = [];
+let COVER_AREA_SELECTED = null;
+let COVER_AREA_BRANCH_DEALERS = [];
+let COVER_AREA_PIC_OPTIONS = [];
+let COVER_AREA_USER_UNIT = null; // { id_unit, nama_unit }
+let COVER_AREA_DOWNLINE_BRANCHES = []; // Array of { id_unit, nama_unit, tipe_unit }
+
+// Helper: Menelusuri cabang-cabang di bawah unit tertentu secara rekursif (Downline Organization)
+async function getDownlineBranches(rootUnitId) {
+  try {
+    let unitsList = (Array.isArray(ORG_UNITS_DATA) && ORG_UNITS_DATA.length > 0) ? ORG_UNITS_DATA : [];
+    
+    // Jika data organisasi belum ada di memori, ambil dari Supabase
+    if (unitsList.length === 0 && supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from("hr_organization_units")
+        .select("id_unit, nama_unit, tipe_unit, parent_unit_id, is_active");
+      if (!error && Array.isArray(data) && data.length > 0) {
+        unitsList = data;
+        ORG_UNITS_DATA = data;
+      }
+    }
+
+    if (!unitsList || unitsList.length === 0) return [];
+
+    const norm = s => String(s || "").trim().toUpperCase();
+    const rootNorm = norm(rootUnitId);
+
+    // Kumpulkan seluruh unit downline (sub-tree) secara rekursif
+    function collectSubUnitIds(parentId, all) {
+      const children = all.filter(u => norm(u.parent_unit_id) === norm(parentId) && norm(u.id_unit) !== norm(parentId));
+      let res = [...children];
+      for (const ch of children) {
+        res = res.concat(collectSubUnitIds(ch.id_unit, all));
+      }
+      return res;
+    }
+
+    // Ambil root unit itu sendiri jika ada
+    const rootObj = unitsList.find(u => norm(u.id_unit) === rootNorm);
+    const subUnits = rootObj ? [rootObj, ...collectSubUnitIds(rootObj.id_unit, unitsList)] : [];
+
+    // Filter hanya unit bertipe CABANG (atau rootUnit itu sendiri jika bertipe cabang)
+    let branchUnits = subUnits.filter(u => norm(u.tipe_unit) === "CABANG");
+
+    // Jika user adalah Head Office / Direksi / Unit Root tidak menghasilkan cabang spesifik,
+    // atau jika rootObj adalah level holding/direksi/area manager yang mencakup semua cabang
+    if (branchUnits.length === 0) {
+      if (!rootObj || norm(rootObj.tipe_unit) !== "CABANG") {
+        const allBranches = unitsList.filter(u => norm(u.tipe_unit) === "CABANG");
+        if (allBranches.length > 0) branchUnits = allBranches;
+      }
+    }
+
+    // Jika rootObj adalah cabang tapi tidak ada sub-cabang di bawahnya, pastikan minimal rootObj masuk
+    if (branchUnits.length === 0 && rootObj) {
+      branchUnits = [rootObj];
+    }
+
+    // Format output rapi & unik
+    const uniqueMap = new Map();
+    branchUnits.forEach(b => {
+      const k = norm(b.id_unit);
+      if (!uniqueMap.has(k)) {
+        uniqueMap.set(k, {
+          id_unit: b.id_unit,
+          nama_unit: b.nama_unit || b.id_unit,
+          tipe_unit: b.tipe_unit || "CABANG"
+        });
+      }
+    });
+
+    return Array.from(uniqueMap.values());
+  } catch (err) {
+    console.warn("Gagal getDownlineBranches:", err);
+    return [];
+  }
+}
+
+function switchCoverAreaTab(tab) {
+  const tabSetup = document.getElementById("cover-area-tab-setup");
+  const tabPic = document.getElementById("cover-area-tab-pic");
+  const btnSetup = document.getElementById("tab-btn-cover-area");
+  const btnPic = document.getElementById("tab-btn-cover-pic");
+
+  if (tab === "setup") {
+    if (tabSetup) tabSetup.classList.remove("hidden");
+    if (tabPic) tabPic.classList.add("hidden");
+    if (btnSetup) {
+      btnSetup.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-teal-800 shadow-sm border border-slate-200 font-bold";
+    }
+    if (btnPic) {
+      btnPic.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold";
+    }
+  } else {
+    if (tabSetup) tabSetup.classList.add("hidden");
+    if (tabPic) tabPic.classList.remove("hidden");
+    if (btnPic) {
+      btnPic.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-indigo-800 shadow-sm border border-slate-200 font-bold";
+    }
+    if (btnSetup) {
+      btnSetup.className = "flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold";
+    }
+    renderCoverAreaPicTable();
+  }
+}
+
+async function initCoverAreaManagementScreen() {
+  if (!CURRENT_USER) return;
+  const screenEl = document.getElementById("screen-cover_area_management");
+  if (screenEl) screenEl.classList.remove("hidden");
+
+  // Deteksi cabang/unit user yang login & downline branches
+  await resolveCoverAreaUserBranch();
+
+  // Load PIC options (User + Rekursif bawahan)
+  await loadCoverAreaPicOptions();
+
+  // Load Cover Area data & dealer cabang downline
+  await loadCoverAreaManagementData();
+}
+
+async function resolveCoverAreaUserBranch() {
+  const branchLabel = document.getElementById("cover-area-user-branch");
+  COVER_AREA_USER_UNIT = null;
+  COVER_AREA_DOWNLINE_BRANCHES = [];
+
+  try {
+    if (!supabaseClient) return;
+
+    // 1. Cek dari location_id user di hr_employees jika ada
+    let unitId = CURRENT_USER.location_id || CURRENT_USER.unit_id || null;
+    let unitName = CURRENT_USER.cabang || CURRENT_USER.unit || "";
+
+    if (CURRENT_USER.nip) {
+      const { data: empData } = await supabaseClient
+        .from("hr_employees")
+        .select("id, nip, location_id, hr_organization_units(id_unit, nama_unit)")
+        .eq("nip", CURRENT_USER.nip)
+        .maybeSingle();
+
+      if (empData) {
+        if (empData.hr_organization_units) {
+          unitId = empData.hr_organization_units.id_unit;
+          unitName = empData.hr_organization_units.nama_unit;
+        } else if (empData.location_id) {
+          unitId = empData.location_id;
+        }
+      }
+    }
+
+    // Jika belum ketemu unitId, cari di hr_organization_units berdasarkan nama cabang
+    if (!unitId && unitName) {
+      const { data: matchedUnit } = await supabaseClient
+        .from("hr_organization_units")
+        .select("id_unit, nama_unit")
+        .ilike("nama_unit", `%${unitName.trim()}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (matchedUnit) {
+        unitId = matchedUnit.id_unit;
+        unitName = matchedUnit.nama_unit;
+      }
+    }
+
+    // Fallback: Jika super admin / HO tanpa cabang spesifik, ambil cabang pertama
+    if (!unitId) {
+      const { data: firstUnit } = await supabaseClient
+        .from("hr_organization_units")
+        .select("id_unit, nama_unit")
+        .eq("tipe_unit", "CABANG")
+        .limit(1)
+        .maybeSingle();
+
+      if (firstUnit) {
+        unitId = firstUnit.id_unit;
+        unitName = firstUnit.nama_unit;
+      }
+    }
+
+    COVER_AREA_USER_UNIT = {
+      id_unit: unitId || "CABANG_DEFAULT",
+      nama_unit: unitName || "Cabang Utama"
+    };
+
+    // Ambil seluruh cabang downline organisasi user
+    COVER_AREA_DOWNLINE_BRANCHES = await getDownlineBranches(COVER_AREA_USER_UNIT.id_unit);
+
+    // Jika list downline kosong, masukkan minimal COVER_AREA_USER_UNIT sebagai opsi
+    if (COVER_AREA_DOWNLINE_BRANCHES.length === 0) {
+      COVER_AREA_DOWNLINE_BRANCHES = [{
+        id_unit: COVER_AREA_USER_UNIT.id_unit,
+        nama_unit: COVER_AREA_USER_UNIT.nama_unit,
+        tipe_unit: "CABANG"
+      }];
+    }
+
+    if (branchLabel) {
+      const branchCount = COVER_AREA_DOWNLINE_BRANCHES.length;
+      if (branchCount > 1) {
+        branchLabel.innerText = `Wilayah: ${COVER_AREA_USER_UNIT.nama_unit} (${branchCount} Cabang)`;
+      } else {
+        branchLabel.innerText = `Cabang: ${COVER_AREA_USER_UNIT.nama_unit}`;
+      }
+    }
+  } catch (err) {
+    console.warn("Gagal resolve branch user cover area:", err);
+    COVER_AREA_USER_UNIT = {
+      id_unit: "CABANG_DEFAULT",
+      nama_unit: CURRENT_USER.cabang || "Cabang"
+    };
+    COVER_AREA_DOWNLINE_BRANCHES = [{
+      id_unit: COVER_AREA_USER_UNIT.id_unit,
+      nama_unit: COVER_AREA_USER_UNIT.nama_unit,
+      tipe_unit: "CABANG"
+    }];
+    if (branchLabel) branchLabel.innerText = `Cabang: ${COVER_AREA_USER_UNIT.nama_unit}`;
+  }
+}
+
+async function loadCoverAreaPicOptions() {
+  COVER_AREA_PIC_OPTIONS = [];
+
+  try {
+    if (supabaseClient && CURRENT_USER) {
+      const { data: rawList, error } = await supabaseClient
+        .from("hr_employees")
+        .select("id, nip, name, supervisor_id, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan)")
+        .order("name", { ascending: true });
+
+      if (!error && Array.isArray(rawList)) {
+        const myNip = String(CURRENT_USER.nip || "").trim();
+        const me = rawList.find(e => String(e.nip || "").trim() === myNip || e.id === CURRENT_USER.id);
+
+        if (me) {
+          // Logika rekursif penarikan bawahan hierarkis (sama seperti REKAP_TIM)
+          function getRecursiveSubordinates(supervisorId, list) {
+            const direct = list.filter(e => e.supervisor_id === supervisorId);
+            let result = [...direct];
+            for (const sub of direct) {
+              result = result.concat(getRecursiveSubordinates(sub.id, list));
+            }
+            return result;
+          }
+
+          const subordinates = getRecursiveSubordinates(me.id, rawList);
+          const combined = [me, ...subordinates];
+
+          const seen = new Set();
+          for (const emp of combined) {
+            if (!seen.has(emp.id)) {
+              seen.add(emp.id);
+              COVER_AREA_PIC_OPTIONS.push({
+                id: emp.id,
+                nip: emp.nip,
+                nama: emp.name || emp.nip || "Karyawan",
+                jabatan: emp.hr_job_positions?.nama_jabatan || "Staff",
+                cabang: emp.hr_organization_units?.nama_unit || "-"
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Gagal load PIC options cover area:", err);
+  }
+
+  // Fallback jika tidak ada data dari DB
+  if (COVER_AREA_PIC_OPTIONS.length === 0 && CURRENT_USER) {
+    COVER_AREA_PIC_OPTIONS.push({
+      id: CURRENT_USER.id || "CURRENT_USER_ID",
+      nip: CURRENT_USER.nip || "-",
+      nama: CURRENT_USER.nama_lengkap || CURRENT_USER.nama || "User Saat Ini",
+      jabatan: CURRENT_USER.role || "Staff",
+      cabang: CURRENT_USER.cabang || "-"
+    });
+  }
+
+  renderCoverAreaPicSelectDropdown();
+}
+
+function renderCoverAreaPicSelectDropdown() {
+  const selectEl = document.getElementById("assign-pic-employee-select");
+  if (!selectEl) return;
+
+  let html = `<option value="">-- Tanpa PIC / Kosongkan --</option>`;
+  COVER_AREA_PIC_OPTIONS.forEach(pic => {
+    const isMe = (CURRENT_USER && (pic.id === CURRENT_USER.id || (pic.nip && pic.nip === CURRENT_USER.nip)));
+    const meBadge = isMe ? " (Saya Sendiri)" : "";
+    html += `<option value="${pic.id}">${pic.nama}${meBadge} - ${pic.jabatan}</option>`;
+  });
+  selectEl.innerHTML = html;
+}
+
+async function loadCoverAreaManagementData() {
+  if (!supabaseClient || !COVER_AREA_USER_UNIT) return;
+
+  const container = document.getElementById("cover-area-cards-container");
+  if (container) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <i class="fa-solid fa-circle-notch fa-spin text-base text-teal-600 mb-1.5 block"></i> Memuat daftar cover area...
+      </div>
+    `;
+  }
+
+  try {
+    // Kumpulkan seluruh unit_id dari downline branches (termasuk user unit itu sendiri)
+    const downlineUnitIds = Array.from(new Set([
+      COVER_AREA_USER_UNIT.id_unit,
+      ...(COVER_AREA_DOWNLINE_BRANCHES || []).map(b => b.id_unit)
+    ])).filter(Boolean);
+
+    // 1. Ambil seluruh cover area milik unit/cabang downline user
+    let areaQuery = supabaseClient
+      .from("m_cover_area")
+      .select("id_area, nama_area, unit_id, pic_id, is_active, hr_organization_units(id_unit, nama_unit), hr_employees(id, nip, name, hr_job_positions(nama_jabatan))")
+      .eq("is_active", true);
+
+    if (downlineUnitIds.length > 0) {
+      areaQuery = areaQuery.in("unit_id", downlineUnitIds);
+    }
+
+    const { data: areas, error: areaErr } = await areaQuery.order("nama_area", { ascending: true });
+
+    if (areaErr) throw areaErr;
+    COVER_AREA_LIST = areas || [];
+
+    // 2. Ambil seluruh mitra di cabang-cabang downline (m_dealer)
+    let dealerQuery = supabaseClient
+      .from("m_dealer")
+      .select("dealer_id, dealer_name, cabang, area_cover, cover_area_id, status");
+
+    const downlineNames = (COVER_AREA_DOWNLINE_BRANCHES || [])
+      .map(b => (b.nama_unit || "").trim())
+      .filter(n => n && !n.toLowerCase().includes("head office"));
+
+    // Jika ada daftar nama cabang downline spesifik, filter dealer yang cabangnya cocok
+    if (downlineNames.length > 0 && !COVER_AREA_USER_UNIT.nama_unit?.toLowerCase().includes("head office")) {
+      const branchFilters = [];
+      downlineNames.forEach(n => {
+        branchFilters.push(`cabang.ilike.%${n}%`);
+        const cleanName = n.replace(/^Cabang\s+/i, "").trim();
+        if (cleanName && cleanName !== n) {
+          branchFilters.push(`cabang.ilike.%${cleanName}%`);
+        }
+      });
+      const orFilters = branchFilters.join(",");
+      dealerQuery = dealerQuery.or(orFilters);
+    }
+
+    const { data: dealers, error: dlrErr } = await dealerQuery.order("dealer_name", { ascending: true });
+    if (!dlrErr && dealers) {
+      COVER_AREA_BRANCH_DEALERS = dealers;
+    } else {
+      COVER_AREA_BRANCH_DEALERS = [];
+    }
+
+    // Render cards list cover area
+    renderCoverAreaCards();
+
+    // Render tabel penugasan PIC
+    renderCoverAreaPicTable();
+  } catch (err) {
+    console.error("Gagal load cover area management data:", err);
+    if (container) {
+      container.innerHTML = `
+        <div class="p-6 text-center text-xs text-rose-500 bg-rose-50 rounded-2xl border border-rose-200">
+          <i class="fa-solid fa-triangle-exclamation text-base mb-1 block"></i>
+          Gagal memuat cover area: ${err.message || err}
+        </div>
+      `;
+    }
+  }
+}
+
+function renderCoverAreaCards() {
+  const container = document.getElementById("cover-area-cards-container");
+  if (!container) return;
+
+  if (COVER_AREA_LIST.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200 space-y-2">
+        <i class="fa-solid fa-map-location-dot text-3xl text-slate-300 block mb-1"></i>
+        <p class="font-bold text-slate-700">Belum ada Cover Area untuk wilayah downline ini</p>
+        <p class="text-[11px] text-slate-400">Klik tombol "+ Buat Cover Area Baru" untuk mulai membagi wilayah cabang.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = "";
+  COVER_AREA_LIST.forEach(area => {
+    // Hitung jumlah mitra yang assigned ke area ini
+    const dealerCount = COVER_AREA_BRANCH_DEALERS.filter(d => d.cover_area_id === area.id_area).length;
+    const borderClass = "border-slate-200 bg-white hover:border-teal-300";
+
+    const picName = area.hr_employees?.name || "Belum Ditugaskan";
+    const picRole = area.hr_employees?.hr_job_positions?.nama_jabatan || "PIC Lapangan";
+    const picBadgeClass = area.pic_id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-100 text-slate-400 border-slate-200";
+    
+    // Nama Cabang pemilik area
+    const branchName = area.hr_organization_units?.nama_unit || (
+      (COVER_AREA_DOWNLINE_BRANCHES || []).find(b => b.id_unit === area.unit_id)?.nama_unit || area.unit_id
+    );
+
+    html += `
+      <div class="p-3.5 rounded-2xl border ${borderClass} shadow-xs transition flex items-center justify-between gap-3">
+        <div class="flex items-center space-x-3 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-bold shrink-0 transition">
+            <i class="fa-solid fa-map-pin"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center space-x-2">
+              <h5 class="text-xs font-bold text-slate-900 truncate">${escapeHtml(area.nama_area)}</h5>
+              <span class="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                <i class="fa-solid fa-building mr-1 text-[8px] text-teal-600"></i>${escapeHtml(branchName)}
+              </span>
+            </div>
+            <div class="flex items-center space-x-2 mt-1">
+              <button type="button" onclick="openViewMitraAreaModal('${area.id_area}', '${escapeHtml(area.nama_area).replace(/'/g, "\\'")}')" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 shrink-0 transition flex items-center cursor-pointer" title="Klik untuk melihat daftar mitra">
+                <i class="fa-solid fa-store mr-1 text-[9px]"></i>${dealerCount} Mitra
+              </button>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border ${picBadgeClass} truncate">
+                <i class="fa-solid fa-user mr-1 text-[9px]"></i>${escapeHtml(picName)}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="text-right shrink-0 flex items-center space-x-1.5 sm:space-x-2">
+          <button type="button" onclick="openViewMitraAreaModal('${area.id_area}', '${escapeHtml(area.nama_area).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center space-x-1 border border-slate-200 shadow-2xs shrink-0 active:scale-95" title="Lihat Daftar Mitra di Area Ini">
+            <i class="fa-solid fa-list-check text-slate-500"></i>
+            <span class="hidden sm:inline">Lihat Mitra</span>
+          </button>
+          <button type="button" onclick="openKelolaMitraModal('${area.id_area}', '${escapeHtml(area.nama_area).replace(/'/g, "\\'")}')" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shadow-sm shrink-0 active:scale-95" title="Tambah / Assign Mitra">
+            <i class="fa-solid fa-store"></i>
+            <span>Kelola Mitra</span>
+          </button>
+          <button type="button" onclick="deleteCoverArea('${area.id_area}', '${escapeHtml(area.nama_area).replace(/'/g, "\\'")}')" class="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition flex items-center justify-center text-xs shrink-0 active:scale-95" title="Hapus Cover Area">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+async function deleteCoverArea(areaId, areaName) {
+  if (!supabaseClient || !areaId) return;
+
+  const targetArea = COVER_AREA_LIST.find(a => a.id_area === areaId);
+  const displayName = areaName || targetArea?.nama_area || "Cover Area";
+
+  // 1. Validasi PIC: Pastikan tidak ada PIC yang masih terhubung
+  if (targetArea && targetArea.pic_id) {
+    const picName = targetArea.hr_employees?.name || "Karyawan Lapangan";
+    if (typeof showToast === "function") {
+      showToast(`Area tidak dapat dihapus! Masih memiliki penugasan PIC (${picName}). Kosongkan PIC terlebih dahulu pada Tab 'Penugasan PIC'.`, "warning", 3500);
+    }
+    return;
+  }
+
+  // 2. Validasi Mitra: Pastikan tidak ada mitra (dealer) yang masih terhubung ke area ini
+  // Cek dari cache lokal terlebih dahulu
+  const assignedDealersLocal = (COVER_AREA_BRANCH_DEALERS || []).filter(d => d.cover_area_id === areaId);
+  if (assignedDealersLocal.length > 0) {
+    if (typeof showToast === "function") {
+      showToast(`Area tidak dapat dihapus! Masih ada ${assignedDealersLocal.length} mitra terhubung ke area ini. Pindahkan atau lepas mitra terlebih dahulu.`, "warning", 3500);
+    }
+    return;
+  }
+
+  // Validasi ganda langsung ke database m_dealer untuk integritas data
+  try {
+    const { count, error: countErr } = await supabaseClient
+      .from("m_dealer")
+      .select("dealer_id", { count: "exact", head: true })
+      .eq("cover_area_id", areaId);
+
+    if (!countErr && typeof count === "number" && count > 0) {
+      if (typeof showToast === "function") {
+        showToast(`Area tidak dapat dihapus! Masih ada ${count} mitra terhubung di database.`, "warning", 3500);
+      }
+      return;
+    }
+  } catch (err) {
+    console.warn("Gagal cek relasi dealer:", err);
+  }
+
+  // Konfirmasi sebelum menghapus
+  const confirmed = window.confirm(`Apakah Anda yakin ingin menghapus Cover Area "${displayName}"?\n\nArea ini belum memiliki mitra maupun PIC yang terhubung.`);
+  if (!confirmed) return;
+
+  try {
+    const { error: delErr } = await supabaseClient
+      .from("m_cover_area")
+      .delete()
+      .eq("id_area", areaId);
+
+    if (delErr) throw delErr;
+
+    if (typeof showToast === "function") {
+      showToast(`Cover Area "${displayName}" berhasil dihapus!`, "success", 2000);
+    }
+
+    // Refresh data
+    await loadCoverAreaManagementData();
+  } catch (err) {
+    console.error("Gagal menghapus cover area:", err);
+    if (typeof showToast === "function") {
+      showToast("Gagal menghapus cover area: " + (err.message || err), "error");
+    }
+  }
+}
+
+// Deprecated panel detail function (kept as no-op if called)
+function selectCoverArea(areaId) {
+  // Panel detail bawah telah dipindahkan langsung ke tombol kartu & modal tabel
+}
+
+async function openCreateCoverAreaModal() {
+  const modal = document.getElementById("modal-create-cover-area");
+  const input = document.getElementById("create-cover-area-name");
+  const branchSelect = document.getElementById("create-cover-area-branch-select");
+
+  if (input) input.value = "";
+
+  // Pastikan daftar downline branches terisi
+  if (!COVER_AREA_DOWNLINE_BRANCHES || COVER_AREA_DOWNLINE_BRANCHES.length === 0) {
+    const rootId = COVER_AREA_USER_UNIT ? COVER_AREA_USER_UNIT.id_unit : (CURRENT_USER?.location_id || CURRENT_USER?.unit_id);
+    COVER_AREA_DOWNLINE_BRANCHES = await getDownlineBranches(rootId);
+  }
+
+  // Populate dropdown pilih cabang
+  if (branchSelect) {
+    let optionsHtml = "";
+    if (COVER_AREA_DOWNLINE_BRANCHES.length === 0) {
+      const fallbackUnit = COVER_AREA_USER_UNIT || { id_unit: "CABANG_DEFAULT", nama_unit: "Cabang Utama" };
+      optionsHtml = `<option value="${fallbackUnit.id_unit}">${fallbackUnit.nama_unit}</option>`;
+    } else {
+      optionsHtml = COVER_AREA_DOWNLINE_BRANCHES.map(b => {
+        const isSelected = COVER_AREA_USER_UNIT && b.id_unit === COVER_AREA_USER_UNIT.id_unit;
+        return `<option value="${b.id_unit}" ${isSelected ? 'selected' : ''}>${b.nama_unit}</option>`;
+      }).join("");
+    }
+    branchSelect.innerHTML = optionsHtml;
+  }
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeCreateCoverAreaModal() {
+  const modal = document.getElementById("modal-create-cover-area");
+  if (modal) modal.classList.add("hidden");
+}
+
+async function handleCreateCoverAreaSubmit(e) {
+  e.preventDefault();
+  if (!supabaseClient) return;
+
+  const input = document.getElementById("create-cover-area-name");
+  const branchSelect = document.getElementById("create-cover-area-branch-select");
+  const btn = document.getElementById("btn-submit-create-area");
+
+  const name = input ? input.value.trim() : "";
+  const selectedUnitId = branchSelect ? branchSelect.value : (COVER_AREA_USER_UNIT?.id_unit || null);
+
+  if (!name) {
+    if (typeof showToast === "function") showToast("Nama cover area wajib diisi!", "warning");
+    return;
+  }
+
+  if (!selectedUnitId) {
+    if (typeof showToast === "function") showToast("Cabang wajib dipilih!", "warning");
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    const payload = {
+      nama_area: name,
+      unit_id: selectedUnitId,
+      is_active: true
+    };
+
+    const { data, error } = await supabaseClient
+      .from("m_cover_area")
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    closeCreateCoverAreaModal();
+    if (typeof showToast === "function") showToast("Cover area berhasil dibuat!", "success");
+
+    await loadCoverAreaManagementData();
+  } catch (err) {
+    console.error("Gagal buat cover area:", err);
+    if (typeof showToast === "function") showToast("Gagal membuat area: " + (err.message || err), "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Simpan Area</span>';
+    }
+  }
+}
+
+// =========================================================================
+// MODAL KELOLA MITRA (TABEL MULTIPLE SELECT & BULK UPDATE)
+// =========================================================================
+let KELOLA_MITRA_AREA_ID = null;
+let KELOLA_MITRA_AREA_NAME = "";
+let KELOLA_MITRA_DEALERS_LIST = [];
+let KELOLA_MITRA_SELECTED_IDS = new Set();
+
+async function openKelolaMitraModal(areaId, areaName) {
+  KELOLA_MITRA_AREA_ID = areaId;
+  KELOLA_MITRA_AREA_NAME = areaName || "Area";
+  KELOLA_MITRA_SELECTED_IDS.clear();
+  KELOLA_MITRA_DEALERS_LIST = [];
+
+  const modal = document.getElementById("modal-manage-mitra-area");
+  const header = document.getElementById("modal-manage-mitra-header");
+  const searchInput = document.getElementById("manage-mitra-search");
+  const tableBody = document.getElementById("kelola-mitra-table-body");
+  const chkAll = document.getElementById("chk-select-all-mitra");
+
+  if (header) header.innerText = `Kelola Mitra — ${KELOLA_MITRA_AREA_NAME}`;
+  if (searchInput) searchInput.value = "";
+  if (chkAll) {
+    chkAll.checked = false;
+    chkAll.indeterminate = false;
+  }
+  updateSelectedMitraCount();
+
+  if (tableBody) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="3" class="p-8 text-center text-xs text-slate-400">
+          <i class="fa-solid fa-circle-notch fa-spin text-base text-teal-600 mb-1.5 block"></i>
+          Memuat daftar mitra yang belum memiliki area...
+        </td>
+      </tr>
+    `;
+  }
+
+  if (modal) modal.classList.remove("hidden");
+
+  // Fetch dari Supabase m_dealer yang cover_area_id IS NULL dan berada di unit_id / cabang area
+  try {
+    const targetArea = COVER_AREA_LIST.find(a => a.id_area === areaId);
+    let branchName = "";
+    if (targetArea) {
+      branchName = targetArea.hr_organization_units?.nama_unit || (
+        (COVER_AREA_DOWNLINE_BRANCHES || []).find(b => b.id_unit === targetArea.unit_id)?.nama_unit || ""
+      );
+    }
+
+    let q = supabaseClient
+      .from("m_dealer")
+      .select("dealer_id, dealer_name, owner_name, cabang, area_cover, cover_area_id, status")
+      .is("cover_area_id", null);
+
+    if (branchName && !branchName.toLowerCase().includes("head office")) {
+      // Ambil nama cabang murni tanpa kata "Cabang " di depan (misal "Cabang Tangerang 1" -> "Tangerang 1")
+      const cleanBranchName = branchName.replace(/^Cabang\s+/i, "").trim();
+      q = q.or(`cabang.ilike.%${cleanBranchName}%,cabang.ilike.%${branchName.trim()}%`);
+    }
+
+    const { data: dealers, error } = await q.order("dealer_name", { ascending: true });
+    if (error) throw error;
+
+    KELOLA_MITRA_DEALERS_LIST = dealers || [];
+    renderKelolaMitraTable();
+  } catch (err) {
+    console.error("Gagal memuat mitra tanpa cover area:", err);
+    if (tableBody) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="3" class="p-6 text-center text-xs text-rose-500">
+            <i class="fa-solid fa-triangle-exclamation mb-1 block"></i>
+            Gagal memuat mitra: ${err.message || err}
+          </td>
+        </tr>
+      `;
+    }
+  }
+}
+
+function closeKelolaMitraModal() {
+  const modal = document.getElementById("modal-manage-mitra-area");
+  if (modal) modal.classList.add("hidden");
+  KELOLA_MITRA_AREA_ID = null;
+  KELOLA_MITRA_SELECTED_IDS.clear();
+}
+
+function filterKelolaMitraTable(query = "") {
+  renderKelolaMitraTable(query);
+}
+
+function renderKelolaMitraTable(filterText = "") {
+  const tableBody = document.getElementById("kelola-mitra-table-body");
+  if (!tableBody) return;
+
+  const q = String(filterText || "").trim().toLowerCase();
+  const filtered = KELOLA_MITRA_DEALERS_LIST.filter(d => {
+    if (!q) return true;
+    return (d.dealer_name || "").toLowerCase().includes(q) ||
+      (d.owner_name || "").toLowerCase().includes(q) ||
+      (d.cabang || "").toLowerCase().includes(q) ||
+      (d.area_cover || "").toLowerCase().includes(q);
+  });
+
+  if (filtered.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="3" class="p-8 text-center text-xs text-slate-400">
+          <i class="fa-solid fa-store-slash text-2xl text-slate-300 block mb-1"></i>
+          Tidak ada mitra yang tersedia tanpa cover area.
+        </td>
+      </tr>
+    `;
+    updateSelectedMitraCount();
+    return;
+  }
+
+  let html = "";
+  filtered.forEach(dealer => {
+    const isChecked = KELOLA_MITRA_SELECTED_IDS.has(dealer.dealer_id);
+    html += `
+      <tr onclick="toggleMitraRowCheckbox('${dealer.dealer_id}')" class="hover:bg-teal-50/50 transition cursor-pointer has-[:checked]:bg-teal-50 group">
+        <td class="p-3 text-center border-r border-slate-100">
+          <input type="checkbox" id="chk-mitra-${dealer.dealer_id}" value="${dealer.dealer_id}" ${isChecked ? 'checked' : ''} onchange="updateSelectedMitraCount()" class="mitra-checkbox w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-600 cursor-pointer pointer-events-none">
+        </td>
+        <td class="p-3">
+          <div class="font-bold text-slate-900 text-[13px] group-hover:text-teal-800">${escapeHtml(dealer.dealer_name)}</div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center">
+            <i class="fa-solid fa-user-tie mr-1.5 text-slate-400"></i>${escapeHtml(dealer.owner_name || '-')}
+          </div>
+        </td>
+        <td class="p-3">
+          <div class="font-semibold text-slate-700 text-[11px] flex items-center">
+            <i class="fa-regular fa-building mr-1.5 text-slate-400"></i>${escapeHtml(dealer.cabang || '-')}
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+              ${escapeHtml(dealer.status || 'AKTIF')}
+            </span>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  tableBody.innerHTML = html;
+  updateSelectedMitraCount();
+}
+
+function toggleMitraRowCheckbox(dealerId) {
+  const chk = document.getElementById(`chk-mitra-${dealerId}`);
+  if (!chk) return;
+
+  const newState = !chk.checked;
+  chk.checked = newState;
+
+  if (newState) {
+    KELOLA_MITRA_SELECTED_IDS.add(dealerId);
+  } else {
+    KELOLA_MITRA_SELECTED_IDS.delete(dealerId);
+  }
+
+  updateSelectedMitraCount();
+}
+
+function toggleSelectAllMitra(checked) {
+  const searchInput = document.getElementById("manage-mitra-search");
+  const q = String(searchInput?.value || "").trim().toLowerCase();
+
+  const currentVisibleDealers = KELOLA_MITRA_DEALERS_LIST.filter(d => {
+    if (!q) return true;
+    return (d.dealer_name || "").toLowerCase().includes(q) ||
+      (d.owner_name || "").toLowerCase().includes(q) ||
+      (d.cabang || "").toLowerCase().includes(q) ||
+      (d.area_cover || "").toLowerCase().includes(q);
+  });
+
+  currentVisibleDealers.forEach(d => {
+    const chk = document.getElementById(`chk-mitra-${d.dealer_id}`);
+    if (chk) chk.checked = checked;
+    if (checked) {
+      KELOLA_MITRA_SELECTED_IDS.add(d.dealer_id);
+    } else {
+      KELOLA_MITRA_SELECTED_IDS.delete(d.dealer_id);
+    }
+  });
+
+  updateSelectedMitraCount();
+}
+
+function updateSelectedMitraCount() {
+  const count = KELOLA_MITRA_SELECTED_IDS.size;
+  const statusEl = document.getElementById("kelola-mitra-status-text");
+  const btnTextEl = document.getElementById("btn-save-mitra-text");
+  const chkAll = document.getElementById("chk-select-all-mitra");
+
+  if (statusEl) {
+    statusEl.innerText = `${count} mitra terpilih`;
+  }
+  if (btnTextEl) {
+    btnTextEl.innerText = `Simpan (${count} Terpilih)`;
+  }
+
+  // Update check all state
+  if (chkAll && KELOLA_MITRA_DEALERS_LIST.length > 0) {
+    const total = KELOLA_MITRA_DEALERS_LIST.length;
+    chkAll.checked = count === total && total > 0;
+    chkAll.indeterminate = count > 0 && count < total;
+  }
+}
+
+async function saveKelolaMitraAssignment() {
+  if (!supabaseClient || !KELOLA_MITRA_AREA_ID) {
+    if (typeof showToast === "function") showToast("Cover area tidak valid!", "warning");
+    return;
+  }
+
+  const selectedIds = Array.from(KELOLA_MITRA_SELECTED_IDS);
+  if (selectedIds.length === 0) {
+    if (typeof showToast === "function") showToast("Pilih minimal 1 mitra untuk dimasukkan ke cover area!", "warning");
+    return;
+  }
+
+  const btn = document.getElementById("btn-save-mitra-assignment");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    const targetAreaId = KELOLA_MITRA_AREA_ID;
+    const targetAreaName = KELOLA_MITRA_AREA_NAME;
+
+    // Bulk UPDATE: UPDATE m_dealer SET cover_area_id = targetAreaId, area_cover = targetAreaName WHERE dealer_id IN (selectedIds)
+    const { error } = await supabaseClient
+      .from("m_dealer")
+      .update({
+        cover_area_id: targetAreaId,
+        area_cover: targetAreaName
+      })
+      .in("dealer_id", selectedIds);
+
+    if (error) throw error;
+
+    closeKelolaMitraModal();
+    if (typeof showToast === "function") {
+      showToast(`Berhasil menambahkan ${selectedIds.length} mitra ke ${targetAreaName}!`, "success");
+    }
+
+    // Refresh daftar area & mitra
+    await loadCoverAreaManagementData();
+  } catch (err) {
+    console.error("Gagal bulk update mitra cover area:", err);
+    if (typeof showToast === "function") {
+      showToast("Gagal menyimpan mitra: " + (err.message || err), "error");
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span id="btn-save-mitra-text">Simpan (0 Terpilih)</span>';
+    }
+  }
+}
+
+// =========================================================================
+// MODAL: LIHAT LIST MITRA DI DALAM COVER AREA
+// =========================================================================
+let VIEW_MITRA_AREA_ID = null;
+let VIEW_MITRA_AREA_NAME = "";
+let VIEW_MITRA_DEALERS_LIST = [];
+
+async function openViewMitraAreaModal(areaId, areaName) {
+  VIEW_MITRA_AREA_ID = areaId;
+  VIEW_MITRA_AREA_NAME = areaName || "Area";
+  VIEW_MITRA_DEALERS_LIST = [];
+
+  const modal = document.getElementById("modal-view-mitra-area");
+  const header = document.getElementById("modal-view-mitra-header");
+  const searchInput = document.getElementById("view-mitra-search");
+  const tableBody = document.getElementById("view-mitra-table-body");
+  const countEl = document.getElementById("view-mitra-total-count");
+
+  if (header) header.innerText = `Daftar Mitra — ${VIEW_MITRA_AREA_NAME}`;
+  if (searchInput) searchInput.value = "";
+  if (countEl) countEl.innerText = "Memuat data...";
+
+  if (tableBody) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="p-8 text-center text-xs text-slate-400">
+          <i class="fa-solid fa-circle-notch fa-spin text-base text-teal-600 mb-1.5 block"></i>
+          Memuat daftar mitra di cover area ini...
+        </td>
+      </tr>
+    `;
+  }
+
+  if (modal) modal.classList.remove("hidden");
+
+  try {
+    // Ambil mitra yang cover_area_id === areaId
+    const { data: dealers, error } = await supabaseClient
+      .from("m_dealer")
+      .select("dealer_id, dealer_name, owner_name, cabang, area_cover, cover_area_id, status")
+      .eq("cover_area_id", areaId)
+      .order("dealer_name", { ascending: true });
+
+    if (error) throw error;
+
+    VIEW_MITRA_DEALERS_LIST = dealers || [];
+    renderViewMitraAreaTable();
+  } catch (err) {
+    console.error("Gagal memuat mitra di cover area:", err);
+    if (tableBody) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="4" class="p-6 text-center text-xs text-rose-500">
+            <i class="fa-solid fa-triangle-exclamation mb-1 block"></i>
+            Gagal memuat mitra: ${err.message || err}
+          </td>
+        </tr>
+      `;
+    }
+    if (countEl) countEl.innerText = "Gagal memuat";
+  }
+}
+
+function closeViewMitraAreaModal() {
+  const modal = document.getElementById("modal-view-mitra-area");
+  if (modal) modal.classList.add("hidden");
+  VIEW_MITRA_AREA_ID = null;
+  VIEW_MITRA_DEALERS_LIST = [];
+}
+
+function filterViewMitraAreaTable(query = "") {
+  renderViewMitraAreaTable(query);
+}
+
+function renderViewMitraAreaTable(filterText = "") {
+  const tableBody = document.getElementById("view-mitra-table-body");
+  const countEl = document.getElementById("view-mitra-total-count");
+  if (!tableBody) return;
+
+  const q = String(filterText || "").trim().toLowerCase();
+  const filtered = VIEW_MITRA_DEALERS_LIST.filter(d => {
+    if (!q) return true;
+    return (d.dealer_name || "").toLowerCase().includes(q) ||
+      (d.owner_name || "").toLowerCase().includes(q) ||
+      (d.cabang || "").toLowerCase().includes(q) ||
+      (d.area_cover || "").toLowerCase().includes(q);
+  });
+
+  if (countEl) {
+    countEl.innerText = `Total: ${VIEW_MITRA_DEALERS_LIST.length} Mitra`;
+  }
+
+  if (filtered.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="p-8 text-center text-xs text-slate-400">
+          <i class="fa-solid fa-store-slash text-2xl text-slate-300 block mb-1"></i>
+          ${VIEW_MITRA_DEALERS_LIST.length === 0 ? 'Belum ada mitra yang dimasukkan ke cover area ini.' : 'Tidak ditemukan mitra yang sesuai pencarian.'}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach((dealer, idx) => {
+    html += `
+      <tr class="hover:bg-slate-50/80 transition">
+        <td class="p-3 text-center text-slate-400 font-bold border-r border-slate-100 w-10">
+          ${idx + 1}
+        </td>
+        <td class="p-3">
+          <div class="font-bold text-slate-900 text-[13px]">${escapeHtml(dealer.dealer_name)}</div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center">
+            <i class="fa-solid fa-user-tie mr-1.5 text-slate-400"></i>${escapeHtml(dealer.owner_name || '-')}
+          </div>
+        </td>
+        <td class="p-3">
+          <div class="font-semibold text-slate-700 text-[11px] flex items-center">
+            <i class="fa-regular fa-building mr-1.5 text-slate-400"></i>${escapeHtml(dealer.cabang || '-')}
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ${escapeHtml(dealer.status || 'AKTIF')}
+            </span>
+          </div>
+        </td>
+        <td class="p-3 text-right">
+          <button type="button" onclick="unassignMitraFromArea('${dealer.dealer_id}', '${escapeHtml(dealer.dealer_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold border border-rose-200 transition active:scale-95 inline-flex items-center space-x-1" title="Lepas mitra dari area ini">
+            <i class="fa-solid fa-link-slash text-[10px]"></i>
+            <span>Lepas</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tableBody.innerHTML = html;
+}
+
+async function unassignMitraFromArea(dealerId, dealerName) {
+  if (!supabaseClient || !dealerId) return;
+
+  const confirmed = window.confirm(`Apakah Anda yakin ingin melepas mitra "${dealerName}" dari ${VIEW_MITRA_AREA_NAME}?`);
+  if (!confirmed) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from("m_dealer")
+      .update({ cover_area_id: null, area_cover: "" })
+      .eq("dealer_id", dealerId);
+
+    if (error) throw error;
+
+    if (typeof showToast === "function") {
+      showToast(`Mitra "${dealerName}" berhasil dilepas dari cover area!`, "success", 2000);
+    }
+
+    // Refresh daftar mitra di modal
+    VIEW_MITRA_DEALERS_LIST = VIEW_MITRA_DEALERS_LIST.filter(d => d.dealer_id !== dealerId);
+    renderViewMitraAreaTable();
+
+    // Refresh cards cover area di latar belakang
+    await loadCoverAreaManagementData();
+  } catch (err) {
+    console.error("Gagal melepas mitra dari area:", err);
+    if (typeof showToast === "function") {
+      showToast("Gagal melepas mitra: " + (err.message || err), "error");
+    }
+  }
+}
+
+// TAB 2: Penugasan PIC
+function renderCoverAreaPicTable() {
+  const tbody = document.getElementById("cover-area-pic-table-body");
+  if (!tbody) return;
+
+  if (COVER_AREA_LIST.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="py-6 text-center text-xs text-slate-400">
+          Belum ada cover area yang terdaftar.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = "";
+  COVER_AREA_LIST.forEach(area => {
+    const picName = area.hr_employees?.name || "-";
+    const picRole = area.hr_employees?.hr_job_positions?.nama_jabatan || "";
+    const hasPic = Boolean(area.pic_id);
+
+    const branchName = area.hr_organization_units?.nama_unit || (
+      (COVER_AREA_DOWNLINE_BRANCHES || []).find(b => b.id_unit === area.unit_id)?.nama_unit || area.unit_id || "-"
+    );
+
+    html += `
+      <tr class="hover:bg-slate-50/80 transition">
+        <td class="py-3 px-3.5 font-bold text-slate-900">${escapeHtml(area.nama_area)}</td>
+        <td class="py-3 px-3.5">
+          <span class="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-flex items-center">
+            <i class="fa-solid fa-building mr-1.5 text-[10px] text-teal-600"></i>${escapeHtml(branchName)}
+          </span>
+        </td>
+        <td class="py-3 px-3.5">
+          ${hasPic ? `
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+                <i class="fa-solid fa-user"></i>
+              </div>
+              <div>
+                <span class="font-bold text-slate-800 block text-xs leading-tight">${escapeHtml(picName)}</span>
+                <span class="text-[10px] text-slate-400 block">${escapeHtml(picRole)}</span>
+              </div>
+            </div>
+          ` : `
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-400 font-medium">Belum Ada PIC</span>
+          `}
+        </td>
+        <td class="py-3 px-3.5 text-right">
+          <button type="button" onclick="openAssignPicModal('${area.id_area}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs border border-indigo-200 transition active:scale-95">
+            <i class="fa-solid fa-user-pen mr-1"></i> Ganti PIC
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+let ASSIGN_PIC_ACTIVE_AREA_ID = null;
+
+function openAssignPicModal(areaId) {
+  const area = COVER_AREA_LIST.find(a => a.id_area === areaId);
+  if (!area) return;
+
+  ASSIGN_PIC_ACTIVE_AREA_ID = areaId;
+  const modal = document.getElementById("modal-assign-pic-area");
+  const areaNameEl = document.getElementById("assign-pic-modal-area-name");
+  const selectEl = document.getElementById("assign-pic-employee-select");
+
+  if (areaNameEl) areaNameEl.innerText = `Area: ${area.nama_area}`;
+  if (selectEl) {
+    selectEl.value = area.pic_id || "";
+  }
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeAssignPicModal() {
+  const modal = document.getElementById("modal-assign-pic-area");
+  if (modal) modal.classList.add("hidden");
+  ASSIGN_PIC_ACTIVE_AREA_ID = null;
+}
+
+async function handleAssignPicSubmit(e) {
+  e.preventDefault();
+  if (!supabaseClient || !ASSIGN_PIC_ACTIVE_AREA_ID) return;
+
+  const selectEl = document.getElementById("assign-pic-employee-select");
+  const btn = document.getElementById("btn-submit-assign-pic");
+  const newPicId = selectEl ? (selectEl.value || null) : null;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("m_cover_area")
+      .update({ pic_id: newPicId, updated_at: new Date().toISOString() })
+      .eq("id_area", ASSIGN_PIC_ACTIVE_AREA_ID);
+
+    if (error) throw error;
+
+    closeAssignPicModal();
+    if (typeof showToast === "function") showToast("PIC berhasil ditugaskan!", "success");
+
+    await loadCoverAreaManagementData();
+  } catch (err) {
+    console.error("Gagal menugaskan PIC cover area:", err);
+    if (typeof showToast === "function") showToast("Gagal menugaskan PIC: " + (err.message || err), "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Simpan PIC</span>';
+    }
+  }
+}
+

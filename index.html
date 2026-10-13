@@ -143,6 +143,93 @@
       <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       <span class="font-bold text-slate-700">Memuat Digi Action...</span>
     </div>
+
+    <!-- MODUL: MANAJEMEN COVER AREA -->
+    <div id="screen-cover_area_management" class="hidden space-y-4">
+      <!-- HEADER MODUL -->
+      <div class="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-700/80 flex justify-between items-center gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-extrabold rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              Operasional Lapangan
+            </span>
+            <span id="cover-area-user-branch" class="px-2 py-0.5 text-[9px] font-bold rounded-full bg-white/10 text-slate-200 border border-white/10">
+              Cabang: -
+            </span>
+          </div>
+          <h3 class="text-base sm:text-lg font-black mt-1.5 leading-tight truncate">Manajemen Cover Area</h3>
+          <p class="text-[11px] text-slate-300 truncate mt-0.5">Bagi wilayah cabang, kelompokkan mitra & tugaskan PIC lapangan</p>
+        </div>
+        <div class="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center text-xl text-teal-300 shrink-0 border border-white/10 shadow-inner">
+          <i class="fa-solid fa-map-location-dot"></i>
+        </div>
+      </div>
+
+      <!-- TAB NAVIGASI (2 TAB) -->
+      <div class="flex space-x-1.5 p-1.5 bg-slate-200/90 rounded-2xl text-xs font-bold shadow-inner">
+        <button type="button" id="tab-btn-cover-area" onclick="switchCoverAreaTab('setup')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap bg-white text-teal-800 shadow-sm border border-slate-200 font-bold">
+          <i class="fa-solid fa-layer-group mr-1.5 text-teal-600"></i> Setup Wilayah & Mitra
+        </button>
+        <button type="button" id="tab-btn-cover-pic" onclick="switchCoverAreaTab('pic')" class="flex-1 py-2 px-3 rounded-xl transition text-center whitespace-nowrap text-slate-600 hover:text-slate-900 font-bold">
+          <i class="fa-solid fa-user-check mr-1.5 text-indigo-600"></i> Penugasan PIC
+        </button>
+      </div>
+
+      <!-- TAB 1: SETUP WILAYAH & MITRA -->
+      <div id="cover-area-tab-setup" class="space-y-4">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h4 class="text-xs font-bold text-slate-800">Daftar Cover Area Cabang</h4>
+            <p class="text-[10px] text-slate-500">Pilih area untuk melihat & kelola mitra di dalamnya</p>
+          </div>
+          <button type="button" onclick="openCreateCoverAreaModal()" class="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition active:scale-95">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>+ Buat Cover Area Baru</span>
+          </button>
+        </div>
+
+        <div id="cover-area-cards-container" class="space-y-2.5">
+          <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+            <i class="fa-solid fa-circle-notch fa-spin text-base text-teal-600 mb-1.5 block"></i> Memuat daftar cover area...
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: PENUGASAN PIC -->
+      <div id="cover-area-tab-pic" class="space-y-4 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-slate-800">Matriks Penugasan PIC</h4>
+            <p class="text-[10px] text-slate-500">Tugaskan PIC (user login & bawahan dalam komando) ke cover area</p>
+          </div>
+          <button type="button" onclick="loadCoverAreaManagementData()" class="p-2 text-slate-500 hover:text-slate-800 rounded-xl transition" title="Refresh Data">
+            <i class="fa-solid fa-arrows-rotate text-xs"></i>
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[11px] uppercase tracking-wider">
+                  <th class="py-3 px-3.5">Nama Cover Area</th>
+                  <th class="py-3 px-3.5">Cabang</th>
+                  <th class="py-3 px-3.5">PIC Saat Ini</th>
+                  <th class="py-3 px-3.5 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="cover-area-pic-table-body" class="divide-y divide-slate-100 text-slate-700">
+                <tr>
+                  <td colspan="4" class="py-8 text-center text-xs text-slate-400">
+                    <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat data penugasan PIC...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- ================= MODALS GLOBAL ================= -->
@@ -3012,6 +3099,187 @@
     </div>
   </div>
 
+  <!-- MODAL: BUAT COVER AREA BARU -->
+  <div id="modal-create-cover-area" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-map-location-dot"></i>
+          </div>
+          <h4 class="font-bold text-xs">Buat Cover Area Baru</h4>
+        </div>
+        <button type="button" onclick="closeCreateCoverAreaModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+
+      <form id="form-create-cover-area" onsubmit="handleCreateCoverAreaSubmit(event)" class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Nama Cover Area <span class="text-rose-500">*</span></label>
+          <input type="text" id="create-cover-area-name" required placeholder="Contoh: Area Timur, Sub-Wilayah A" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white transition" />
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Pilih Cabang <span class="text-rose-500">*</span></label>
+          <select id="create-cover-area-branch-select" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white transition cursor-pointer">
+            <option value="">-- Memuat daftar cabang downline... --</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">Daftar cabang di bawah garis koordinasi / downline organisasi Anda.</p>
+        </div>
+
+        <div class="flex space-x-2 pt-2">
+          <button type="button" onclick="closeCreateCoverAreaModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-submit-create-area" class="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Simpan Area</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: KELOLA MITRA DALAM AREA (TABEL BULK ASSIGN) -->
+  <div id="modal-manage-mitra-area" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs" id="modal-manage-mitra-header">Kelola Mitra Area</h4>
+            <p class="text-[10px] text-slate-300">Pilih mitra di cabang ini yang belum memiliki cover area</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeKelolaMitraModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="p-3 bg-slate-50 border-b border-slate-200 shrink-0">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="manage-mitra-search" oninput="filterKelolaMitraTable(this.value)" placeholder="Cari nama dealer, owner, cabang..." class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600" />
+        </div>
+      </div>
+
+      <!-- Container Tabel (Bisa di-scroll) -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar bg-white min-h-[250px]">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-100 border-b border-slate-200 sticky top-0 z-10 shadow-sm text-[11px] text-slate-600">
+            <tr>
+              <th class="p-3 w-12 text-center border-r border-slate-200/50">
+                <label class="flex justify-center items-center cursor-pointer">
+                  <input type="checkbox" id="chk-select-all-mitra" onchange="toggleSelectAllMitra(this.checked)" class="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-600 cursor-pointer">
+                </label>
+              </th>
+              <th class="p-3 font-bold">Nama Mitra & Owner</th>
+              <th class="p-3 font-bold">Cabang / Status</th>
+            </tr>
+          </thead>
+          <tbody id="kelola-mitra-table-body" class="divide-y divide-slate-100">
+            <!-- Render dinamis via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer Modal -->
+      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <span class="text-[11px] text-slate-500 font-medium" id="kelola-mitra-status-text">0 mitra terpilih</span>
+        <div class="flex space-x-2">
+          <button type="button" onclick="closeKelolaMitraModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="button" id="btn-save-mitra-assignment" onclick="saveKelolaMitraAssignment()" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 flex items-center space-x-1.5">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span id="btn-save-mitra-text">Simpan (0 Terpilih)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LIHAT LIST MITRA DI COVER AREA -->
+  <div id="modal-view-mitra-area" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs" id="modal-view-mitra-header">Daftar Mitra Area</h4>
+            <p class="text-[10px] text-slate-300">Daftar mitra yang saat ini terdaftar di dalam cover area ini</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeViewMitraAreaModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+
+      <!-- Search Bar & Summary -->
+      <div class="p-3 bg-slate-50 border-b border-slate-200 shrink-0 flex items-center justify-between gap-3">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="view-mitra-search" oninput="filterViewMitraAreaTable(this.value)" placeholder="Cari nama dealer, owner, cabang..." class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600" />
+        </div>
+        <span id="view-mitra-total-count" class="text-[11px] font-bold text-slate-600 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shrink-0 shadow-2xs">Total: 0 Mitra</span>
+      </div>
+
+      <!-- Container Tabel -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar bg-white min-h-[250px]">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-100 border-b border-slate-200 sticky top-0 z-10 shadow-sm text-[11px] text-slate-600">
+            <tr>
+              <th class="p-3 w-10 text-center border-r border-slate-200/50">#</th>
+              <th class="p-3 font-bold">Nama Mitra & Owner</th>
+              <th class="p-3 font-bold">Cabang / Status</th>
+              <th class="p-3 font-bold text-right w-24">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="view-mitra-table-body" class="divide-y divide-slate-100">
+            <!-- Render dinamis via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer Modal -->
+      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end shrink-0">
+        <button type="button" onclick="closeViewMitraAreaModal()" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-sm">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GANTI PIC AREA (REKURSIF BAWAHAN + DIRI SENDIRI) -->
+  <div id="modal-assign-pic-area" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-user-gear"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs">Ganti PIC Cover Area</h4>
+            <p class="text-[10px] text-slate-300" id="assign-pic-modal-area-name">-</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAssignPicModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+      </div>
+
+      <form id="form-assign-pic-area" onsubmit="handleAssignPicSubmit(event)" class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Pilih PIC Bertugas</label>
+          <select id="assign-pic-employee-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition">
+            <option value="">-- Tanpa PIC / Kosongkan --</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">Menampilkan Anda & seluruh karyawan dalam garis hierarki komando bawahan.</p>
+        </div>
+
+        <div class="flex space-x-2 pt-2">
+          <button type="button" onclick="closeAssignPicModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+          <button type="submit" id="btn-submit-assign-pic" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Simpan PIC</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- PDF.js CDN for Protected Anti-Download PDF Viewer Canvas Rendering -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
@@ -3033,7 +3301,7 @@
       document.body.appendChild(scConfig);
 
       const scApp = document.createElement("script");
-      scApp.src = "/app.js?v=" + dailyVer + "_v180";
+      scApp.src = "/app.js?v=" + dailyVer + "_v189";
       document.body.appendChild(scApp);
     })();
   </script>

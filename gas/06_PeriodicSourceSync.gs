@@ -1,18 +1,14 @@
 /**
  * 06_PeriodicSourceSync.gs - DIGIASHA FIELD MONITORING SYSTEM
- * Script Sinkronisasi Data dari Spreadsheet Sumber Asli (HR & Operasional) ke Supabase
- * Arsitektur: Apps Script bertindak sebagai ETL Murni -> Supabase PostgreSQL Engine menghitung kalkulasi prioritas & metrik
+ * Script Sinkronisasi Data dari Spreadsheet Sumber Asli Operasional ke Supabase
+ * Arsitektur: Apps Script bertindak murni sebagai ETL Kurir Operasional (Dealer & Unit) -> Supabase PostgreSQL Engine
  */
 
 const PERIODIC_SYNC_CONFIG = {
   SUPABASE_URL: "https://pqfzkizqqhmsnidocumv.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxZnpraXpxcWhtc25pZG9jdW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4Nzc2MTUsImV4cCI6MjEwNDQ1MzYxNX0.06q1t6BEk01wwQOO68hH_HtcsIdfUgbtBbcOhoXukKo",
   
-  // 1. Spreadsheet HR Karyawan
-  HR_SOURCE_ID: "1h2NiNffCNUrtoauLkdJXBKXTyOOnxBh6vPvLowOo5M8",
-  HR_SHEET_GID: "1541309632",
-
-  // 2. Spreadsheet Dealer & Fasilitas Operasional
+  // Spreadsheet Dealer & Fasilitas Operasional
   DEALER_SOURCE_ID: "1ST9KvTCE9iyhz0GD4gRQIBt6gS_3pnGOUZbHYkAO75M",
   DEALER_SHEET_GID: "126845644",
   FACILITY_SHEET_GID: "1137250571"
@@ -76,91 +72,8 @@ function upsertToSupabase(tableName, payloadArray, onConflict) {
   }
 }
 
-function callSupabaseRpc(rpcName, payload) {
-  const endpoint = `${PERIODIC_SYNC_CONFIG.SUPABASE_URL}/rest/v1/rpc/${rpcName}`;
-  const options = {
-    method: "POST",
-    headers: {
-      "apikey": PERIODIC_SYNC_CONFIG.SUPABASE_ANON_KEY,
-      "Authorization": `Bearer ${PERIODIC_SYNC_CONFIG.SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json"
-    },
-    payload: JSON.stringify(payload || {}),
-    muteHttpExceptions: true
-  };
-  try {
-    const res = UrlFetchApp.fetch(endpoint, options);
-    const code = res.getResponseCode();
-    Logger.log(`[RPC ${rpcName}] (${code}): ${res.getContentText()}`);
-  } catch (e) {
-    Logger.log(`Exception RPC ${rpcName}: ` + e.toString());
-  }
-}
-
 /**
- * 1. SINKRONISASI DATA HR (KARYAWAN)
- * Mapping Kolom Sumber HR:
- * - NO ID (NIP): Kolom F (Index 5) -> Wajib ada
- * - Nama Lengkap: Kolom G (Index 6)
- * - Jabatan: Kolom P (Index 15)
- * - Cabang: Kolom Q (Index 16)
- * - Email: Kolom N (Index 13)
- */
-function syncHrEmployeesFromSource() {
-  Logger.log("=== SINKRONISASI DATA HR DARI SUMBER ===");
-  const ss = SpreadsheetApp.openById(PERIODIC_SYNC_CONFIG.HR_SOURCE_ID);
-  const sheets = ss.getSheets();
-  let sheet = sheets.find(s => String(s.getSheetId()) === PERIODIC_SYNC_CONFIG.HR_SHEET_GID) || sheets[0];
-  if (!sheet) return;
-
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return;
-
-  // Snapshot Supabase agar password, area_cover, role, status_aktif tidak tertimpa
-  const existing = fetchSupabaseExisting("m_employee", "nip,password_hash,area_cover,role_id,status_aktif,status_ganti_pass");
-  const existingMap = {};
-  existing.forEach(e => { existingMap[String(e.nip).trim()] = e; });
-
-  const rows = [];
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    const nip = String(r[5] || "").trim(); // Kolom F (Index 5)
-    
-    // Validasi NO ID aktif
-    if (!nip || nip === "-" || nip.toLowerCase() === "null" || nip.length < 3) {
-      continue;
-    }
-
-    const nama = String(r[6] || "").trim() || nip; // Kolom G (Index 6)
-    const emailRaw = String(r[13] || "").trim();   // Kolom N (Index 13)
-    const email = (emailRaw && emailRaw.includes("@")) ? emailRaw : `${nip}@digiasha.com`;
-    const jabatan = String(r[15] || "").trim();    // Kolom P (Index 15)
-    const cabang = String(r[16] || "Head Office").trim(); // Kolom Q (Index 16)
-
-    const old = existingMap[nip];
-    rows.push({
-      nip: nip,
-      nama_lengkap: nama,
-      email: email,
-      jabatan: jabatan,
-      cabang: cabang,
-      area_cover: old?.area_cover || "",
-      password_hash: old?.password_hash || "Password123!",
-      role_id: old?.role_id || "R-04",
-      status_ganti_pass: old ? (old.status_ganti_pass === true || String(old.status_ganti_pass).toLowerCase() === "true") : true,
-      status_aktif: old?.status_aktif || "AKTIF",
-      updated_at: new Date().toISOString()
-    });
-  }
-
-  for (let i = 0; i < rows.length; i += 100) {
-    upsertToSupabase("m_employee", rows.slice(i, i + 100), "nip");
-  }
-  Logger.log(`[OK] Sinkronisasi HR selesai: ${rows.length} karyawan aktif diproses.`);
-}
-
-/**
- * 2. SINKRONISASI DATA DEALER & FASILITAS DARI SUMBER OPERASIONAL
+ * SINKRONISASI DATA DEALER & FASILITAS DARI SUMBER OPERASIONAL
  */
 function syncDealersAndFacilitiesFromSource() {
   Logger.log("=== SINKRONISASI DEALER & FASILITAS DARI SUMBER ===");
@@ -267,33 +180,15 @@ function syncDealersAndFacilitiesFromSource() {
 }
 
 /**
- * ⚡ SINKRONISASI PERIODIK DATA SUMBER (SETIAP 5 MENIT)
- * Pasang fungsi ini pada Trigger: Berdasarkan Waktu -> Pemicu Menit -> Setiap 5 Menit.
- * Tugas: Murni cloning data baru dari Spreadsheet ke Supabase.
+ * 🚀 FUNGSI UTAMA HARIAN
+ * Pasang fungsi ini pada Trigger Google Apps Script (misal: Timer Harian Jam 06:00 Pagi)
  */
-function syncAllSourcesPeriodically() {
-  Logger.log("=== MEMULAI SINKRONISASI PERIODIK (5 MENIT) ===");
+function runPeriodicDailySync() {
+  Logger.log("=== MEMULAI SINKRONISASI PERIODIK HARIAN ===");
   try {
-    syncHrEmployeesFromSource();
     syncDealersAndFacilitiesFromSource();
-    Logger.log("=== SINKRONISASI CLONING DATA SELESAI ===");
+    Logger.log("=== SINKRONISASI PERIODIK SELESAI DENGAN SUKSES ===");
   } catch (e) {
     Logger.log("Error sync periodik: " + e.toString());
-  }
-}
-
-/**
- * 🚀 JALANKAN MANUAL / TEST KALKULASI PRIORITAS HARIAN (03:00 Pagi)
- * Fungsi ini memicu stored procedure PostgreSQL 'recalculate_all_priorities' di Supabase
- * yang secara otomatis mengevaluasi aging visit, status GPS, JTO, concern aktif,
- * dan menyimpan snapshot target harian ke 'log_priority_daily'.
- */
-function runDailyPriorityRecalculationNow() {
-  Logger.log("=== MEMULAI TEST KALKULASI PRIORITAS HARIAN (JAM 03:00) ===");
-  try {
-    callSupabaseRpc("recalculate_all_priorities", {});
-    Logger.log("=== KALKULASI PRIORITAS BERHASIL DIJALANKAN DI SUPABASE ===");
-  } catch (e) {
-    Logger.log("Error saat menjalankan kalkulasi prioritas: " + e.toString());
   }
 }
