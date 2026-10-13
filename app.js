@@ -644,7 +644,7 @@ async function supabaseGetMasterData() {
     supabaseClient.from("hr_work_locations").select("*"),
     supabaseClient.from("m_dealer").select("*").order("dealer_name"),
     supabaseClient.from("m_facility_unit").select("*").order("dealer_name"),
-    supabaseClient.from("m_gps_device").select("*")
+    supabaseClient.from("gps_devices").select("*")
   ]);
 
   // Ambil antrean concern supervisor dari t_priority_action
@@ -1030,7 +1030,7 @@ async function supabaseSubmitGpsMaintenance(data) {
     data.foto_posisi_gps_base64 ? uploadToSupabaseStorage(data.foto_posisi_gps_base64, "gps", `GPS-POS-${data.nopol}`) : Promise.resolve("")
   ]);
 
-  await supabaseClient.from("tr_gps_maintenance").insert([{
+  await supabaseClient.from("gps_maintenance").insert([{
     maint_id: maintId,
     nip: data.currentUser?.nip || null,
     dealer_name: data.dealer_name,
@@ -1070,21 +1070,21 @@ async function supabaseSubmitGpsMaintenance(data) {
   const officeStockLoc = data.work_location_name || "Kantor Pusat";
   if (data.act_type === "Ganti GPS") {
     if (data.imei_lama && data.imei_lama !== "-") {
-      await supabaseClient.from("m_gps_device")
+      await supabaseClient.from("gps_devices")
         .upsert({ imei: data.imei_lama, status_device: "TERSEDIA", posisi_stock: officeStockLoc, last_updated: new Date().toISOString() });
     }
     if (data.imei_baru) {
-      await supabaseClient.from("m_gps_device")
+      await supabaseClient.from("gps_devices")
         .upsert({ imei: data.imei_baru, status_device: `Terpasang di ${data.nopol}`, posisi_stock: data.dealer_name, last_updated: new Date().toISOString() });
     }
   } else if (data.act_type === "Cabut GPS") {
     if (data.imei_lama && data.imei_lama !== "-") {
-      await supabaseClient.from("m_gps_device")
+      await supabaseClient.from("gps_devices")
         .upsert({ imei: data.imei_lama, status_device: "TERSEDIA", posisi_stock: officeStockLoc, last_updated: new Date().toISOString() });
     }
   } else if (data.act_type === "Pasang GPS") {
     if (data.imei_baru) {
-      await supabaseClient.from("m_gps_device")
+      await supabaseClient.from("gps_devices")
         .upsert({ imei: data.imei_baru, status_device: `Terpasang di ${data.nopol}`, posisi_stock: data.dealer_name, last_updated: new Date().toISOString() });
     }
   }
@@ -1171,7 +1171,7 @@ async function supabaseSubmitAbsensi(data) {
     selfie_photo_url: selfieUrl
   };
 
-  const { error } = await supabaseClient.from("tr_absensi_log").insert([insertPayload]);
+  const { error } = await supabaseClient.from("hr_absensi_log").insert([insertPayload]);
   if (error) throw error;
 
   return {
@@ -1235,7 +1235,7 @@ async function supabaseSubmitIzin(data) {
   // 1. Coba via Supabase Client SDK
   if (supabaseClient) {
     try {
-      const { error } = await supabaseClient.from("tr_izin_log").insert([payload]);
+      const { error } = await supabaseClient.from("hr_izin_log").insert([payload]);
       if (!error) {
         return {
           success: true,
@@ -1251,7 +1251,7 @@ async function supabaseSubmitIzin(data) {
 
   // 2. Direct REST fallback (100% reliable)
   if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log`, {
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log`, {
       method: "POST",
       headers: {
         "apikey": CONFIG.SUPABASE_ANON_KEY,
@@ -1307,7 +1307,7 @@ async function supabaseProcessApproval(data) {
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient
-        .from("tr_izin_log")
+        .from("hr_izin_log")
         .update(updateData)
         .eq("izin_id", data.izin_id);
       if (!error) {
@@ -1323,7 +1323,7 @@ async function supabaseProcessApproval(data) {
   }
 
   if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?izin_id=eq.${encodeURIComponent(data.izin_id)}`, {
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?izin_id=eq.${encodeURIComponent(data.izin_id)}`, {
       method: "PATCH",
       headers: {
         "apikey": CONFIG.SUPABASE_ANON_KEY,
@@ -1521,7 +1521,7 @@ async function callApi(action, data = {}) {
       if (action === "getApprovalList") {
         const isAdmin = String(data.role || "").toLowerCase().includes("admin");
         const cleanNip = data.nip || "";
-        let query = supabaseClient ? supabaseClient.from("tr_izin_log").select("*").order("timestamp", { ascending: false }) : null;
+        let query = supabaseClient ? supabaseClient.from("hr_izin_log").select("*").order("timestamp", { ascending: false }) : null;
         if (query) {
           if (!isAdmin && cleanNip) {
             query = query.eq("pic_approval_nip", cleanNip);
@@ -1532,8 +1532,8 @@ async function callApi(action, data = {}) {
         if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
           const cleanNip = encodeURIComponent(CURRENT_USER?.nip || data?.nip || "");
           const queryUrl = cleanNip
-            ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&select=*&order=timestamp.desc`
-            : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?order=timestamp.desc`;
+            ? `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&select=*&order=timestamp.desc`
+            : `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?order=timestamp.desc`;
           const res = await fetch(queryUrl, {
             headers: {
               "apikey": CONFIG.SUPABASE_ANON_KEY,
@@ -2691,7 +2691,7 @@ async function fetchTodayAbsenStatus() {
 
     if (supabaseClient) {
       let query = supabaseClient
-        .from("tr_absensi_log")
+        .from("hr_absensi_log")
         .select("jenis_absen, timestamp, nip, nama_karyawan")
         .gte("timestamp", `${startDateUtc}T00:00:00`)
         .order("timestamp", { ascending: true });
@@ -2709,7 +2709,7 @@ async function fetchTodayAbsenStatus() {
     }
 
     if ((!logs || logs.length === 0) && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && CURRENT_USER.nip) {
-      const url = `${CONFIG.SUPABASE_URL}/rest/v1/tr_absensi_log?nip=eq.${encodeURIComponent(CURRENT_USER.nip)}&timestamp=gte.${startDateUtc}T00:00:00&order=timestamp.asc`;
+      const url = `${CONFIG.SUPABASE_URL}/rest/v1/hr_absensi_log?nip=eq.${encodeURIComponent(CURRENT_USER.nip)}&timestamp=gte.${startDateUtc}T00:00:00&order=timestamp.asc`;
       const res = await fetch(url, {
         headers: {
           "apikey": CONFIG.SUPABASE_ANON_KEY,
@@ -3702,8 +3702,8 @@ async function fetchApprovalList() {
         const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
         // Pengguna HANYA memuat pengajuan di mana dia ditunjuk sebagai atasan/approver dan pengajuan miliknya sendiri
         const queryUrl = cleanNip
-          ? `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&order=timestamp.desc`
-          : `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?order=timestamp.desc`;
+          ? `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?or=(pic_approval_nip.eq.${cleanNip},nip.eq.${cleanNip})&order=timestamp.desc`
+          : `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?order=timestamp.desc`;
 
         const sbRes = await fetch(queryUrl, {
           headers: {
@@ -3843,7 +3843,7 @@ async function fetchPendingApprovalCount() {
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
       const cleanNip = encodeURIComponent(CURRENT_USER.nip || "");
       // HANYA hitung pengajuan bawahan yang secara spesifik menunjuk user ini sebagai atasan (pic_approval_nip == cleanNip)
-      const queryUrl = `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`;
+      const queryUrl = `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?pic_approval_nip=eq.${cleanNip}&status_approval=eq.PENDING&nip=neq.${cleanNip}&select=izin_id`;
 
       const sbRes = await fetch(queryUrl, {
         headers: {
@@ -4640,10 +4640,10 @@ async function fetchAndRenderRekapCalendar() {
   REKAP_MONTH_IZIN_DATA = [];
 
   try {
-    // 1. Ambil data tr_absensi_log
+    // 1. Ambil data hr_absensi_log & hr_izin_log
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      const absenUrl = `${CONFIG.SUPABASE_URL}/rest/v1/tr_absensi_log?nip=eq.${encodeURIComponent(nip)}&timestamp=gte.${startDateStr}T00:00:00&timestamp=lte.${endDateStr}T23:59:59&order=timestamp.asc`;
-      const izinUrl = `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?nip=eq.${encodeURIComponent(nip)}&tgl_mulai=lte.${endDateStr}&tgl_selesai=gte.${startDateStr}&order=timestamp.asc`;
+      const absenUrl = `${CONFIG.SUPABASE_URL}/rest/v1/hr_absensi_log?nip=eq.${encodeURIComponent(nip)}&timestamp=gte.${startDateStr}T00:00:00&timestamp=lte.${endDateStr}T23:59:59&order=timestamp.asc`;
+      const izinUrl = `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?nip=eq.${encodeURIComponent(nip)}&tgl_mulai=lte.${endDateStr}&tgl_selesai=gte.${startDateStr}&order=timestamp.asc`;
 
       const [absenRes, izinRes] = await Promise.all([
         fetch(absenUrl, {
@@ -5509,8 +5509,8 @@ async function fetchAndRenderRekapTimCalendar() {
 
   try {
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-      const absenUrl = `${CONFIG.SUPABASE_URL}/rest/v1/tr_absensi_log?nip=eq.${encodeURIComponent(nip)}&timestamp=gte.${startDateStr}T00:00:00&timestamp=lte.${endDateStr}T23:59:59&order=timestamp.asc`;
-      const izinUrl = `${CONFIG.SUPABASE_URL}/rest/v1/tr_izin_log?nip=eq.${encodeURIComponent(nip)}&tgl_mulai=lte.${endDateStr}&tgl_selesai=gte.${startDateStr}&order=timestamp.asc`;
+      const absenUrl = `${CONFIG.SUPABASE_URL}/rest/v1/hr_absensi_log?nip=eq.${encodeURIComponent(nip)}&timestamp=gte.${startDateStr}T00:00:00&timestamp=lte.${endDateStr}T23:59:59&order=timestamp.asc`;
+      const izinUrl = `${CONFIG.SUPABASE_URL}/rest/v1/hr_izin_log?nip=eq.${encodeURIComponent(nip)}&tgl_mulai=lte.${endDateStr}&tgl_selesai=gte.${startDateStr}&order=timestamp.asc`;
 
       const [absenRes, izinRes] = await Promise.all([
         fetch(absenUrl, {
@@ -5855,7 +5855,7 @@ async function refreshRekapTimSummary() {
         .lte("timestamp", `${endDateStr}T23:59:59`)
         .order("timestamp", { ascending: true }),
       supabaseClient
-        .from("tr_izin_log")
+        .from("hr_izin_log")
         .select("*")
         .in("nip", teamNips)
         .lte("tgl_mulai", endDateStr)
@@ -11442,7 +11442,7 @@ async function loadGpsInventoryForSettings() {
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient
-        .from("m_gps_device")
+        .from("gps_devices")
         .select("*")
         .order("last_updated", { ascending: false });
 
@@ -11561,7 +11561,7 @@ async function saveTransferGpsLocation() {
     const client = supabaseClient || getSupabaseClient();
     if (client) {
       const { error } = await client
-        .from("m_gps_device")
+        .from("gps_devices")
         .update({
           posisi_stock: targetLocation,
           status_device: targetStatus,
@@ -11607,7 +11607,7 @@ async function saveNewGpsDevice() {
     const client = supabaseClient || getSupabaseClient();
     if (client) {
       const { error } = await client
-        .from("m_gps_device")
+        .from("gps_devices")
         .upsert({
           imei: imei,
           status_device: "TERSEDIA",
@@ -12629,7 +12629,7 @@ async function loadActivityHistory(forceRefresh = false) {
     if (userNip) qOnb = qOnb.eq("nip", userNip);
 
     // 3. Query GPS Maintenance
-    let qGps = supabaseClient.from("tr_gps_maintenance").select("*").order("created_at", { ascending: false }).limit(100);
+    let qGps = supabaseClient.from("gps_maintenance").select("*").order("created_at", { ascending: false }).limit(100);
     if (userNip) qGps = qGps.eq("nip", userNip);
 
     const [resVisit, resOnb, resGps] = await Promise.all([qVisit, qOnb, qGps]);
@@ -13787,7 +13787,7 @@ async function handleSaveEditActivity(e) {
     } else if (type === "GPS") {
       const techNotes = document.getElementById("edit-gps-notes")?.value || "";
 
-      const { error: gpsErr } = await supabaseClient.from("tr_gps_maintenance").update({
+      const { error: gpsErr } = await supabaseClient.from("gps_maintenance").update({
         catatan_teknis: techNotes
       }).eq("maint_id", id);
 
@@ -17155,12 +17155,7 @@ async function handleDeleteOrgUnit(id) {
       try {
         const { data: pData } = await supabaseClient.from("hr_job_positions").select("id_position, nama_jabatan").eq("unit_id", id);
         if (pData && pData.length > 0) positions = pData;
-      } catch (e) {
-        try {
-          const { data: pData } = await supabaseClient.from("job_positions").select("id_position, nama_jabatan").eq("unit_id", id);
-          if (pData && pData.length > 0) positions = pData;
-        } catch (err) { }
-      }
+      } catch (e) { }
     }
 
     // 3. Cek karyawan aktif yang bertugas di unit ini (location_id)
@@ -17690,12 +17685,7 @@ async function handleDeleteMasterLevel(id) {
       try {
         const { data } = await supabaseClient.from("hr_job_positions").select("id_position, nama_jabatan").eq("level_id", id);
         if (data && data.length > 0) positionsUsing = data;
-      } catch (e) {
-        try {
-          const { data } = await supabaseClient.from("job_positions").select("id_position, nama_jabatan").eq("level_id", id);
-          if (data && data.length > 0) positionsUsing = data;
-        } catch (err) { }
-      }
+      } catch (e) { }
     }
 
     if (positionsUsing.length > 0) {
