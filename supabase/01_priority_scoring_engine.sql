@@ -111,70 +111,110 @@ BEGIN
       u.no_fasilitas,
       uc.calc_aging_visit,
       CASE
-        -- Non-eligible contract check
-        WHEN NOT uc.is_eligible AND uc.concern_urgency IS NULL THEN 0
-
-        -- Status Dealer Closed / Dormant: Jangan jadi prioritas otomatis kecuali ada assign concern
+        -- Abaikan jika dealer Closed/Dormant dan tidak ada concern manual
         WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 0
 
-        -- Level: SANGAT PENTING (Score 3)
+        -- LEVEL 3: SANGAT PENTING (SP)
         WHEN uc.concern_urgency = 'Sangat Penting' THEN 3
-        WHEN u.gps_status ILIKE ANY(ARRAY['%Pelepasan%', '%Offline%', '%Baterai Lemah%']) THEN 3
-        WHEN uc.calc_aging_visit >= 22 AND COALESCE(u.lifetime_days, 0) > 90 THEN 3
-        WHEN uc.calc_aging_visit >= 15 AND uc.is_h3_jto THEN 3
+        WHEN uc.calc_aging_visit > 21 THEN 3
+        WHEN u.gps_status ILIKE ANY(ARRAY['%Offline%', '%Pelepasan%', '%Pindah%', '%Geser%']) THEN 3
+        WHEN COALESCE(u.overdue_days, 0) IN (3, 6, 9) THEN 3
+        WHEN COALESCE(u.overdue_days, 0) > 11 AND uc.calc_aging_visit > 3 THEN 3
 
-        -- Level: PENTING (Score 2)
+        -- LEVEL 2: PENTING (P)
         WHEN uc.concern_urgency = 'Penting' THEN 2
-        WHEN u.gps_status ILIKE ANY(ARRAY['%Belum Lepas%', '%Belum Pasang%', '%Geser%']) THEN 2
-        WHEN uc.calc_aging_visit >= 3 AND COALESCE(u.overdue_days, 0) >= 3 THEN 2
-        WHEN uc.calc_aging_visit >= 5 AND uc.is_h3_jto THEN 2
-        WHEN uc.calc_aging_visit >= 22 THEN 2
+        WHEN uc.calc_aging_visit > 14 THEN 2
+        WHEN u.gps_status ILIKE '%Baterai Lemah%' THEN 2
+        WHEN (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6) THEN 2
+        WHEN (UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' AND (LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) < 6 OR u.gps_status ILIKE '%Belum Pasang%')) THEN 2
+        WHEN uc.is_h3_jto AND uc.calc_aging_visit > 4 THEN 2
 
-        -- Level: MODERAT (Score 1)
-        WHEN uc.calc_aging_visit >= 15 THEN 1
+        -- LEVEL 1: MODERAT (M)
         WHEN uc.concern_urgency = 'Moderat' THEN 1
+        WHEN uc.calc_aging_visit > 7 THEN 1
         WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 1
 
-        -- Level: NORMAL (Score 0)
         ELSE 0
       END AS calc_score,
 
       CASE
-        -- Non-eligible contract
-        WHEN NOT uc.is_eligible AND uc.concern_urgency IS NULL THEN 'Normal'
-
-        -- Status Dealer Closed / Dormant
-        WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 'Normal'
-
-        WHEN uc.concern_urgency = 'Sangat Penting' THEN 'Sangat Penting'
-        WHEN u.gps_status ILIKE ANY(ARRAY['%Pelepasan%', '%Offline%', '%Baterai Lemah%']) THEN 'Sangat Penting'
-        WHEN uc.calc_aging_visit >= 22 AND COALESCE(u.lifetime_days, 0) > 90 THEN 'Sangat Penting'
-        WHEN uc.calc_aging_visit >= 15 AND uc.is_h3_jto THEN 'Sangat Penting'
-
-        WHEN uc.concern_urgency = 'Penting' THEN 'Penting'
-        WHEN u.gps_status ILIKE ANY(ARRAY['%Belum Lepas%', '%Belum Pasang%', '%Geser%']) THEN 'Penting'
-        WHEN uc.calc_aging_visit >= 3 AND COALESCE(u.overdue_days, 0) >= 3 THEN 'Penting'
-        WHEN uc.calc_aging_visit >= 5 AND uc.is_h3_jto THEN 'Penting'
-        WHEN uc.calc_aging_visit >= 22 THEN 'Penting'
-
-        WHEN uc.calc_aging_visit >= 15 THEN 'Moderat'
-        WHEN uc.concern_urgency = 'Moderat' THEN 'Moderat'
-        WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 'Moderat'
-
+        WHEN (
+          CASE
+            WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 0
+            WHEN uc.concern_urgency = 'Sangat Penting' THEN 3
+            WHEN uc.calc_aging_visit > 21 THEN 3
+            WHEN u.gps_status ILIKE ANY(ARRAY['%Offline%', '%Pelepasan%', '%Pindah%', '%Geser%']) THEN 3
+            WHEN COALESCE(u.overdue_days, 0) IN (3, 6, 9) THEN 3
+            WHEN COALESCE(u.overdue_days, 0) > 11 AND uc.calc_aging_visit > 3 THEN 3
+            WHEN uc.concern_urgency = 'Penting' THEN 2
+            WHEN uc.calc_aging_visit > 14 THEN 2
+            WHEN u.gps_status ILIKE '%Baterai Lemah%' THEN 2
+            WHEN (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6) THEN 2
+            WHEN (UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' AND (LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) < 6 OR u.gps_status ILIKE '%Belum Pasang%')) THEN 2
+            WHEN uc.is_h3_jto AND uc.calc_aging_visit > 4 THEN 2
+            WHEN uc.concern_urgency = 'Moderat' THEN 1
+            WHEN uc.calc_aging_visit > 7 THEN 1
+            WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 1
+            ELSE 0
+          END
+        ) = 3 THEN 'Sangat Penting'
+        WHEN (
+          CASE
+            WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 0
+            WHEN uc.concern_urgency = 'Sangat Penting' THEN 3
+            WHEN uc.calc_aging_visit > 21 THEN 3
+            WHEN u.gps_status ILIKE ANY(ARRAY['%Offline%', '%Pelepasan%', '%Pindah%', '%Geser%']) THEN 3
+            WHEN COALESCE(u.overdue_days, 0) IN (3, 6, 9) THEN 3
+            WHEN COALESCE(u.overdue_days, 0) > 11 AND uc.calc_aging_visit > 3 THEN 3
+            WHEN uc.concern_urgency = 'Penting' THEN 2
+            WHEN uc.calc_aging_visit > 14 THEN 2
+            WHEN u.gps_status ILIKE '%Baterai Lemah%' THEN 2
+            WHEN (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6) THEN 2
+            WHEN (UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' AND (LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) < 6 OR u.gps_status ILIKE '%Belum Pasang%')) THEN 2
+            WHEN uc.is_h3_jto AND uc.calc_aging_visit > 4 THEN 2
+            WHEN uc.concern_urgency = 'Moderat' THEN 1
+            WHEN uc.calc_aging_visit > 7 THEN 1
+            WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 1
+            ELSE 0
+          END
+        ) = 2 THEN 'Penting'
+        WHEN (
+          CASE
+            WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 0
+            WHEN uc.concern_urgency = 'Sangat Penting' THEN 3
+            WHEN uc.calc_aging_visit > 21 THEN 3
+            WHEN u.gps_status ILIKE ANY(ARRAY['%Offline%', '%Pelepasan%', '%Pindah%', '%Geser%']) THEN 3
+            WHEN COALESCE(u.overdue_days, 0) IN (3, 6, 9) THEN 3
+            WHEN COALESCE(u.overdue_days, 0) > 11 AND uc.calc_aging_visit > 3 THEN 3
+            WHEN uc.concern_urgency = 'Penting' THEN 2
+            WHEN uc.calc_aging_visit > 14 THEN 2
+            WHEN u.gps_status ILIKE '%Baterai Lemah%' THEN 2
+            WHEN (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6) THEN 2
+            WHEN (UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' AND (LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) < 6 OR u.gps_status ILIKE '%Belum Pasang%')) THEN 2
+            WHEN uc.is_h3_jto AND uc.calc_aging_visit > 4 THEN 2
+            WHEN uc.concern_urgency = 'Moderat' THEN 1
+            WHEN uc.calc_aging_visit > 7 THEN 1
+            WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 1
+            ELSE 0
+          END
+        ) = 1 THEN 'Moderat'
         ELSE 'Normal'
       END AS calc_level,
 
       CASE
-        WHEN uc.concern_urgency IS NOT NULL THEN 'Concern: ' || COALESCE(uc.concern_note, '-')
-        WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 'Normal (Mitra Closed / Dormant)'
-        WHEN u.gps_status ILIKE ANY(ARRAY['%Pelepasan%', '%Offline%', '%Baterai Lemah%', '%Belum Lepas%', '%Belum Pasang%', '%Geser%']) THEN 'GPS Alert: ' || u.gps_status
-        WHEN uc.calc_aging_visit >= 22 AND COALESCE(u.lifetime_days, 0) > 90 THEN 'Aging Visit >= 22 hr (' || uc.calc_aging_visit || ' hr) & Lifetime > 90 hr (' || COALESCE(u.lifetime_days, 0) || ' hr)'
-        WHEN uc.calc_aging_visit >= 15 AND uc.is_h3_jto THEN 'Aging Visit >= 15 hr (' || uc.calc_aging_visit || ' hr) & H-3 JTO (' || TO_CHAR(u.jto_date, 'YYYY-MM-DD') || ')'
-        WHEN uc.calc_aging_visit >= 3 AND COALESCE(u.overdue_days, 0) >= 3 THEN 'Aging Visit >= 3 hr (' || uc.calc_aging_visit || ' hr) & Overdue >= 3 hr (' || COALESCE(u.overdue_days, 0) || ' hr)'
-        WHEN uc.calc_aging_visit >= 5 AND uc.is_h3_jto THEN 'Aging Visit >= 5 hr (' || uc.calc_aging_visit || ' hr) & H-3 JTO (' || TO_CHAR(u.jto_date, 'YYYY-MM-DD') || ')'
-        WHEN uc.calc_aging_visit >= 22 THEN 'Aging Visit Unit >= 22 hr (' || uc.calc_aging_visit || ' hr)'
-        WHEN uc.calc_aging_visit >= 15 THEN 'Aging Visit Unit >= 15 hr (' || uc.calc_aging_visit || ' hr)'
-        WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 'Aging Maintenance GPS > 30 hr (' || COALESCE(u.aging_gps_maint, 0) || ' hr)'
+        WHEN uc.is_dealer_closed_or_dormant AND uc.concern_urgency IS NULL THEN 'Normal (Mitra Closed/Dormant)'
+        WHEN uc.concern_urgency IS NOT NULL THEN 'Concern Unit: ' || COALESCE(uc.concern_note, '-')
+        WHEN uc.calc_aging_visit > 21 THEN 'Aging Visit Unit > 21 hr (' || uc.calc_aging_visit || ' hr)'
+        WHEN u.gps_status ILIKE ANY(ARRAY['%Offline%', '%Pelepasan%', '%Pindah%', '%Geser%']) THEN 'Anomali GPS (Offline/Pelepasan/Geser)'
+        WHEN COALESCE(u.overdue_days, 0) IN (3, 6, 9) THEN 'Fasilitas OVD ' || u.overdue_days || ' Hari'
+        WHEN COALESCE(u.overdue_days, 0) > 11 AND uc.calc_aging_visit > 3 THEN 'Fasilitas OVD > 11 hr & Aging Visit > 3 hr'
+        WHEN uc.calc_aging_visit > 14 THEN 'Aging Visit Unit > 14 hr (' || uc.calc_aging_visit || ' hr)'
+        WHEN u.gps_status ILIKE '%Baterai Lemah%' THEN 'Baterai GPS Lemah'
+        WHEN (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6) THEN 'Fasilitas Expired, GPS Belum Dilepas'
+        WHEN (UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' AND (LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) < 6 OR u.gps_status ILIKE '%Belum Pasang%')) THEN 'Fasilitas Live, GPS Belum Pasang'
+        WHEN uc.is_h3_jto AND uc.calc_aging_visit > 4 THEN 'H-3 JTO & Aging Visit > 4 hr'
+        WHEN uc.calc_aging_visit > 7 THEN 'Aging Visit Unit > 7 hr (' || uc.calc_aging_visit || ' hr)'
+        WHEN COALESCE(u.aging_gps_maint, 0) > 30 THEN 'Aging Maintenance GPS > 30 hr'
         ELSE 'Normal'
       END AS calc_reason
     FROM m_facility_unit u
@@ -203,7 +243,7 @@ BEGIN
         MAX(CASE WHEN u.priority_score > 0 THEN u.priority_reason END), 
         'Normal'
       ) AS unit_highest_reason,
-      BOOL_OR(u.priority_reason LIKE 'Concern: %') AS has_assigned_unit_concern
+      BOOL_OR(u.priority_reason LIKE 'Concern: %' OR u.priority_reason LIKE 'Concern Unit: %') AS has_assigned_unit_concern
     FROM m_facility_unit u
     WHERE UPPER(COALESCE(u.contract_status, 'LIVE')) LIKE '%LIVE%' 
        OR (UPPER(COALESCE(u.contract_status, '')) LIKE '%EXPIRED%' AND LENGTH(REGEXP_REPLACE(COALESCE(u.imei_gps, ''), '\D', '', 'g')) >= 6)
@@ -236,22 +276,29 @@ BEGIN
       d.dealer_id,
       dc.calc_aging_visit,
       (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') AS is_closed_or_dormant,
-      CASE 
-        WHEN dc.concern_urgency = 'Sangat Penting' THEN 3
-        WHEN dc.concern_urgency = 'Penting' THEN 2
-        WHEN dc.concern_urgency = 'Moderat' THEN 1
-        -- Abaikan aging visit jika Closed / Dormant
+      CASE
+        -- Kunci Status Closed & Dormant tetap di paling atas (Skor 0)
         WHEN (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') THEN 0
+        
+        WHEN dc.concern_urgency = 'Sangat Penting' THEN 3
+        WHEN dc.calc_aging_visit >= 61 THEN 3
+        
+        WHEN dc.concern_urgency = 'Penting' THEN 2
         WHEN dc.calc_aging_visit >= 31 THEN 2
-        WHEN dc.calc_aging_visit >= 22 THEN 1
+        
+        WHEN dc.concern_urgency = 'Moderat' THEN 1
+        WHEN dc.calc_aging_visit >= 21 THEN 1
+        WHEN d.last_visit_date IS NULL THEN 1 -- New Mitra
         ELSE 0
       END AS mitra_score,
 
-      CASE 
-        WHEN dc.concern_urgency IS NOT NULL THEN 'Concern Mitra: ' || COALESCE(dc.concern_note, '-')
+      CASE
         WHEN (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') THEN 'Normal (Mitra Closed / Dormant)'
+        WHEN dc.concern_urgency IS NOT NULL THEN 'Concern Mitra: ' || COALESCE(dc.concern_note, '-')
+        WHEN dc.calc_aging_visit >= 61 THEN 'Aging Visit Mitra >= 61 hr (' || dc.calc_aging_visit || ' hr)'
         WHEN dc.calc_aging_visit >= 31 THEN 'Aging Visit Mitra >= 31 hr (' || dc.calc_aging_visit || ' hr)'
-        WHEN dc.calc_aging_visit >= 22 THEN 'Aging Visit Mitra >= 22 hr (' || dc.calc_aging_visit || ' hr)'
+        WHEN dc.calc_aging_visit >= 21 THEN 'Aging Visit Mitra >= 21 hr (' || dc.calc_aging_visit || ' hr)'
+        WHEN d.last_visit_date IS NULL THEN 'New Mitra (Belum Ada Visit)'
         ELSE 'Normal'
       END AS mitra_reason
     FROM m_dealer d

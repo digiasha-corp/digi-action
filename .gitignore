@@ -12,3 +12,13 @@ npm-debug.log*
 
 # Google Drive for Desktop temp upload folder
 .tmp.driveupload/
+
+# Temporary scratch & debug scripts
+fix_*.js
+fix_*.ps1
+fix_*.py
+replace_script.js
+scratch_replace.js
+scratch/
+Digiaction_Gabungan.txt
+image.png

@@ -364,60 +364,93 @@ function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
   if (!dealer) return false;
   if (!user) return true;
 
+  const clean = (s) => String(s || "").toLowerCase().replace(/^(cabang|branch)\s+/i, "").replace(/[\s\-_.]/g, "");
+
   const rawArea = String(user.area_cover || "").trim();
 
-  // ATURAN UTAMA:
-  // Semua user (termasuk Admin/Super Admin/user cabang) diatur oleh field area_cover.
-  // Jika area_cover kosong, "*", atau "ALL", artinya user memiliki akses ke SEMUA AREA (seluruh dealer).
-  if (!rawArea || rawArea === "*" || rawArea.toUpperCase() === "ALL") {
+  // 1. JIKA USER MEMILIKI AREA_COVER SPESIFIK:
+  if (rawArea && rawArea !== "*" && rawArea.toUpperCase() !== "ALL") {
+    // Parsing daftar area cover user (contoh: 'TGR 1, TGR 2, Jakarta' -> ['tgr 1', 'tgr 2', 'jakarta'])
+    const userAreas = rawArea.split(/[,;/|\n\r]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+    const userAreasClean = userAreas.map(clean).filter(Boolean);
+
+    if (userAreas.length > 0) {
+      const dArea = String(dealer.area_cover || "").trim().toLowerCase();
+      const dAreaClean = clean(dealer.area_cover);
+
+      const dCabang = String(dealer.cabang || "").trim().toLowerCase();
+      const dCabangClean = clean(dealer.cabang);
+
+      // Cek kecocokan antara area_cover dealer dengan daftar cover area user
+      if (dArea) {
+        const matchArea = userAreas.some((a, idx) => {
+          const aClean = userAreasClean[idx];
+          return (
+            dArea === a ||
+            dArea.includes(a) ||
+            a.includes(dArea) ||
+            (dAreaClean && aClean && (dAreaClean === aClean || dAreaClean.includes(aClean) || aClean.includes(dAreaClean)))
+          );
+        });
+        if (matchArea) return true;
+      }
+
+      // Cek apakah cabang dealer cocok dengan salah satu area cover user
+      if (dCabang) {
+        const matchCabang = userAreas.some((a, idx) => {
+          const aClean = userAreasClean[idx];
+          return (
+            dCabang === a ||
+            dCabang.includes(a) ||
+            a.includes(dCabang) ||
+            (dCabangClean && aClean && (dCabangClean === aClean || dCabangClean.includes(aClean) || aClean.includes(dCabangClean)))
+          );
+        });
+        if (matchCabang) return true;
+      }
+
+      return false;
+    }
+  }
+
+  // 2. JIKA USER TIDAK MEMILIKI AREA_COVER SPESIFIK (Fallback ke Cabang Pengguna):
+  // Cek apakah user adalah entitas pusat / BOD / HO / Super Admin yang berhak memantau seluruh cabang
+  const userCabang = String(user.cabang || "").trim();
+  const userCabangClean = clean(userCabang);
+  const userRole = String(user.role || user.jabatan || "").toLowerCase();
+
+  const isGlobalEntity = !userCabang ||
+    userCabangClean === "pusat" ||
+    userCabangClean === "kantorpusat" ||
+    userCabangClean === "headoffice" ||
+    userCabangClean === "ho" ||
+    userCabangClean.includes("boardofdirector") ||
+    userCabangClean.includes("bod") ||
+    userCabangClean.includes("all") ||
+    userRole.includes("super admin") ||
+    userRole.includes("director") ||
+    userRole.includes("coo") ||
+    userRole.includes("ceo");
+
+  if (isGlobalEntity && (!userCabang || rawArea === "*" || rawArea.toUpperCase() === "ALL")) {
     return true;
   }
 
-  // Jika area_cover diisi secara spesifik (misal: "Tangerang 1, Tangerang 2, Jakarta Barat"),
-  // maka user (siapapun rolenya) hanya dapat melihat dealer yang berada di area cover tersebut.
-  const clean = (s) => String(s || "").toLowerCase().replace(/[\s\-_.]/g, "");
+  // Jika user adalah orang cabang (misal: "Cabang Tangerang 1"):
+  // Maka user HANYA dapat melihat dealer yang berada di cabangnya sendiri
+  if (userCabangClean) {
+    const dCabangClean = clean(dealer.cabang);
+    if (!dCabangClean) return false;
 
-  // Parsing daftar area cover user (contoh: 'TGR 1, TGR 2, Jakarta' -> ['tgr 1', 'tgr 2', 'jakarta'])
-  const userAreas = rawArea.split(/[,;/|\n\r]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
-  const userAreasClean = userAreas.map(clean).filter(Boolean);
-
-  if (userAreas.length === 0) return true;
-
-  const dArea = String(dealer.area_cover || "").trim().toLowerCase();
-  const dAreaClean = clean(dealer.area_cover);
-
-  const dCabang = String(dealer.cabang || "").trim().toLowerCase();
-  const dCabangClean = clean(dealer.cabang);
-
-  // 1. Cek kecocokan antara area_cover dealer dengan daftar cover area user
-  if (dArea) {
-    const matchArea = userAreas.some((a, idx) => {
-      const aClean = userAreasClean[idx];
-      return (
-        dArea === a ||
-        dArea.includes(a) ||
-        a.includes(dArea) ||
-        (dAreaClean && aClean && (dAreaClean === aClean || dAreaClean.includes(aClean) || aClean.includes(dAreaClean)))
-      );
-    });
-    if (matchArea) return true;
+    // Cocokkan cabang dealer dengan cabang user
+    return (
+      dCabangClean === userCabangClean ||
+      dCabangClean.includes(userCabangClean) ||
+      userCabangClean.includes(dCabangClean)
+    );
   }
 
-  // 2. Cek apakah cabang dealer cocok dengan salah satu area cover user
-  if (dCabang) {
-    const matchCabang = userAreas.some((a, idx) => {
-      const aClean = userAreasClean[idx];
-      return (
-        dCabang === a ||
-        dCabang.includes(a) ||
-        a.includes(dCabang) ||
-        (dCabangClean && aClean && (dCabangClean === aClean || dCabangClean.includes(aClean) || aClean.includes(dCabangClean)))
-      );
-    });
-    if (matchCabang) return true;
-  }
-
-  return false;
+  return true;
 }
 
 let CURRENT_USER_GEO = { lat: null, long: null, accuracy: null, nearestOffice: null, distanceToOffice: null, isInsideRadius: false };
@@ -437,6 +470,7 @@ let CENTER_ALERT_CALLBACK = null;
 
 let PRIORITY_ACTIVE_FILTER = "ALL";
 let PRIORITY_VISIT_STATUS_FILTER = "ALL";
+let ACTIVE_USER_COVER_AREAS = [];
 let FAC_ACTIVE_CONTRACT_FILTER = "ALL";
 let FAC_SELECTED_STATUS_FILTERS = [];
 
@@ -622,6 +656,8 @@ async function supabaseLogin(identifier, password) {
   return {
     success: true,
     user: {
+      id: emp.id,
+      employee_id: emp.id,
       nip: emp.nip,
       email: emp.email || emailToLogin,
       nama: emp.name,
@@ -732,6 +768,7 @@ async function supabaseGetMasterData() {
       owner_name: d.owner_name,
       cabang: d.cabang,
       area_cover: d.area_cover || "",
+      cover_area_id: d.cover_area_id || null,
       productivity: d.productivity || "Normal",
       status: d.status || "AKTIF",
       tanggal_kerjasama: d.tanggal_kerjasama,
@@ -1844,9 +1881,9 @@ async function loadScreen(screenName, updateHistory = true) {
     if (screenName === "dashboard") initDashboard();
     if (screenName === "profile") initProfileScreen();
     if (screenName === "priority") {
-      renderPriorityList();
-      // Silently sync di background untuk memastikan assign concern atau status visit terbaru selalu termuat
-      syncMasterDataFromApi().then(() => renderPriorityList());
+      fetchUserCoverAreas().then(() => renderPriorityList());
+      // Silently sync di background untuk memastikan assign concern, cover area, atau status visit terbaru selalu termuat
+      Promise.all([syncMasterDataFromApi(), fetchUserCoverAreas()]).then(() => renderPriorityList());
     }
     if (screenName === "assignment") {
       populateAssignDealerOptions();
@@ -6487,6 +6524,83 @@ async function startVisitForDealer(dealerId) {
   setTimeout(trySelect, 50);
 }
 
+// -------------------------------------------------------------------------
+// COVER AREA PIC LOGIC (DUAL-APPROACH FILTERING & DYNAMIC HEADER)
+// -------------------------------------------------------------------------
+async function fetchUserCoverAreas() {
+  if (!CURRENT_USER) {
+    ACTIVE_USER_COVER_AREAS = [];
+    return ACTIVE_USER_COVER_AREAS;
+  }
+
+  try {
+    if (!supabaseClient && typeof getSupabaseClient === "function") {
+      supabaseClient = getSupabaseClient();
+    }
+    if (!supabaseClient) return [];
+
+    let employeeId = CURRENT_USER.id || CURRENT_USER.employee_id;
+
+    // Jika user login lama belum memiliki field .id di localStorage, cari berdasarkan NIP atau user_id
+    if (!employeeId && (CURRENT_USER.nip || CURRENT_USER.user_id)) {
+      let query = supabaseClient.from("hr_employees").select("id").limit(1);
+      if (CURRENT_USER.nip) {
+        query = query.eq("nip", CURRENT_USER.nip);
+      } else {
+        query = query.eq("user_id", CURRENT_USER.user_id);
+      }
+      const { data: empData } = await query;
+      if (empData && empData.length > 0) {
+        employeeId = empData[0].id;
+        CURRENT_USER.id = employeeId;
+        CURRENT_USER.employee_id = employeeId;
+        try {
+          localStorage.setItem("DIGIASHA_AUTH_USER", JSON.stringify(CURRENT_USER));
+        } catch (e) { }
+      }
+    }
+
+    if (!employeeId) {
+      console.warn("[fetchUserCoverAreas] ID Karyawan tidak ditemukan untuk user:", CURRENT_USER);
+      ACTIVE_USER_COVER_AREAS = [];
+      return ACTIVE_USER_COVER_AREAS;
+    }
+
+    const uid = employeeId;
+    // Query area di mana user adalah pic_fac_id ATAU pic_marketing_id
+    let { data: areas, error } = await supabaseClient
+      .from("m_cover_area")
+      .select("id_area, nama_area")
+      .or(`pic_fac_id.eq.${uid},pic_marketing_id.eq.${uid}`)
+      .eq("is_active", true);
+
+    // Fallback jika database belum ada kolom pic_fac_id (masih pic_id)
+    if (error && (error.message || "").includes("pic_fac_id")) {
+      const resFallback = await supabaseClient
+        .from("m_cover_area")
+        .select("id_area, nama_area")
+        .eq("pic_id", uid)
+        .eq("is_active", true);
+      if (!resFallback.error && resFallback.data) {
+        areas = resFallback.data;
+        error = null;
+      }
+    }
+
+    if (error) {
+      console.warn("[fetchUserCoverAreas Error]:", error);
+      ACTIVE_USER_COVER_AREAS = [];
+    } else {
+      ACTIVE_USER_COVER_AREAS = areas || [];
+    }
+  } catch (err) {
+    console.warn("[fetchUserCoverAreas Exception]:", err);
+    ACTIVE_USER_COVER_AREAS = [];
+  }
+
+  return ACTIVE_USER_COVER_AREAS;
+}
+
 async function refreshPriorityData(btn) {
   const container = document.getElementById("priority-list-container");
   if (container) {
@@ -6496,7 +6610,10 @@ async function refreshPriorityData(btn) {
     btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
     btn.disabled = true;
   }
-  await syncMasterDataFromApi();
+  await Promise.all([
+    syncMasterDataFromApi(),
+    fetchUserCoverAreas()
+  ]);
   renderPriorityList();
   if (btn) {
     btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
@@ -6509,13 +6626,22 @@ function renderPriorityList() {
   if (!container) return;
   container.innerHTML = "";
 
-  // Tampilkan label area cover aktif di header
+  // Tampilkan label area cover dinamis di header berdasarkan ACTIVE_USER_COVER_AREAS & CURRENT_USER.cabang
   const subTitleEl = document.getElementById("priority-header-subtitle");
   if (subTitleEl) {
-    if (CURRENT_USER?.area_cover) {
-      subTitleEl.innerHTML = `<i class="fa-solid fa-map-location-dot mr-1 text-amber-800"></i>Cover Area: <strong class="text-amber-900 font-bold">${CURRENT_USER.area_cover}</strong>`;
+    if (Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
+      const areaNames = ACTIVE_USER_COVER_AREAS.map(a => a.nama_area).filter(Boolean);
+      if (areaNames.length === 1) {
+        subTitleEl.innerHTML = `<i class="fa-solid fa-map-location-dot mr-1 text-amber-800"></i>Area: <strong class="text-amber-900 font-bold">${escapeHtml(areaNames[0])}</strong>`;
+      } else if (areaNames.length <= 3) {
+        subTitleEl.innerHTML = `<i class="fa-solid fa-map-location-dot mr-1 text-amber-800"></i>Area: <strong class="text-amber-900 font-bold">${areaNames.map(escapeHtml).join(", ")}</strong>`;
+      } else {
+        const firstTwo = areaNames.slice(0, 2).map(escapeHtml).join(", ");
+        const remaining = areaNames.length - 2;
+        subTitleEl.innerHTML = `<i class="fa-solid fa-map-location-dot mr-1 text-amber-800"></i>Area: <strong class="text-amber-900 font-bold">${firstTwo}, +${remaining} Area Lainnya</strong>`;
+      }
     } else if (CURRENT_USER?.cabang) {
-      subTitleEl.innerHTML = `<i class="fa-solid fa-building mr-1 text-amber-800"></i>Cabang: <strong class="text-amber-900 font-bold">${CURRENT_USER.cabang}</strong>`;
+      subTitleEl.innerHTML = `<i class="fa-solid fa-building mr-1 text-amber-800"></i>Cabang: <strong class="text-amber-900 font-bold">${escapeHtml(CURRENT_USER.cabang)}</strong>`;
     } else {
       subTitleEl.innerText = "Real-time Closed-Loop Priority Action Monitoring";
     }
@@ -6602,9 +6728,17 @@ function renderPriorityList() {
     };
   });
 
-  // 0. Filter Cakupan Wilayah (Cover Area PIC):
-  // Wajib difilter strictly sesuai cover area pengguna yang aktif, berlaku untuk seluruh role (termasuk Admin/Super Admin).
-  computedList = computedList.filter(d => isDealerInUserCoverArea(d));
+  // 0. DUAL-APPROACH FILTERING PADA LIST MITRA:
+  // - Pendekatan 1 (Filter by Cover Area): Jika ACTIVE_USER_COVER_AREAS ada isinya (>0),
+  //   maka HANYA tampilkan dealer (m_dealer) yang cover_area_id-nya ada di dalam array tersebut.
+  // - Pendekatan 2 (Fallback Hierarchy): Jika ACTIVE_USER_COVER_AREAS kosong (0),
+  //   maka fallback ke hierarki cakupan wilayah/cabang user yang login (isDealerInUserCoverArea(d)).
+  if (Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
+    const userAreaIds = new Set(ACTIVE_USER_COVER_AREAS.map(a => a.id_area).filter(Boolean));
+    computedList = computedList.filter(d => d.cover_area_id && userAreaIds.has(d.cover_area_id));
+  } else {
+    computedList = computedList.filter(d => isDealerInUserCoverArea(d));
+  }
 
   // Sorting: Prioritas yang belum selesai diletakkan paling atas -> Score DESC -> Aging Visit DESC
   computedList.sort((a, b) => {
@@ -6658,7 +6792,14 @@ function renderPriorityList() {
 
   if (computedList.length === 0) {
     const isSearching = !!PRIORITY_SEARCH_QUERY;
-    const userAreaLabel = (CURRENT_USER?.area_cover && CURRENT_USER.area_cover !== "*" && CURRENT_USER.area_cover.toUpperCase() !== "ALL") ? `Area ${CURRENT_USER.area_cover}` : "Semua Area";
+    let userAreaLabel = "Semua Area";
+    if (Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
+      userAreaLabel = "Area " + ACTIVE_USER_COVER_AREAS.map(a => a.nama_area).filter(Boolean).join(", ");
+    } else if (CURRENT_USER?.cabang) {
+      userAreaLabel = `Cabang ${CURRENT_USER.cabang}`;
+    } else if (CURRENT_USER?.area_cover && CURRENT_USER.area_cover !== "*" && CURRENT_USER.area_cover.toUpperCase() !== "ALL") {
+      userAreaLabel = `Area ${CURRENT_USER.area_cover}`;
+    }
     const filterText = isSearching
       ? `Pencarian "${PRIORITY_SEARCH_QUERY}"`
       : (PRIORITY_ACTIVE_FILTER === "ALL" ? `Prioritas Aktif (${userAreaLabel})` : `Level "${PRIORITY_ACTIVE_FILTER}" (${userAreaLabel})`);
@@ -24826,16 +24967,18 @@ async function loadCoverAreaPicOptions() {
 }
 
 function renderCoverAreaPicSelectDropdown() {
-  const selectEl = document.getElementById("assign-pic-employee-select");
-  if (!selectEl) return;
+  const facSelect = document.getElementById("assign-pic-fac-select");
+  const mktSelect = document.getElementById("assign-pic-marketing-select");
 
   let html = `<option value="">-- Tanpa PIC / Kosongkan --</option>`;
   COVER_AREA_PIC_OPTIONS.forEach(pic => {
     const isMe = (CURRENT_USER && (pic.id === CURRENT_USER.id || (pic.nip && pic.nip === CURRENT_USER.nip)));
     const meBadge = isMe ? " (Saya Sendiri)" : "";
-    html += `<option value="${pic.id}">${pic.nama}${meBadge} - ${pic.jabatan}</option>`;
+    html += `<option value="${pic.id}">${escapeHtml(pic.nama)}${meBadge} - ${escapeHtml(pic.jabatan)}</option>`;
   });
-  selectEl.innerHTML = html;
+
+  if (facSelect) facSelect.innerHTML = html;
+  if (mktSelect) mktSelect.innerHTML = html;
 }
 
 async function loadCoverAreaManagementData() {
@@ -24858,19 +25001,88 @@ async function loadCoverAreaManagementData() {
     ])).filter(Boolean);
 
     // 1. Ambil seluruh cover area milik unit/cabang downline user
+    // Query pic_fac_id & pic_marketing_id (setelah migrasi 21_add_pic_marketing_to_cover_area.sql)
     let areaQuery = supabaseClient
       .from("m_cover_area")
-      .select("id_area, nama_area, unit_id, pic_id, is_active, hr_organization_units(id_unit, nama_unit), hr_employees(id, nip, name, hr_job_positions(nama_jabatan))")
+      .select("id_area, nama_area, unit_id, pic_fac_id, pic_marketing_id, is_active, hr_organization_units(id_unit, nama_unit)")
       .eq("is_active", true);
 
     if (downlineUnitIds.length > 0) {
       areaQuery = areaQuery.in("unit_id", downlineUnitIds);
     }
 
-    const { data: areas, error: areaErr } = await areaQuery.order("nama_area", { ascending: true });
+    let { data: areas, error: areaErr } = await areaQuery.order("nama_area", { ascending: true });
+
+    // Fallback jika database belum menjalankan migrasi rename (masih menggunakan kolom lama 'pic_id')
+    if (areaErr && (areaErr.message || "").includes("pic_fac_id")) {
+      console.warn("Kolom pic_fac_id belum ada, mencoba fallback ke pic_id:", areaErr);
+      let fallbackQuery = supabaseClient
+        .from("m_cover_area")
+        .select("id_area, nama_area, unit_id, pic_id, is_active, hr_organization_units(id_unit, nama_unit)")
+        .eq("is_active", true);
+      if (downlineUnitIds.length > 0) {
+        fallbackQuery = fallbackQuery.in("unit_id", downlineUnitIds);
+      }
+      const resFallback = await fallbackQuery.order("nama_area", { ascending: true });
+      if (!resFallback.error && resFallback.data) {
+        areas = resFallback.data;
+        areaErr = null;
+      }
+    }
 
     if (areaErr) throw areaErr;
-    COVER_AREA_LIST = areas || [];
+
+    // Kumpulkan seluruh ID PIC yang terpasang untuk di-fetch informasinya jika belum ada di COVER_AREA_PIC_OPTIONS
+    const neededPicIds = new Set();
+    (areas || []).forEach(a => {
+      const fId = a.pic_fac_id || a.pic_id;
+      const mId = a.pic_marketing_id;
+      if (fId) neededPicIds.add(fId);
+      if (mId) neededPicIds.add(mId);
+    });
+
+    // Ambil data karyawan PIC tambahan jika ada yang belum ada di cache options
+    const picMap = new Map();
+    (COVER_AREA_PIC_OPTIONS || []).forEach(p => picMap.set(p.id, p));
+
+    const missingIds = Array.from(neededPicIds).filter(id => !picMap.has(id));
+    if (missingIds.length > 0) {
+      try {
+        const { data: missingEmps } = await supabaseClient
+          .from("hr_employees")
+          .select("id, nip, name, hr_job_positions(nama_jabatan), hr_organization_units(nama_unit)")
+          .in("id", missingIds);
+        (missingEmps || []).forEach(emp => {
+          const item = {
+            id: emp.id,
+            nip: emp.nip,
+            nama: emp.name || emp.nip || "Karyawan",
+            jabatan: emp.hr_job_positions?.nama_jabatan || "Staff",
+            cabang: emp.hr_organization_units?.nama_unit || "-"
+          };
+          picMap.set(emp.id, item);
+          COVER_AREA_PIC_OPTIONS.push(item);
+        });
+      } catch (e) {
+        console.warn("Gagal fetch missing PICs:", e);
+      }
+    }
+
+    COVER_AREA_LIST = (areas || []).map(area => {
+      const facId = area.pic_fac_id || area.pic_id || null;
+      const mktId = area.pic_marketing_id || null;
+      const facObj = facId ? picMap.get(facId) : null;
+      const mktObj = mktId ? picMap.get(mktId) : null;
+
+      return {
+        ...area,
+        pic_fac_id: facId,
+        pic_marketing_id: mktId,
+        pic_id: facId,
+        pic_fac: facObj ? { id: facObj.id, nip: facObj.nip, name: facObj.nama, hr_job_positions: { nama_jabatan: facObj.jabatan } } : null,
+        pic_mkt: mktObj ? { id: mktObj.id, nip: mktObj.nip, name: mktObj.nama, hr_job_positions: { nama_jabatan: mktObj.jabatan } } : null
+      };
+    });
 
     // 2. Ambil seluruh mitra di cabang-cabang downline (m_dealer)
     let dealerQuery = supabaseClient
@@ -24926,7 +25138,7 @@ function renderCoverAreaCards() {
 
   if (COVER_AREA_LIST.length === 0) {
     container.innerHTML = `
-      <div class="p-8 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200 space-y-2">
+      <div class="col-span-full p-8 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200 space-y-2">
         <i class="fa-solid fa-map-location-dot text-3xl text-slate-300 block mb-1"></i>
         <p class="font-bold text-slate-700">Belum ada Cover Area untuk wilayah downline ini</p>
         <p class="text-[11px] text-slate-400">Klik tombol "+ Buat Cover Area Baru" untuk mulai membagi wilayah cabang.</p>
@@ -24941,9 +25153,14 @@ function renderCoverAreaCards() {
     const dealerCount = COVER_AREA_BRANCH_DEALERS.filter(d => d.cover_area_id === area.id_area).length;
     const borderClass = "border-slate-200 bg-white hover:border-teal-300";
 
-    const picName = area.hr_employees?.name || "Belum Ditugaskan";
-    const picRole = area.hr_employees?.hr_job_positions?.nama_jabatan || "PIC Lapangan";
-    const picBadgeClass = area.pic_id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-100 text-slate-400 border-slate-200";
+    const facObj = area.pic_fac || area.legacy_pic || (COVER_AREA_PIC_OPTIONS || []).find(p => p.id === area.pic_fac_id);
+    const mktObj = area.pic_mkt || (COVER_AREA_PIC_OPTIONS || []).find(p => p.id === area.pic_marketing_id);
+
+    const facName = facObj?.name || facObj?.nama || (area.pic_fac_id ? "PIC FAC" : "Belum Ditugaskan");
+    const mktName = mktObj?.name || mktObj?.nama || (area.pic_marketing_id ? "PIC Marketing" : "Belum Ditugaskan");
+
+    const facBadgeClass = area.pic_fac_id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-100 text-slate-400 border-slate-200";
+    const mktBadgeClass = area.pic_marketing_id ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200";
     
     // Nama Cabang pemilik area
     const branchName = area.hr_organization_units?.nama_unit || (
@@ -24963,12 +25180,15 @@ function renderCoverAreaCards() {
                 <i class="fa-solid fa-building mr-1 text-[8px] text-teal-600"></i>${escapeHtml(branchName)}
               </span>
             </div>
-            <div class="flex items-center space-x-2 mt-1">
+            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
               <button type="button" onclick="openViewMitraAreaModal('${area.id_area}', '${escapeHtml(area.nama_area).replace(/'/g, "\\'")}')" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 shrink-0 transition flex items-center cursor-pointer" title="Klik untuk melihat daftar mitra">
                 <i class="fa-solid fa-store mr-1 text-[9px]"></i>${dealerCount} Mitra
               </button>
-              <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border ${picBadgeClass} truncate">
-                <i class="fa-solid fa-user mr-1 text-[9px]"></i>${escapeHtml(picName)}
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border ${facBadgeClass} truncate" title="PIC FAC">
+                <i class="fa-solid fa-user-shield mr-1 text-[9px]"></i>FAC: ${escapeHtml(facName)}
+              </span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border ${mktBadgeClass} truncate" title="PIC Marketing">
+                <i class="fa-solid fa-bullhorn mr-1 text-[9px]"></i>MKT: ${escapeHtml(mktName)}
               </span>
             </div>
           </div>
@@ -24999,11 +25219,10 @@ async function deleteCoverArea(areaId, areaName) {
   const targetArea = COVER_AREA_LIST.find(a => a.id_area === areaId);
   const displayName = areaName || targetArea?.nama_area || "Cover Area";
 
-  // 1. Validasi PIC: Pastikan tidak ada PIC yang masih terhubung
-  if (targetArea && targetArea.pic_id) {
-    const picName = targetArea.hr_employees?.name || "Karyawan Lapangan";
+  // 1. Validasi PIC: Pastikan tidak ada PIC (FAC atau Marketing) yang masih terhubung
+  if (targetArea && (targetArea.pic_fac_id || targetArea.pic_marketing_id || targetArea.pic_id)) {
     if (typeof showToast === "function") {
-      showToast(`Area tidak dapat dihapus! Masih memiliki penugasan PIC (${picName}). Kosongkan PIC terlebih dahulu pada Tab 'Penugasan PIC'.`, "warning", 3500);
+      showToast(`Area tidak dapat dihapus! Masih memiliki penugasan PIC (FAC/Marketing). Kosongkan PIC terlebih dahulu pada Tab 'Penugasan PIC'.`, "warning", 3500);
     }
     return;
   }
@@ -25604,7 +25823,7 @@ function renderCoverAreaPicTable() {
   if (COVER_AREA_LIST.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="4" class="py-6 text-center text-xs text-slate-400">
+        <td colspan="5" class="py-6 text-center text-xs text-slate-400">
           Belum ada cover area yang terdaftar.
         </td>
       </tr>
@@ -25614,9 +25833,16 @@ function renderCoverAreaPicTable() {
 
   let html = "";
   COVER_AREA_LIST.forEach(area => {
-    const picName = area.hr_employees?.name || "-";
-    const picRole = area.hr_employees?.hr_job_positions?.nama_jabatan || "";
-    const hasPic = Boolean(area.pic_id);
+    const facObj = area.pic_fac || area.legacy_pic || (COVER_AREA_PIC_OPTIONS || []).find(p => p.id === area.pic_fac_id);
+    const mktObj = area.pic_mkt || (COVER_AREA_PIC_OPTIONS || []).find(p => p.id === area.pic_marketing_id);
+
+    const facName = facObj?.name || facObj?.nama || "-";
+    const facRole = facObj?.hr_job_positions?.nama_jabatan || facObj?.jabatan || "FAC";
+    const hasFac = Boolean(area.pic_fac_id);
+
+    const mktName = mktObj?.name || mktObj?.nama || "-";
+    const mktRole = mktObj?.hr_job_positions?.nama_jabatan || mktObj?.jabatan || "Marketing";
+    const hasMkt = Boolean(area.pic_marketing_id);
 
     const branchName = area.hr_organization_units?.nama_unit || (
       (COVER_AREA_DOWNLINE_BRANCHES || []).find(b => b.id_unit === area.unit_id)?.nama_unit || area.unit_id || "-"
@@ -25631,18 +25857,37 @@ function renderCoverAreaPicTable() {
           </span>
         </td>
         <td class="py-3 px-3.5">
-          ${hasPic ? `
+          ${hasFac ? `
             <div class="flex items-center space-x-2">
               <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
-                <i class="fa-solid fa-user"></i>
+                <i class="fa-solid fa-user-shield"></i>
               </div>
               <div>
-                <span class="font-bold text-slate-800 block text-xs leading-tight">${escapeHtml(picName)}</span>
-                <span class="text-[10px] text-slate-400 block">${escapeHtml(picRole)}</span>
+                <span class="font-bold text-slate-800 block text-xs leading-tight">${escapeHtml(facName)}</span>
+                <span class="text-[10px] text-slate-400 block">${escapeHtml(facRole)}</span>
               </div>
             </div>
           ` : `
-            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-400 font-medium">Belum Ada PIC</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-rose-50 text-rose-600 font-semibold border border-rose-200 inline-flex items-center">
+              <i class="fa-solid fa-circle-exclamation mr-1 text-[8px]"></i>Belum Ditugaskan
+            </span>
+          `}
+        </td>
+        <td class="py-3 px-3.5">
+          ${hasMkt ? `
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold">
+                <i class="fa-solid fa-bullhorn"></i>
+              </div>
+              <div>
+                <span class="font-bold text-slate-800 block text-xs leading-tight">${escapeHtml(mktName)}</span>
+                <span class="text-[10px] text-slate-400 block">${escapeHtml(mktRole)}</span>
+              </div>
+            </div>
+          ` : `
+            <span class="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200 inline-flex items-center">
+              <i class="fa-solid fa-circle-exclamation mr-1 text-[8px]"></i>Belum Ditugaskan
+            </span>
           `}
         </td>
         <td class="py-3 px-3.5 text-right">
@@ -25666,11 +25911,15 @@ function openAssignPicModal(areaId) {
   ASSIGN_PIC_ACTIVE_AREA_ID = areaId;
   const modal = document.getElementById("modal-assign-pic-area");
   const areaNameEl = document.getElementById("assign-pic-modal-area-name");
-  const selectEl = document.getElementById("assign-pic-employee-select");
+  const facSelect = document.getElementById("assign-pic-fac-select");
+  const mktSelect = document.getElementById("assign-pic-marketing-select");
 
   if (areaNameEl) areaNameEl.innerText = `Area: ${area.nama_area}`;
-  if (selectEl) {
-    selectEl.value = area.pic_id || "";
+  if (facSelect) {
+    facSelect.value = area.pic_fac_id || area.pic_id || "";
+  }
+  if (mktSelect) {
+    mktSelect.value = area.pic_marketing_id || "";
   }
 
   if (modal) modal.classList.remove("hidden");
@@ -25686,9 +25935,12 @@ async function handleAssignPicSubmit(e) {
   e.preventDefault();
   if (!supabaseClient || !ASSIGN_PIC_ACTIVE_AREA_ID) return;
 
-  const selectEl = document.getElementById("assign-pic-employee-select");
+  const facSelect = document.getElementById("assign-pic-fac-select");
+  const mktSelect = document.getElementById("assign-pic-marketing-select");
   const btn = document.getElementById("btn-submit-assign-pic");
-  const newPicId = selectEl ? (selectEl.value || null) : null;
+
+  const valFac = facSelect ? (facSelect.value || null) : null;
+  const valMkt = mktSelect ? (mktSelect.value || null) : null;
 
   if (btn) {
     btn.disabled = true;
@@ -25696,15 +25948,36 @@ async function handleAssignPicSubmit(e) {
   }
 
   try {
-    const { error } = await supabaseClient
+    const payload = {
+      pic_fac_id: valFac || null,
+      pic_marketing_id: valMkt || null,
+      updated_at: new Date().toISOString()
+    };
+
+    let { error } = await supabaseClient
       .from("m_cover_area")
-      .update({ pic_id: newPicId, updated_at: new Date().toISOString() })
+      .update(payload)
       .eq("id_area", ASSIGN_PIC_ACTIVE_AREA_ID);
+
+    // Jika Supabase database belum me-rename kolom pic_id menjadi pic_fac_id (fallback toleran)
+    if (error && (error.message || "").includes("pic_fac_id")) {
+      console.warn("Kolom pic_fac_id belum ada, mencoba update pic_id (legacy):", error);
+      const fallbackPayload = {
+        pic_id: valFac || null,
+        pic_marketing_id: valMkt || null,
+        updated_at: new Date().toISOString()
+      };
+      const resFallback = await supabaseClient
+        .from("m_cover_area")
+        .update(fallbackPayload)
+        .eq("id_area", ASSIGN_PIC_ACTIVE_AREA_ID);
+      error = resFallback.error;
+    }
 
     if (error) throw error;
 
     closeAssignPicModal();
-    if (typeof showToast === "function") showToast("PIC berhasil ditugaskan!", "success");
+    if (typeof showToast === "function") showToast("PIC Cover Area berhasil diperbarui!", "success");
 
     await loadCoverAreaManagementData();
   } catch (err) {

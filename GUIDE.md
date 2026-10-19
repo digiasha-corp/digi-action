@@ -415,6 +415,13 @@ await supabaseClient
 | `18_update_trigger_generate_nip.sql` | ⏳ SIAP DIJALANKAN | Penentuan NIP otomatis sepenuhnya merujuk ke hr_employees (tahunan YY) |
 | `19_update_priority_scoring_fac.sql` | ⏳ SIAP DIJALANKAN | Penyempurnaan parameter prioritas FAC: SP Terbit (OVD 3/6/9), Aging >= 3 & OVD >= 11, Aging visit diler (>= 61, >= 31, >= 21) |
 | `20_create_cover_area_management.sql` | ⏳ SIAP DIJALANKAN | Tabel m_cover_area (id_area, nama_area, unit_id, pic_id, is_active) & relasi cover_area_id di m_dealer |
+| `21_add_pic_marketing_to_cover_area.sql` | ⏳ SIAP DIJALANKAN | Tambah kolom pic_marketing_id dan rename pic_id -> pic_fac_id pada m_cover_area |
+
+> ✅ UPDATE: Modul Priority FAC. Layout diubah menjadi terpusat (max-w-2xl). Implementasi Dual-Approach Filtering: sistem membaca relasi `m_cover_area` secara real-time dari Supabase berdasarkan penugasan PIC (pic_fac_id). Jika PIC tidak terdaftar di cover area manapun, sistem menerapkan fallback hierarki cabang yang presisi: karyawan cabang (misal: Cabang Tangerang 1) HANYA dapat melihat mitra dari cabang mereka sendiri (tidak akan bocor ke cabang lain seperti Balikpapan). Header area kini dinamis.
+
+> ✅ UPDATE: UI/UX Desktop Optimization (Tahap 1). Menghapus batasan `max-w-2xl` menjadi `max-w-7xl` pada kontainer utama. Menerapkan grid responsif pada tombol menu Dashboard dan daftar kartu Cover Area agar proporsional di layar desktop.
+
+> ✅ UPDATE: Modul Manajemen Cover Area kini mendukung sistem penugasan dual-PIC (FAC dan Marketing). Menambahkan kolom pic_marketing_id dan me-rename pic_id menjadi pic_fac_id di Supabase. Modal dan matriks tabel PIC diperbarui.
 
 > ✅ UPDATE: Fitur 'Lihat Mitra' dalam bentuk pop-up modal ditambahkan pada kartu Cover Area (tersedia melalui tombol 'Lihat Mitra' dan klik pada badge jumlah mitra). Dilengkapi tabel detail mitra terdaftar, fitur pencarian, dan tombol 'Lepas' (unassign mitra) langsung dari area.
 

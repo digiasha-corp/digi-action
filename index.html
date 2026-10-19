@@ -117,7 +117,7 @@
 
   <!-- TOP BAR -->
   <header id="topbar" class="hidden bg-slate-900 text-white px-3 py-3 sticky top-0 z-40 shadow w-full">
-    <div class="max-w-2xl mx-auto flex justify-between items-center w-full">
+    <div class="max-w-7xl mx-auto flex justify-between items-center w-full">
       <div class="flex items-center space-x-2 min-w-0">
         <button id="btn-back-home" onclick="handleBackNavigation()"
           class="hidden text-slate-300 hover:text-white p-1 rounded-lg">
@@ -137,7 +137,7 @@
   </header>
 
   <!-- CONTAINER DINAMIS TEMPAT LAYAR DIMUAT -->
-  <main id="main-view-container" class="w-full flex-1 px-3 py-4 max-w-2xl mx-auto">
+  <main id="main-view-container" class="w-full flex-1 px-3 py-4 max-w-7xl mx-auto">
     <div id="initial-app-loader"
       class="py-24 text-center text-xs text-slate-500 flex flex-col items-center justify-center space-y-3">
       <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -188,8 +188,8 @@
           </button>
         </div>
 
-        <div id="cover-area-cards-container" class="space-y-2.5">
-          <div class="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <div id="cover-area-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="col-span-full p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
             <i class="fa-solid fa-circle-notch fa-spin text-base text-teal-600 mb-1.5 block"></i> Memuat daftar cover area...
           </div>
         </div>
@@ -214,13 +214,14 @@
                 <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[11px] uppercase tracking-wider">
                   <th class="py-3 px-3.5">Nama Cover Area</th>
                   <th class="py-3 px-3.5">Cabang</th>
-                  <th class="py-3 px-3.5">PIC Saat Ini</th>
+                  <th class="py-3 px-3.5">PIC FAC</th>
+                  <th class="py-3 px-3.5">PIC Marketing</th>
                   <th class="py-3 px-3.5 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody id="cover-area-pic-table-body" class="divide-y divide-slate-100 text-slate-700">
                 <tr>
-                  <td colspan="4" class="py-8 text-center text-xs text-slate-400">
+                  <td colspan="5" class="py-8 text-center text-xs text-slate-400">
                     <i class="fa-solid fa-circle-notch fa-spin text-base text-indigo-600 mb-1.5 block"></i> Memuat data penugasan PIC...
                   </td>
                 </tr>
@@ -3262,11 +3263,19 @@
 
       <form id="form-assign-pic-area" onsubmit="handleAssignPicSubmit(event)" class="p-5 space-y-4 text-xs">
         <div>
-          <label class="block font-bold text-slate-700 mb-1">Pilih PIC Bertugas</label>
-          <select id="assign-pic-employee-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition">
+          <label class="block font-bold text-slate-700 mb-1">PIC Field Action Coordinator (FAC)</label>
+          <select id="assign-pic-fac-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition">
             <option value="">-- Tanpa PIC / Kosongkan --</option>
           </select>
-          <p class="text-[10px] text-slate-400 mt-1">Menampilkan Anda & seluruh karyawan dalam garis hierarki komando bawahan.</p>
+          <p class="text-[10px] text-slate-400 mt-1">PIC Operasional penanganan & kunjungan diler.</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">PIC Marketing Officer</label>
+          <select id="assign-pic-marketing-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition">
+            <option value="">-- Tanpa PIC / Kosongkan --</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">PIC Bisnis & pengembangan relasi kemitraan.</p>
         </div>
 
         <div class="flex space-x-2 pt-2">
