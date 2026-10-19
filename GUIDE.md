@@ -6,50 +6,94 @@
 
 ---
 
-## 🌿 GIT BRANCHING WORKFLOW
+## 🌿 GIT BRANCHING & MULTI-DEVICE WORKFLOW (SOP TESTING WAJIB)
 
-> **ATURAN WAJIB**: Semua pekerjaan development dilakukan di branch `feature/fac-workflow`. **Jangan pernah push langsung ke `main`/`master`.**
+> ⚠️ **ATURAN MUTLAK (ZERO ACCIDENTAL DEPLOY)**:
+> - **DILARANG KERAS** melakukan `git push origin main` secara langsung saat proses coding/development sehari-hari, baik di laptop utama maupun laptop kedua/lainnya!
+> - Branch `main` **TERKONEKSI LANGSUNG DENGAN LIVE PRODUCTION DI VERCEL**. Setiap push ke `main` langsung dinikmati oleh seluruh pengguna/karyawan.
+> - **Seluruh pengembangan di laptop lain WAJIB** menggunakan branch testing/staging: `develop` (atau branch fitur spesifik `feature/*`).
 
-### Struktur Branch & Deployment
-| Branch | Target Vercel | Tujuan |
-|--------|---------------|--------|
-| `main` | **Production URL** | Hanya menerima merge PR setelah fitur stabil & teruji |
-| `feature/fac-workflow` | **Preview / Dev URL** | **Development aktif** — tempat menguji fitur & tampilan baru sebelum production |
+---
 
-> **CATATAN PENTING**:
-> - **Branching HANYA ada di GitHub & Vercel**: Digunakan semata-mata untuk memisahkan deployment tampilan frontend (Development vs Production).
-> - **Database Supabase TIDAK menggunakan branching**: Instance database Supabase adalah satu kesatuan langsung. Setiap script migrasi SQL (`supabase/*.sql`) dieksekusi langsung di SQL Editor dashboard Supabase tersebut.
+### 1. Struktur Branch & Target Deployment Vercel
 
+| Branch | Lingkungan | Target Vercel | Keterangan |
+|---|---|---|---|
+| `develop` | **Staging / Testing** | **Preview Deployment** | **Wajib dipakai untuk develop sehari-hari & antar laptop**. Perubahan di sini menghasilkan preview link otomatis di Vercel tanpa mengganggu user live. |
+| `feature/*` | **Fitur Baru** | **Preview Deployment** | Digunakan jika mengerjakan fitur terisolasi (contoh: `feature/fac-workflow`). |
+| `main` | **Production (Live)** | **Production URL (Live)** | **Hanya menerima Merge / Pull Request** setelah pengujian di branch `develop` dinyatakan 100% lulus & disetujui owner. |
 
-### Prosedur Kerja (Wajib Diikuti Setiap Agent)
+> **CATATAN PENTING ARSITEKTUR**:
+> - **Branching HANYA memisahkan Frontend**: GitHub & Vercel memisahkan file tampilan (HTML/JS/CSS).
+> - **Database Supabase adalah SATU (SHARED LIVE)**: Perubahan skema SQL atau modifikasi data di Supabase langsung berdampak real-time ke semua branch. Selalu uji script SQL dengan hati-hati.
 
+---
+
+### 2. Prosedur SOP Multi-Device (Saat Pindah ke Laptop Lain)
+
+#### A. Di Laptop A (Sebelum Ditinggal / Diakhiri):
+Simpan dan kirim semua progress ke branch `develop`:
 ```powershell
-# 1. Pastikan sudah di branch yang benar sebelum mulai
-git checkout feature/fac-workflow
-git pull origin feature/fac-workflow
+# 1. Pastikan sedang di branch develop
+git checkout develop
+git pull origin develop
 
-# 2. Setelah selesai edit file, stage semua perubahan
-git add -A
+# 2. Ambil perubahan terbaru dari main (jika ada update sebelumnya)
+git merge main
 
-# 3. Commit dengan pesan deskriptif
-git commit -m "fix: deskripsi singkat perubahan yang dilakukan"
+# 3. Tambahkan semua perubahan file yang dikerjakan
+git add .
+git commit -m "feat/fix: deskripsi progress pekerjaan hari ini"
 
-# 4. Push ke remote branch (bukan ke main!)
-git push origin feature/fac-workflow
+# 4. Push ke remote branch develop (JANGAN PUSH KE MAIN!)
+git push origin develop
 ```
 
-### Konvensi Pesan Commit
-| Prefix | Digunakan untuk |
-|--------|-----------------|
-| `fix:` | Perbaikan bug / data tidak sinkron |
-| `feat:` | Fitur baru |
-| `refactor:` | Refactor kode tanpa perubahan fungsional |
-| `db:` | Perubahan skema / migrasi database |
-| `docs:` | Update GUIDE.md atau dokumentasi |
-| `chore:` | Maintenance, update dependency, config |
+---
 
-### Merge ke Production
-Hanya dilakukan oleh owner proyek secara manual via GitHub Pull Request, setelah testing di branch `feature/fac-workflow` dinyatakan aman.
+#### B. Di Laptop B (Saat Membuka / Melanjutkan Kerja):
+```powershell
+# 1. Jika baru pertama kali di laptop B, clone repo:
+git clone https://github.com/digiasha-corp/digi-action.git
+cd digi-action
+
+# 2. Pindah dan tarik versi develop teranyar:
+git checkout develop
+git pull origin develop
+
+# 3. Jalankan local test server (misal: node server.js atau Live Server)
+# 4. Lanjutkan proses coding dengan aman!
+```
+
+---
+
+### 3. Prosedur Testing Sebelum Rilis ke Production (`main`)
+
+Sebelum kode di branch `develop` dinaikkan ke `main`, wajib mengikuti checklist berikut:
+
+1. **Local / Preview Testing**:
+   - Jalankan web di local (`run-local.bat` atau `node server.js`).
+   - Atau cek link **Vercel Preview Deployment** yang otomatis terbuat saat branch `develop` di-push.
+2. **Uji Fungsionalitas Kritis**:
+   - [ ] Autentikasi Login & Role Access (Admin, Karyawan, Leader).
+   - [ ] CRUD data terkait yang baru diubah (misal: Cover Area, Priority Scoring, Kunjungan).
+   - [ ] Buka Browser Console (F12) dan pastikan tidak ada error JavaScript berwarna merah.
+3. **Merge ke Production (`main`)**:
+   Hanya setelah lolos uji, lakukan penggabungan ke `main`:
+   
+   **Opsi Rekomendasi (Via GitHub Pull Request):**
+   - Buat PR dari `develop` ke `main` di web GitHub.
+   - Periksa perubahan diff dan klik **Merge Pull Request**.
+
+   **Opsi Terminal (Jika dilakukan langsung oleh Owner):**
+   ```powershell
+   git checkout main
+   git pull origin main
+   git merge develop
+   git push origin main
+   ```
+   *(Vercel akan otomatis mendeteksi perubahan `main` dan memperbarui web Production secara aman).*
+
 
 ---
 
