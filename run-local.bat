@@ -4,6 +4,8 @@ echo ========================================================
 echo Menjalankan Digi-Action di http://localhost:8080/
 echo ========================================================
 
+start http://localhost:8080/
+
 where node >nul 2>nul
 if %errorlevel% equ 0 (
     node "%~dp0server.js"

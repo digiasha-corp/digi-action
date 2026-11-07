@@ -2,7 +2,6 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8080;
 const ROOT = __dirname;
 
 const MIME_TYPES = {
@@ -57,12 +56,27 @@ const server = http.createServer((req, res) => {
     stream.pipe(res);
   });
 });
+let port = parseInt(process.env.PORT, 10) || 8080;
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('========================================================');
-  console.log(' Digi-Action Local Dev Server (Node.js) Berjalan!');
-  console.log(` Akses di Browser: http://localhost:${PORT}/`);
-  console.log(` Root Directory  : ${ROOT}`);
-  console.log(' Tekan Ctrl+C untuk menghentikan server.');
-  console.log('========================================================');
+function startServer(p) {
+  server.listen(p, '0.0.0.0', () => {
+    console.log('========================================================');
+    console.log(' Digi-Action Local Dev Server (Node.js) Berjalan!');
+    console.log(` Akses di Browser: http://localhost:${p}/`);
+    console.log(` Root Directory  : ${ROOT}`);
+    console.log(' Tekan Ctrl+C untuk menghentikan server.');
+    console.log('========================================================');
+  });
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`[WARNING] Port ${port} sedang dipakai! Mencoba port ${port + 1}...`);
+    port++;
+    startServer(port);
+  } else {
+    console.error('Server error:', err);
+  }
 });
+
+startServer(port);

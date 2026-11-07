@@ -358,11 +358,43 @@ let APP_STATE = {
 
 let MASTER_DEALER_PRIORITY_DATA = [];
 let FAC_GPS_MONITORING_DATA = [];
+let ACTIVE_USER_COVER_AREAS = [];
+
+// Helper filter mitra berbasis dual-approach cover area (identik dengan filter di priority visit)
+function getCoveredDealersForUser(dealers = MASTER_DEALER_PRIORITY_DATA, user = CURRENT_USER) {
+  const list = Array.isArray(dealers) ? dealers : [];
+  if (!user) return list;
+
+  // 1. Pendekatan 1 (Filter by Cover Area): Jika user memiliki ACTIVE_USER_COVER_AREAS terisi,
+  //    cocokkan cover_area_id atau nama area_cover mitra
+  if (user === CURRENT_USER && Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
+    const userAreaIds = new Set(ACTIVE_USER_COVER_AREAS.map(a => a.id_area).filter(Boolean));
+    const userAreaNames = new Set(ACTIVE_USER_COVER_AREAS.map(a => String(a.nama_area || "").trim().toLowerCase()).filter(Boolean));
+    return list.filter(d => {
+      if (d.cover_area_id && userAreaIds.has(d.cover_area_id)) return true;
+      if (d.area_cover && userAreaNames.has(String(d.area_cover).trim().toLowerCase())) return true;
+      return false;
+    });
+  }
+
+  // 2. Pendekatan 2 (Fallback Hierarchy): Jika ACTIVE_USER_COVER_AREAS kosong,
+  //    fallback ke verifikasi area_cover teks atau cabang pengguna
+  return list.filter(d => isDealerInUserCoverArea(d, user));
+}
 
 // Helper verifikasi cakupan wilayah (cover area) mitra vs PIC pengguna (berlaku untuk seluruh role)
 function isDealerInUserCoverArea(dealer, user = CURRENT_USER) {
   if (!dealer) return false;
   if (!user) return true;
+
+  // 0. DUAL-APPROACH PENGECEKAN COVER AREA AKTIF (m_cover_area):
+  if (user === CURRENT_USER && Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
+    const userAreaIds = new Set(ACTIVE_USER_COVER_AREAS.map(a => a.id_area).filter(Boolean));
+    const userAreaNames = new Set(ACTIVE_USER_COVER_AREAS.map(a => String(a.nama_area || "").trim().toLowerCase()).filter(Boolean));
+    if (dealer.cover_area_id && userAreaIds.has(dealer.cover_area_id)) return true;
+    if (dealer.area_cover && userAreaNames.has(String(dealer.area_cover).trim().toLowerCase())) return true;
+    return false;
+  }
 
   const clean = (s) => String(s || "").toLowerCase().replace(/^(cabang|branch)\s+/i, "").replace(/[\s\-_.]/g, "");
 
@@ -470,7 +502,7 @@ let CENTER_ALERT_CALLBACK = null;
 
 let PRIORITY_ACTIVE_FILTER = "ALL";
 let PRIORITY_VISIT_STATUS_FILTER = "ALL";
-let ACTIVE_USER_COVER_AREAS = [];
+// ACTIVE_USER_COVER_AREAS dideklarasikan di bagian atas sebelum helper filter
 let FAC_ACTIVE_CONTRACT_FILTER = "ALL";
 let FAC_SELECTED_STATUS_FILTERS = [];
 
@@ -1886,15 +1918,19 @@ async function loadScreen(screenName, updateHistory = true) {
       Promise.all([syncMasterDataFromApi(), fetchUserCoverAreas()]).then(() => renderPriorityList());
     }
     if (screenName === "assignment") {
-      populateAssignDealerOptions();
+      fetchUserCoverAreas().then(() => populateAssignDealerOptions());
       if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
-        syncMasterDataFromApi().then(() => populateAssignDealerOptions());
+        Promise.all([syncMasterDataFromApi(), fetchUserCoverAreas()]).then(() => populateAssignDealerOptions());
+      } else {
+        populateAssignDealerOptions();
       }
     }
     if (screenName === "visit") {
-      populateVisitDealerOptions();
+      fetchUserCoverAreas().then(() => populateVisitDealerOptions());
       if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
-        syncMasterDataFromApi().then(() => populateVisitDealerOptions());
+        Promise.all([syncMasterDataFromApi(), fetchUserCoverAreas()]).then(() => populateVisitDealerOptions());
+      } else {
+        populateVisitDealerOptions();
       }
     }
     if (screenName === "onboarding" && typeof initOnboardingScreen === "function") initOnboardingScreen();
@@ -2080,6 +2116,7 @@ submitBtn.innerHTML = originalText;
         const resolved = getScreenFromUrl();
         await loadScreen(resolved, false);
         syncMasterDataFromApi();
+        fetchUserCoverAreas();
         return;
       } else if (redirectScreen && redirectScreen !== "login" && VALID_APP_SCREENS.includes(redirectScreen)) {
         targetScreen = redirectScreen;
@@ -2088,6 +2125,7 @@ submitBtn.innerHTML = originalText;
 
     await loadScreen(targetScreen, true);
     syncMasterDataFromApi();
+    fetchUserCoverAreas();
   } catch (err) {
     submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
@@ -6728,17 +6766,8 @@ function renderPriorityList() {
     };
   });
 
-  // 0. DUAL-APPROACH FILTERING PADA LIST MITRA:
-  // - Pendekatan 1 (Filter by Cover Area): Jika ACTIVE_USER_COVER_AREAS ada isinya (>0),
-  //   maka HANYA tampilkan dealer (m_dealer) yang cover_area_id-nya ada di dalam array tersebut.
-  // - Pendekatan 2 (Fallback Hierarchy): Jika ACTIVE_USER_COVER_AREAS kosong (0),
-  //   maka fallback ke hierarki cakupan wilayah/cabang user yang login (isDealerInUserCoverArea(d)).
-  if (Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
-    const userAreaIds = new Set(ACTIVE_USER_COVER_AREAS.map(a => a.id_area).filter(Boolean));
-    computedList = computedList.filter(d => d.cover_area_id && userAreaIds.has(d.cover_area_id));
-  } else {
-    computedList = computedList.filter(d => isDealerInUserCoverArea(d));
-  }
+  // 0. DUAL-APPROACH FILTERING PADA LIST MITRA (Identik terpusat melalui getCoveredDealersForUser):
+  computedList = getCoveredDealersForUser(computedList);
 
   // Sorting: Prioritas yang belum selesai diletakkan paling atas -> Score DESC -> Aging Visit DESC
   computedList.sort((a, b) => {
@@ -7059,7 +7088,7 @@ function populateAssignDealerOptions() {
   const selectDealer = document.getElementById("assign-select-dealer");
   if (!selectDealer) return;
   selectDealer.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
-  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const coveredDealers = getCoveredDealersForUser(MASTER_DEALER_PRIORITY_DATA);
   coveredDealers.forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.dealer_id;
@@ -7100,7 +7129,7 @@ function renderAssignDealerSearchDropdown(query = "") {
   if (!dropdown) return;
 
   const q = String(query || "").trim().toLowerCase();
-  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const coveredDealers = getCoveredDealersForUser(MASTER_DEALER_PRIORITY_DATA);
   const filtered = coveredDealers.filter(d => {
     if (!q) return true;
     const name = String(d.dealer_name || "").toLowerCase();
@@ -7483,11 +7512,36 @@ async function handleAssignConcernSubmit(e) {
 // =========================================================================
 // LAPORAN VISIT SHOWROOM
 // =========================================================================
-function populateVisitDealerOptions() {
+async function populateVisitDealerOptions() {
   const sel = document.getElementById("input-dealer");
   if (!sel) return;
+
+  // Pastikan data cover area user sudah sinkron
+  if (!Array.isArray(ACTIVE_USER_COVER_AREAS) || ACTIVE_USER_COVER_AREAS.length === 0) {
+    try {
+      await fetchUserCoverAreas();
+    } catch (e) {
+      console.warn("[populateVisitDealerOptions] fetchUserCoverAreas error:", e);
+    }
+  }
+
+  // Update info cover area badge di Segmen 1
+  const areaBadge = document.getElementById("visit-cover-area-badge");
+  if (areaBadge) {
+    if (Array.isArray(ACTIVE_USER_COVER_AREAS) && ACTIVE_USER_COVER_AREAS.length > 0) {
+      const areaNames = ACTIVE_USER_COVER_AREAS.map(a => a.nama_area).filter(Boolean);
+      areaBadge.innerHTML = `<i class="fa-solid fa-map-location-dot mr-1 text-amber-600"></i>Area: ${areaNames.join(", ")}`;
+      areaBadge.classList.remove("hidden");
+    } else if (CURRENT_USER?.cabang) {
+      areaBadge.innerHTML = `<i class="fa-solid fa-building mr-1 text-slate-500"></i>Cabang: ${CURRENT_USER.cabang}`;
+      areaBadge.classList.remove("hidden");
+    } else {
+      areaBadge.classList.add("hidden");
+    }
+  }
+
   sel.innerHTML = '<option value="">-- Pilih Partner Dealer --</option>';
-  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const coveredDealers = getCoveredDealersForUser(MASTER_DEALER_PRIORITY_DATA);
   coveredDealers.forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.dealer_id;
@@ -7552,7 +7606,7 @@ function renderDealerSearchDropdown(query = "") {
   if (!dropdown) return;
 
   const q = String(query || "").trim().toLowerCase();
-  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const coveredDealers = getCoveredDealersForUser(MASTER_DEALER_PRIORITY_DATA);
   const filtered = coveredDealers.filter(d => {
     if (!q) return true;
     const name = String(d.dealer_name || "").toLowerCase();
@@ -7669,7 +7723,7 @@ function onDealerSearchKeyDown(e) {
     const input = document.getElementById("dealer-search-input");
     const q = input ? input.value.trim().toLowerCase() : "";
     if (q) {
-      const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+      const coveredDealers = getCoveredDealersForUser(MASTER_DEALER_PRIORITY_DATA);
       const match = coveredDealers.find(d => {
         const name = String(d.dealer_name || "").toLowerCase();
         const branch = String(d.cabang || "").toLowerCase();
@@ -7700,7 +7754,8 @@ function onDealerSearchInputBlur() {
     }
     // Jika belum terpilih, auto-match dari teks yang diketik
     if (!sel.value) {
-      const match = MASTER_DEALER_PRIORITY_DATA.find(d => {
+      const coveredDealers = getCoveredDealersForUser(MASTER_DEALER_PRIORITY_DATA);
+      const match = coveredDealers.find(d => {
         const name = String(d.dealer_name || "").toLowerCase();
         const full = `${name} (${String(d.cabang || '').toLowerCase()})`;
         return full === val || name === val || full.includes(val) || val.includes(name);
@@ -16648,6 +16703,9 @@ async function initAppBootstrap() {
           window.history.replaceState({ screen: target }, "", targetPath);
         }
         syncMasterDataFromApi();
+        if (typeof fetchUserCoverAreas === "function") {
+          fetchUserCoverAreas();
+        }
       }
     } else {
       if (requestedScreen && requestedScreen !== "login") {
