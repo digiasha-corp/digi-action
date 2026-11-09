@@ -389,14 +389,14 @@
           </h5>
           <div class="space-y-1 text-[11px] text-slate-600">
             <p class="p-1.5 bg-red-50 border border-red-200 rounded-lg"><strong class="text-red-700">Sangat
-                Penting:</strong> Concern 'Sangat Penting' | GPS Pelepasan/Offline/Batt Lemah | Aging Visit >21 hr
-              (Lifetime >90) | Aging Visit >14 hr (H-3 JTO).</p>
+                Penting:</strong> Concern 'Sangat Penting' | Aging Visit &gt; 21 hr | GPS Offline/Pelepasan/Pindah/Geser |
+              Fasilitas OVD 3, 6, 9 hr | Fasilitas OVD &gt; 11 hr &amp; Aging Visit &gt; 3 hr.</p>
             <p class="p-1.5 bg-orange-50 border border-orange-200 rounded-lg"><strong
-                class="text-orange-700">Penting:</strong> Concern 'Penting' | GPS Blm Lepas/Blm Pasang/Geser | Aging
-              Visit >3 hr (OVD >3) | Aging Visit >5 hr (H-3 JTO) | Aging Visit >21 hr (Lifetime &le;90).</p>
+                class="text-orange-700">Penting:</strong> Concern 'Penting' | Aging Visit &gt; 14 hr | Baterai GPS Lemah |
+              Kontrak Expired (GPS Belum Dilepas) | Kontrak Live (GPS Belum Pasang) | H-3 JTO &amp; Aging Visit &gt; 4 hr.</p>
             <p class="p-1.5 bg-amber-50 border border-amber-200 rounded-lg"><strong
-                class="text-amber-700">Moderat:</strong> Aging Visit >14 hr | Concern 'Moderat' | Aging Pasang/Ganti GPS
-              >30 hr.</p>
+                class="text-amber-700">Moderat:</strong> Concern 'Moderat' | Aging Visit &gt; 7 hr | Aging Maintenance GPS
+              &gt; 30 hr.</p>
           </div>
         </div>
         <div class="space-y-1.5">
@@ -406,16 +406,28 @@
           </h5>
           <div class="space-y-1 text-[11px] text-slate-600">
             <p class="p-1.5 bg-red-50 border border-red-200 rounded-lg"><strong class="text-red-700">Sangat
-                Penting:</strong> Concern Non-Fasilitas 'Sangat Penting' | Aging Visit Mitra >60 hr.</p>
+                Penting:</strong> Concern Mitra 'Sangat Penting' | Aging Visit Mitra &ge; 61 hr.</p>
             <p class="p-1.5 bg-orange-50 border border-orange-200 rounded-lg"><strong
-                class="text-orange-700">Penting:</strong> Concern Non-Fasilitas 'Penting' | Aging Visit Mitra >30 hr.
+                class="text-orange-700">Penting:</strong> Concern Mitra 'Penting' | Aging Visit Mitra &ge; 31 hr.
             </p>
             <p class="p-1.5 bg-amber-50 border border-amber-200 rounded-lg"><strong
-                class="text-amber-700">Moderat:</strong> Concern Non-Fasilitas 'Moderat' | Aging Visit Mitra >20 hr.</p>
+                class="text-amber-700">Moderat:</strong> Concern Mitra 'Moderat' | Aging Visit Mitra &ge; 21 hr | New Mitra (Belum Ada Visit).</p>
             <p class="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 italic"><strong
                 class="text-slate-700 not-italic">Mitra Closed & Dormant:</strong> Mitra dengan produktivitas '7.Closed'
               dan '5. Dormant' tidak masuk kalkulasi prioritas otomatis (status Normal), kecuali jika terdapat Penugasan
               Concern khusus.</p>
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          <h5 class="font-bold text-slate-900 uppercase text-[11px] flex items-center space-x-1">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+            <span>3. Kriteria Done / Clear Parameter</span>
+          </h5>
+          <div class="space-y-1 text-[11px] text-slate-600">
+            <p class="p-1.5 bg-emerald-50 border border-emerald-200 rounded-lg"><strong class="text-emerald-800">Concern Mitra / Aging Visit Mitra (&ge;61, 31-60, 21-30 hr):</strong> Done ketika <strong>Lokasi Kunjungan = "Showroom"</strong> ATAU <strong>Bertemu Siapa = "Owner"</strong>.</p>
+            <p class="p-1.5 bg-teal-50 border border-teal-200 rounded-lg"><strong class="text-teal-800">New Mitra:</strong> Done ketika segmen <strong>Validasi Onboarding</strong> keduanya (<strong>Visit Lokasi Rumah</strong> &amp; <strong>Visit Lokasi Showroom</strong>) sudah terisi lengkap (dapat 1x visit atau bertahap 2x visit).</p>
+            <p class="p-1.5 bg-blue-50 border border-blue-200 rounded-lg"><strong class="text-blue-800">Concern Unit / Aging Visit Unit / Anomali GPS / Baterai Lemah / GPS Belum Dilepas / GPS Belum Pasang / Aging Maint GPS &gt;30 hr:</strong> Done ketika unit diperiksa <strong>Apakah Unit Terlihat ? = "Ya, Terlihat"</strong>.</p>
+            <p class="p-1.5 bg-purple-50 border border-purple-200 rounded-lg"><strong class="text-purple-800">H-3 JTO &amp; Aging &gt;4 hr / Fasilitas OVD (3, 6, 9 hr atau &gt;11 hr):</strong> Done ketika unit diperiksa (<strong>Apakah Unit Terlihat ? = "Ya, Terlihat"</strong> ATAU <strong>Bertemu Siapa = "Owner"</strong>) DAN <strong>Komitmen Pembayaran = Ada Jawaban</strong>.</p>
           </div>
         </div>
       </div>
@@ -445,7 +457,7 @@
       </div>
       <div class="p-4 space-y-3.5 overflow-y-auto flex-1 text-xs">
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Apakah Unit Terlihat di Lokasi?</label>
+          <label class="block font-semibold text-slate-700 mb-1">Apakah Unit Terlihat ?</label>
           <div class="grid grid-cols-2 gap-2">
             <label
               class="border border-slate-300 rounded-xl p-2 text-center font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
@@ -515,7 +527,7 @@
           </div>
         </div>
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Titik GPS Sesuai Lokasi Visit?</label>
+          <label class="block font-semibold text-slate-700 mb-1">Apakah Titik GPS Sesuai Dengan Lokasi Real Unit?</label>
           <div class="grid grid-cols-2 gap-2">
             <label
               class="border border-slate-300 rounded-xl p-2 text-center font-semibold block cursor-pointer has-[:checked]:bg-slate-900 has-[:checked]:text-white">
@@ -528,7 +540,7 @@
           </div>
         </div>
         <div>
-          <label class="block font-semibold text-slate-700 mb-1.5">Info Status Unit (Bisa Pilih >1):</label>
+          <label class="block font-semibold text-slate-700 mb-1.5">Info Status Fasilitas (Bisa Pilih >1):</label>
           <div class="grid grid-cols-2 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
             <label class="flex items-center space-x-2 text-[11px]"><input type="checkbox" name="modal_info_unit"
                 value="Plan Perpanjang" class="rounded text-slate-900" /> <span>Plan Perpanjang</span></label>
@@ -547,16 +559,12 @@
                 class="rounded text-slate-900" /> <span>Lainnya</span></label>
           </div>
           <div id="modal-box-info-lainnya" class="hidden mt-2">
-            <input type="text" id="modal-input-info-lainnya" placeholder="Sebutkan status unit lainnya..."
+            <input type="text" id="modal-input-info-lainnya" placeholder="Sebutkan status fasilitas lainnya..."
               class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold placeholder-slate-400 focus:border-slate-800 outline-none" />
           </div>
         </div>
-        <div id="modal-box-overdue-container" class="hidden space-y-3 pt-2 border-t border-red-100">
-          <div class="p-2.5 bg-red-50 rounded-xl border border-red-200 space-y-1">
-            <label class="block font-bold text-red-900 text-[11px]">Plan Penyelesaian Overdue:</label>
-            <textarea id="modal-input-ovd-plan" rows="2" placeholder="Rencana penanganan pelunasan"
-              class="w-full bg-white border border-red-300 rounded-lg p-2 text-xs"></textarea>
-          </div>
+        <!-- E.5 & E.6: Komitmen Pembayaran & Tanggal Komitmen (Muncul Kalau OVD atau H-3 JTO) -->
+        <div id="modal-box-komitmen-container" class="hidden space-y-3 pt-2 border-t border-amber-200">
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Komitmen Pembayaran:</label>
             <select id="modal-select-komitmen" onchange="onModalKomitmenChange(this.value)"
@@ -571,6 +579,14 @@
             <label class="block font-semibold text-slate-700 mb-1">Tanggal Komitmen:</label>
             <input type="date" id="modal-input-tgl-komitmen"
               class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2" />
+          </div>
+        </div>
+        <!-- E.7: Plan Penyelesaian Overdue (Muncul Hanya Kalau OVD) -->
+        <div id="modal-box-overdue-container" class="hidden space-y-3 pt-1">
+          <div class="p-2.5 bg-red-50 rounded-xl border border-red-200 space-y-1">
+            <label class="block font-bold text-red-900 text-[11px]">Plan Penyelesaian Overdue:</label>
+            <textarea id="modal-input-ovd-plan" rows="2" placeholder="Rencana penanganan pelunasan"
+              class="w-full bg-white border border-red-300 rounded-lg p-2 text-xs"></textarea>
           </div>
         </div>
       </div>
@@ -3310,7 +3326,7 @@
       document.body.appendChild(scConfig);
 
       const scApp = document.createElement("script");
-      scApp.src = "/app.js?v=" + dailyVer + "_v189";
+      scApp.src = "/app.js?v=" + dailyVer + "_v196";
       document.body.appendChild(scApp);
     })();
   </script>

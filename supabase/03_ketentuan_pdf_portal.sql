@@ -28,11 +28,14 @@ CREATE INDEX IF NOT EXISTS idx_ketentuan_active ON public.m_ketentuan (is_active
 -- Enable RLS
 ALTER TABLE public.m_ketentuan ENABLE ROW LEVEL SECURITY;
 
--- Allow anon & authenticated users to read & manage ketentuan
+-- Allow anon & authenticated users (PUBLIC) to read & manage ketentuan
 DROP POLICY IF EXISTS "Allow anon all on m_ketentuan" ON public.m_ketentuan;
-CREATE POLICY "Allow anon all on m_ketentuan"
-ON public.m_ketentuan FOR ALL TO anon
+DROP POLICY IF EXISTS "Allow public all on m_ketentuan" ON public.m_ketentuan;
+CREATE POLICY "Allow public all on m_ketentuan"
+ON public.m_ketentuan FOR ALL TO public
 USING (true)
 WITH CHECK (true);
+
+GRANT ALL ON TABLE public.m_ketentuan TO anon, authenticated, service_role;
 
 COMMENT ON TABLE public.m_ketentuan IS 'Tabel Master Portal Ketentuan & SOP Perusahaan Terproteksi';

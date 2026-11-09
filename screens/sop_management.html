@@ -180,23 +180,23 @@
           </div>
         </div>
 
-        <!-- Pengaturan Hak Akses Role (Checkboxes) -->
+        <!-- Pengaturan Hak Akses Jabatan (Checkboxes) -->
         <div class="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-2.5">
           <div class="flex justify-between items-center">
             <div>
-              <label class="font-bold text-xs text-indigo-950 block">Hak Akses Role (Siapa yang Boleh Membuka)</label>
-              <span class="text-[10px] text-indigo-600">Pilih jabatan/role yang memiliki wewenang membuka dokumen ini</span>
+              <label class="font-bold text-xs text-indigo-950 block">Hak Akses Jabatan (Siapa yang Boleh Membuka)</label>
+              <span class="text-[10px] text-indigo-600">Pilih master jabatan yang memiliki wewenang membuka dokumen ini</span>
             </div>
             <!-- Checkbox Pilih Semua -->
             <label class="flex items-center space-x-1.5 text-[11px] font-bold text-indigo-900 cursor-pointer select-none">
               <input type="checkbox" id="check-all-roles" onchange="toggleAllRoleKetentuan(this.checked)" class="rounded text-indigo-600 focus:ring-indigo-500" />
-              <span>Semua Role</span>
+              <span>Semua Jabatan</span>
             </label>
           </div>
 
-          <!-- Daftar Role Dinamis -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1" id="ketentuan-roles-checkbox-container">
-            <!-- Diinjeksi otomatis via JavaScript berdasarkan master role -->
+          <!-- Daftar Jabatan Dinamis (Master hr_job_positions) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-56 overflow-y-auto pr-1" id="ketentuan-roles-checkbox-container">
+            <!-- Diinjeksi otomatis via JavaScript berdasarkan master hr_job_positions -->
           </div>
         </div>
 
