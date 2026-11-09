@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261108_v199";
+const APP_BUILD_VERSION = "20261108_v200";
 const screenCache = {};
 
 function escapeHtml(str) {
@@ -38,13 +38,13 @@ function escapeHtml(str) {
       if ("caches" in window && typeof caches.keys === "function") {
         caches.keys().then(names => {
           names.forEach(name => caches.delete(name));
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // 2. Bersihkan Session Storage
       try {
         sessionStorage.clear();
-      } catch (e) {}
+      } catch (e) { }
 
       // 3. Bersihkan data cache temporary di Local Storage
       // DAFTAR KUNCI YANG DIBERSIHKAN:
@@ -54,7 +54,7 @@ function escapeHtml(str) {
       ];
 
       tempKeysToClear.forEach(k => {
-        try { localStorage.removeItem(k); } catch (e) {}
+        try { localStorage.removeItem(k); } catch (e) { }
       });
 
       // Hapus seluruh cache status absensi hari-hari kemarin yang tersimpan di localStorage (format: YYYY-MM-DD_*)
@@ -66,7 +66,7 @@ function escapeHtml(str) {
             localStorage.removeItem(k);
           }
         });
-      } catch (e) {}
+      } catch (e) { }
 
       // 4. Update penanda tanggal reset hari ini
       localStorage.setItem("DIGIASHA_LAST_DAILY_RESET", todayStr);
@@ -610,7 +610,7 @@ async function supabaseLogin(identifier, password) {
   const idTrim = String(identifier).trim();
   const passTrim = String(password).trim();
 
-    // 1. Cari email asli di hr_employees berdasarkan identifier (NIP atau Email)
+  // 1. Cari email asli di hr_employees berdasarkan identifier (NIP atau Email)
   let emailToLogin = idTrim;
   try {
     const { data: empLookup, error: lookupError } = await supabaseClient
@@ -618,7 +618,7 @@ async function supabaseLogin(identifier, password) {
       .select("email, nip")
       .or("nip.eq." + idTrim + ",email.eq." + idTrim)
       .single();
-      
+
     if (!lookupError && empLookup) {
       if (empLookup.email && empLookup.email.includes("@")) {
         emailToLogin = empLookup.email;
@@ -674,7 +674,7 @@ async function supabaseLogin(identifier, password) {
         .from("hr_job_position_permissions")
         .select("permission_code")
         .eq("position_id", emp.position_id);
-      
+
       if (jobPerms && jobPerms.length > 0) {
         permissions = jobPerms.map(p => p.permission_code);
       }
@@ -2282,21 +2282,21 @@ async function handleLoginSubmit(e) {
   try {
     let authUser = null;
 
-        // 1. Autentikasi menggunakan Supabase Auth (Native)
+    // 1. Autentikasi menggunakan Supabase Auth (Native)
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
       try {
         const loginRes = await supabaseLogin(identifier, password);
         if (loginRes && loginRes.success) {
-           authUser = loginRes.user;
+          authUser = loginRes.user;
         } else {
-           submitBtn.innerHTML = originalText;
-           submitBtn.disabled = false;
-           showCenterAlertModal({
-             title: "Belum Berhasil Masuk",
-             message: loginRes?.message || "Email/NIP atau kata sandi yang Anda masukkan belum sesuai. Silakan periksa kembali.",
-             type: "error"
-           });
-           return;
+          submitBtn.innerHTML = originalText;
+          submitBtn.disabled = false;
+          showCenterAlertModal({
+            title: "Belum Berhasil Masuk",
+            message: loginRes?.message || "Email/NIP atau kata sandi yang Anda masukkan belum sesuai. Silakan periksa kembali.",
+            type: "error"
+          });
+          return;
         }
       } catch (errSup) {
         console.warn("Supabase login error:", errSup);
@@ -2310,16 +2310,16 @@ async function handleLoginSubmit(e) {
         return;
       }
     } else {
-       submitBtn.innerHTML = originalText;
-       submitBtn.disabled = false;
-       showCenterAlertModal({
-         title: "Layanan Sedang Dimuat",
-         message: "Layanan masuk sedang dipersiapkan. Silakan muat ulang halaman dan coba beberapa saat lagi.",
-         type: "warning"
-       });
-       return;
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+      showCenterAlertModal({
+        title: "Layanan Sedang Dimuat",
+        message: "Layanan masuk sedang dipersiapkan. Silakan muat ulang halaman dan coba beberapa saat lagi.",
+        type: "warning"
+      });
+      return;
     }
-submitBtn.innerHTML = originalText;
+    submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
 
     CURRENT_USER = authUser;
@@ -3007,7 +3007,7 @@ function showCenterAlertModal({ title, message, type = "success", detailsHtml = 
 
 // Arahkan seluruh pemanggilan window.alert ke modal in-app agar tidak memunculkan URL domain browser & pesan sistem mentah
 if (typeof window !== "undefined") {
-  window.alert = function(rawMessage) {
+  window.alert = function (rawMessage) {
     const cleanMsg = sanitizeUserFacingMessage(rawMessage, "Silakan periksa kembali isian Anda.");
     const lower = cleanMsg.toLowerCase();
     let type = "warning";
@@ -4956,28 +4956,28 @@ function setupRekapTeamFilter() {
     });
   } else if (supabaseClient) {
     supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id").order("name", { ascending: true })
-    .then(({ data: list, error }) => {
-      if (!error && Array.isArray(list)) {
-        const mapped = list.map(e => ({
-           nip: e.nip, 
-           nama_lengkap: e.name, 
-           nama: e.name,
-           cabang: e.hr_organization_units?.nama_unit || "",
-           jabatan: e.hr_job_positions?.nama_jabatan || "",
-           role_id: e.position_id
-        }));
-        window.ALL_EMPLOYEES_CACHE = mapped;
-        mapped.forEach(emp => {
-          if (emp.nip !== CURRENT_USER.nip) {
-            const opt = document.createElement("option");
-            opt.value = emp.nip;
-            opt.textContent = `${emp.nama_lengkap} (${emp.nip})`;
-            if (emp.nip === REKAP_SELECTED_NIP) opt.selected = true;
-            selectEl.appendChild(opt);
-          }
-        });
-      }
-    }).catch(err => console.warn("Gagal load opsi karyawan rekap:", err));
+      .then(({ data: list, error }) => {
+        if (!error && Array.isArray(list)) {
+          const mapped = list.map(e => ({
+            nip: e.nip,
+            nama_lengkap: e.name,
+            nama: e.name,
+            cabang: e.hr_organization_units?.nama_unit || "",
+            jabatan: e.hr_job_positions?.nama_jabatan || "",
+            role_id: e.position_id
+          }));
+          window.ALL_EMPLOYEES_CACHE = mapped;
+          mapped.forEach(emp => {
+            if (emp.nip !== CURRENT_USER.nip) {
+              const opt = document.createElement("option");
+              opt.value = emp.nip;
+              opt.textContent = `${emp.nama_lengkap} (${emp.nip})`;
+              if (emp.nip === REKAP_SELECTED_NIP) opt.selected = true;
+              selectEl.appendChild(opt);
+            }
+          });
+        }
+      }).catch(err => console.warn("Gagal load opsi karyawan rekap:", err));
   }
 }
 
@@ -12343,14 +12343,14 @@ async function loadEmployeesForSettings() {
 
       if (!error && data) {
         SETTINGS_EMPLOYEES_DATA = data.map(e => ({
-           nip: e.nip, 
-           nama_lengkap: e.name,
-           email: e.email,
-           cabang: e.hr_organization_units?.nama_unit || "",
-           jabatan: e.hr_job_positions?.nama_jabatan || "",
-           role_id: e.position_id,
-           status_aktif: e.status_kerja,
-           area_cover: ""
+          nip: e.nip,
+          nama_lengkap: e.name,
+          email: e.email,
+          cabang: e.hr_organization_units?.nama_unit || "",
+          jabatan: e.hr_job_positions?.nama_jabatan || "",
+          role_id: e.position_id,
+          status_aktif: e.status_kerja,
+          area_cover: ""
         }));
         renderEmployeeList(SETTINGS_EMPLOYEES_DATA);
         return;
@@ -14142,24 +14142,51 @@ async function loadActivityHistory(forceRefresh = false) {
 
     const [resVisit, resOnb, resGps] = await Promise.all([qVisit, qOnb, qGps]);
 
-    const visitLogs = (resVisit.data || []).map(item => ({
-      id: item.visit_id,
-      type: "VISIT",
-      typeLabel: "Visit Mitra",
-      icon: "fa-clipboard-check",
-      iconColor: "text-blue-600 bg-blue-50 border-blue-200",
-      title: item.dealer_name || "Mitra",
-      subtitle: `Lokasi: ${item.lokasi || 'Showroom'} • Bertemu: ${item.bertemu_owner || '-'}`,
-      notes: item.catatan_visit || item.tindak_lanjut_concern || "-",
-      createdAt: item.created_at,
-      dateObj: new Date(item.created_at),
-      isToday: isTodayRecord(item.created_at),
-      nip: item.nip,
-      lat: item.lat,
-      long: item.long,
-      photos: item.showroom_photo_url ? [{ label: "Foto Showroom", url: item.showroom_photo_url }] : [],
-      raw: item
-    }));
+    const visitLogs = (resVisit.data || []).map(item => {
+      const visitPhotos = [];
+      if (item.showroom_photo_url) {
+        visitPhotos.push({ label: "Selfie Kunjungan", url: item.showroom_photo_url, type: "image" });
+      }
+      if (item.onb_domisili_photo_url) {
+        visitPhotos.push({ label: "Foto Domisili", url: item.onb_domisili_photo_url, type: "image" });
+      }
+      if (Array.isArray(item.stock_media_urls)) {
+        item.stock_media_urls.forEach((mUrl, mIdx) => {
+          if (mUrl) {
+            const isVid = /\.(mp4|mov|webm|ogg|m4v)(\?|$)/i.test(mUrl) || String(mUrl).startsWith("data:video");
+            visitPhotos.push({
+              label: `${isVid ? "Video" : "Foto"} Stock #${mIdx + 1}`,
+              url: mUrl,
+              type: isVid ? "video" : "image"
+            });
+          }
+        });
+      }
+
+      const unitCountInfo = item.total_unit ? ` • ${item.total_unit} Unit` : "";
+      const notePreview = (item.catatan_visit && item.catatan_visit !== "-")
+        ? item.catatan_visit
+        : ((item.issue_digi && item.issue_digi !== "-") ? `Issue Digiasha: ${item.issue_digi}` : "Tidak ada catatan tambahan");
+
+      return {
+        id: item.visit_id,
+        type: "VISIT",
+        typeLabel: "Visit Mitra",
+        icon: "fa-clipboard-check",
+        iconColor: "text-blue-600 bg-blue-50 border-blue-200",
+        title: item.dealer_name || "Mitra",
+        subtitle: `Lokasi: ${item.lokasi || 'Showroom'} • Bertemu: ${item.bertemu_owner || '-'}${unitCountInfo}`,
+        notes: notePreview,
+        createdAt: item.created_at,
+        dateObj: new Date(item.created_at),
+        isToday: isTodayRecord(item.created_at),
+        nip: item.nip,
+        lat: item.lat,
+        long: item.long,
+        photos: visitPhotos,
+        raw: item
+      };
+    });
 
     const onbLogs = (resOnb.data || []).map(item => {
       const parsed = parseOnboardingRecord(item);
@@ -14427,95 +14454,340 @@ function toggleHistUnitAccordion(checkId) {
 }
 
 function toggleHistUnitAda(val, checkId) {
+  const isTidak = val === "Tidak Terlihat" || val === "Tidak";
   const boxIndikasi = document.getElementById(`box-hist-indikasi-${checkId}`);
-  if (boxIndikasi) {
-    if (val === "Tidak Terlihat" || val === "Tidak") {
-      boxIndikasi.classList.remove("hidden");
-    } else {
-      boxIndikasi.classList.add("hidden");
-    }
-  }
-}
-
-function onHistIndikasiPresetChange(val, checkId) {
-  const boxCustom = document.getElementById(`box-hist-indikasi-custom-${checkId}`);
-  const inputCustom = document.getElementById(`input-hist-indikasi-custom-${checkId}`);
-  if (boxCustom) {
-    if (val === "Lainnya") {
-      boxCustom.classList.remove("hidden");
-      if (inputCustom) inputCustom.focus();
-    } else {
-      boxCustom.classList.add("hidden");
-    }
-  }
+  const boxFoto = document.getElementById(`box-hist-foto-unit-${checkId}`);
+  if (boxIndikasi) boxIndikasi.classList.toggle("hidden", !isTidak);
+  if (boxFoto) boxFoto.classList.toggle("hidden", isTidak);
 }
 
 function toggleHistUnitLainnya(chk, checkId) {
   const boxLainnya = document.getElementById(`box-hist-info-lainnya-${checkId}`);
+  const inputLainnya = document.getElementById(`input-hist-info-lainnya-${checkId}`);
   if (boxLainnya) {
     if (chk && chk.checked) {
       boxLainnya.classList.remove("hidden");
+      if (inputLainnya) inputLainnya.focus();
     } else {
       boxLainnya.classList.add("hidden");
     }
   }
 }
 
-function toggleHistLokasiChange(val) {
-  const boxCustom = document.getElementById("box-hist-lokasi-custom");
-  const inputCustom = document.getElementById("input-hist-lokasi-custom");
-  if (boxCustom) {
-    if (val === "Lainnya") {
-      boxCustom.classList.remove("hidden");
-      if (inputCustom) inputCustom.focus();
-    } else {
-      boxCustom.classList.add("hidden");
-    }
+function onHistUnitKomitmenChange(val, checkId) {
+  const boxTgl = document.getElementById(`box-hist-tgl-komitmen-${checkId}`);
+  if (!boxTgl) return;
+  const vLower = String(val || "").trim().toLowerCase();
+  if (vLower === "bayar" || vLower === "serahkan unit" || vLower.includes("janji")) {
+    boxTgl.classList.remove("hidden");
+  } else {
+    boxTgl.classList.add("hidden");
   }
 }
 
-function toggleHistBertemuChange(val) {
-  const boxCustom = document.getElementById("box-hist-bertemu-custom");
-  const inputCustom = document.getElementById("input-hist-bertemu-custom");
-  const boxReason = document.getElementById("box-hist-bertemu-reason");
-
-  if (boxCustom) {
-    if (val === "Lainnya") {
-      boxCustom.classList.remove("hidden");
-      if (inputCustom) inputCustom.focus();
+function toggleHistOnbLokasiBox(type, checked) {
+  const box = document.getElementById(type === "rumah" ? "hist-box-onb-rumah" : "hist-box-onb-showroom");
+  const badge = document.getElementById(type === "rumah" ? "hist-badge-onb-rumah" : "hist-badge-onb-showroom");
+  if (box) box.classList.toggle("hidden", !checked);
+  if (badge) {
+    if (checked) {
+      badge.innerHTML = '<i class="fa-solid fa-check mr-0.5"></i> Tervalidasi';
+      badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0";
     } else {
-      boxCustom.classList.add("hidden");
-    }
-  }
-
-  if (boxReason) {
-    if (val === "Tidak Bertemu") {
-      boxReason.classList.remove("hidden");
-    } else {
-      boxReason.classList.add("hidden");
+      badge.innerText = "Belum";
+      badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 shrink-0";
     }
   }
 }
 
 function toggleHistNoInfo(checked) {
-  const inputStock = document.getElementById("edit-visit-stock");
-  const inputSales = document.getElementById("edit-visit-sales");
   const boxInputs = document.getElementById("box-hist-showroom-inputs");
-  if (inputStock && inputSales) {
-    if (checked) {
-      inputStock.disabled = true;
-      inputSales.disabled = true;
-      inputStock.value = "-";
-      inputSales.value = "-";
-      if (boxInputs) boxInputs.classList.add("opacity-50", "pointer-events-none");
-    } else {
-      inputStock.disabled = false;
-      inputSales.disabled = false;
-      if (inputStock.value === "-") inputStock.value = "0";
-      if (inputSales.value === "-") inputSales.value = "0";
-      if (boxInputs) boxInputs.classList.remove("opacity-50", "pointer-events-none");
-    }
+  const boxNotice = document.getElementById("box-hist-no-showroom-notice");
+  if (checked) {
+    if (boxInputs) boxInputs.classList.add("hidden");
+    if (boxNotice) boxNotice.classList.remove("hidden");
+  } else {
+    if (boxInputs) boxInputs.classList.remove("hidden");
+    if (boxNotice) boxNotice.classList.add("hidden");
   }
+}
+
+// =========================================================================
+// FLOATING SEARCHABLE DROPDOWN ENGINE UNTUK MODAL DETAIL & EDIT RIWAYAT PIC
+// =========================================================================
+function getHistDropdownPresetConfig(presetType) {
+  switch (presetType) {
+    case "LOKASI":
+      return {
+        presets: VISIT_LOKASI_PRESETS,
+        customTitle: "Gunakan Lokasi",
+        customDesc: "Gunakan lokasi pertemuan khusus sesuai inputan",
+        customIcon: "fa-location-arrow"
+      };
+    case "BERTEMU":
+      return {
+        presets: VISIT_BERTEMU_PRESETS,
+        customTitle: "Gunakan Pilihan",
+        customDesc: "Pertemuan dengan pihak khusus sesuai inputan",
+        customIcon: "fa-user-plus"
+      };
+    case "ONB_DOMISILI":
+      return {
+        presets: VISIT_ONB_DOMISILI_PRESETS,
+        customTitle: "Gunakan Status",
+        customDesc: "Status kepemilikan domisili khusus sesuai inputan",
+        customIcon: "fa-house-user"
+      };
+    case "ONB_SHOWROOM":
+      return {
+        presets: VISIT_ONB_SHOWROOM_PRESETS,
+        customTitle: "Gunakan Status",
+        customDesc: "Status kepemilikan showroom khusus sesuai inputan",
+        customIcon: "fa-store"
+      };
+    case "INDIKASI":
+      return {
+        presets: typeof UNIT_INDIKASI_PRESETS !== "undefined" ? UNIT_INDIKASI_PRESETS : [],
+        customTitle: "Gunakan Indikasi",
+        customDesc: "Indikasi keberadaan unit sesuai inputan",
+        customIcon: "fa-car-side"
+      };
+    case "KOMITMEN":
+      return {
+        presets: VISIT_KOMITMEN_PRESETS,
+        customTitle: "Gunakan Komitmen",
+        customDesc: "Catatan komitmen pembayaran khusus sesuai inputan",
+        customIcon: "fa-hand-holding-dollar"
+      };
+    default:
+      return { presets: [], customTitle: "Gunakan Pilihan", customDesc: "Sesuai inputan", customIcon: "fa-check" };
+  }
+}
+
+function initHistSearchableDropdownListener() {
+  if (!window._histDropdownClickAttached) {
+    window._histDropdownClickAttached = true;
+    document.addEventListener("click", (e) => {
+      document.querySelectorAll(".hist-floating-dd-wrapper").forEach(wrapper => {
+        const menu = wrapper.querySelector(".hist-floating-dd-menu");
+        if (menu && !wrapper.contains(e.target)) {
+          menu.classList.add("hidden");
+        }
+      });
+    });
+  }
+}
+
+function renderHistFloatingDropdownField({
+  uid,
+  inputId = "",
+  inputClass = "",
+  presetType,
+  value = "",
+  placeholder = "Pilih atau ketik...",
+  icon = "fa-list",
+  isReadOnly = false
+}) {
+  const safeVal = escapeHtml(value || "");
+  const domInputId = inputId || `hist-dd-input-${uid}`;
+  const hasVal = Boolean(String(value || "").trim());
+
+  if (isReadOnly) {
+    return `
+      <div class="relative flex items-center">
+        <i class="fa-solid ${icon} absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+        <input
+          type="text"
+          id="${domInputId}"
+          value="${safeVal}"
+          disabled
+          class="${inputClass} w-full bg-slate-100 border border-slate-200 rounded-xl pl-8 pr-3 py-2.5 text-xs font-semibold text-slate-600 cursor-not-allowed outline-none"
+        />
+      </div>
+    `;
+  }
+
+  return `
+    <div class="relative hist-floating-dd-wrapper" id="hist-dd-wrap-${uid}">
+      <div class="relative flex items-center">
+        <i class="fa-solid ${icon} absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+        <input
+          type="text"
+          id="${domInputId}"
+          data-hist-uid="${uid}"
+          value="${safeVal}"
+          placeholder="${escapeHtml(placeholder)}"
+          autocomplete="off"
+          onfocus="openHistCustomDropdown('${uid}', '${presetType}')"
+          onclick="openHistCustomDropdown('${uid}', '${presetType}')"
+          oninput="filterHistCustomDropdown('${uid}', '${presetType}', this.value)"
+          onkeydown="onHistCustomDropdownKeyDown(event, '${uid}', '${presetType}')"
+          onblur="onHistCustomDropdownBlur('${uid}')"
+          class="${inputClass} w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition outline-none cursor-pointer"
+        />
+        <button
+          type="button"
+          id="hist-dd-clear-${uid}"
+          onclick="clearHistCustomDropdown('${uid}', '${presetType}')"
+          class="${hasVal ? '' : 'hidden'} absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <i id="hist-dd-chevron-${uid}" class="${hasVal ? 'hidden' : ''} fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+      </div>
+      <div
+        id="hist-dd-menu-${uid}"
+        class="hist-floating-dd-menu hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto z-50 divide-y divide-slate-100"
+      ></div>
+    </div>
+  `;
+}
+
+function getHistDropdownInputEl(uid) {
+  return document.querySelector(`input[data-hist-uid="${uid}"]`) || document.getElementById(`hist-dd-input-${uid}`);
+}
+
+function openHistCustomDropdown(uid, presetType) {
+  const menu = document.getElementById(`hist-dd-menu-${uid}`);
+  const input = getHistDropdownInputEl(uid);
+  if (!menu) return;
+  initHistSearchableDropdownListener();
+  // Tutup dropdown lain yang sedang terbuka di modal
+  document.querySelectorAll(".hist-floating-dd-menu").forEach(m => {
+    if (m.id !== `hist-dd-menu-${uid}`) m.classList.add("hidden");
+  });
+  renderHistCustomDropdownItems(uid, presetType, input ? input.value : "");
+  menu.classList.remove("hidden");
+}
+
+function closeHistCustomDropdown(uid) {
+  const menu = document.getElementById(`hist-dd-menu-${uid}`);
+  if (menu) menu.classList.add("hidden");
+}
+
+function renderHistCustomDropdownItems(uid, presetType, query = "") {
+  const menu = document.getElementById(`hist-dd-menu-${uid}`);
+  if (!menu) return;
+  const cfg = getHistDropdownPresetConfig(presetType);
+  const q = String(query || "").trim().toLowerCase();
+  menu.innerHTML = "";
+
+  const exactMatch = cfg.presets.some(item => item.value.toLowerCase() === q || item.label.toLowerCase() === q);
+  const filtered = cfg.presets.filter(item => {
+    if (!q || exactMatch) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || (item.desc && item.desc.toLowerCase().includes(q));
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-slate-100 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectHistCustomDropdown(uid, presetType, item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc || ""}</div>
+      </div>
+    `;
+    menu.appendChild(el);
+  });
+
+  const rawQ = String(query || "").trim();
+  if (rawQ && !exactMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-teal-50/60 hover:bg-teal-100/70 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-teal-100";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectHistCustomDropdown(uid, presetType, rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid ${cfg.customIcon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-teal-900">${cfg.customTitle}: "${escapeHtml(rawQ)}"</div>
+        <div class="text-[10px] text-teal-700">${cfg.customDesc}</div>
+      </div>
+    `;
+    menu.prepend(customEl);
+  }
+}
+
+function selectHistCustomDropdown(uid, presetType, val) {
+  const input = getHistDropdownInputEl(uid);
+  const clearBtn = document.getElementById(`hist-dd-clear-${uid}`);
+  const chevron = document.getElementById(`hist-dd-chevron-${uid}`);
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeHistCustomDropdown(uid);
+
+  if (presetType === "KOMITMEN" && uid.startsWith("komitmen-")) {
+    const checkId = uid.replace("komitmen-", "");
+    onHistUnitKomitmenChange(val, checkId);
+  }
+}
+
+function filterHistCustomDropdown(uid, presetType, val) {
+  const clearBtn = document.getElementById(`hist-dd-clear-${uid}`);
+  const chevron = document.getElementById(`hist-dd-chevron-${uid}`);
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderHistCustomDropdownItems(uid, presetType, val);
+  const menu = document.getElementById(`hist-dd-menu-${uid}`);
+  if (menu) menu.classList.remove("hidden");
+
+  if (presetType === "KOMITMEN" && uid.startsWith("komitmen-")) {
+    const checkId = uid.replace("komitmen-", "");
+    onHistUnitKomitmenChange(val, checkId);
+  }
+}
+
+function clearHistCustomDropdown(uid, presetType) {
+  const input = getHistDropdownInputEl(uid);
+  const clearBtn = document.getElementById(`hist-dd-clear-${uid}`);
+  const chevron = document.getElementById(`hist-dd-chevron-${uid}`);
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderHistCustomDropdownItems(uid, presetType, "");
+  const menu = document.getElementById(`hist-dd-menu-${uid}`);
+  if (menu) menu.classList.remove("hidden");
+
+  if (presetType === "KOMITMEN" && uid.startsWith("komitmen-")) {
+    const checkId = uid.replace("komitmen-", "");
+    onHistUnitKomitmenChange("", checkId);
+  }
+}
+
+function onHistCustomDropdownKeyDown(e, uid, presetType) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = getHistDropdownInputEl(uid);
+    const val = input ? input.value.trim() : "";
+    if (val) selectHistCustomDropdown(uid, presetType, val);
+    closeHistCustomDropdown(uid);
+    if (input) input.blur();
+  }
+}
+
+function onHistCustomDropdownBlur(uid) {
+  setTimeout(() => {
+    closeHistCustomDropdown(uid);
+  }, 200);
 }
 
 async function openActivityDetailModal(type, id) {
@@ -14550,7 +14822,7 @@ async function openActivityDetailModal(type, id) {
       statusAlert.className = "p-2.5 rounded-xl text-[11px] leading-relaxed flex items-center space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200";
     }
     if (statusMsg) {
-      statusMsg.innerHTML = "<strong>Bisa Diedit:</strong> Anda dapat mengubah catatan hasil wawancara, respon, atau status unit. Tagging lokasi dan foto bukti awal terkunci permanen.";
+      statusMsg.innerHTML = "<strong>Bisa Diedit:</strong> Anda dapat memperbarui atau melengkapi data kunjungan sesuai Form Visit FAC. Geotag lokasi dan foto bukti fisik terkunci permanen.";
     }
     document.getElementById("btn-save-edit-act")?.classList.remove("hidden");
   } else {
@@ -14570,7 +14842,10 @@ async function openActivityDetailModal(type, id) {
   // 2. Populate Header Details
   document.getElementById("dtl-hist-target").innerText = item.title;
   document.getElementById("dtl-hist-time").innerText = formatDisplayDate(item.createdAt);
-  document.getElementById("dtl-hist-pic").innerText = item.nip || (CURRENT_USER?.nama || "PIC Lapangan");
+  const picDisplay = (CURRENT_USER && CURRENT_USER.nama && (!item.nip || String(CURRENT_USER.nip) === String(item.nip)))
+    ? `${CURRENT_USER.nama}${item.nip ? ' (' + item.nip + ')' : ''}`
+    : (item.nip || CURRENT_USER?.nama || "PIC Lapangan");
+  document.getElementById("dtl-hist-pic").innerText = picDisplay;
 
   // 3. Geotag (Read-Only)
   document.getElementById("dtl-hist-lat").innerText = item.lat || "-";
@@ -14584,12 +14859,14 @@ async function openActivityDetailModal(type, id) {
     mapsBox?.classList.add("hidden");
   }
 
-  // 4. Photos (Read-Only Preview)
+  // 4. Photos & Media Stock (Read-Only Preview)
   const photosContainer = document.getElementById("dtl-hist-photos-container");
   const photosSectionTitle = document.getElementById("hist-photos-section-title");
 
   if (photosSectionTitle) {
-    photosSectionTitle.innerText = type === "ONBOARDING" ? "Foto Selfie Kunjungan" : "Foto Bukti Fisik Awal";
+    photosSectionTitle.innerText = type === "ONBOARDING"
+      ? "Foto Selfie Kunjungan"
+      : (type === "VISIT" ? "Bukti Lapangan (Selfie & Media Stock)" : "Foto Bukti Fisik Awal");
   }
 
   if (photosContainer) {
@@ -14612,14 +14889,26 @@ async function openActivityDetailModal(type, id) {
     } else {
       photosContainer.className = "grid grid-cols-3 gap-2";
       if (item.photos && item.photos.length > 0) {
-        photosContainer.innerHTML = item.photos.map(p => `
-          <a href="${p.url}" target="_blank" class="block group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-2xs hover:opacity-90 transition">
-            <img src="${p.url}" alt="${p.label}" class="w-full h-full object-cover" />
-            <div class="absolute inset-x-0 bottom-0 bg-slate-900/70 backdrop-blur-xs text-white text-[9px] font-bold p-1 text-center truncate">
-              ${p.label}
-            </div>
-          </a>
-        `).join("");
+        photosContainer.innerHTML = item.photos.map(p => {
+          if (p.type === "video") {
+            return `
+              <div class="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 aspect-square shadow-2xs flex flex-col">
+                <video src="${p.url}" controls preload="metadata" class="w-full h-full object-cover"></video>
+                <div class="absolute top-1 left-1 bg-rose-600/90 text-white text-[8px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
+                  <i class="fa-solid fa-video mr-0.5"></i>${p.label}
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <a href="${p.url}" target="_blank" class="block group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-2xs hover:opacity-90 transition">
+              <img src="${p.url}" alt="${p.label}" class="w-full h-full object-cover" />
+              <div class="absolute inset-x-0 bottom-0 bg-slate-900/75 backdrop-blur-xs text-white text-[9px] font-bold p-1 text-center truncate">
+                ${p.label}
+              </div>
+            </a>
+          `;
+        }).join("");
       } else {
         photosContainer.innerHTML = '<div class="col-span-3 py-2 text-center text-[10px] text-slate-400 italic">Tidak ada foto bukti terlampir</div>';
       }
@@ -14645,95 +14934,262 @@ async function openActivityDetailModal(type, id) {
     }
 
     const raw = item.raw || {};
-
-    // Evaluasi Lokasi Kunjungan
     const lokasiVal = raw.lokasi || "Showroom";
-    const LOKASI_PRESETS = ["Showroom", "Rumah Owner", "Janjian Diluar"];
-    const isPresetLokasi = LOKASI_PRESETS.includes(lokasiVal);
-    const isCustomLokasi = !isPresetLokasi && lokasiVal !== "";
-
-    // Evaluasi Pihak yang Ditemui
     const bertemuVal = raw.bertemu_owner || "Owner";
-    const BERTEMU_PRESETS = ["Owner", "Pekerja", "Penanggung Jawab", "Tidak Bertemu"];
-    const isPresetBertemu = BERTEMU_PRESETS.includes(bertemuVal);
-    const isCustomBertemu = !isPresetBertemu && bertemuVal !== "";
 
-    // Evaluasi Segmen 2 (Tidak Ada Informasi)
-    const isNoInfo = (raw.stock === "-" || raw.sales === "-" || raw.stock === null || (raw.stock === 0 && raw.sales === 0 && String(raw.catatan_visit || '').includes('Tidak Ada Informasi')));
-    const stockDisplay = isNoInfo ? "-" : (raw.stock !== undefined && raw.stock !== null ? raw.stock : "0");
-    const salesDisplay = isNoInfo ? "-" : (raw.sales !== undefined && raw.sales !== null ? raw.sales : "0");
+    const matchedDealer = MASTER_DEALER_PRIORITY_DATA.find(d =>
+      d.dealer_name === item.title ||
+      (raw.dealer_id && d.dealer_id === raw.dealer_id)
+    );
 
+    // Evaluasi Segmen Validasi Onboarding (New Mitra)
+    const hasOnbRumahData = Boolean(raw.onb_visit_rumah || raw.onb_domisili_status || raw.onb_domisili_photo_url || (raw.onb_domisili_note && raw.onb_domisili_note !== "-"));
+    const hasOnbShowroomData = Boolean(raw.onb_visit_showroom || raw.onb_showroom_status || (raw.onb_showroom_note && raw.onb_showroom_note !== "-"));
+    const showOnbSegment = Boolean(hasOnbRumahData || hasOnbShowroomData || (matchedDealer && typeof isDealerNewMitra === "function" && isDealerNewMitra(matchedDealer)));
+
+    const domLat = raw.onb_domisili_lat || (hasOnbRumahData ? raw.lat : null);
+    const domLong = raw.onb_domisili_long || (hasOnbRumahData ? raw.long : null);
+    const shwLat = raw.onb_showroom_lat || (hasOnbShowroomData ? raw.lat : null);
+    const shwLong = raw.onb_showroom_long || (hasOnbShowroomData ? raw.long : null);
+
+    let onbSegmentHtml = "";
+    if (showOnbSegment) {
+      onbSegmentHtml = `
+        <!-- Segmen Validasi Onboarding (New Mitra) - Sesuai Form Visit FAC -->
+        <div id="hist-segment-validasi-onboarding" class="bg-teal-50/40 p-3.5 rounded-2xl border border-teal-300 shadow-2xs space-y-3">
+          <div class="flex justify-between items-center border-b border-teal-200/70 pb-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-5 h-5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center">
+                <i class="fa-solid fa-user-check text-[9px]"></i>
+              </span>
+              <h5 class="text-xs font-bold text-teal-950 uppercase">Validasi Onboarding</h5>
+            </div>
+            <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-300">New Mitra</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label class="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-300 bg-white ${isReadOnly ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer hover:border-teal-600'} has-[:checked]:border-teal-700 has-[:checked]:bg-teal-900 has-[:checked]:text-white transition shadow-2xs select-none">
+              <div class="flex items-center space-x-2 min-w-0">
+                <input
+                  type="checkbox"
+                  id="hist-chk-onb-rumah"
+                  ${hasOnbRumahData ? 'checked' : ''}
+                  ${isReadOnly ? 'disabled' : ''}
+                  onchange="toggleHistOnbLokasiBox('rumah', this.checked)"
+                  class="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 shrink-0"
+                />
+                <div class="text-xs font-bold flex items-center gap-1.5 truncate">
+                  <i class="fa-solid fa-house-chimney text-[11px]"></i>
+                  <span>Visit Lokasi Rumah</span>
+                </div>
+              </div>
+              <span id="hist-badge-onb-rumah" class="text-[9px] font-bold px-1.5 py-0.5 rounded ${hasOnbRumahData ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-200'} shrink-0">${hasOnbRumahData ? '<i class="fa-solid fa-check mr-0.5"></i> Tervalidasi' : 'Belum'}</span>
+            </label>
+
+            <label class="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-300 bg-white ${isReadOnly ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer hover:border-teal-600'} has-[:checked]:border-teal-700 has-[:checked]:bg-teal-900 has-[:checked]:text-white transition shadow-2xs select-none">
+              <div class="flex items-center space-x-2 min-w-0">
+                <input
+                  type="checkbox"
+                  id="hist-chk-onb-showroom"
+                  ${hasOnbShowroomData ? 'checked' : ''}
+                  ${isReadOnly ? 'disabled' : ''}
+                  onchange="toggleHistOnbLokasiBox('showroom', this.checked)"
+                  class="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 shrink-0"
+                />
+                <div class="text-xs font-bold flex items-center gap-1.5 truncate">
+                  <i class="fa-solid fa-store text-[11px]"></i>
+                  <span>Visit Lokasi Showroom</span>
+                </div>
+              </div>
+              <span id="hist-badge-onb-showroom" class="text-[9px] font-bold px-1.5 py-0.5 rounded ${hasOnbShowroomData ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-200'} shrink-0">${hasOnbShowroomData ? '<i class="fa-solid fa-check mr-0.5"></i> Tervalidasi' : 'Belum'}</span>
+            </label>
+          </div>
+
+          <!-- Detail Validasi Lokasi Rumah (Domisili) -->
+          <div id="hist-box-onb-rumah" class="${hasOnbRumahData ? '' : 'hidden'} bg-white p-3 rounded-xl border border-teal-200 space-y-2.5">
+            <div class="text-[11px] font-bold text-teal-900 border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
+              <i class="fa-solid fa-house-user text-teal-600"></i>
+              <span>Detail Validasi Lokasi Rumah (Domisili)</span>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Status Kepemilikan Domisili <span class="text-red-500">*</span></label>
+              ${renderHistFloatingDropdownField({
+                uid: "onb-domisili",
+                inputId: "edit-visit-onb-domisili-status",
+                presetType: "ONB_DOMISILI",
+                value: raw.onb_domisili_status || "",
+                placeholder: "Pilih atau ketik status kepemilikan domisili...",
+                icon: "fa-house-lock",
+                isReadOnly
+              })}
+            </div>
+
+            <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] font-bold text-slate-800">Tagging Geolokasi Domisili</span>
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-200 text-slate-600 uppercase">Terkunci</span>
+                </div>
+                <span class="text-[10px] text-slate-600 font-mono block truncate mt-0.5">${domLat && domLong ? `${domLat}, ${domLong}` : "Mengikuti Geotag Kunjungan"}</span>
+              </div>
+              ${domLat && domLong ? `
+                <a href="https://www.google.com/maps?q=${domLat},${domLong}" target="_blank" class="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-[10px] font-bold shrink-0">
+                  <i class="fa-solid fa-location-dot mr-1"></i>Maps
+                </a>
+              ` : ''}
+            </div>
+
+            ${raw.onb_domisili_photo_url ? `
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Foto Domisili (Terkunci)</label>
+                <a href="${raw.onb_domisili_photo_url}" target="_blank" class="block relative rounded-xl overflow-hidden border border-slate-300 bg-slate-900 h-36">
+                  <img src="${raw.onb_domisili_photo_url}" alt="Foto Domisili" class="w-full h-full object-cover" />
+                  <div class="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                    <i class="fa-solid fa-camera mr-1 text-emerald-400"></i> Foto Domisili Tersimpan
+                  </div>
+                </a>
+              </div>
+            ` : ''}
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Note Domisili</label>
+              <textarea id="edit-visit-onb-domisili-note" rows="2" ${isReadOnly ? 'disabled' : ''} placeholder="Tuliskan catatan hasil verifikasi domisili rumah mitra..." class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white focus:border-teal-700 text-slate-800'} border border-slate-300 rounded-xl p-2.5 text-xs outline-none">${escapeHtml(raw.onb_domisili_note && raw.onb_domisili_note !== '-' ? raw.onb_domisili_note : '')}</textarea>
+            </div>
+          </div>
+
+          <!-- Detail Validasi Lokasi Showroom -->
+          <div id="hist-box-onb-showroom" class="${hasOnbShowroomData ? '' : 'hidden'} bg-white p-3 rounded-xl border border-teal-200 space-y-2.5">
+            <div class="text-[11px] font-bold text-teal-900 border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
+              <i class="fa-solid fa-shop text-teal-600"></i>
+              <span>Detail Validasi Lokasi Showroom</span>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Status Kepemilikan Showroom <span class="text-red-500">*</span></label>
+              ${renderHistFloatingDropdownField({
+                uid: "onb-showroom",
+                inputId: "edit-visit-onb-showroom-status",
+                presetType: "ONB_SHOWROOM",
+                value: raw.onb_showroom_status || "",
+                placeholder: "Pilih atau ketik status kepemilikan showroom...",
+                icon: "fa-building-shield",
+                isReadOnly
+              })}
+            </div>
+
+            <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] font-bold text-slate-800">Tagging Geolokasi Showroom</span>
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-200 text-slate-600 uppercase">Terkunci</span>
+                </div>
+                <span class="text-[10px] text-slate-600 font-mono block truncate mt-0.5">${shwLat && shwLong ? `${shwLat}, ${shwLong}` : "Mengikuti Geotag Kunjungan"}</span>
+              </div>
+              ${shwLat && shwLong ? `
+                <a href="https://www.google.com/maps?q=${shwLat},${shwLong}" target="_blank" class="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-[10px] font-bold shrink-0">
+                  <i class="fa-solid fa-location-dot mr-1"></i>Maps
+                </a>
+              ` : ''}
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Note Showroom</label>
+              <textarea id="edit-visit-onb-showroom-note" rows="2" ${isReadOnly ? 'disabled' : ''} placeholder="Tuliskan catatan hasil verifikasi lokasi showroom mitra..." class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white focus:border-teal-700 text-slate-800'} border border-slate-300 rounded-xl p-2.5 text-xs outline-none">${escapeHtml(raw.onb_showroom_note && raw.onb_showroom_note !== '-' ? raw.onb_showroom_note : '')}</textarea>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Evaluasi Segmen KONDISI SHOWROOM (Tidak Ada Informasi)
+    const hasShowroomIssues = (raw.issue_digi && raw.issue_digi !== "-") || (raw.issue_internal && raw.issue_internal !== "-") || (raw.issue_komp && raw.issue_komp !== "-");
+    const isNoInfo = Boolean(
+      raw.stock === "-" ||
+      raw.sales === "-" ||
+      raw.stock === null ||
+      (Number(raw.stock) === 0 && Number(raw.sales) === 0 && !hasShowroomIssues && String(raw.catatan_visit || "").includes("Tidak Ada Informasi"))
+    );
+    const stockDisplay = isNoInfo ? "" : (raw.stock !== undefined && raw.stock !== null ? raw.stock : "0");
+    const salesDisplay = isNoInfo ? "" : (raw.sales !== undefined && raw.sales !== null ? raw.sales : "0");
+    const issueDigiVal = (raw.issue_digi && raw.issue_digi !== "-") ? raw.issue_digi : "";
+    const issueInternalVal = (raw.issue_internal && raw.issue_internal !== "-") ? raw.issue_internal : "";
+    const issueKompVal = (raw.issue_komp && raw.issue_komp !== "-") ? raw.issue_komp : "";
+    const catatanVisitVal = (raw.catatan_visit && raw.catatan_visit !== "-") ? raw.catatan_visit : "";
+
+    // Render Segmen FASILITAS AKTIF (Pemeriksaan Unit) sesuai Modal Unit di Form Visit FAC
     let unitsHtml = "";
     if (checkedUnits.length > 0) {
-      const INDIKASI_PRESETS = [
-        "Showroom Lain",
-        "Gudang",
-        "Dealer Lain",
-        "Dibawa Karyawan",
-        "Dibawa Rekanan",
-        "Unit Dipembeli"
-      ];
-
       unitsHtml = `
-        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
-          <div class="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
-            <div class="flex items-center space-x-1.5">
-              <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">3</span>
-              <h5 class="text-xs font-bold text-slate-800 uppercase">Pemeriksaan Unit Fasilitas (${checkedUnits.length} Unit)</h5>
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
+                <i class="fa-solid fa-car-side text-[9px]"></i>
+              </span>
+              <h5 class="text-xs font-bold text-slate-800 uppercase">Fasilitas Aktif</h5>
             </div>
-            <span class="text-[9px] text-slate-400 font-semibold">Klik unit untuk buka detail</span>
+            <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">${checkedUnits.length} Unit</span>
           </div>
 
           <div class="space-y-2">
             ${checkedUnits.map((u, idx) => {
-        const parsed = parseCatatanUnit(u.catatan_unit, u);
-        const checkId = u.check_id || u.id;
-        const isAda = u.status_keberadaan === "Ya" || u.status_keberadaan === "Ya, Terlihat" || u.status_keberadaan === "Terlihat di Showroom";
-        const statusVal = isAda ? "Ya, Terlihat" : "Tidak Terlihat";
-        const gpsMatchVal = (u.kondisi_unit === "Tidak Sesuai" || u.kondisi_unit === "Tidak") ? "Tidak Sesuai" : "Ya, Sesuai";
-        const hasLainnya = parsed.infoList.includes("Lainnya") || (parsed.infoLainnya && parsed.infoLainnya.trim() !== "");
+              const parsed = parseCatatanUnit(u.catatan_unit, u);
+              const checkId = u.check_id || u.id || `u-${idx}`;
+              const isAda = u.status_keberadaan === "Ya" || u.status_keberadaan === "Ya, Terlihat" || u.status_keberadaan === "Terlihat di Showroom";
+              const gpsMatchVal = (u.kondisi_unit === "Tidak Sesuai" || u.kondisi_unit === "Tidak") ? "Tidak Sesuai" : "Ya, Sesuai";
+              const hasLainnya = parsed.infoList.includes("Lainnya") || (parsed.infoLainnya && parsed.infoLainnya.trim() !== "");
 
-        // Deteksi apakah unit Overdue
-        let isOvd = false;
-        const matchedDealer = MASTER_DEALER_PRIORITY_DATA.find(d =>
-          d.dealer_name === item.title ||
-          (item.raw && d.dealer_id === item.raw.dealer_id)
-        );
-        if (matchedDealer && matchedDealer.units) {
-          const matchedUnit = matchedDealer.units.find(mu =>
-            (u.no_fasilitas && mu.no_fasilitas === u.no_fasilitas) ||
-            (u.nopol && mu.nopol === u.nopol)
-          );
-          if (matchedUnit) {
-            isOvd = !!(matchedUnit.is_ovd || matchedUnit.ovd_days > 0 || (matchedUnit.aging_ovd && matchedUnit.aging_ovd > 0));
-          }
-        }
-        if (!isOvd && (parsed.ovdPlan || (parsed.komitmen && parsed.komitmen !== "Tidak Ada" && parsed.komitmen !== "-") || parsed.tglKomitmen)) {
-          isOvd = true;
-        }
+              // Deteksi apakah unit Overdue atau H-3 JTO
+              let isOvd = false;
+              let isNearJto = false;
+              if (matchedDealer && matchedDealer.units) {
+                const matchedUnit = matchedDealer.units.find(mu =>
+                  (u.no_fasilitas && mu.no_fasilitas === u.no_fasilitas) ||
+                  (u.nopol && mu.nopol === u.nopol)
+                );
+                if (matchedUnit) {
+                  isOvd = Boolean(matchedUnit.is_ovd || matchedUnit.ovd_days > 0 || (matchedUnit.aging_ovd && matchedUnit.aging_ovd > 0));
+                  isNearJto = Boolean(matchedUnit.is_h3_jto || (typeof isUnitNearJTO === "function" && isUnitNearJTO(matchedUnit)));
+                }
+              }
+              if (!isOvd && parsed.ovdPlan) {
+                isOvd = true;
+              }
+              const hasSavedKomitmen = Boolean((parsed.komitmen && parsed.komitmen !== "Tidak Ada" && parsed.komitmen !== "-") || parsed.tglKomitmen);
+              const showKomitmen = Boolean(isOvd || isNearJto || hasSavedKomitmen);
+              const komitmenVal = parsed.komitmen || "Tidak Ada";
+              const showTglKomitmen = Boolean(
+                komitmenVal === "Bayar" ||
+                komitmenVal === "Serahkan Unit" ||
+                String(komitmenVal).toLowerCase().includes("janji") ||
+                parsed.tglKomitmen
+              );
 
-        const isPresetIndikasi = INDIKASI_PRESETS.includes(parsed.indikasi);
-        const isCustomIndikasi = parsed.indikasi && !isPresetIndikasi;
+              const statusBadgeText = isOvd ? "OVERDUE" : (isNearJto ? "H-3 JTO" : "LANCAR");
+              const statusBadgeClass = isOvd
+                ? "bg-rose-100 text-rose-700 border border-rose-200"
+                : (isNearJto ? "bg-amber-100 text-amber-800 border border-amber-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200");
 
-        return `
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden hist-unit-card transition" data-check-id="${checkId}" data-is-ovd="${isOvd}">
+              return `
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden hist-unit-card transition" data-check-id="${checkId}" data-is-ovd="${isOvd}" data-show-komitmen="${showKomitmen}" data-nopol="${escapeHtml(u.nopol || '')}" data-no-fasilitas="${escapeHtml(u.no_fasilitas || '')}">
                   <!-- Accordion Header (Clickable) -->
                   <div onclick="toggleHistUnitAccordion('${checkId}')" class="p-3 bg-slate-50/80 hover:bg-slate-100 cursor-pointer flex items-center justify-between gap-2 transition select-none">
                     <div class="flex items-center space-x-2.5 min-w-0">
-                      <div class="w-7 h-7 rounded-xl ${isOvd ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'} flex items-center justify-center text-xs font-bold shrink-0">
+                      <div class="w-7 h-7 rounded-xl ${isOvd ? 'bg-rose-100 text-rose-700' : (isNearJto ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700')} flex items-center justify-center text-xs font-bold shrink-0">
                         ${idx + 1}
                       </div>
                       <div class="min-w-0">
                         <div class="flex items-center space-x-1.5 flex-wrap">
-                          <span class="font-bold text-xs text-slate-900 leading-tight">${u.nopol || 'Unit'}</span>
-                          <span class="text-[9px] px-1.5 py-0.2 rounded font-extrabold ${isOvd ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}">
-                            ${isOvd ? 'OVERDUE' : 'LANCAR'}
+                          <span class="font-bold text-xs text-slate-900 leading-tight">${escapeHtml(u.nopol || 'Unit')}</span>
+                          <span class="text-[9px] px-1.5 py-0.2 rounded font-extrabold ${statusBadgeClass}">
+                            ${statusBadgeText}
                           </span>
                           <span class="text-[9px] px-1.5 py-0.2 rounded font-bold ${isAda ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}">
                             ${isAda ? 'Terlihat' : 'Tidak Terlihat'}
                           </span>
                         </div>
-                        <div class="text-[10px] text-slate-500 truncate mt-0.5">${u.unit_desc || ''} ${u.no_fasilitas ? '• ' + u.no_fasilitas : ''}</div>
+                        <div class="text-[10px] text-slate-500 truncate mt-0.5">${escapeHtml(u.unit_desc || '')} ${u.no_fasilitas ? '• ' + escapeHtml(u.no_fasilitas) : ''}</div>
                       </div>
                     </div>
                     <div class="flex items-center space-x-2 shrink-0">
@@ -14748,44 +15204,72 @@ async function openActivityDetailModal(type, id) {
                     </div>
                   </div>
 
-                  <!-- Accordion Body (Detail Inputan, Hidden by Default) -->
-                  <div id="hist-unit-body-${checkId}" class="hidden p-3.5 space-y-3 bg-white border-t border-slate-100">
-                    <!-- 1. Status Keberadaan Unit -->
+                  <!-- Accordion Body (Detail Inputan sesuai Modal Unit Form Visit FAC) -->
+                  <div id="hist-unit-body-${checkId}" class="hidden p-3.5 space-y-3.5 bg-white border-t border-slate-100">
+                    <!-- 1. Apakah Unit Terlihat ? -->
                     <div>
-                      <label class="block text-[10px] font-bold text-slate-600 mb-1">Apakah Unit Terlihat di Lokasi?</label>
-                      <select ${isReadOnly ? 'disabled' : ''} onchange="toggleHistUnitAda(this.value, '${checkId}')" class="hist-unit-ada w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                        <option value="Ya, Terlihat" ${statusVal === 'Ya, Terlihat' ? 'selected' : ''}>Ya, Terlihat</option>
-                        <option value="Tidak Terlihat" ${statusVal === 'Tidak Terlihat' ? 'selected' : ''}>Tidak Terlihat</option>
-                      </select>
-                    </div>
-
-                    <!-- Indikasi Keberadaan (Tampil jika Tidak Terlihat) -->
-                    <div id="box-hist-indikasi-${checkId}" class="${statusVal === 'Tidak Terlihat' ? '' : 'hidden'} p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-                      <label class="block text-[10px] font-bold text-amber-950">Indikasi Keberadaan Unit:</label>
-                      <select ${isReadOnly ? 'disabled' : ''} onchange="onHistIndikasiPresetChange(this.value, '${checkId}')" class="hist-unit-indikasi-select w-full bg-white border border-amber-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500">
-                        <option value="">-- Pilih Indikasi Keberadaan --</option>
-                        ${INDIKASI_PRESETS.map(preset => `
-                          <option value="${preset}" ${parsed.indikasi === preset ? 'selected' : ''}>${preset}</option>
-                        `).join('')}
-                        <option value="Lainnya" ${isCustomIndikasi ? 'selected' : ''}>Lainnya (Ketik Bebas)</option>
-                      </select>
-                      <div id="box-hist-indikasi-custom-${checkId}" class="${isCustomIndikasi ? '' : 'hidden'}">
-                        <input type="text" id="input-hist-indikasi-custom-${checkId}" ${isReadOnly ? 'disabled' : ''} value="${isCustomIndikasi ? parsed.indikasi : ''}" placeholder="Ketik indikasi keberadaan unit..." class="hist-unit-indikasi-custom w-full bg-white border border-amber-300 rounded-xl p-2 text-xs text-slate-800 font-semibold placeholder-slate-400" />
+                      <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Apakah Unit Terlihat ?</label>
+                      <div class="grid grid-cols-2 gap-2">
+                        <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold text-xs block ${isReadOnly ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} has-[:checked]:bg-slate-900 has-[:checked]:text-white transition">
+                          <input type="radio" name="hist_unit_ada_${checkId}" value="Ya, Terlihat" ${isAda ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} onchange="toggleHistUnitAda('Ya, Terlihat', '${checkId}')" class="hist-unit-ada-radio hidden" />
+                          Ya, Terlihat
+                        </label>
+                        <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold text-xs block ${isReadOnly ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} has-[:checked]:bg-slate-900 has-[:checked]:text-white transition">
+                          <input type="radio" name="hist_unit_ada_${checkId}" value="Tidak Terlihat" ${!isAda ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} onchange="toggleHistUnitAda('Tidak Terlihat', '${checkId}')" class="hist-unit-ada-radio hidden" />
+                          Tidak Terlihat
+                        </label>
                       </div>
                     </div>
 
-                    <!-- 2. Titik GPS Sesuai Lokasi Visit? -->
-                    <div>
-                      <label class="block text-[10px] font-bold text-slate-600 mb-1">Titik GPS Sesuai Lokasi Visit?</label>
-                      <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-gps-match w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                        <option value="Ya, Sesuai" ${gpsMatchVal === 'Ya, Sesuai' ? 'selected' : ''}>Ya, Sesuai</option>
-                        <option value="Tidak Sesuai" ${gpsMatchVal === 'Tidak Sesuai' ? 'selected' : ''}>Tidak Sesuai</option>
-                      </select>
+                    <!-- Foto Fisik Kendaraan (Tampil jika Ya, Terlihat) -->
+                    <div id="box-hist-foto-unit-${checkId}" class="${isAda ? '' : 'hidden'} p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                      <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-800 text-[11px]"><i class="fa-solid fa-camera text-slate-500 mr-1"></i>Foto Fisik Kendaraan</span>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase bg-slate-200 px-1.5 py-0.5 rounded">Terkunci</span>
+                      </div>
+                      ${u.foto_unit_url ? `
+                        <a href="${u.foto_unit_url}" target="_blank" class="block relative rounded-xl overflow-hidden border border-slate-300 bg-slate-900 h-36">
+                          <img src="${u.foto_unit_url}" alt="Foto Unit" class="w-full h-full object-cover" />
+                          <div class="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                            <i class="fa-solid fa-camera-retro mr-1 text-emerald-400"></i> Klik untuk perbesar
+                          </div>
+                        </a>
+                      ` : `<div class="text-[10px] text-slate-400 italic py-1">Foto fisik unit tidak terlampir</div>`}
                     </div>
 
-                    <!-- 3. Info Status Unit (Multi Checkbox + Lainnya Free Text) -->
+                    <!-- Indikasi Keberadaan Unit (Tampil jika Tidak Terlihat - Floating Dropdown Card) -->
+                    <div id="box-hist-indikasi-${checkId}" class="${!isAda ? '' : 'hidden'}">
+                      <label class="block font-semibold text-amber-900 mb-1 text-[11px]">Indikasi Keberadaan Unit: <span class="text-red-500">*</span></label>
+                      ${renderHistFloatingDropdownField({
+                        uid: `indikasi-${checkId}`,
+                        inputId: `hist-dd-input-indikasi-${checkId}`,
+                        inputClass: "hist-unit-indikasi-input",
+                        presetType: "INDIKASI",
+                        value: parsed.indikasi || "",
+                        placeholder: "Pilih atau ketik indikasi keberadaan unit...",
+                        icon: "fa-car-side",
+                        isReadOnly
+                      })}
+                    </div>
+
+                    <!-- 2. Apakah Titik GPS Sesuai Dengan Lokasi Real Unit? -->
+                    <div>
+                      <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Apakah Titik GPS Sesuai Dengan Lokasi Real Unit?</label>
+                      <div class="grid grid-cols-2 gap-2">
+                        <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold text-xs block ${isReadOnly ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} has-[:checked]:bg-slate-900 has-[:checked]:text-white transition">
+                          <input type="radio" name="hist_unit_gps_${checkId}" value="Ya, Sesuai" ${gpsMatchVal === 'Ya, Sesuai' ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="hist-unit-gps-radio hidden" />
+                          Ya, Sesuai
+                        </label>
+                        <label class="border border-slate-300 rounded-xl p-2 text-center font-semibold text-xs block ${isReadOnly ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} has-[:checked]:bg-slate-900 has-[:checked]:text-white transition">
+                          <input type="radio" name="hist_unit_gps_${checkId}" value="Tidak Sesuai" ${gpsMatchVal === 'Tidak Sesuai' ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="hist-unit-gps-radio hidden" />
+                          Tidak Sesuai
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- 3. Info Status Fasilitas (Bisa Pilih >1) -->
                     <div class="space-y-1.5">
-                      <label class="block text-[10px] font-bold text-slate-600">Info Status Unit (Bisa Pilih > 1):</label>
+                      <label class="block font-semibold text-slate-700 text-[11px]">Info Status Fasilitas (Bisa Pilih &gt;1):</label>
                       <div class="grid grid-cols-2 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px]">
                         <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Perpanjang" ${parsed.infoList.includes('Plan Perpanjang') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Perpanjang</span></label>
                         <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Plan Pelunasan" ${parsed.infoList.includes('Plan Pelunasan') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Plan Pelunasan</span></label>
@@ -14793,45 +15277,47 @@ async function openActivityDetailModal(type, id) {
                         <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Proses Kredit" ${parsed.infoList.includes('Proses Kredit') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Proses Kredit</span></label>
                         <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Cash Tempo" ${parsed.infoList.includes('Unit Cash Tempo') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Unit Cash Tempo</span></label>
                         <label class="flex items-center space-x-1.5"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Unit Milik Orang Lain" ${parsed.infoList.includes('Unit Milik Orang Lain') ? 'checked' : ''} class="hist-unit-info-chk rounded text-slate-900" /> <span>Milik Orang Lain</span></label>
-                        <label class="flex items-center space-x-1.5 col-span-2"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Lainnya" ${hasLainnya ? 'checked' : ''} onchange="toggleHistUnitLainnya(this, '${checkId}')" class="hist-unit-info-chk hist-unit-info-lainnya-chk rounded text-slate-900" /> <span class="font-semibold text-slate-800">Lainnya (Free Text)</span></label>
+                        <label class="flex items-center space-x-1.5 col-span-2"><input type="checkbox" ${isReadOnly ? 'disabled' : ''} value="Lainnya" ${hasLainnya ? 'checked' : ''} onchange="toggleHistUnitLainnya(this, '${checkId}')" class="hist-unit-info-chk hist-unit-info-lainnya-chk rounded text-slate-900" /> <span class="font-semibold text-slate-800">Lainnya</span></label>
                       </div>
                       <div id="box-hist-info-lainnya-${checkId}" class="${hasLainnya ? '' : 'hidden'} mt-1.5">
-                        <input type="text" ${isReadOnly ? 'disabled' : ''} value="${parsed.infoLainnya}" placeholder="Sebutkan info status unit lainnya..." class="hist-unit-info-lainnya w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400" />
+                        <input type="text" id="input-hist-info-lainnya-${checkId}" ${isReadOnly ? 'disabled' : ''} value="${escapeHtml(parsed.infoLainnya || '')}" placeholder="Sebutkan status fasilitas lainnya..." class="hist-unit-info-lainnya w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-800 focus:border-slate-800 outline-none placeholder-slate-400" />
                       </div>
                     </div>
 
-                    <!-- 4. Plan Penyelesaian Overdue & Komitmen (HANYA MUNCUL JIKA isOvd === true) -->
-                    ${isOvd ? `
-                      <div class="space-y-2 pt-2 border-t border-rose-100 bg-rose-50/50 p-2.5 rounded-xl border border-rose-200/80">
-                        <div class="flex items-center space-x-1.5 text-rose-900 font-bold text-xs">
-                          <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
-                          <span>Penanganan Unit Overdue</span>
-                        </div>
+                    <!-- 4. Komitmen Pembayaran & Tanggal Komitmen (Muncul jika OVD atau H-3 JTO) -->
+                    ${showKomitmen ? `
+                      <div class="space-y-2.5 pt-2 border-t border-amber-200">
                         <div>
-                          <label class="block font-bold text-rose-950 text-[10px] mb-1">Plan Penyelesaian Overdue (Free Text):</label>
-                          <textarea ${isReadOnly ? 'disabled' : ''} rows="2" placeholder="Rencana penanganan pelunasan unit..." class="hist-unit-ovd-plan w-full bg-white border border-rose-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-rose-500">${parsed.ovdPlan || ''}</textarea>
+                          <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Komitmen Pembayaran:</label>
+                          ${renderHistFloatingDropdownField({
+                            uid: `komitmen-${checkId}`,
+                            inputId: `hist-dd-input-komitmen-${checkId}`,
+                            inputClass: "hist-unit-komitmen",
+                            presetType: "KOMITMEN",
+                            value: komitmenVal,
+                            placeholder: "Pilih komitmen pembayaran...",
+                            icon: "fa-hand-holding-dollar",
+                            isReadOnly
+                          })}
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <div>
-                            <label class="block text-[10px] font-bold text-slate-700 mb-1">Komitmen Pembayaran:</label>
-                            <select ${isReadOnly ? 'disabled' : ''} class="hist-unit-komitmen w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                              <option value="Tidak Ada" ${parsed.komitmen === 'Tidak Ada' || !parsed.komitmen ? 'selected' : ''}>Tidak Ada Komitmen</option>
-                              <option value="Sudah Bayar" ${parsed.komitmen === 'Sudah Bayar' ? 'selected' : ''}>Sudah Bayar</option>
-                              <option value="Bayar" ${parsed.komitmen === 'Bayar' ? 'selected' : ''}>Bayar</option>
-                              <option value="Serahkan Unit" ${parsed.komitmen === 'Serahkan Unit' ? 'selected' : ''}>Serahkan Unit</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label class="block text-[10px] font-bold text-slate-700 mb-1">Tanggal Komitmen:</label>
-                            <input type="date" ${isReadOnly ? 'disabled' : ''} value="${parsed.tglKomitmen || ''}" class="hist-unit-tgl-komitmen w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800" />
-                          </div>
+                        <div id="box-hist-tgl-komitmen-${checkId}" class="${showTglKomitmen ? '' : 'hidden'}">
+                          <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Tanggal Komitmen:</label>
+                          <input type="date" ${isReadOnly ? 'disabled' : ''} value="${escapeHtml(parsed.tglKomitmen || '')}" class="hist-unit-tgl-komitmen w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800" />
                         </div>
+                      </div>
+                    ` : ''}
+
+                    <!-- 5. Plan Penyelesaian Overdue (Muncul jika OVD) -->
+                    ${isOvd ? `
+                      <div class="p-2.5 bg-red-50 rounded-xl border border-red-200 space-y-1">
+                        <label class="block font-bold text-red-900 text-[11px]">Plan Penyelesaian Overdue:</label>
+                        <textarea ${isReadOnly ? 'disabled' : ''} rows="2" placeholder="Rencana penanganan pelunasan" class="hist-unit-ovd-plan w-full bg-white border border-red-300 rounded-lg p-2 text-xs text-slate-800">${escapeHtml(parsed.ovdPlan || '')}</textarea>
                       </div>
                     ` : ''}
                   </div>
                 </div>
               `;
-      }).join("")}
+            }).join("")}
           </div>
         </div>
       `;
@@ -14839,111 +15325,106 @@ async function openActivityDetailModal(type, id) {
 
     fieldsContainer.innerHTML = `
       <div class="space-y-3.5">
-        <!-- 1. Lokasi & Pihak yang Ditemui -->
-        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
-          <div class="flex items-center space-x-1.5 border-b border-slate-200/60 pb-1.5">
-            <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">1</span>
-            <h5 class="text-xs font-bold text-slate-800 uppercase">Lokasi & Pihak yang Ditemui</h5>
-          </div>
-          
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <!-- Lokasi Kunjungan -->
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Lokasi Kunjungan:</label>
-              <select id="edit-visit-lokasi-select" onchange="toggleHistLokasiChange(this.value)" ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                <option value="Showroom" ${lokasiVal === 'Showroom' ? 'selected' : ''}>Showroom</option>
-                <option value="Rumah Owner" ${lokasiVal === 'Rumah Owner' ? 'selected' : ''}>Rumah Owner</option>
-                <option value="Janjian Diluar" ${lokasiVal === 'Janjian Diluar' ? 'selected' : ''}>Janjian Diluar</option>
-                <option value="Lainnya" ${isCustomLokasi ? 'selected' : ''}>Lainnya (Ketik Lokasi)</option>
-              </select>
-              <div id="box-hist-lokasi-custom" class="${isCustomLokasi ? '' : 'hidden'} mt-1.5">
-                <input type="text" id="input-hist-lokasi-custom" value="${isCustomLokasi ? lokasiVal : ''}" placeholder="Ketik lokasi khusus..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400 font-semibold" />
-              </div>
-            </div>
-
-            <!-- Pihak yang Ditemui -->
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Pihak yang Ditemui:</label>
-              <select id="edit-visit-bertemu-select" onchange="toggleHistBertemuChange(this.value)" ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800">
-                <option value="Owner" ${bertemuVal === 'Owner' ? 'selected' : ''}>Owner</option>
-                <option value="Pekerja" ${bertemuVal === 'Pekerja' ? 'selected' : ''}>Pekerja</option>
-                <option value="Penanggung Jawab" ${bertemuVal === 'Penanggung Jawab' ? 'selected' : ''}>Penanggung Jawab</option>
-                <option value="Tidak Bertemu" ${bertemuVal === 'Tidak Bertemu' ? 'selected' : ''}>Tidak Bertemu</option>
-                <option value="Lainnya" ${isCustomBertemu ? 'selected' : ''}>Lainnya (Ketik Pihak)</option>
-              </select>
-              <div id="box-hist-bertemu-custom" class="${isCustomBertemu ? '' : 'hidden'} mt-1.5">
-                <input type="text" id="input-hist-bertemu-custom" value="${isCustomBertemu ? bertemuVal : ''}" placeholder="Ketik pihak yang ditemui..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800 placeholder-slate-400 font-semibold" />
-              </div>
-            </div>
+        <!-- Segmen Identitas Kunjungan & Pertemuan (Sesuai Form Visit FAC) -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+            <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
+              <i class="fa-solid fa-handshake text-[9px]"></i>
+            </span>
+            <h5 class="text-xs font-bold text-slate-800 uppercase">Identitas Kunjungan &amp; Pertemuan</h5>
           </div>
 
-          <!-- Alasan Tidak Bertemu (Jika Tidak Bertemu) -->
-          <div id="box-hist-bertemu-reason" class="${bertemuVal === 'Tidak Bertemu' ? '' : 'hidden'}">
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Alasan Tidak Bertemu:</label>
-            <input type="text" id="edit-visit-reason" value="${raw.owner_reason || ''}" placeholder="Contoh: Showroom tutup / owner sedang keluar kota" ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800" />
+          <!-- Lokasi Kunjungan -->
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Lokasi Kunjungan <span class="text-red-500">*</span></label>
+            ${renderHistFloatingDropdownField({
+              uid: "lokasi",
+              inputId: "edit-visit-lokasi-input",
+              presetType: "LOKASI",
+              value: lokasiVal,
+              placeholder: "Pilih atau ketik lokasi (Showroom, Rumah Owner, dll)...",
+              icon: "fa-location-dot",
+              isReadOnly
+            })}
+          </div>
+
+          <!-- Bertemu Siapa -->
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Bertemu Siapa <span class="text-red-500">*</span></label>
+            ${renderHistFloatingDropdownField({
+              uid: "bertemu",
+              inputId: "edit-visit-bertemu-input",
+              presetType: "BERTEMU",
+              value: bertemuVal,
+              placeholder: "Pilih atau ketik siapa yang ditemui (Owner, Pekerja, dll)...",
+              icon: "fa-user-check",
+              isReadOnly
+            })}
           </div>
         </div>
 
-        <!-- 2. Kondisi Showroom & Wawancara (Segmen 2) -->
-        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
-          <div class="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
-            <div class="flex items-center space-x-1.5">
-              <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">2</span>
-              <h5 class="text-xs font-bold text-slate-800 uppercase">Kondisi Showroom & Wawancara</h5>
+        <!-- Segmen Validasi Onboarding (Jika New Mitra / Ada Data Validasi Onboarding) -->
+        ${onbSegmentHtml}
+
+        <!-- Segmen KONDISI SHOWROOM (Sesuai Form Visit FAC) -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
+                <i class="fa-solid fa-store text-[9px]"></i>
+              </span>
+              <h5 class="text-xs font-bold text-slate-800 uppercase">Kondisi Showroom</h5>
             </div>
-            <label class="inline-flex items-center space-x-1.5 cursor-pointer select-none">
-              <input type="checkbox" id="edit-visit-toggle-no-info" onchange="toggleHistNoInfo(this.checked)" ${isNoInfo ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="rounded text-slate-900" />
-              <span class="text-[10px] font-bold text-slate-600">Tidak Ada Informasi</span>
+            <label class="flex items-center space-x-1.5 ${isReadOnly ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-200'} select-none bg-slate-100 px-2.5 py-1 rounded-xl transition border border-slate-200">
+              <input type="checkbox" id="edit-visit-toggle-no-info" onchange="toggleHistNoInfo(this.checked)" ${isNoInfo ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''} class="w-3.5 h-3.5 rounded text-slate-900 border-slate-300 focus:ring-slate-900" />
+              <span class="text-[10px] font-bold text-slate-700">Tidak Ada Informasi</span>
             </label>
           </div>
 
-          <div id="box-hist-showroom-inputs" class="grid grid-cols-2 gap-2 ${isNoInfo ? 'opacity-50 pointer-events-none' : ''}">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Jumlah Stok Unit (Showroom):</label>
-              <input type="text" id="edit-visit-stock" value="${stockDisplay}" ${isNoInfo || isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800" />
+          <div id="box-hist-no-showroom-notice" class="${isNoInfo ? '' : 'hidden'} p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center text-xs text-slate-500 font-medium">
+            <i class="fa-solid fa-ban mr-1.5 text-slate-400"></i> Data kondisi showroom dilewati (tidak ada informasi).
+          </div>
+
+          <div id="box-hist-showroom-inputs" class="${isNoInfo ? 'hidden' : ''} space-y-3">
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Jumlah Stock <span class="text-red-500">*</span></label>
+                <input type="number" id="edit-visit-stock" min="0" placeholder="0" value="${escapeHtml(stockDisplay)}" ${isReadOnly ? 'disabled' : ''} class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white text-slate-800'} border border-slate-300 rounded-xl p-2.5 text-xs font-bold outline-none" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Penjualan Bulan Ini <span class="text-red-500">*</span></label>
+                <input type="number" id="edit-visit-sales" min="0" placeholder="0" value="${escapeHtml(salesDisplay)}" ${isReadOnly ? 'disabled' : ''} class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white text-slate-800'} border border-slate-300 rounded-xl p-2.5 text-xs font-bold outline-none" />
+              </div>
             </div>
             <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Penjualan Bulan Ini:</label>
-              <input type="text" id="edit-visit-sales" value="${salesDisplay}" ${isNoInfo || isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-slate-800" />
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Terkait Digiasha <span class="text-[10px] font-normal text-slate-400">(Kondisional / Opsional)</span></label>
+              <textarea id="edit-visit-issue-digi" rows="2" placeholder="Masukan layanan, admin, GPS, dll." ${isReadOnly ? 'disabled' : ''} class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white text-slate-800'} border border-slate-300 rounded-xl p-2 text-xs outline-none">${escapeHtml(issueDigiVal)}</textarea>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Internal Mitra <span class="text-[10px] font-normal text-slate-400">(Kondisional / Opsional)</span></label>
+              <textarea id="edit-visit-issue-internal" rows="2" placeholder="Kendala cashflow, sengketa, dll." ${isReadOnly ? 'disabled' : ''} class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white text-slate-800'} border border-slate-300 rounded-xl p-2 text-xs outline-none">${escapeHtml(issueInternalVal)}</textarea>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Issue Kompetitor <span class="text-[10px] font-normal text-slate-400">(Kondisional / Opsional)</span></label>
+              <textarea id="edit-visit-issue-komp" rows="2" placeholder="Program leasing / fintech lain" ${isReadOnly ? 'disabled' : ''} class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white text-slate-800'} border border-slate-300 rounded-xl p-2 text-xs outline-none">${escapeHtml(issueKompVal)}</textarea>
             </div>
           </div>
         </div>
 
-        <!-- 3. Checklist Unit Fasilitas (Accordion Collapsible) -->
+        <!-- Segmen FASILITAS AKTIF (Accordion Collapsible) -->
         ${unitsHtml}
 
-        <!-- 4. Catatan Kunjungan & Tindak Lanjut -->
-        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
-          <div class="flex items-center space-x-1.5 border-b border-slate-200/60 pb-1.5">
-            <span class="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">4</span>
-            <h5 class="text-xs font-bold text-slate-800 uppercase">Catatan & Masukan Kunjungan</h5>
+        <!-- Segmen CATATAN TAMBAHAN VISIT (Sesuai Form Visit FAC) -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+          <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
+            <span class="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
+              <i class="fa-solid fa-clipboard-list text-[9px]"></i>
+            </span>
+            <h5 class="text-xs font-bold text-slate-800 uppercase">Catatan Tambahan Visit</h5>
           </div>
 
           <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Catatan Kunjungan Lapangan:</label>
-            <textarea id="edit-visit-notes" rows="3" placeholder="Catatan lengkap hasil kunjungan..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800">${raw.catatan_visit || ''}</textarea>
-          </div>
-
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Tindak Lanjut Concern Prioritas:</label>
-            <textarea id="edit-visit-concern" rows="2" placeholder="Tindak lanjut instruksi supervisor / concern unit..." ${isReadOnly ? 'disabled' : ''} class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800">${raw.tindak_lanjut_concern || ''}</textarea>
-          </div>
-
-          <!-- Isu & Feedback -->
-          <div class="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2">
-            <span class="text-[10px] font-bold text-slate-500 uppercase block">Isu & Feedback Lapangan</span>
-            <div>
-              <label class="block text-[10px] text-slate-600 mb-0.5">Isu Layanan Digiasha:</label>
-              <input type="text" id="edit-visit-issue-digi" value="${raw.issue_digi || ''}" placeholder="Kendala/masukan sistem & layanan Digiasha" ${isReadOnly ? 'disabled' : ''} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800" />
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-600 mb-0.5">Isu Internal Mitra:</label>
-              <input type="text" id="edit-visit-issue-internal" value="${raw.issue_internal || ''}" placeholder="Kondisi internal bisnis/keuangan mitra" ${isReadOnly ? 'disabled' : ''} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800" />
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-600 mb-0.5">Aktivitas Kompetitor:</label>
-              <input type="text" id="edit-visit-issue-komp" value="${raw.issue_komp || ''}" placeholder="Pergerakan atau promo kompetitor" ${isReadOnly ? 'disabled' : ''} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800" />
-            </div>
+            <textarea id="edit-visit-notes" rows="3" placeholder="Tuliskan poin penting lainnya..." ${isReadOnly ? 'disabled' : ''} class="w-full ${isReadOnly ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:bg-white text-slate-800'} border border-slate-300 rounded-xl p-2.5 text-xs outline-none">${escapeHtml(catatanVisitVal)}</textarea>
           </div>
         </div>
       </div>
@@ -15155,66 +15636,168 @@ async function handleSaveEditActivity(e) {
 
   try {
     if (type === "VISIT") {
-      // 1. Lokasi Kunjungan
-      const lokasiSelect = document.getElementById("edit-visit-lokasi-select")?.value || "Showroom";
-      const customLokasi = document.getElementById("input-hist-lokasi-custom")?.value?.trim() || "";
-      const finalLokasi = (lokasiSelect === "Lainnya" && customLokasi) ? customLokasi : lokasiSelect;
+      // 1. Identitas Kunjungan & Pertemuan (Lokasi Kunjungan & Bertemu Siapa)
+      const finalLokasi = document.getElementById("edit-visit-lokasi-input")?.value?.trim() || "";
+      if (!finalLokasi) {
+        alert("Silakan pilih atau ketik Lokasi Kunjungan terlebih dahulu!");
+        document.getElementById("edit-visit-lokasi-input")?.focus();
+        return;
+      }
 
-      // 2. Pihak yang Ditemui
-      const bertemuSelect = document.getElementById("edit-visit-bertemu-select")?.value || "Owner";
-      const customBertemu = document.getElementById("input-hist-bertemu-custom")?.value?.trim() || "";
-      const finalBertemu = (bertemuSelect === "Lainnya" && customBertemu) ? customBertemu : bertemuSelect;
-      const ownerReason = document.getElementById("edit-visit-reason")?.value?.trim() || (finalBertemu.toLowerCase().includes("tidak bertemu") ? "Tidak Bertemu" : "-");
+      const finalBertemu = document.getElementById("edit-visit-bertemu-input")?.value?.trim() || "";
+      if (!finalBertemu) {
+        alert("Silakan pilih atau ketik Bertemu Siapa terlebih dahulu!");
+        document.getElementById("edit-visit-bertemu-input")?.focus();
+        return;
+      }
 
-      // 3. Segmen 2 (Stok & Sales)
+      const isBertemu = (
+        finalBertemu !== "" &&
+        finalBertemu !== "-" &&
+        !finalBertemu.toLowerCase().includes("tidak bertemu") &&
+        finalBertemu.toLowerCase() !== "tidak"
+      );
+      const ownerReason = isBertemu ? "-" : "Tidak Bertemu";
+
+      // 2. Segmen Validasi Onboarding (Jika tampil)
+      const onbSegEl = document.getElementById("hist-segment-validasi-onboarding");
+      const hasOnbSeg = Boolean(onbSegEl);
+      let onbVisitRumah = Boolean(item.raw?.onb_visit_rumah);
+      let onbDomStatus = item.raw?.onb_domisili_status || null;
+      let onbDomNote = item.raw?.onb_domisili_note || null;
+      let onbVisitShowroom = Boolean(item.raw?.onb_visit_showroom);
+      let onbShwStatus = item.raw?.onb_showroom_status || null;
+      let onbShwNote = item.raw?.onb_showroom_note || null;
+
+      if (hasOnbSeg) {
+        onbVisitRumah = document.getElementById("hist-chk-onb-rumah")?.checked || false;
+        onbVisitShowroom = document.getElementById("hist-chk-onb-showroom")?.checked || false;
+
+        if (onbVisitRumah) {
+          onbDomStatus = document.getElementById("edit-visit-onb-domisili-status")?.value?.trim() || "";
+          if (!onbDomStatus) {
+            alert("Mohon pilih atau ketik Status Kepemilikan Domisili pada segmen Validasi Onboarding!");
+            document.getElementById("edit-visit-onb-domisili-status")?.focus();
+            return;
+          }
+          onbDomNote = document.getElementById("edit-visit-onb-domisili-note")?.value?.trim() || "-";
+        }
+        if (onbVisitShowroom) {
+          onbShwStatus = document.getElementById("edit-visit-onb-showroom-status")?.value?.trim() || "";
+          if (!onbShwStatus) {
+            alert("Mohon pilih atau ketik Status Kepemilikan Showroom pada segmen Validasi Onboarding!");
+            document.getElementById("edit-visit-onb-showroom-status")?.focus();
+            return;
+          }
+          onbShwNote = document.getElementById("edit-visit-onb-showroom-note")?.value?.trim() || "-";
+        }
+      }
+
+      // 3. Segmen Kondisi Showroom
       const isNoInfo = document.getElementById("edit-visit-toggle-no-info")?.checked || false;
-      const rawStock = document.getElementById("edit-visit-stock")?.value;
-      const rawSales = document.getElementById("edit-visit-sales")?.value;
+      const rawStock = document.getElementById("edit-visit-stock")?.value?.trim();
+      const rawSales = document.getElementById("edit-visit-sales")?.value?.trim();
+
+      if (!isNoInfo) {
+        if (rawStock === "" || rawStock === undefined) {
+          alert("Mohon isi Jumlah Stock di segmen KONDISI SHOWROOM (atau aktifkan centang 'Tidak Ada Informasi').");
+          document.getElementById("edit-visit-stock")?.focus();
+          return;
+        }
+        if (rawSales === "" || rawSales === undefined) {
+          alert("Mohon isi Penjualan Bulan Ini di segmen KONDISI SHOWROOM (atau aktifkan centang 'Tidak Ada Informasi').");
+          document.getElementById("edit-visit-sales")?.focus();
+          return;
+        }
+      }
+
       const stock = isNoInfo ? 0 : (parseInt(rawStock) || 0);
       const sales = isNoInfo ? 0 : (parseInt(rawSales) || 0);
+      const issueDigi = isNoInfo ? "-" : (document.getElementById("edit-visit-issue-digi")?.value?.trim() || "-");
+      const issueInternal = isNoInfo ? "-" : (document.getElementById("edit-visit-issue-internal")?.value?.trim() || "-");
+      const issueKomp = isNoInfo ? "-" : (document.getElementById("edit-visit-issue-komp")?.value?.trim() || "-");
+      const notes = document.getElementById("edit-visit-notes")?.value?.trim() || "-";
 
-      const notes = document.getElementById("edit-visit-notes")?.value || "";
-      const concern = document.getElementById("edit-visit-concern")?.value || "";
-      const issueDigi = document.getElementById("edit-visit-issue-digi")?.value || "";
-      const issueInternal = document.getElementById("edit-visit-issue-internal")?.value || "";
-      const issueKomp = document.getElementById("edit-visit-issue-komp")?.value || "";
+      // Validasi awal checklist unit sebelum simpan
+      const unitCards = document.querySelectorAll(".hist-unit-card");
+      for (let i = 0; i < unitCards.length; i++) {
+        const card = unitCards[i];
+        const checkId = card.getAttribute("data-check-id");
+        const nopolLabel = card.getAttribute("data-nopol") || `Unit #${i + 1}`;
+        const uAdaRadio = card.querySelector(`input[name="hist_unit_ada_${checkId}"]:checked`);
+        const uAda = uAdaRadio ? uAdaRadio.value : "Ya, Terlihat";
+        if (uAda === "Tidak Terlihat" || uAda === "Tidak") {
+          const indVal = card.querySelector(".hist-unit-indikasi-input")?.value?.trim() || "";
+          if (!indVal) {
+            const body = document.getElementById(`hist-unit-body-${checkId}`);
+            if (body && body.classList.contains("hidden")) toggleHistUnitAccordion(checkId);
+            alert(`Silakan pilih atau ketik Indikasi Keberadaan Unit untuk kendaraan ${nopolLabel}!`);
+            card.querySelector(".hist-unit-indikasi-input")?.focus();
+            return;
+          }
+        }
+      }
 
-      // 1. Update tr_laporan_visit (created_at DILARANG diubah demi audit!)
-      const { error: visitErr } = await supabaseClient.from("tr_laporan_visit").update({
+      // 4. Update tr_laporan_visit (created_at DILARANG diubah demi audit!)
+      const baseUpdatePayload = {
         lokasi: finalLokasi,
         bertemu_owner: finalBertemu,
         owner_reason: ownerReason,
         stock: stock,
         sales: sales,
         catatan_visit: notes,
-        tindak_lanjut_concern: concern,
         issue_digi: issueDigi,
         issue_internal: issueInternal,
         issue_komp: issueKomp
-      }).eq("visit_id", id);
+      };
 
-      if (visitErr) throw visitErr;
+      const extendedUpdatePayload = hasOnbSeg
+        ? {
+            ...baseUpdatePayload,
+            onb_visit_rumah: onbVisitRumah,
+            onb_domisili_status: onbVisitRumah ? onbDomStatus : null,
+            onb_domisili_note: onbVisitRumah ? onbDomNote : null,
+            onb_visit_showroom: onbVisitShowroom,
+            onb_showroom_status: onbVisitShowroom ? onbShwStatus : null,
+            onb_showroom_note: onbVisitShowroom ? onbShwNote : null
+          }
+        : baseUpdatePayload;
 
-      // 2. Update tr_visit_unit_check child items (created_at DILARANG diubah demi audit!)
-      const unitCards = document.querySelectorAll(".hist-unit-card");
+      const { error: visitErr } = await supabaseClient
+        .from("tr_laporan_visit")
+        .update(extendedUpdatePayload)
+        .eq("visit_id", id);
 
+      if (visitErr) {
+        const { error: fallbackErr } = await supabaseClient
+          .from("tr_laporan_visit")
+          .update(baseUpdatePayload)
+          .eq("visit_id", id);
+        if (fallbackErr) throw fallbackErr;
+      }
+
+      // 5. Update tr_visit_unit_check child items (created_at DILARANG diubah demi audit!)
+      const updatedUnitsForEval = [];
       for (let i = 0; i < unitCards.length; i++) {
         const card = unitCards[i];
         const checkId = card.getAttribute("data-check-id");
         if (!checkId) continue;
 
         const isOvd = card.getAttribute("data-is-ovd") === "true";
-        const uAda = card.querySelector(".hist-unit-ada")?.value || "Ya, Terlihat";
+        const showKomitmen = card.getAttribute("data-show-komitmen") === "true" || isOvd;
+        const nopol = card.getAttribute("data-nopol") || "";
+        const noFasilitas = card.getAttribute("data-no-fasilitas") || "";
 
-        // Indikasi Keberadaan
+        const uAdaRadio = card.querySelector(`input[name="hist_unit_ada_${checkId}"]:checked`);
+        const uAda = uAdaRadio ? uAdaRadio.value : "Ya, Terlihat";
+
         let finalIndikasi = "-";
-        if (uAda === "Tidak Terlihat") {
-          const indikasiSelect = card.querySelector(".hist-unit-indikasi-select")?.value || "";
-          const indikasiCustom = card.querySelector(".hist-unit-indikasi-custom")?.value?.trim() || "";
-          finalIndikasi = (indikasiSelect === "Lainnya" && indikasiCustom) ? indikasiCustom : (indikasiSelect || "-");
+        if (uAda === "Tidak Terlihat" || uAda === "Tidak") {
+          finalIndikasi = card.querySelector(".hist-unit-indikasi-input")?.value?.trim() || "-";
         }
 
-        const uGpsMatch = card.querySelector(".hist-unit-gps-match")?.value || "Ya, Sesuai";
+        const uGpsRadio = card.querySelector(`input[name="hist_unit_gps_${checkId}"]:checked`);
+        const uGpsMatch = uGpsRadio ? uGpsRadio.value : "Ya, Sesuai";
 
         const chkElems = card.querySelectorAll(".hist-unit-info-chk:checked");
         const selectedInfos = Array.from(chkElems).map(c => c.value);
@@ -15224,6 +15807,7 @@ async function handleSaveEditActivity(e) {
         selectedInfos.forEach(info => {
           if (info === "Lainnya") {
             if (customLainnya) finalInfoList.push(`Lainnya: ${customLainnya}`);
+            else finalInfoList.push("Lainnya");
           } else {
             finalInfoList.push(info);
           }
@@ -15234,10 +15818,16 @@ async function handleSaveEditActivity(e) {
         let uOvdPlan = "";
         let uKomitmen = "Tidak Ada";
         let uTglKomitmen = "";
+
+        if (showKomitmen) {
+          uKomitmen = card.querySelector(".hist-unit-komitmen")?.value?.trim() || "Tidak Ada";
+          uTglKomitmen = card.querySelector(".hist-unit-tgl-komitmen")?.value || "";
+        }
         if (isOvd) {
           uOvdPlan = card.querySelector(".hist-unit-ovd-plan")?.value?.trim() || "";
-          uKomitmen = card.querySelector(".hist-unit-komitmen")?.value || "Tidak Ada";
-          uTglKomitmen = card.querySelector(".hist-unit-tgl-komitmen")?.value || "";
+        }
+
+        if (showKomitmen || isOvd) {
           constructedNotes += `; Plan: ${uOvdPlan || '-'}; Komitmen: ${uKomitmen}${uTglKomitmen ? ' (Tgl: ' + uTglKomitmen + ')' : ''}`;
         } else {
           constructedNotes += `; Plan: -; Komitmen: Tidak Ada`;
@@ -15253,11 +15843,64 @@ async function handleSaveEditActivity(e) {
           ovd_plan: uOvdPlan ? uOvdPlan : null,
           catatan_unit: constructedNotes
         }).eq("check_id", checkId);
+
+        updatedUnitsForEval.push({
+          nopol: nopol,
+          no_fasilitas: noFasilitas,
+          terlihat: uAda === "Ya, Terlihat" ? "Ya" : "Tidak",
+          komitmen: uKomitmen,
+          tgl_komitmen: uTglKomitmen,
+          ovd_plan: uOvdPlan,
+          is_ovd: isOvd,
+          is_h3_jto: showKomitmen && !isOvd
+        });
       }
 
-      // Update item di cached history lokal
-      item.subtitle = `Lokasi: ${finalLokasi} • Bertemu: ${finalBertemu}`;
-      item.notes = notes || concern || "-";
+      // 6. Sinkronisasi ulang status Done/Clear pada MASTER_DEALER_PRIORITY_DATA
+      const targetDealer = MASTER_DEALER_PRIORITY_DATA.find(d =>
+        d.dealer_name === item.title || (item.raw && d.dealer_id === item.raw.dealer_id)
+      );
+      if (targetDealer) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const isMitraGroup1Done = typeof isMitraGroup1DoneByVisit === "function"
+          ? isMitraGroup1DoneByVisit(finalLokasi, finalBertemu)
+          : false;
+
+        if (hasOnbSeg) {
+          targetDealer.onb_rumah_validated = Boolean(targetDealer.onb_rumah_validated || onbVisitRumah);
+          targetDealer.onb_showroom_validated = Boolean(targetDealer.onb_showroom_validated || onbVisitShowroom);
+        }
+
+        if (isMitraGroup1Done) {
+          targetDealer.dealer_concern = null;
+        }
+
+        if (targetDealer.units && updatedUnitsForEval.length > 0 && typeof evaluateUnitVisitDone === "function") {
+          updatedUnitsForEval.forEach(checkedUnit => {
+            const unitDoneEval = evaluateUnitVisitDone(checkedUnit, finalBertemu);
+            if (unitDoneEval.isDone) {
+              const uObj = targetDealer.units.find(u =>
+                (checkedUnit.no_fasilitas && u.no_fasilitas === checkedUnit.no_fasilitas) ||
+                (checkedUnit.nopol && u.nopol === checkedUnit.nopol)
+              );
+              if (uObj) {
+                uObj.unit_concern = null;
+                uObj.is_visited_today = true;
+                uObj.last_visit_date = todayStr;
+                uObj.aging_visit_unit = 0;
+                uObj.priority_level = "Normal";
+                uObj.priority_score = 0;
+                uObj.priority_reason = "Kondisi Normal / Terjadwal Baik";
+              }
+            }
+          });
+        }
+      }
+
+      // 7. Update item di cached history lokal
+      const unitCountInfo = item.raw?.total_unit ? ` • ${item.raw.total_unit} Unit` : "";
+      item.subtitle = `Lokasi: ${finalLokasi} • Bertemu: ${finalBertemu}${unitCountInfo}`;
+      item.notes = (notes && notes !== "-") ? notes : ((issueDigi && issueDigi !== "-") ? `Issue Digiasha: ${issueDigi}` : "Tidak ada catatan tambahan");
       if (item.raw) {
         item.raw.lokasi = finalLokasi;
         item.raw.bertemu_owner = finalBertemu;
@@ -15265,10 +15908,17 @@ async function handleSaveEditActivity(e) {
         item.raw.stock = stock;
         item.raw.sales = sales;
         item.raw.catatan_visit = notes;
-        item.raw.tindak_lanjut_concern = concern;
         item.raw.issue_digi = issueDigi;
         item.raw.issue_internal = issueInternal;
         item.raw.issue_komp = issueKomp;
+        if (hasOnbSeg) {
+          item.raw.onb_visit_rumah = onbVisitRumah;
+          item.raw.onb_domisili_status = onbDomStatus;
+          item.raw.onb_domisili_note = onbDomNote;
+          item.raw.onb_visit_showroom = onbVisitShowroom;
+          item.raw.onb_showroom_status = onbShwStatus;
+          item.raw.onb_showroom_note = onbShwNote;
+        }
       }
 
     } else if (type === "ONBOARDING") {
@@ -16040,11 +16690,11 @@ async function loadActivityFilterDropdowns() {
       const { data: rawList, error } = await supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id").order("name", { ascending: true });
       if (!error && Array.isArray(rawList)) {
         empList = rawList.map(e => ({
-           nip: e.nip, 
-           nama_lengkap: e.name,
-           cabang: e.hr_organization_units?.nama_unit || "",
-           jabatan: e.hr_job_positions?.nama_jabatan || "",
-           role_id: e.position_id
+          nip: e.nip,
+          nama_lengkap: e.name,
+          cabang: e.hr_organization_units?.nama_unit || "",
+          jabatan: e.hr_job_positions?.nama_jabatan || "",
+          role_id: e.position_id
         }));
         window.ALL_EMPLOYEES_CACHE = empList;
       }
@@ -20532,23 +21182,23 @@ async function handleSavePositionPermissions() {
         .from('hr_job_position_permissions')
         .delete()
         .eq('position_id', positionId);
-        
+
       if (delError) {
         console.error("Error deleting old permissions:", delError);
         throw delError;
       }
-      
+
       // 2. Insert new permissions if any
       if (permsArray.length > 0) {
         const inserts = permsArray.map(code => ({
           position_id: positionId,
           permission_code: code
         }));
-        
+
         const { error: insError } = await supabaseClient
           .from('hr_job_position_permissions')
           .insert(inserts);
-          
+
         if (insError) {
           console.error("Error inserting new permissions:", insError);
           throw insError;
@@ -21112,7 +21762,7 @@ async function loadDossierJobDetails(emp) {
       // Cari nama atasan berdasarkan supervisor_id
       try {
         const supMatch = (PERSONALIA_EMPLOYEES_DATA || []).find(e => e.id === emp.supervisor_id) ||
-                         (APP_STATE.employees || []).find(e => e.id === emp.supervisor_id);
+          (APP_STATE.employees || []).find(e => e.id === emp.supervisor_id);
         if (supMatch) {
           elAtasan.value = `${supMatch.nama_lengkap || supMatch.nama || supMatch.name} (${supMatch.nip || ''})`.trim();
         } else {
@@ -21394,24 +22044,24 @@ async function loadDossierTransactionsHistory(emp) {
           ${salaryChange ? `<p class="text-[10px] text-emerald-700 font-bold">Gaji Pokok: ${salaryChange}</p>` : ''}
           ${tx.exit_notes ? `<p class="text-[10px] text-slate-500 italic mt-0.5">"${tx.exit_notes}"</p>` : ''}
           ${tx.status === "PENDING_AGREEMENT" ? (() => {
-            const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
-                           (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
-            if (isSelf) {
-              return `
+        const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
+          (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
+        if (isSelf) {
+          return `
                 <div class="mt-1.5 p-2 bg-purple-50 border border-purple-200 rounded-xl text-[10px] text-purple-900 flex items-center justify-between">
                   <span><i class="fa-solid fa-signature mr-1"></i>Persetujuan elektronik diperlukan dari Anda</span>
                   <button type="button" onclick="openElectronicAgreementModal('${tx.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-[9px] shadow-2xs transition">Tanda Tangani</button>
                 </div>
               `;
-            } else {
-              return `
+        } else {
+          return `
                 <div class="mt-1.5 p-2 bg-purple-50/70 border border-purple-200 rounded-xl text-[10px] text-purple-800 flex items-center gap-1.5">
                   <i class="fa-solid fa-clock-rotate-left text-purple-600"></i>
                   <span>Menunggu tanda tangan persetujuan elektronik oleh karyawan ybs di Menu Persetujuan</span>
                 </div>
               `;
-            }
-          })() : ''}
+        }
+      })() : ''}
         </div>
       </div>
     `;
@@ -21942,7 +22592,7 @@ async function loadPersonaliaTransactionHistory() {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
-      
+
     if (error) throw error;
     PERSONALIA_HISTORY_DATA = data || [];
     filterPersonaliaHistory();
@@ -22005,9 +22655,9 @@ function filterPersonaliaHistory() {
       }
     }
 
-    const dCreate = new Date(tx.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric'});
+    const dCreate = new Date(tx.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     const tTypes = Array.isArray(tx.transaction_types) ? tx.transaction_types.join(", ") : tx.transaction_types;
-    const dEffective = tx.effective_date ? new Date(tx.effective_date).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric'}) : '-';
+    const dEffective = tx.effective_date ? new Date(tx.effective_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
     html += `
       <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="openCareerTransactionDetailModal('${tx.id}')">
@@ -22243,17 +22893,17 @@ function renderPersonaliaEmployees(list) {
   }).join("");
 }
 
-window.adminResetEmployeePassword = async function(nip, nama) {
+window.adminResetEmployeePassword = async function (nip, nama) {
   if (!confirm(`KONFIRMASI RESET SANDI\n\nNIP: ${nip}\nNama: ${nama}\n\nKata sandi karyawan ini akan diatur ulang ke kata sandi awal dan karyawan wajib membuat kata sandi baru saat masuk berikutnya.\n\nApakah Anda yakin ingin melanjutkan?`)) return;
-  
+
   try {
     showToast("Memproses reset sandi...", "info", 2000);
     const { data, error } = await supabaseClient.rpc("admin_reset_employee_password", { target_nip: nip });
-    
+
     if (error) throw error;
-    
+
     showToast(`Kata sandi untuk ${nama} berhasil direset!`, "success", 3000);
-    
+
     // Refresh employee list if necessary
     if (typeof loadPersonaliaEmployees === "function") {
       loadPersonaliaEmployees();
@@ -23453,13 +24103,13 @@ async function onTxEmployeeSelected(empId) {
 
     // Deductions & BPJS Sebelumnya
     const deductions = latestBenefit?.payroll_deductions_json || emp.payroll_deductions_json || {};
-    
+
     // Tentukan status kepesertaan BPJS sebelumnya
     let isBpjsKesActive = deductions.apply_bpjs_kes;
     if (typeof isBpjsKesActive !== "boolean") {
       isBpjsKesActive = !!(latestBenefit?.bpjs_kesehatan_number || emp.bpjs_kesehatan_number || emp.bpjs_kes_number);
     }
-    
+
     let isBpjsTkActive = deductions.apply_bpjs_tk;
     if (typeof isBpjsTkActive !== "boolean") {
       isBpjsTkActive = !!(latestBenefit?.bpjs_ketenagakerjaan_number || emp.bpjs_ketenagakerjaan_number || emp.bpjs_tk_number);
@@ -23576,7 +24226,7 @@ function toggleTxSubforms() {
   toggleElement("subform-promosi", isPromosi);
   toggleElement("subform-demosi", isDemosi);
   toggleElement("subform-mutasi", isMutasi);
-  
+
   const showBenefit = isBenefit && !isExit;
   toggleElement("subform-benefit", showBenefit);
   if (showBenefit && CURRENT_TX_BENEFIT_CACHE) {
@@ -24355,8 +25005,8 @@ async function handleSubmitEmployeeTransaction(event) {
         bank_name: document.getElementById("tx-new-bank-name")?.value.trim() || emp.bank_name || null,
         bank_account_holder: document.getElementById("tx-new-bank-holder")?.value.trim() || emp.bank_account_holder || null,
         bank_account_no: document.getElementById("tx-new-bank-account")?.value.trim() || emp.bank_account_no || null
-      } : { 
-        ...(emp.payroll_deductions_json || {}), 
+      } : {
+        ...(emp.payroll_deductions_json || {}),
         pph_scheme: emp.pph_scheme || emp.payroll_deductions_json?.pph_scheme || 'Not Set',
         bank_name: emp.bank_name || emp.payroll_deductions_json?.bank_name || null,
         bank_account_holder: emp.bank_account_holder || emp.payroll_deductions_json?.bank_account_holder || null,
@@ -24705,17 +25355,17 @@ function buildCareerTransactionSummaryHtml(tx, relatedEmp, options = {}) {
             </div>
           </div>
           ${(() => {
-            const bName = tx.bank_name || tx.payroll_deductions_json?.bank_name;
-            const bAcc = tx.bank_account_no || tx.payroll_deductions_json?.bank_account_no;
-            const bHolder = tx.bank_account_holder || tx.payroll_deductions_json?.bank_account_holder;
-            if (!bName && !bAcc) return '';
-            return `
+          const bName = tx.bank_name || tx.payroll_deductions_json?.bank_name;
+          const bAcc = tx.bank_account_no || tx.payroll_deductions_json?.bank_account_no;
+          const bHolder = tx.bank_account_holder || tx.payroll_deductions_json?.bank_account_holder;
+          if (!bName && !bAcc) return '';
+          return `
               <div class="mt-3">
                 <label class="block font-semibold text-slate-500 text-[11px] mb-1">Rekening Payroll Baru:</label>
                 <input type="text" disabled class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-600 text-xs cursor-not-allowed" value="${bName || '-'} - ${bAcc || '-'} ${bHolder ? `(a/n ${bHolder})` : ''}" />
               </div>
             `;
-          })()}
+        })()}
         ` : ''}
         ${allowances.length > 0 ? `
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
@@ -25216,7 +25866,7 @@ async function openElectronicAgreementModal(txId) {
   // VALIDASI HAK AKSES PIC YBS:
   // Hanya karyawan pemilik transaksi yang berhak melakukan review & tanda tangan kesepakatan
   const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
-                 (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
+    (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
   if (!isSelf) {
     alert("Akses Ditolak: Hanya karyawan yang bersangkutan (" + (tx.nip || "PIC") + ") yang berhak menandatangani persetujuan ini melalui akun mereka.");
     return;
@@ -25272,7 +25922,7 @@ async function confirmElectronicAgreement() {
 
   // Double check hak akses
   const isSelf = (CURRENT_USER?.nip && String(CURRENT_USER.nip).trim() === String(tx.nip).trim()) ||
-                 (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
+    (CURRENT_USER?.id && String(CURRENT_USER.id).trim() === String(tx.employee_id).trim());
   if (!isSelf) {
     alert("Gagal: Anda tidak berhak menandatangani transaksi atas nama karyawan lain.");
     closeElectronicAgreementModal();
@@ -25551,9 +26201,9 @@ async function applyApprovedTransactionToEmployee(tx, isFromEOD = false) {
       if (tx.effective_date > todayStr) {
         console.log(`[applyApprovedTransactionToEmployee] Menunda penerapan TX ${tx.id} ke master data karena effective_date (${tx.effective_date}) masih di masa depan.`);
         if (!isFromEOD) {
-           await supabaseClient.from("hr_employee_transactions").update({ status: "APPROVED", updated_at: now }).eq("id", tx.id);
+          await supabaseClient.from("hr_employee_transactions").update({ status: "APPROVED", updated_at: now }).eq("id", tx.id);
         }
-        return; 
+        return;
       }
     }
 
@@ -25817,7 +26467,7 @@ function openModulePermissionsModal() {
     modal.classList.remove("opacity-0");
     modal.querySelector(".bg-white").classList.remove("scale-95");
   }, 10);
-  
+
   CURRENT_BULK_PERMS_SET.clear();
   gotoModulePermPage1();
 }
@@ -25837,16 +26487,16 @@ function closeModulePermissionsModal() {
 function gotoModulePermPage1() {
   document.getElementById("module-perm-page-2").classList.add("hidden");
   document.getElementById("module-perm-page-1").classList.remove("hidden");
-  
+
   document.getElementById("btn-mod-perm-back").classList.add("hidden");
   document.getElementById("btn-goto-page-2").classList.remove("hidden");
   document.getElementById("btn-save-module-perms").classList.add("hidden");
   document.getElementById("btn-revoke-module-perms").classList.add("hidden");
-  
+
   // Uncheck 'pilih semua' di page 1
   document.getElementById("check-all-module-view").checked = false;
   document.getElementById("check-all-module-edit").checked = false;
-  
+
   renderModulePermAppTabs();
 }
 
@@ -25858,33 +26508,33 @@ function gotoModulePermPage2() {
 
   document.getElementById("module-perm-page-1").classList.add("hidden");
   document.getElementById("module-perm-page-2").classList.remove("hidden");
-  
+
   document.getElementById("btn-mod-perm-back").classList.remove("hidden");
   document.getElementById("btn-goto-page-2").classList.add("hidden");
   document.getElementById("btn-save-module-perms").classList.remove("hidden");
   document.getElementById("btn-revoke-module-perms").classList.remove("hidden");
-  
+
   // Reset select all
   const chkAll = document.getElementById("check-all-module-positions");
   if (chkAll) chkAll.checked = false;
-  
+
   renderModulePositionsList();
 }
 
 function renderModulePermAppTabs() {
   const container = document.getElementById("module-perm-app-tabs");
   if (!container) return;
-  
+
   const appKeys = ["digi_active", "digicore", "digi_workapp", "digi_spector"];
   let html = "";
-  
+
   appKeys.forEach(key => {
     const isActive = key === CURRENT_MODULE_PERM_APP_TAB;
     const conf = ORG_APPS_CONFIG[key] || { name: key };
-    const classes = isActive 
+    const classes = isActive
       ? "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-emerald-600 text-emerald-700 whitespace-nowrap cursor-pointer"
       : "pb-2 px-3 border-b-2 font-bold text-xs flex items-center space-x-2 transition border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer";
-    
+
     html += `
       <div class="${classes}" onclick="switchModulePermAppTab('${key}')">
         <i class="fa-solid fa-${conf.icon || 'box'}"></i>
@@ -25892,7 +26542,7 @@ function renderModulePermAppTabs() {
       </div>
     `;
   });
-  
+
   container.innerHTML = html;
   renderModulePermList();
 }
@@ -25905,21 +26555,21 @@ function switchModulePermAppTab(key) {
 function renderModulePermList() {
   const container = document.getElementById("module-perm-list-container");
   if (!container) return;
-  
+
   const appConfig = ORG_APPS_CONFIG[CURRENT_MODULE_PERM_APP_TAB];
   if (!appConfig || !appConfig.modules || appConfig.modules.length === 0) {
     container.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-xs text-slate-400">Belum ada modul di aplikasi ini.</td></tr>`;
     return;
   }
-  
+
   let html = "";
   appConfig.modules.forEach(mod => {
     const viewCode = `${CURRENT_MODULE_PERM_APP_TAB}:${mod.key}:view`;
     const editCode = `${CURRENT_MODULE_PERM_APP_TAB}:${mod.key}:edit`;
-    
+
     const isView = CURRENT_BULK_PERMS_SET.has(viewCode);
     const isEdit = CURRENT_BULK_PERMS_SET.has(editCode);
-    
+
     html += `
       <tr class="hover:bg-slate-50/80 transition">
         <td class="py-2.5 px-3 font-semibold text-slate-800 text-xs">
@@ -25986,10 +26636,10 @@ function renderModulePositionsList() {
   const container = document.getElementById("module-positions-list");
   if (!container) return;
   container.innerHTML = "";
-  
+
   const positions = ORG_POSITIONS_DATA || [];
-  
-  positions.sort((a,b) => a.nama_jabatan.localeCompare(b.nama_jabatan)).forEach(pos => {
+
+  positions.sort((a, b) => a.nama_jabatan.localeCompare(b.nama_jabatan)).forEach(pos => {
     const div = document.createElement("label");
     div.className = "flex items-center p-3 border border-slate-200 rounded-xl bg-white hover:border-emerald-300 hover:bg-emerald-50/30 cursor-pointer transition space-x-3";
     div.innerHTML = `
@@ -26017,38 +26667,38 @@ async function handleSaveModulePermissions(actionType) {
     alert("Tidak ada hak akses modul yang dipilih di langkah sebelumnya!");
     return;
   }
-  
+
   // Kumpulkan jabatan yang DICENTANG di UI
   const selectedPosIds = [];
   document.querySelectorAll('input.bulk-pos-cb').forEach(cb => {
     if (cb.checked) selectedPosIds.push(cb.dataset.pos);
   });
-  
+
   if (selectedPosIds.length === 0) {
     alert("Pilih minimal 1 jabatan!");
     return;
   }
-  
+
   // Konfirmasi
   if (actionType === 'LEPASKAN') {
     if (!confirm(`Anda yakin ingin MENCABUT ${CURRENT_BULK_PERMS_SET.size} hak akses modul dari ${selectedPosIds.length} jabatan yang dicentang?`)) return;
   } else {
     if (!confirm(`Anda yakin ingin MENERAPKAN ${CURRENT_BULK_PERMS_SET.size} hak akses modul ke ${selectedPosIds.length} jabatan yang dicentang?`)) return;
   }
-  
+
   const btnTerapkan = document.getElementById("btn-save-module-perms");
   const btnLepas = document.getElementById("btn-revoke-module-perms");
   const origHtml = actionType === 'TERAPKAN' ? btnTerapkan.innerHTML : btnLepas.innerHTML;
-  
+
   btnTerapkan.disabled = true;
   btnLepas.disabled = true;
   if (actionType === 'TERAPKAN') btnTerapkan.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Menerapkan...';
   if (actionType === 'LEPASKAN') btnLepas.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Mencabut...';
-  
+
   try {
     if (supabaseClient) {
       const allPermCodes = Array.from(CURRENT_BULK_PERMS_SET);
-      
+
       if (actionType === 'TERAPKAN') {
         const inserts = [];
         selectedPosIds.forEach(pId => {
@@ -26056,23 +26706,23 @@ async function handleSaveModulePermissions(actionType) {
             inserts.push({ position_id: pId, permission_code: code });
           });
         });
-        
+
         // Use upsert to avoid duplicate errors
         await supabaseClient.from("hr_job_position_permissions").upsert(inserts, { onConflict: 'position_id, permission_code' });
-        
+
       } else if (actionType === 'LEPASKAN') {
         await supabaseClient.from("hr_job_position_permissions").delete().in("permission_code", allPermCodes).in("position_id", selectedPosIds);
       }
     }
-    
+
     // Update local ORG_POSITION_PERMS_DATA
     const allPermCodes = Array.from(CURRENT_BULK_PERMS_SET);
     const positions = ORG_POSITIONS_DATA || [];
-    
+
     positions.forEach(pos => {
       const pId = pos.id_position;
       if (!ORG_POSITION_PERMS_DATA[pId]) ORG_POSITION_PERMS_DATA[pId] = [];
-      
+
       if (selectedPosIds.includes(pId)) {
         if (actionType === 'TERAPKAN') {
           allPermCodes.forEach(code => {
@@ -26083,11 +26733,11 @@ async function handleSaveModulePermissions(actionType) {
         }
       }
     });
-    
+
     if (typeof renderOrgRolePermissions === "function") {
       renderOrgRolePermissions(CURRENT_ROLE_FILTER_KEYWORD || "");
     }
-    
+
     closeModulePermissionsModal();
     if (typeof showToast === "function") {
       const actionText = actionType === 'TERAPKAN' ? 'diberikan ke' : 'dicabut dari';
@@ -26158,7 +26808,7 @@ async function initProfileScreen() {
       if (locEl) locEl.innerText = emp.hr_organization_units?.hr_work_locations?.nama_lokasi || CURRENT_USER.area_cover || "-";
 
       const pUrl = emp.hr_employee_personal_details?.foto_profile_url ||
-                   (Array.isArray(emp.hr_employee_personal_details) && emp.hr_employee_personal_details[0]?.foto_profile_url) || null;
+        (Array.isArray(emp.hr_employee_personal_details) && emp.hr_employee_personal_details[0]?.foto_profile_url) || null;
 
       if (photoEl) {
         if (pUrl) {
@@ -26302,7 +26952,7 @@ let COVER_AREA_DOWNLINE_BRANCHES = []; // Array of { id_unit, nama_unit, tipe_un
 async function getDownlineBranches(rootUnitId) {
   try {
     let unitsList = (Array.isArray(ORG_UNITS_DATA) && ORG_UNITS_DATA.length > 0) ? ORG_UNITS_DATA : [];
-    
+
     // Jika data organisasi belum ada di memori, ambil dari Supabase
     if (unitsList.length === 0 && supabaseClient) {
       const { data, error } = await supabaseClient
@@ -26769,7 +27419,7 @@ function renderCoverAreaCards() {
 
     const facBadgeClass = area.pic_fac_id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-100 text-slate-400 border-slate-200";
     const mktBadgeClass = area.pic_marketing_id ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200";
-    
+
     // Nama Cabang pemilik area
     const branchName = area.hr_organization_units?.nama_unit || (
       (COVER_AREA_DOWNLINE_BRANCHES || []).find(b => b.id_unit === area.unit_id)?.nama_unit || area.unit_id
@@ -27598,4 +28248,3 @@ async function handleAssignPicSubmit(e) {
     }
   }
 }
-
