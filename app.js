@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261108_v201";
+const APP_BUILD_VERSION = "20261108_v202";
 const screenCache = {};
 
 function escapeHtml(str) {
@@ -831,11 +831,20 @@ async function supabaseGetMasterData() {
     const reasonLower = String(u.priority_reason || "").toLowerCase();
     const isOldAgingReason = reasonLower.includes("aging visit");
 
+    const isExpired = String(u.contract_status || "").toUpperCase().includes("EXPIRED");
+    const hasImei = String(u.imei_gps || "").replace(/\D/g, "").length >= 6;
+    const isManualConcern = reasonLower.startsWith("concern");
+
     let pLevel = u.priority_level || "NORMAL";
     let pScore = u.priority_score || 0;
     let pReason = u.priority_reason || "";
 
     if (isVisitedToday && isOldAgingReason) {
+      pLevel = "Normal";
+      pScore = 0;
+      pReason = "Kondisi Normal / Terjadwal Baik";
+      obsoleteUnitsToClean.push(u.no_fasilitas);
+    } else if (isExpired && !hasImei && !isManualConcern && pScore > 0) {
       pLevel = "Normal";
       pScore = 0;
       pReason = "Kondisi Normal / Terjadwal Baik";
@@ -6558,6 +6567,14 @@ function calculateUnitUrgency(u) {
     return { level: "Normal", score: 0, reason: "Sudah Dikunjungi Hari Ini", triggers: [] };
   }
 
+  const isExpired = String(u.contract_status || "").toUpperCase().includes("EXPIRED");
+  const hasImei = String(u.imei_gps || "").replace(/\D/g, "").length >= 6;
+
+  // Jika fasilitas expired tanpa GPS dan tidak ada concern atasan, unit berstatus Normal
+  if (isExpired && !hasImei && !concernUrgency) {
+    return { level: "Normal", score: 0, reason: "Kondisi Normal / Terjadwal Baik", triggers: [] };
+  }
+
   const rawDbLevel = (u.priority_level && String(u.priority_level).trim() !== "" && u.priority_level !== "undefined")
     ? String(u.priority_level).trim()
     : "Normal";
@@ -6582,7 +6599,9 @@ function calculateUnitUrgency(u) {
 
   if (dbScore > 0) {
     const isDuplicateConcern = concernUrgency && dbReason.toLowerCase().startsWith("concern");
-    if (!isDuplicateConcern) {
+    // Abaikan prioritas sistem DB jika unit expired dan pemicunya bukan "GPS Belum Dilepas"
+    const isInvalidExpiredDbTrigger = isExpired && !dbReason.toLowerCase().includes("gps belum dilepas");
+    if (!isDuplicateConcern && !isInvalidExpiredDbTrigger) {
       triggers.push({
         level: scoreToLevel[dbScore] || rawDbLevel,
         score: dbScore,
