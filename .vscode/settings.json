@@ -1,0 +1,9 @@
+{
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+  "editor.codeActionsOnSave": {},
+  "diffEditor.maxComputationTime": 5000,
+  "editor.largeFileOptimizations": true,
+  "files.refactoring.autoSave": true
+}
