@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261108_v197";
+const APP_BUILD_VERSION = "20261108_v198";
 const screenCache = {};
 
 function escapeHtml(str) {
@@ -8033,22 +8033,49 @@ const VISIT_BERTEMU_PRESETS = [
   { value: "Tidak Bertemu", label: "Tidak Bertemu", icon: "fa-user-xmark", desc: "Showroom tutup / tidak bertemu siapapun" }
 ];
 
+const VISIT_ONB_DOMISILI_PRESETS = [
+  { value: "Milik Sendiri", label: "Milik Sendiri", icon: "fa-house-chimney-user", desc: "Rumah milik pribadi / atas nama sendiri atau pasangan" },
+  { value: "Milik Keluarga / Orang Tua", label: "Milik Keluarga / Orang Tua", icon: "fa-people-roof", desc: "Rumah milik orang tua / keluarga dekat" },
+  { value: "Sewa / Kontrak", label: "Sewa / Kontrak", icon: "fa-file-contract", desc: "Rumah berstatus sewa tahunan / kontrak aktif" },
+  { value: "KPR / Kredit", label: "KPR / Kredit", icon: "fa-building-columns", desc: "Rumah dalam masa angsuran KPR" },
+  { value: "Rumah Dinas", label: "Rumah Dinas", icon: "fa-briefcase", desc: "Fasilitas tempat tinggal dinas / instansi" },
+  { value: "Lainnya", label: "Lainnya", icon: "fa-ellipsis", desc: "Status kepemilikan domisili lainnya" }
+];
+
+const VISIT_ONB_SHOWROOM_PRESETS = [
+  { value: "Milik Sendiri", label: "Milik Sendiri", icon: "fa-store", desc: "Lahan / bangunan showroom milik sendiri" },
+  { value: "Milik Keluarga", label: "Milik Keluarga", icon: "fa-people-group", desc: "Lahan / bangunan milik orang tua atau keluarga" },
+  { value: "Sewa / Kontrak", label: "Sewa / Kontrak", icon: "fa-file-signature", desc: "Lahan / bangunan showroom sewa atau kontrak" },
+  { value: "Kerjasama / Bagi Hasil", label: "Kerjasama / Bagi Hasil", icon: "fa-handshake", desc: "Pengelolaan bersama / kemitraan lahan usaha" },
+  { value: "Lainnya", label: "Lainnya", icon: "fa-ellipsis", desc: "Status kepemilikan showroom lainnya" }
+];
+
+const VISIT_KOMITMEN_PRESETS = [
+  { value: "Tidak Ada", label: "Tidak Ada Komitmen", icon: "fa-circle-minus", desc: "Belum ada kepastian tanggal / komitmen pembayaran" },
+  { value: "Sudah Bayar", label: "Sudah Bayar", icon: "fa-circle-check", desc: "Mitra sudah melakukan pembayaran fasilitas" },
+  { value: "Bayar", label: "Bayar (Janji Bayar)", icon: "fa-calendar-check", desc: "Mitra berkomitmen membayar pada tanggal tertentu" },
+  { value: "Serahkan Unit", label: "Serahkan Unit", icon: "fa-key", desc: "Mitra bersedia menyerahkan unit kendaraan" }
+];
+
 // Helper listener untuk menutup dropdown saat klik di luar
 function initVisitSearchableDropdowns() {
   if (!window._visitDropdownClickAttached) {
     window._visitDropdownClickAttached = true;
     document.addEventListener("click", (e) => {
-      const lokasiWrapper = document.getElementById("lokasi-search-wrapper");
-      const lokasiDropdown = document.getElementById("lokasi-search-dropdown");
-      if (lokasiDropdown && lokasiWrapper && !lokasiWrapper.contains(e.target)) {
-        lokasiDropdown.classList.add("hidden");
-      }
-
-      const bertemuWrapper = document.getElementById("bertemu-search-wrapper");
-      const bertemuDropdown = document.getElementById("bertemu-search-dropdown");
-      if (bertemuDropdown && bertemuWrapper && !bertemuWrapper.contains(e.target)) {
-        bertemuDropdown.classList.add("hidden");
-      }
+      const pairs = [
+        ["lokasi-search-wrapper", "lokasi-search-dropdown"],
+        ["bertemu-search-wrapper", "bertemu-search-dropdown"],
+        ["onb-domisili-status-wrapper", "onb-domisili-status-dropdown"],
+        ["onb-showroom-status-wrapper", "onb-showroom-status-dropdown"],
+        ["komitmen-search-wrapper", "komitmen-search-dropdown"]
+      ];
+      pairs.forEach(([wrapId, dropId]) => {
+        const wrapper = document.getElementById(wrapId);
+        const dropdown = document.getElementById(dropId);
+        if (dropdown && wrapper && !wrapper.contains(e.target)) {
+          dropdown.classList.add("hidden");
+        }
+      });
     });
   }
 }
@@ -8333,6 +8360,381 @@ function onBertemuSearchInputBlur() {
   }, 200);
 }
 
+// 3. STATUS KEPEMILIKAN DOMISILI (VALIDASI ONBOARDING)
+function openOnbDomisiliStatusDropdown() {
+  const dropdown = document.getElementById("onb-domisili-status-dropdown");
+  const input = document.getElementById("visit-onb-domisili-status");
+  if (!dropdown) return;
+  initVisitSearchableDropdowns();
+  renderOnbDomisiliStatusDropdown(input ? input.value : "");
+  dropdown.classList.remove("hidden");
+}
+
+function closeOnbDomisiliStatusDropdown() {
+  const dropdown = document.getElementById("onb-domisili-status-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function renderOnbDomisiliStatusDropdown(query = "") {
+  const dropdown = document.getElementById("onb-domisili-status-dropdown");
+  if (!dropdown) return;
+  const q = String(query || "").trim().toLowerCase();
+  dropdown.innerHTML = "";
+
+  const exactPresetMatch = VISIT_ONB_DOMISILI_PRESETS.some(item => item.value.toLowerCase() === q);
+  const filtered = VISIT_ONB_DOMISILI_PRESETS.filter(item => {
+    if (!q || exactPresetMatch) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-teal-50/70 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectOnbDomisiliStatusOption(item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc}</div>
+      </div>
+    `;
+    dropdown.appendChild(el);
+  });
+
+  const rawQ = String(query || "").trim();
+  if (rawQ && !exactPresetMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-teal-50/60 hover:bg-teal-100/70 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-teal-100";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectOnbDomisiliStatusOption(rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid fa-house-user"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-teal-900">Gunakan Status: "${rawQ}"</div>
+        <div class="text-[10px] text-teal-700">Status kepemilikan domisili khusus sesuai inputan</div>
+      </div>
+    `;
+    dropdown.prepend(customEl);
+  }
+}
+
+function selectOnbDomisiliStatusOption(val) {
+  const input = document.getElementById("visit-onb-domisili-status");
+  const clearBtn = document.getElementById("onb-domisili-status-clear-btn");
+  const chevron = document.getElementById("onb-domisili-status-chevron");
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeOnbDomisiliStatusDropdown();
+}
+
+function filterOnbDomisiliStatusOptions(val) {
+  const clearBtn = document.getElementById("onb-domisili-status-clear-btn");
+  const chevron = document.getElementById("onb-domisili-status-chevron");
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderOnbDomisiliStatusDropdown(val);
+  const dropdown = document.getElementById("onb-domisili-status-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function clearOnbDomisiliStatusSelection() {
+  const input = document.getElementById("visit-onb-domisili-status");
+  const clearBtn = document.getElementById("onb-domisili-status-clear-btn");
+  const chevron = document.getElementById("onb-domisili-status-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderOnbDomisiliStatusDropdown("");
+  const dropdown = document.getElementById("onb-domisili-status-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function onOnbDomisiliStatusKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = document.getElementById("visit-onb-domisili-status");
+    const val = input ? input.value.trim() : "";
+    if (val) selectOnbDomisiliStatusOption(val);
+    closeOnbDomisiliStatusDropdown();
+    if (input) input.blur();
+  }
+}
+
+function onOnbDomisiliStatusBlur() {
+  setTimeout(() => {
+    closeOnbDomisiliStatusDropdown();
+  }, 200);
+}
+
+// 4. STATUS KEPEMILIKAN SHOWROOM (VALIDASI ONBOARDING)
+function openOnbShowroomStatusDropdown() {
+  const dropdown = document.getElementById("onb-showroom-status-dropdown");
+  const input = document.getElementById("visit-onb-showroom-status");
+  if (!dropdown) return;
+  initVisitSearchableDropdowns();
+  renderOnbShowroomStatusDropdown(input ? input.value : "");
+  dropdown.classList.remove("hidden");
+}
+
+function closeOnbShowroomStatusDropdown() {
+  const dropdown = document.getElementById("onb-showroom-status-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function renderOnbShowroomStatusDropdown(query = "") {
+  const dropdown = document.getElementById("onb-showroom-status-dropdown");
+  if (!dropdown) return;
+  const q = String(query || "").trim().toLowerCase();
+  dropdown.innerHTML = "";
+
+  const exactPresetMatch = VISIT_ONB_SHOWROOM_PRESETS.some(item => item.value.toLowerCase() === q);
+  const filtered = VISIT_ONB_SHOWROOM_PRESETS.filter(item => {
+    if (!q || exactPresetMatch) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-teal-50/70 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectOnbShowroomStatusOption(item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc}</div>
+      </div>
+    `;
+    dropdown.appendChild(el);
+  });
+
+  const rawQ = String(query || "").trim();
+  if (rawQ && !exactPresetMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-teal-50/60 hover:bg-teal-100/70 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-teal-100";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectOnbShowroomStatusOption(rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid fa-store"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-teal-900">Gunakan Status: "${rawQ}"</div>
+        <div class="text-[10px] text-teal-700">Status kepemilikan showroom khusus sesuai inputan</div>
+      </div>
+    `;
+    dropdown.prepend(customEl);
+  }
+}
+
+function selectOnbShowroomStatusOption(val) {
+  const input = document.getElementById("visit-onb-showroom-status");
+  const clearBtn = document.getElementById("onb-showroom-status-clear-btn");
+  const chevron = document.getElementById("onb-showroom-status-chevron");
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeOnbShowroomStatusDropdown();
+}
+
+function filterOnbShowroomStatusOptions(val) {
+  const clearBtn = document.getElementById("onb-showroom-status-clear-btn");
+  const chevron = document.getElementById("onb-showroom-status-chevron");
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderOnbShowroomStatusDropdown(val);
+  const dropdown = document.getElementById("onb-showroom-status-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function clearOnbShowroomStatusSelection() {
+  const input = document.getElementById("visit-onb-showroom-status");
+  const clearBtn = document.getElementById("onb-showroom-status-clear-btn");
+  const chevron = document.getElementById("onb-showroom-status-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderOnbShowroomStatusDropdown("");
+  const dropdown = document.getElementById("onb-showroom-status-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+}
+
+function onOnbShowroomStatusKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = document.getElementById("visit-onb-showroom-status");
+    const val = input ? input.value.trim() : "";
+    if (val) selectOnbShowroomStatusOption(val);
+    closeOnbShowroomStatusDropdown();
+    if (input) input.blur();
+  }
+}
+
+function onOnbShowroomStatusBlur() {
+  setTimeout(() => {
+    closeOnbShowroomStatusDropdown();
+  }, 200);
+}
+
+// 5. KOMITMEN PEMBAYARAN (MODAL CHECKLIST UNIT)
+function openKomitmenSearchDropdown() {
+  const dropdown = document.getElementById("komitmen-search-dropdown");
+  const input = document.getElementById("modal-select-komitmen");
+  if (!dropdown) return;
+  initVisitSearchableDropdowns();
+  renderKomitmenSearchDropdown(input ? input.value : "");
+  dropdown.classList.remove("hidden");
+}
+
+function closeKomitmenSearchDropdown() {
+  const dropdown = document.getElementById("komitmen-search-dropdown");
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function renderKomitmenSearchDropdown(query = "") {
+  const dropdown = document.getElementById("komitmen-search-dropdown");
+  if (!dropdown) return;
+  const q = String(query || "").trim().toLowerCase();
+  dropdown.innerHTML = "";
+
+  const exactPresetMatch = VISIT_KOMITMEN_PRESETS.some(item => item.value.toLowerCase() === q || item.label.toLowerCase() === q);
+  const filtered = VISIT_KOMITMEN_PRESETS.filter(item => {
+    if (!q || exactPresetMatch) return true;
+    return item.value.toLowerCase().includes(q) || item.label.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+  });
+
+  filtered.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "p-2.5 hover:bg-slate-100 cursor-pointer flex items-center space-x-2.5 text-xs transition";
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      selectKomitmenOption(item.value);
+    };
+    el.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid ${item.icon}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-slate-800">${item.label}</div>
+        <div class="text-[10px] text-slate-400 truncate">${item.desc}</div>
+      </div>
+    `;
+    dropdown.appendChild(el);
+  });
+
+  const rawQ = String(query || "").trim();
+  if (rawQ && !exactPresetMatch) {
+    const customEl = document.createElement("div");
+    customEl.className = "p-2.5 bg-amber-50/60 hover:bg-amber-100/70 cursor-pointer flex items-center space-x-2.5 text-xs transition border-t border-amber-100";
+    customEl.onmousedown = (e) => {
+      e.preventDefault();
+      selectKomitmenOption(rawQ);
+    };
+    customEl.innerHTML = `
+      <div class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 text-xs shadow-xs">
+        <i class="fa-solid fa-hand-holding-dollar"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-amber-900">Gunakan Komitmen: "${rawQ}"</div>
+        <div class="text-[10px] text-amber-700">Catatan komitmen pembayaran khusus sesuai inputan</div>
+      </div>
+    `;
+    dropdown.prepend(customEl);
+  }
+}
+
+function selectKomitmenOption(val) {
+  const input = document.getElementById("modal-select-komitmen");
+  const clearBtn = document.getElementById("komitmen-search-clear-btn");
+  const chevron = document.getElementById("komitmen-search-chevron");
+
+  if (input) input.value = val;
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  closeKomitmenSearchDropdown();
+  onModalKomitmenChange(val);
+}
+
+function filterKomitmenSearchOptions(val) {
+  const clearBtn = document.getElementById("komitmen-search-clear-btn");
+  const chevron = document.getElementById("komitmen-search-chevron");
+  if (clearBtn) clearBtn.classList.toggle("hidden", !val);
+  if (chevron) chevron.classList.toggle("hidden", !!val);
+
+  renderKomitmenSearchDropdown(val);
+  const dropdown = document.getElementById("komitmen-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+  onModalKomitmenChange(val);
+}
+
+function clearKomitmenSearchSelection() {
+  const input = document.getElementById("modal-select-komitmen");
+  const clearBtn = document.getElementById("komitmen-search-clear-btn");
+  const chevron = document.getElementById("komitmen-search-chevron");
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (clearBtn) clearBtn.classList.add("hidden");
+  if (chevron) chevron.classList.remove("hidden");
+
+  renderKomitmenSearchDropdown("");
+  const dropdown = document.getElementById("komitmen-search-dropdown");
+  if (dropdown) dropdown.classList.remove("hidden");
+  onModalKomitmenChange("");
+}
+
+function onKomitmenSearchKeyDown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const input = document.getElementById("modal-select-komitmen");
+    const val = input ? input.value.trim() : "";
+    if (val) selectKomitmenOption(val);
+    closeKomitmenSearchDropdown();
+    if (input) input.blur();
+  }
+}
+
+function onKomitmenSearchBlur() {
+  setTimeout(() => {
+    closeKomitmenSearchDropdown();
+  }, 200);
+}
+
 // =========================================================================
 // ENGINE EVALUATOR DONE / CLEAR 17 PARAMETER PRIORITAS VISIT FAC
 // =========================================================================
@@ -8562,10 +8964,15 @@ function resetVisitOnboardingSegment(showSegment = false, dealer = null) {
   if (boxShowroom) boxShowroom.classList.add("hidden");
 
   const domStatus = document.getElementById("visit-onb-domisili-status");
+  const domClearBtn = document.getElementById("onb-domisili-status-clear-btn");
+  const domChevron = document.getElementById("onb-domisili-status-chevron");
   const domNote = document.getElementById("visit-onb-domisili-note");
   const domGeoDisp = document.getElementById("visit-onb-domisili-geo-display");
   const domGeoBadge = document.getElementById("visit-onb-domisili-geo-badge");
   if (domStatus) domStatus.value = "";
+  if (domClearBtn) domClearBtn.classList.add("hidden");
+  if (domChevron) domChevron.classList.remove("hidden");
+  closeOnbDomisiliStatusDropdown();
   if (domNote) domNote.value = "";
   if (domGeoDisp) domGeoDisp.innerText = "Klik tombol Tag Lokasi untuk mengunci koordinat domisili";
   if (domGeoBadge) {
@@ -8575,10 +8982,15 @@ function resetVisitOnboardingSegment(showSegment = false, dealer = null) {
   removeVisitOnbDomisiliPhoto();
 
   const shwStatus = document.getElementById("visit-onb-showroom-status");
+  const shwClearBtn = document.getElementById("onb-showroom-status-clear-btn");
+  const shwChevron = document.getElementById("onb-showroom-status-chevron");
   const shwNote = document.getElementById("visit-onb-showroom-note");
   const shwGeoDisp = document.getElementById("visit-onb-showroom-geo-display");
   const shwGeoBadge = document.getElementById("visit-onb-showroom-geo-badge");
   if (shwStatus) shwStatus.value = "";
+  if (shwClearBtn) shwClearBtn.classList.add("hidden");
+  if (shwChevron) shwChevron.classList.remove("hidden");
+  closeOnbShowroomStatusDropdown();
   if (shwNote) shwNote.value = "";
   if (shwGeoDisp) shwGeoDisp.innerText = "Klik tombol Tag Lokasi untuk mengunci koordinat showroom";
   if (shwGeoBadge) {
@@ -9192,11 +9604,19 @@ function openUnitModal(index) {
   if (komitmenContainer) {
     if (showKomitmen) {
       komitmenContainer.classList.remove("hidden");
-      document.getElementById("modal-select-komitmen").value = u.komitmen || "Tidak Ada";
-      onModalKomitmenChange(u.komitmen || "Tidak Ada");
+      const komVal = u.komitmen || "Tidak Ada";
+      const komInput = document.getElementById("modal-select-komitmen");
+      const komClearBtn = document.getElementById("komitmen-search-clear-btn");
+      const komChevron = document.getElementById("komitmen-search-chevron");
+      if (komInput) komInput.value = komVal;
+      if (komClearBtn) komClearBtn.classList.toggle("hidden", !komVal);
+      if (komChevron) komChevron.classList.toggle("hidden", !!komVal);
+      closeKomitmenSearchDropdown();
+      onModalKomitmenChange(komVal);
       document.getElementById("modal-input-tgl-komitmen").value = u.tgl_komitmen || "";
     } else {
       komitmenContainer.classList.add("hidden");
+      closeKomitmenSearchDropdown();
       u.komitmen = "Tidak Ada";
       u.tgl_komitmen = "";
     }
@@ -9227,6 +9647,7 @@ function toggleInfoUnitLainnya(isChecked) {
 
 function closeUnitModal() {
   closeIndikasiSearchDropdown();
+  closeKomitmenSearchDropdown();
   document.getElementById("modal-unit").classList.add("hidden");
   CURRENT_UNIT_INDEX = null;
   TEMP_MODAL_PHOTO_BASE64 = null;

@@ -207,18 +207,43 @@
           <span>Detail Validasi Lokasi Rumah (Domisili)</span>
         </div>
 
-        <!-- C.1.a. Status Kepemilikan Domisili -->
-        <div>
+        <!-- C.1.a. Status Kepemilikan Domisili (Searchable Floating Dropdown seperti Bertemu Siapa) -->
+        <div class="relative" id="onb-domisili-status-wrapper">
           <label class="block text-[11px] font-semibold text-slate-600 mb-1">Status Kepemilikan Domisili <span class="text-red-500">*</span></label>
-          <select id="visit-onb-domisili-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:border-teal-700 outline-none">
-            <option value="">-- Pilih Status Kepemilikan Domisili --</option>
-            <option value="Milik Sendiri">Milik Sendiri</option>
-            <option value="Milik Keluarga / Orang Tua">Milik Keluarga / Orang Tua</option>
-            <option value="Sewa / Kontrak">Sewa / Kontrak</option>
-            <option value="KPR / Kredit">KPR / Kredit</option>
-            <option value="Rumah Dinas">Rumah Dinas</option>
-            <option value="Lainnya">Lainnya</option>
-          </select>
+          <div class="relative">
+            <div class="relative flex items-center">
+              <i class="fa-solid fa-house-lock absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+              <input
+                type="text"
+                id="visit-onb-domisili-status"
+                value=""
+                placeholder="Pilih atau ketik status kepemilikan domisili..."
+                autocomplete="off"
+                onfocus="openOnbDomisiliStatusDropdown()"
+                onclick="openOnbDomisiliStatusDropdown()"
+                oninput="filterOnbDomisiliStatusOptions(this.value)"
+                onkeydown="onOnbDomisiliStatusKeyDown(event)"
+                onblur="onOnbDomisiliStatusBlur()"
+                class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-teal-700 focus:ring-1 focus:ring-teal-700 transition outline-none cursor-pointer"
+              />
+              <button
+                type="button"
+                id="onb-domisili-status-clear-btn"
+                onclick="clearOnbDomisiliStatusSelection()"
+                class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+              <i id="onb-domisili-status-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+            </div>
+
+            <div
+              id="onb-domisili-status-dropdown"
+              class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+            >
+              <!-- Dropdown items rendered via JS -->
+            </div>
+          </div>
         </div>
 
         <!-- C.1.b. Tagging Geolokasi Domisili -->
@@ -273,17 +298,43 @@
           <span>Detail Validasi Lokasi Showroom</span>
         </div>
 
-        <!-- C.2.a. Status Kepemilikan Showroom -->
-        <div>
+        <!-- C.2.a. Status Kepemilikan Showroom (Searchable Floating Dropdown seperti Bertemu Siapa) -->
+        <div class="relative" id="onb-showroom-status-wrapper">
           <label class="block text-[11px] font-semibold text-slate-600 mb-1">Status Kepemilikan Showroom <span class="text-red-500">*</span></label>
-          <select id="visit-onb-showroom-status" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:border-teal-700 outline-none">
-            <option value="">-- Pilih Status Kepemilikan Showroom --</option>
-            <option value="Milik Sendiri">Milik Sendiri</option>
-            <option value="Milik Keluarga">Milik Keluarga</option>
-            <option value="Sewa / Kontrak">Sewa / Kontrak</option>
-            <option value="Kerjasama / Bagi Hasil">Kerjasama / Bagi Hasil</option>
-            <option value="Lainnya">Lainnya</option>
-          </select>
+          <div class="relative">
+            <div class="relative flex items-center">
+              <i class="fa-solid fa-building-shield absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+              <input
+                type="text"
+                id="visit-onb-showroom-status"
+                value=""
+                placeholder="Pilih atau ketik status kepemilikan showroom..."
+                autocomplete="off"
+                onfocus="openOnbShowroomStatusDropdown()"
+                onclick="openOnbShowroomStatusDropdown()"
+                oninput="filterOnbShowroomStatusOptions(this.value)"
+                onkeydown="onOnbShowroomStatusKeyDown(event)"
+                onblur="onOnbShowroomStatusBlur()"
+                class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-teal-700 focus:ring-1 focus:ring-teal-700 transition outline-none cursor-pointer"
+              />
+              <button
+                type="button"
+                id="onb-showroom-status-clear-btn"
+                onclick="clearOnbShowroomStatusSelection()"
+                class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs p-1"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+              <i id="onb-showroom-status-chevron" class="fa-solid fa-chevron-down absolute right-3 text-slate-400 text-[10px] pointer-events-none"></i>
+            </div>
+
+            <div
+              id="onb-showroom-status-dropdown"
+              class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100"
+            >
+              <!-- Dropdown items rendered via JS -->
+            </div>
+          </div>
         </div>
 
         <!-- C.2.b. Tagging Geolokasi Showroom -->
