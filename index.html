@@ -285,7 +285,7 @@
 
   <!-- MODAL POPUP TENGAH (CENTER ALERT DIALOG) -->
   <div id="modal-center-alert"
-    class="fixed inset-0 bg-slate-900/65 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    class="fixed inset-0 bg-slate-900/65 backdrop-blur-sm z-[120] hidden flex items-center justify-center p-4">
     <div
       class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 text-center animate-in fade-in zoom-in-95 duration-200">
       <div id="center-alert-icon-box"
@@ -293,8 +293,8 @@
         <i id="center-alert-icon" class="fa-solid fa-circle-check"></i>
       </div>
       <div>
-        <h4 id="center-alert-title" class="text-base font-bold text-slate-900">Absensi Berhasil</h4>
-        <p id="center-alert-message" class="text-xs text-slate-600 mt-1.5 leading-relaxed">-</p>
+        <h4 id="center-alert-title" class="text-base font-bold text-slate-900">Pemberitahuan</h4>
+        <p id="center-alert-message" class="text-xs text-slate-600 mt-1.5 leading-relaxed whitespace-pre-line">-</p>
       </div>
       <div id="center-alert-details"
         class="hidden p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] text-slate-700 space-y-1 text-left">
@@ -3326,7 +3326,7 @@
       document.body.appendChild(scConfig);
 
       const scApp = document.createElement("script");
-      scApp.src = "/app.js?v=" + dailyVer + "_v196";
+      scApp.src = "/app.js?v=" + dailyVer + "_v197";
       document.body.appendChild(scApp);
     })();
   </script>

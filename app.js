@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261108_v196";
+const APP_BUILD_VERSION = "20261108_v197";
 const screenCache = {};
 
 function escapeHtml(str) {
@@ -605,7 +605,7 @@ async function uploadToSupabaseStorage(base64Data, folder, prefix = "IMG") {
 }
 
 async function supabaseLogin(identifier, password) {
-  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+  if (!supabaseClient) throw new Error("Layanan masuk sedang memuat, silakan coba beberapa saat lagi.");
 
   const idTrim = String(identifier).trim();
   const passTrim = String(password).trim();
@@ -642,7 +642,7 @@ async function supabaseLogin(identifier, password) {
 
   if (authError || !authData.user) {
     console.error("Login Error:", authError);
-    return { success: false, message: "Kredensial tidak valid atau akun tidak ditemukan." };
+    return { success: false, message: "Email/NIP atau kata sandi yang Anda masukkan belum sesuai. Silakan periksa kembali." };
   }
 
   // 3. Ambil data profil dari hr_employees beserta relasinya
@@ -657,13 +657,13 @@ async function supabaseLogin(identifier, password) {
     .limit(1);
 
   if (empError || !employees || employees.length === 0) {
-    return { success: false, message: "Profil karyawan tidak ditemukan untuk akun ini." };
+    return { success: false, message: "Data profil Anda belum terhubung. Silakan hubungi tim HR atau Administrator." };
   }
 
   const emp = employees[0];
 
   if (emp.status_kerja === "NONAKTIF" || emp.deleted_at !== null) {
-    return { success: false, message: "Akun Anda saat ini berstatus NONAKTIF. Hubungi Administrator." };
+    return { success: false, message: "Akun Anda saat ini sedang tidak aktif. Silakan hubungi tim HR atau Administrator." };
   }
 
   // 4. Ambil Job Permissions (Pengganti role_id)
@@ -1546,11 +1546,12 @@ async function supabaseSubmitIzin(data) {
       };
     } else {
       const errText = await res.text();
-      throw new Error(`Gagal menyimpan ke database Supabase: ${errText}`);
+      console.error("Error saving izin:", errText);
+      throw new Error("Belum dapat menyimpan pengajuan izin saat ini. Silakan periksa koneksi Anda dan coba kembali.");
     }
   }
 
-  throw new Error("Koneksi Supabase belum terkonfigurasi.");
+  throw new Error("Layanan sedang memuat, silakan coba beberapa saat lagi.");
 }
 
 async function supabaseProcessApproval(data) {
@@ -1618,11 +1619,11 @@ async function supabaseProcessApproval(data) {
     }
   }
 
-  throw new Error("Gagal memproses persetujuan di database.");
+  throw new Error("Belum dapat memproses persetujuan saat ini. Silakan coba kembali.");
 }
 
 async function supabaseSubmitOnboarding(data) {
-  if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
+  if (!supabaseClient) throw new Error("Layanan sedang memuat, silakan coba beberapa saat lagi.");
 
   const onbId = `ONB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const selfieUrl = data.selfie_base64
@@ -1833,7 +1834,7 @@ async function callApi(action, data = {}) {
     } catch (supabaseErr) {
       console.error(`[Supabase Execution Error on ${action}]:`, supabaseErr);
       if (action === "submitIzin" || action === "submitAbsensi" || action === "processApproval") {
-        return { success: false, message: supabaseErr.message || "Gagal memproses data ke database." };
+        return { success: false, message: getFriendlyErrorMessage(supabaseErr, "Belum dapat memproses permintaan saat ini. Silakan coba kembali.") };
       }
     }
   }
@@ -1850,11 +1851,11 @@ async function callApi(action, data = {}) {
       return await res.json();
     } catch (err) {
       console.error("GAS Fallback Error:", err);
-      return { success: false, message: "Koneksi API Gagal: " + err.message };
+      return { success: false, message: "Koneksi internet sedang tidak stabil. Silakan periksa jaringan Anda dan coba kembali." };
     }
   }
 
-  return { success: false, message: "Backend database belum terkonfigurasi." };
+  return { success: false, message: "Layanan sedang memuat, silakan coba beberapa saat lagi." };
 }
 
 // =========================================================================
@@ -2214,8 +2215,8 @@ async function loadScreen(screenName, updateHistory = true) {
           <div class="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-lg">
             <i class="fa-solid fa-triangle-exclamation"></i>
           </div>
-          <h4 class="font-bold text-sm text-slate-800">Gagal Memuat Layar</h4>
-          <p class="text-xs text-slate-500">${err.message}</p>
+          <h4 class="font-bold text-sm text-slate-800">Gagal Memuat Halaman</h4>
+          <p class="text-xs text-slate-500">Halaman belum dapat ditampilkan. Silakan periksa koneksi internet Anda lalu muat ulang.</p>
           <button type="button" onclick="loadScreen('dashboard')" class="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition">
             Kembali ke Dashboard
           </button>
@@ -2254,14 +2255,22 @@ async function handleLoginSubmit(e) {
   const password = document.getElementById("login-pass")?.value.trim();
 
   if (!identifier || !password) {
-    alert("Email/NIP dan Password wajib diisi!");
+    showCenterAlertModal({
+      title: "Data Belum Lengkap",
+      message: "Mohon isi Email/NIP dan Kata Sandi terlebih dahulu.",
+      type: "warning"
+    });
     return;
   }
 
   // PROTEKSI CALON KARYAWAN:
   // Calon karyawan (NIP sementara CAND-xxxx) belum resmi bergabung dan dilarang login ke aplikasi
   if (identifier.toUpperCase().startsWith("CAND-")) {
-    alert("Akses Ditolak: Calon karyawan dengan NIP sementara belum dapat login ke sistem. Silakan tunggu proses penerimaan karyawan disetujui.");
+    showCenterAlertModal({
+      title: "Akses Belum Aktif",
+      message: "Akun Anda masih dalam tahap proses penerimaan karyawan dan belum dapat digunakan untuk masuk.",
+      type: "warning"
+    });
     return;
   }
 
@@ -2282,20 +2291,32 @@ async function handleLoginSubmit(e) {
         } else {
            submitBtn.innerHTML = originalText;
            submitBtn.disabled = false;
-           alert(loginRes?.message || "Kredensial tidak valid.");
+           showCenterAlertModal({
+             title: "Belum Berhasil Masuk",
+             message: loginRes?.message || "Email/NIP atau kata sandi yang Anda masukkan belum sesuai. Silakan periksa kembali.",
+             type: "error"
+           });
            return;
         }
       } catch (errSup) {
         console.warn("Supabase login error:", errSup);
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
-        alert("Terjadi kesalahan saat menghubungi server otentikasi.");
+        showCenterAlertModal({
+          title: "Koneksi Terkendala",
+          message: "Tidak dapat terhubung ke layanan masuk saat ini. Pastikan koneksi internet Anda stabil dan coba lagi.",
+          type: "error"
+        });
         return;
       }
     } else {
        submitBtn.innerHTML = originalText;
        submitBtn.disabled = false;
-       alert("Gagal Login: Sistem otentikasi belum terkonfigurasi dengan benar (Kunci Supabase hilang).");
+       showCenterAlertModal({
+         title: "Layanan Sedang Dimuat",
+         message: "Layanan masuk sedang dipersiapkan. Silakan muat ulang halaman dan coba beberapa saat lagi.",
+         type: "warning"
+       });
        return;
     }
 submitBtn.innerHTML = originalText;
@@ -2334,9 +2355,14 @@ submitBtn.innerHTML = originalText;
     syncMasterDataFromApi();
     fetchUserCoverAreas();
   } catch (err) {
+    console.error("Login exception:", err);
     submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
-    alert("Error login: " + err.message);
+    showCenterAlertModal({
+      title: "Belum Berhasil Masuk",
+      message: "Tidak dapat memproses permintaan masuk saat ini. Silakan periksa koneksi internet Anda dan coba kembali.",
+      type: "error"
+    });
   }
 }
 
@@ -2854,12 +2880,87 @@ function handleSupportSubmit(type, e) {
 
 
 // =========================================================================
-// POPUP TENGAH (CENTER ALERT DIALOG)
+// SANITASI PESAN PENGGUNA & POPUP TENGAH (CENTER ALERT DIALOG)
 // =========================================================================
+const _NATIVE_BROWSER_ALERT = typeof window !== "undefined" && typeof window.alert === "function"
+  ? window.alert.bind(window)
+  : null;
+
+function sanitizeUserFacingMessage(rawText, fallbackText = "Terjadi kendala saat memproses permintaan. Silakan periksa koneksi Anda dan coba kembali.") {
+  if (rawText === null || rawText === undefined) return fallbackText;
+  let msg = String(rawText).trim();
+  if (!msg) return fallbackText;
+
+  // Bersihkan frase teknis pada pesan sukses/info
+  msg = msg
+    .replace(/\s*ke database Supabase\b/gi, "")
+    .replace(/\s*di database Supabase\b/gi, "")
+    .replace(/\s*dari database Supabase\b/gi, "")
+    .replace(/\s*ke Supabase\b/gi, "")
+    .replace(/\s*di Supabase\b/gi, "")
+    .replace(/\s*dari database\b/gi, "")
+    .replace(/\s*ke database\b/gi, "")
+    .replace(/\s*di database\b/gi, "")
+    .replace(/\s*\(is_active\s*=\s*false\)/gi, "");
+
+  const lower = msg.toLowerCase();
+
+  // Deteksi pesan error teknis / database / autentikasi mentah
+  if (lower.includes("invalid login credentials") || lower.includes("kredensial tidak valid")) {
+    return "Email/NIP atau kata sandi yang Anda masukkan belum sesuai. Silakan periksa kembali.";
+  }
+  if (lower.includes("row-level security") || lower.includes("violates row-level") || lower.includes("permission denied") || lower.includes("rls")) {
+    return "Anda belum memiliki akses untuk melakukan tindakan ini. Silakan hubungi Administrator.";
+  }
+  if (lower.includes("duplicate key") || lower.includes("unique constraint") || lower.includes("already exists") || lower.includes("already registered")) {
+    return "Data dengan kode atau identitas tersebut sudah terdaftar. Silakan periksa kembali isian Anda.";
+  }
+  if (lower.includes("foreign key constraint") || lower.includes("violates foreign key")) {
+    return "Data ini masih terhubung dengan data lain yang aktif sehingga belum dapat diubah atau dihapus.";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("networkerror") || lower.includes("load failed") || lower.includes("err_network") || lower.includes("koneksi terputus")) {
+    return "Koneksi internet sedang tidak stabil. Silakan periksa jaringan Anda lalu coba kembali.";
+  }
+  if (
+    lower.includes("pgrst") ||
+    lower.includes("schema cache") ||
+    lower.includes("relation ") ||
+    lower.includes("does not exist") ||
+    lower.includes("syntax error") ||
+    lower.includes("supabase") ||
+    lower.includes("database") ||
+    lower.includes("migrasi") ||
+    lower.includes("jwt") ||
+    lower.includes("authapierror") ||
+    lower.includes("json") ||
+    lower.includes("null value in column")
+  ) {
+    // Jika ada prefix ramah seperti "Gagal menyimpan ...: <teknis>", pertahankan konteks depannya
+    const colonIdx = msg.indexOf(":");
+    if (colonIdx > 0 && colonIdx < 45) {
+      const prefix = msg.slice(0, colonIdx).trim();
+      if (!/supabase|database|sql|error|exception/i.test(prefix)) {
+        return `${prefix}. Silakan periksa kembali isian Anda atau coba beberapa saat lagi.`;
+      }
+    }
+    return fallbackText;
+  }
+
+  return msg;
+}
+
+function getFriendlyErrorMessage(err, fallbackText = "Terjadi kendala saat memproses data. Silakan coba beberapa saat lagi.") {
+  if (!err) return fallbackText;
+  const raw = typeof err === "string" ? err : (err.message || "");
+  return sanitizeUserFacingMessage(raw, fallbackText);
+}
+
 function showCenterAlertModal({ title, message, type = "success", detailsHtml = "", onClose = null }) {
+  const cleanTitle = sanitizeUserFacingMessage(title, "Pemberitahuan");
+  const cleanMessage = sanitizeUserFacingMessage(message, "Silakan periksa kembali data Anda.");
   const modal = document.getElementById("modal-center-alert");
   if (!modal) {
-    alert(`${title}: ${message}`);
+    if (_NATIVE_BROWSER_ALERT) _NATIVE_BROWSER_ALERT(`${cleanTitle}\n\n${cleanMessage}`);
     if (onClose) onClose();
     return;
   }
@@ -2873,8 +2974,8 @@ function showCenterAlertModal({ title, message, type = "success", detailsHtml = 
 
   CENTER_ALERT_CALLBACK = onClose;
 
-  if (titleEl) titleEl.innerText = title;
-  if (msgEl) msgEl.innerText = message;
+  if (titleEl) titleEl.innerText = cleanTitle;
+  if (msgEl) msgEl.innerText = cleanMessage;
 
   if (type === "success") {
     if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
@@ -2882,8 +2983,12 @@ function showCenterAlertModal({ title, message, type = "success", detailsHtml = 
     if (btnClose) btnClose.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95";
   } else if (type === "warning") {
     if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
-    if (icon) icon.className = "fa-solid fa-clock";
+    if (icon) icon.className = "fa-solid fa-circle-exclamation";
     if (btnClose) btnClose.className = "w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95";
+  } else if (type === "info") {
+    if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
+    if (icon) icon.className = "fa-solid fa-circle-info";
+    if (btnClose) btnClose.className = "w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-xs shadow-md transition active:scale-95";
   } else {
     if (iconBox) iconBox.className = "w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center text-3xl mx-auto shadow-inner";
     if (icon) icon.className = "fa-solid fa-circle-xmark";
@@ -2900,6 +3005,32 @@ function showCenterAlertModal({ title, message, type = "success", detailsHtml = 
   modal.classList.remove("hidden");
 }
 
+// Arahkan seluruh pemanggilan window.alert ke modal in-app agar tidak memunculkan URL domain browser & pesan sistem mentah
+if (typeof window !== "undefined") {
+  window.alert = function(rawMessage) {
+    const cleanMsg = sanitizeUserFacingMessage(rawMessage, "Silakan periksa kembali isian Anda.");
+    const lower = cleanMsg.toLowerCase();
+    let type = "warning";
+    let title = "Perhatian";
+
+    if (lower.includes("berhasil") || lower.includes("selamat datang") || lower.includes("tersimpan")) {
+      type = "success";
+      title = "Berhasil";
+    } else if (lower.includes("akses ditolak") || lower.includes("dilarang") || lower.includes("tidak berhak") || lower.includes("hanya dapat diakses")) {
+      type = "error";
+      title = "Akses Dibatasi";
+    } else if (lower.includes("gagal") || lower.includes("kendala") || lower.includes("kesalahan") || lower.includes("tidak ditemukan") || lower.includes("tidak valid")) {
+      type = "error";
+      title = "Belum Berhasil";
+    } else if (lower.includes("wajib") || lower.includes("mohon") || lower.includes("silakan") || lower.includes("pilih") || lower.includes("minimal") || lower.includes("maksimal")) {
+      type = "warning";
+      title = "Lengkapi Data";
+    }
+
+    showCenterAlertModal({ title, message: cleanMsg, type });
+  };
+}
+
 function closeCenterAlertModal() {
   const modal = document.getElementById("modal-center-alert");
   if (modal) modal.classList.add("hidden");
@@ -2912,6 +3043,7 @@ function closeCenterAlertModal() {
 
 // Helper Toast Notification Auto-Close (Untuk notifikasi ringkas)
 function showToast(message, type = "success", durationMs = 1500) {
+  const cleanMessage = sanitizeUserFacingMessage(message, "Permintaan selesai diproses.");
   let toast = document.getElementById("global-toast");
   if (!toast) {
     toast = document.createElement("div");
@@ -2933,11 +3065,11 @@ function showToast(message, type = "success", durationMs = 1500) {
     info: '<i class="fa-solid fa-circle-info text-sm"></i>'
   };
 
-  toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-100 translate-y-0 ${bgStyles[type] || bgStyles.info}`;
-  toast.innerHTML = `${iconMap[type] || ''} <span>${message}</span>`;
+  toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[130] px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-100 translate-y-0 ${bgStyles[type] || bgStyles.info}`;
+  toast.innerHTML = `${iconMap[type] || ''} <span>${cleanMessage}</span>`;
 
   setTimeout(() => {
-    toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-0 translate-y-[-10px] ${bgStyles[type] || bgStyles.info}`;
+    toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[130] px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all duration-300 pointer-events-none opacity-0 translate-y-[-10px] ${bgStyles[type] || bgStyles.info}`;
   }, durationMs);
 }
 
@@ -4114,7 +4246,7 @@ async function fetchApprovalList() {
     renderApprovalList();
 
   } catch (err) {
-    container.innerHTML = `<div class="p-5 text-center text-xs text-rose-600 bg-rose-50 rounded-2xl border border-rose-200">Error memuat data: ${err.message}</div>`;
+    container.innerHTML = `<div class="p-5 text-center text-xs text-rose-600 bg-rose-50 rounded-2xl border border-rose-200">Belum dapat memuat daftar permohonan saat ini. Silakan periksa koneksi Anda lalu muat ulang.</div>`;
   }
 }
 
@@ -6725,7 +6857,7 @@ async function fetchUserCoverAreas() {
 async function refreshPriorityData(btn) {
   const container = document.getElementById("priority-list-container");
   if (container) {
-    container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-amber-600"></i>Menyinkronkan data antrean prioritas dari database...</div>';
+    container.innerHTML = '<div class="py-12 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-lg mb-2 block text-amber-600"></i>Menyinkronkan data antrean prioritas...</div>';
   }
   if (btn) {
     btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
@@ -12096,7 +12228,7 @@ async function handleSaveEmployee(e) {
           .from("hr_employees")
           .upsert(payload, { onConflict: "nip" });
         if (error) throw error;
-        alert("Catatan: Jika karyawan baru, Administrator harus menambahkan email user ini ke sistem Auth Supabase secara manual (Admin Auth) agar bisa login.");
+        alert("Data karyawan baru berhasil ditambahkan. Pastikan akun email karyawan telah diaktifkan oleh Administrator agar dapat digunakan untuk masuk.");
       }
     }
 
@@ -12781,7 +12913,7 @@ async function handleApplyBulkRoleAssign(e) {
   const origBtnHtml = submitBtn ? submitBtn.innerHTML : "";
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Menyimpan ke Supabase...</span>';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Menyimpan perubahan...</span>';
   }
 
   try {
@@ -12862,7 +12994,7 @@ async function handleApplyBulkRoleAssign(e) {
     loadRolePermissionsSettings();
     populateEmployeeRoleOptions();
 
-    showToast(`Berhasil menambahkan ${selectedModuleKeys.length} menu ke ${selectedRoleIds.length} role terpilih (${totalNewAdded} hak akses baru berhasil disimpan ke Supabase)!`, "success", 3000);
+    showToast(`Berhasil menambahkan ${selectedModuleKeys.length} menu ke ${selectedRoleIds.length} role terpilih (${totalNewAdded} hak akses baru berhasil diterapkan)!`, "success", 3000);
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -12982,7 +13114,7 @@ async function handleApplyBulkRoleRemove(e) {
   const origBtnHtml = submitBtn ? submitBtn.innerHTML : "";
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Mencabut & Menyimpan ke Supabase...</span>';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Menyimpan perubahan...</span>';
   }
 
   try {
@@ -13067,7 +13199,7 @@ async function handleApplyBulkRoleRemove(e) {
     loadRolePermissionsSettings();
     populateEmployeeRoleOptions();
 
-    showToast(`Berhasil mencabut ${selectedModuleKeys.length} menu dari ${selectedRoleIds.length} role terpilih (${totalRemoved} hak akses dicabut & tersimpan di Supabase)!`, "info", 3000);
+    showToast(`Berhasil mencabut ${selectedModuleKeys.length} menu dari ${selectedRoleIds.length} role terpilih (${totalRemoved} hak akses berhasil diperbarui)!`, "info", 3000);
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -13567,7 +13699,7 @@ async function loadActivityHistory(forceRefresh = false) {
   if (refreshBtn) refreshBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
 
   if (!supabaseClient) {
-    if (container) container.innerHTML = '<div class="p-4 bg-amber-50 text-amber-800 rounded-xl text-xs">Supabase Client belum siap.</div>';
+    if (container) container.innerHTML = '<div class="p-4 bg-amber-50 text-amber-800 rounded-xl text-xs">Layanan sedang memuat, silakan muat ulang beberapa saat lagi.</div>';
     if (refreshBtn) refreshBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
     return;
   }
@@ -13667,7 +13799,7 @@ async function loadActivityHistory(forceRefresh = false) {
   } catch (err) {
     console.error("Error loading activity history:", err);
     if (container) {
-      container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-xs">Gagal memuat riwayat: ${err.message}</div>`;
+      container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-xs">Belum dapat memuat riwayat aktivitas saat ini. Silakan periksa koneksi internet Anda.</div>`;
     }
   } finally {
     if (refreshBtn) refreshBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
@@ -14926,7 +15058,7 @@ async function loadPipelineData(isManualRefresh = false) {
   } catch (err) {
     console.error("Error loading pipeline data:", err);
     if (container) {
-      container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-2xl text-xs">Gagal memuat pipeline: ${err.message}</div>`;
+      container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-2xl text-xs">Belum dapat memuat daftar pipeline saat ini. Silakan periksa koneksi internet Anda.</div>`;
     }
   } finally {
     if (icon) icon.classList.remove("fa-spin");
@@ -15376,7 +15508,7 @@ async function handleForceChangePasswordSubmit(e) {
     return;
   }
   if (newPass === "Password123!") {
-    alert("Kata sandi baru tidak boleh sama dengan kata sandi default (Password123!). Buatlah kata sandi pribadi yang aman.");
+    alert("Kata sandi baru tidak boleh sama dengan kata sandi awal. Silakan buat kata sandi pribadi yang lebih aman.");
     return;
   }
   if (newPass !== confirmPass) {
@@ -16773,8 +16905,8 @@ async function openSecurePdfViewer(pdfUrl, title, meta) {
       viewportContainer.innerHTML = `
         <div class="m-auto text-center p-6 bg-slate-800 text-white rounded-2xl max-w-sm space-y-3">
           <i class="fa-solid fa-triangle-exclamation text-rose-400 text-3xl"></i>
-          <h4 class="font-bold text-sm">Gagal Menampilkan PDF</h4>
-          <p class="text-xs text-slate-300">${err.message || "File dokumen tidak dapat diakses atau diblokir oleh CORS."}</p>
+          <h4 class="font-bold text-sm">Belum Dapat Menampilkan Dokumen</h4>
+          <p class="text-xs text-slate-300">Dokumen ini belum dapat ditampilkan langsung. Pastikan koneksi internet Anda stabil atau hubungi Administrator.</p>
           <button type="button" onclick="closeSecurePdfViewer()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold transition">
             Tutup Viewer
           </button>
@@ -18104,7 +18236,7 @@ async function handleDeleteWorkLocation(id) {
       const unitNames = unitsUsing.map(u => `• ${u.nama_unit || u.id_unit} (${u.id_unit})`).slice(0, 5).join("\n");
       const moreText = unitsUsing.length > 5 ? `\n...dan ${unitsUsing.length - 5} unit lainnya.` : "";
 
-      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nTempat kerja "${item.nama_lokasi}" (${id}) saat ini terhubung dengan ${unitsUsing.length} Unit Organisasi:\n${unitNames}${moreText}\n\nKarena sedang digunakan, data ini TIDAK BISA DIHAPUS PERMANEN demi menjaga integritas database dan relasi cabang.\n\nSistem akan mengubah status tempat kerja ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+      const msg = `⚠️ DATA MASIH TERHUBUNG\n\nTempat kerja "${item.nama_lokasi}" (${id}) saat ini masih digunakan oleh ${unitsUsing.length} Unit Organisasi:\n${unitNames}${moreText}\n\nKarena sedang digunakan, data ini tidak dapat dihapus permanen dan akan diubah statusnya menjadi NONAKTIF.\n\nApakah Anda ingin melanjutkan?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18120,8 +18252,8 @@ async function handleDeleteWorkLocation(id) {
       closeWorkLocModal();
       showToast(`Tempat kerja "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
     } else {
-      // KONDISI 2: DATA TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN DARI DATABASE
-      const msg = `🗑️ HAPUS PERMANEN\n\nTempat kerja "${item.nama_lokasi}" (${id}) TIDAK DIGUNAKAN oleh unit organisasi manapun.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+      // KONDISI 2: DATA TIDAK DIGUNAKAN -> HAPUS PERMANEN
+      const msg = `🗑️ KONFIRMASI HAPUS\n\nTempat kerja "${item.nama_lokasi}" (${id}) belum digunakan oleh unit organisasi manapun.\n\nApakah Anda yakin ingin menghapus data tempat kerja ini?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18132,7 +18264,7 @@ async function handleDeleteWorkLocation(id) {
       ORG_WORK_LOCATIONS_DATA = ORG_WORK_LOCATIONS_DATA.filter(w => w.id_work_location !== id);
       renderWorkLocationsList(ORG_WORK_LOCATIONS_DATA);
       closeWorkLocModal();
-      showToast(`Tempat kerja "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+      showToast(`Tempat kerja "${id}" berhasil dihapus!`, "success", 2000);
     }
   } catch (e) {
     alert("Gagal memproses penghapusan: " + e.message);
@@ -18383,7 +18515,7 @@ async function handleDeleteOrgUnit(id) {
       }
 
       const reasonsText = reasons.map(r => `• ${r}`).join("\n");
-      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nUnit Organisasi "${item.nama_unit}" (${id}) saat ini terhubung dengan:\n${reasonsText}\n\nKarena sedang digunakan, unit ini TIDAK BISA DIHAPUS PERMANEN demi menjaga integritas database dan data historis karyawan.\n\nSistem akan mengubah status unit ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+      const msg = `⚠️ DATA MASIH TERHUBUNG\n\nUnit Organisasi "${item.nama_unit}" (${id}) saat ini masih terhubung dengan:\n${reasonsText}\n\nKarena sedang digunakan, unit ini tidak dapat dihapus permanen dan akan diubah statusnya menjadi NONAKTIF.\n\nApakah Anda ingin melanjutkan?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18400,8 +18532,8 @@ async function handleDeleteOrgUnit(id) {
       closeOrgUnitModal();
       showToast(`Unit "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
     } else {
-      // KONDISI 2: TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN
-      const msg = `🗑️ HAPUS PERMANEN\n\nUnit Organisasi "${item.nama_unit}" (${id}) TIDAK DIGUNAKAN oleh karyawan, jabatan, atau sub-unit manapun.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+      // KONDISI 2: TIDAK DIGUNAKAN -> HAPUS PERMANEN
+      const msg = `🗑️ KONFIRMASI HAPUS\n\nUnit Organisasi "${item.nama_unit}" (${id}) belum digunakan oleh karyawan, jabatan, atau sub-unit manapun.\n\nApakah Anda yakin ingin menghapus unit organisasi ini?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18413,7 +18545,7 @@ async function handleDeleteOrgUnit(id) {
       renderOrgUnitsList(ORG_UNITS_DATA);
       populateOrgFilterUnits();
       closeOrgUnitModal();
-      showToast(`Unit organisasi "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+      showToast(`Unit organisasi "${id}" berhasil dihapus!`, "success", 2000);
     }
   } catch (e) {
     alert("Gagal memproses penghapusan: " + e.message);
@@ -18673,7 +18805,7 @@ async function handleDeleteJobPosition(id) {
       }
 
       const reasonsText = reasons.map(r => `• ${r}`).join("\n");
-      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nPosisi Jabatan "${item.nama_jabatan}" (${id}) saat ini terhubung dengan:\n${reasonsText}\n\nKarena sedang digunakan, jabatan ini TIDAK BISA DIHAPUS PERMANEN demi menjaga hierarki organisasi dan data karyawan.\n\nSistem akan mengubah status jabatan ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+      const msg = `⚠️ DATA MASIH TERHUBUNG\n\nPosisi Jabatan "${item.nama_jabatan}" (${id}) saat ini masih terhubung dengan:\n${reasonsText}\n\nKarena sedang digunakan, jabatan ini tidak dapat dihapus permanen dan akan diubah statusnya menjadi NONAKTIF.\n\nApakah Anda ingin melanjutkan?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18689,8 +18821,8 @@ async function handleDeleteJobPosition(id) {
       closeJobPosModal();
       showToast(`Posisi jabatan "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
     } else {
-      // KONDISI 2: TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN
-      const msg = `🗑️ HAPUS PERMANEN\n\nPosisi Jabatan "${item.nama_jabatan}" (${id}) TIDAK DIGUNAKAN oleh karyawan maupun struktur jabatan lain.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+      // KONDISI 2: TIDAK DIGUNAKAN -> HAPUS PERMANEN
+      const msg = `🗑️ KONFIRMASI HAPUS\n\nPosisi Jabatan "${item.nama_jabatan}" (${id}) belum digunakan oleh karyawan maupun struktur jabatan lain.\n\nApakah Anda yakin ingin menghapus posisi jabatan ini?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18701,7 +18833,7 @@ async function handleDeleteJobPosition(id) {
       ORG_POSITIONS_DATA = ORG_POSITIONS_DATA.filter(p => p.id_position !== id);
       renderOrgPositionsList(ORG_POSITIONS_DATA);
       closeJobPosModal();
-      showToast(`Posisi jabatan "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+      showToast(`Posisi jabatan "${id}" berhasil dihapus!`, "success", 2000);
     }
   } catch (e) {
     alert("Gagal memproses penghapusan: " + e.message);
@@ -18893,7 +19025,7 @@ async function handleDeleteMasterLevel(id) {
       const posNames = positionsUsing.map(p => `• ${p.nama_jabatan || p.id_position} (${p.id_position})`).slice(0, 5).join("\n");
       const moreText = positionsUsing.length > 5 ? `\n...dan ${positionsUsing.length - 5} jabatan lainnya.` : "";
 
-      const msg = `⚠️ DATA SEDANG DIGUNAKAN DI TABEL LAIN!\n\nMaster Level "${item.nama_level}" (${id}) saat ini terhubung dengan ${positionsUsing.length} Posisi Jabatan:\n${posNames}${moreText}\n\nKarena sedang digunakan, level ini TIDAK BISA DIHAPUS PERMANEN demi menjaga hierarki jabatan.\n\nSistem akan mengubah status level ini menjadi NONAKTIF (is_active = false).\n\nApakah Anda ingin melanjutkan?`;
+      const msg = `⚠️ DATA MASIH TERHUBUNG\n\nMaster Level "${item.nama_level}" (${id}) saat ini masih terhubung dengan ${positionsUsing.length} Posisi Jabatan:\n${posNames}${moreText}\n\nKarena sedang digunakan, level ini tidak dapat dihapus permanen dan akan diubah statusnya menjadi NONAKTIF.\n\nApakah Anda ingin melanjutkan?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18909,8 +19041,8 @@ async function handleDeleteMasterLevel(id) {
       closeMasterLevelModal();
       showToast(`Master level "${id}" diubah menjadi NONAKTIF karena sedang digunakan.`, "info", 2500);
     } else {
-      // KONDISI 2: TIDAK DIGUNAKAN DI TABEL MANAPUN -> HAPUS PERMANEN
-      const msg = `🗑️ HAPUS PERMANEN\n\nMaster Level "${item.nama_level}" (${id}) TIDAK DIGUNAKAN oleh jabatan manapun.\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN data ini dari database?`;
+      // KONDISI 2: TIDAK DIGUNAKAN -> HAPUS PERMANEN
+      const msg = `🗑️ KONFIRMASI HAPUS\n\nMaster Level "${item.nama_level}" (${id}) belum digunakan oleh jabatan manapun.\n\nApakah Anda yakin ingin menghapus master level ini?`;
 
       if (!confirm(msg)) {
         if (btn) btn.disabled = false;
@@ -18921,7 +19053,7 @@ async function handleDeleteMasterLevel(id) {
       ORG_LEVELS_DATA = ORG_LEVELS_DATA.filter(l => l.id_level !== id);
       renderOrgLevelsList(ORG_LEVELS_DATA);
       closeMasterLevelModal();
-      showToast(`Master level "${id}" berhasil dihapus permanen dari database!`, "success", 2000);
+      showToast(`Master level "${id}" berhasil dihapus!`, "success", 2000);
     }
   } catch (e) {
     alert("Gagal memproses penghapusan: " + e.message);
@@ -21395,7 +21527,7 @@ async function loadPersonaliaTransactionHistory() {
     filterPersonaliaHistory();
   } catch (err) {
     console.error("[loadPersonaliaTransactionHistory] Gagal:", err);
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Gagal memuat riwayat transaksi. ${err.message || ""}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Belum dapat memuat riwayat transaksi kepegawaian saat ini.</td></tr>`;
   }
 }
 
@@ -21691,7 +21823,7 @@ function renderPersonaliaEmployees(list) {
 }
 
 window.adminResetEmployeePassword = async function(nip, nama) {
-  if (!confirm(`PERINGATAN: Anda akan mereset kata sandi milik karyawan: \n\nNIP: ${nip}\nNama: ${nama}\n\nSandi akan direset kembali menjadi default: Password123! \nKaryawan akan dipaksa mengganti sandinya saat login berikutnya.\n\nApakah Anda yakin?`)) return;
+  if (!confirm(`KONFIRMASI RESET SANDI\n\nNIP: ${nip}\nNama: ${nama}\n\nKata sandi karyawan ini akan diatur ulang ke kata sandi awal dan karyawan wajib membuat kata sandi baru saat masuk berikutnya.\n\nApakah Anda yakin ingin melanjutkan?`)) return;
   
   try {
     showToast("Memproses reset sandi...", "info", 2000);
@@ -22074,11 +22206,11 @@ async function handleSaveCandidate(event) {
       if (personalDetailsSaved) {
         showToast(`Data calon karyawan "${nama}" berhasil disimpan! NIP resmi akan dibuat saat Penerimaan Karyawan diajukan.`, "success", 4000);
       } else {
-        showToast(`Data akun calon "${nama}" tersimpan di sistem, namun data biodata detail perlu diperbarui. Jalankan migrasi 12 di Supabase untuk sinkronisasi penuh.`, "warning", 6000);
+        showToast(`Data calon karyawan "${nama}" berhasil disimpan, silakan lengkapi detail biodata melalui menu profil.`, "warning", 5000);
       }
     } else {
       closeCandidateInputModal();
-      showToast(`Data calon karyawan "${nama}" berhasil disimpan (mode offline).`, "info", 3000);
+      showToast(`Data calon karyawan "${nama}" berhasil disimpan.`, "info", 3000);
     }
 
     if (typeof loadPersonaliaEmployees === "function") {
@@ -22086,11 +22218,7 @@ async function handleSaveCandidate(event) {
     }
   } catch (err) {
     console.error("[handleSaveCandidate] Error:", err);
-    const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    const userMsg = isDev
-      ? `[Dev Error] ${err.message || err}`
-      : "Gagal menyimpan data calon karyawan. Silakan coba lagi atau hubungi Administrator.";
-    alert(userMsg);
+    alert("Belum dapat menyimpan data calon karyawan saat ini. Silakan periksa kembali isian Anda dan coba lagi.");
   } finally {
     if (btn) {
       btn.innerHTML = origText;
@@ -24886,7 +25014,7 @@ function openProcessTransactionApprovalModal(txId, stageId, actionType) {
 
 async function executeTransactionApproval(txId, stageId, actionType, notes) {
   if (!supabaseClient) {
-    showToast("Database Supabase tidak terhubung", "error");
+    showToast("Layanan sedang memuat, silakan coba beberapa saat lagi.", "error");
     return;
   }
 
@@ -24905,7 +25033,7 @@ async function executeTransactionApproval(txId, stageId, actionType, notes) {
       .single();
 
     if (txErr || !tx) {
-      alert("Transaksi tidak ditemukan di database: " + (txErr?.message || ""));
+      alert("Data pengajuan kepegawaian tidak ditemukan atau sudah diperbarui.");
       return;
     }
 
@@ -25730,7 +25858,7 @@ async function submitChangePassword() {
     if (typeof showToast === "function") showToast("Password berhasil diubah!", "success", 3000);
   } catch (err) {
     console.error("Change password error:", err);
-    if (errEl) { errEl.innerText = err.message || "Gagal mengubah password."; errEl.classList.remove("hidden"); }
+    if (errEl) { errEl.innerText = getFriendlyErrorMessage(err, "Belum dapat mengubah kata sandi saat ini. Silakan coba kembali."); errEl.classList.remove("hidden"); }
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -26184,7 +26312,7 @@ async function loadCoverAreaManagementData() {
       container.innerHTML = `
         <div class="p-6 text-center text-xs text-rose-500 bg-rose-50 rounded-2xl border border-rose-200">
           <i class="fa-solid fa-triangle-exclamation text-base mb-1 block"></i>
-          Gagal memuat cover area: ${err.message || err}
+          Belum dapat memuat daftar Cover Area saat ini. Silakan periksa koneksi Anda.
         </div>
       `;
     }
@@ -26305,7 +26433,7 @@ async function deleteCoverArea(areaId, areaName) {
 
     if (!countErr && typeof count === "number" && count > 0) {
       if (typeof showToast === "function") {
-        showToast(`Area tidak dapat dihapus! Masih ada ${count} mitra terhubung di database.`, "warning", 3500);
+        showToast(`Area belum dapat dihapus karena masih memiliki ${count} mitra yang terhubung.`, "warning", 3500);
       }
       return;
     }
@@ -26510,7 +26638,7 @@ async function openKelolaMitraModal(areaId, areaName) {
         <tr>
           <td colspan="3" class="p-6 text-center text-xs text-rose-500">
             <i class="fa-solid fa-triangle-exclamation mb-1 block"></i>
-            Gagal memuat mitra: ${err.message || err}
+            Belum dapat memuat daftar mitra saat ini. Silakan periksa koneksi Anda.
           </td>
         </tr>
       `;
@@ -26756,7 +26884,7 @@ async function openViewMitraAreaModal(areaId, areaName) {
         <tr>
           <td colspan="4" class="p-6 text-center text-xs text-rose-500">
             <i class="fa-solid fa-triangle-exclamation mb-1 block"></i>
-            Gagal memuat mitra: ${err.message || err}
+            Belum dapat memuat daftar mitra saat ini. Silakan periksa koneksi Anda.
           </td>
         </tr>
       `;
