@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261108_v202";
+const APP_BUILD_VERSION = "20261112_v210";
 const screenCache = {};
 
 function escapeHtml(str) {
@@ -14133,6 +14133,102 @@ function setHistoryTypeFilter(type) {
   renderHistoryList();
 }
 
+function mapVisitToHistoryItem(item) {
+  const visitPhotos = [];
+  if (item.showroom_photo_url) {
+    visitPhotos.push({ label: "Selfie Kunjungan", url: item.showroom_photo_url, type: "image" });
+  }
+  if (item.onb_domisili_photo_url) {
+    visitPhotos.push({ label: "Foto Domisili", url: item.onb_domisili_photo_url, type: "image" });
+  }
+  if (Array.isArray(item.stock_media_urls)) {
+    item.stock_media_urls.forEach((mUrl, mIdx) => {
+      if (mUrl) {
+        const isVid = /\.(mp4|mov|webm|ogg|m4v)(\?|$)/i.test(mUrl) || String(mUrl).startsWith("data:video");
+        visitPhotos.push({
+          label: `${isVid ? "Video" : "Foto"} Stock #${mIdx + 1}`,
+          url: mUrl,
+          type: isVid ? "video" : "image"
+        });
+      }
+    });
+  }
+
+  const unitCountInfo = item.total_unit ? ` • ${item.total_unit} Unit` : "";
+  const notePreview = (item.catatan_visit && item.catatan_visit !== "-")
+    ? item.catatan_visit
+    : ((item.issue_digi && item.issue_digi !== "-") ? `Issue Digiasha: ${item.issue_digi}` : "Tidak ada catatan tambahan");
+
+  return {
+    id: item.visit_id,
+    type: "VISIT",
+    typeLabel: "Visit Mitra",
+    icon: "fa-clipboard-check",
+    iconColor: "text-blue-600 bg-blue-50 border-blue-200",
+    title: item.dealer_name || "Mitra",
+    subtitle: `Lokasi: ${item.lokasi || 'Showroom'} • Bertemu: ${item.bertemu_owner || '-'}${unitCountInfo}`,
+    notes: notePreview,
+    createdAt: item.created_at,
+    dateObj: new Date(item.created_at),
+    isToday: isTodayRecord(item.created_at),
+    nip: item.nip,
+    lat: item.lat,
+    long: item.long,
+    photos: visitPhotos,
+    raw: item
+  };
+}
+
+function mapOnboardingToHistoryItem(item) {
+  const parsed = parseOnboardingRecord(item);
+  const selfieUrl = item.selfie_photo_url || item.foto_showroom_url || item.foto_ktp_url || null;
+  return {
+    id: item.onboarding_id,
+    type: "ONBOARDING",
+    typeLabel: "Visit Calon Mitra",
+    icon: "fa-user-plus",
+    iconColor: "text-teal-600 bg-teal-50 border-teal-200",
+    title: parsed.namaUsaha || parsed.namaPemohon || "Calon Mitra",
+    subtitle: `Pemohon: ${parsed.namaPemohon || '-'} • Tahapan: ${parsed.stages.join(' & ') || 'On-Process'}`,
+    notes: parsed.catatan || "-",
+    createdAt: item.created_at,
+    dateObj: new Date(item.created_at),
+    isToday: isTodayRecord(item.created_at),
+    nip: item.nip,
+    lat: item.lokasi_lat,
+    long: item.lokasi_long,
+    selfieUrl: selfieUrl,
+    photos: selfieUrl ? [{ label: "Foto Selfie Kunjungan", url: selfieUrl }] : [],
+    parsedOnb: parsed,
+    raw: item
+  };
+}
+
+function mapGpsToHistoryItem(item) {
+  return {
+    id: item.maint_id,
+    type: "GPS",
+    typeLabel: "GPS Maintenance",
+    icon: "fa-satellite-dish",
+    iconColor: "text-emerald-600 bg-emerald-50 border-emerald-200",
+    title: `${item.nopol || 'Kendaraan'} (${item.dealer_name || 'Mitra'})`,
+    subtitle: `Aktivitas: ${item.act_type || 'Maintenance'} • No Fas: ${item.no_fasilitas || '-'}`,
+    notes: item.catatan_teknis || "-",
+    createdAt: item.created_at,
+    dateObj: new Date(item.created_at),
+    isToday: isTodayRecord(item.created_at),
+    nip: item.nip,
+    lat: item.lat,
+    long: item.long,
+    photos: [
+      item.foto_imei_lama_url ? { label: "IMEI Lama", url: item.foto_imei_lama_url } : null,
+      item.foto_imei_baru_url ? { label: "IMEI Baru", url: item.foto_imei_baru_url } : null,
+      item.foto_posisi_gps_url ? { label: "Posisi GPS", url: item.foto_posisi_gps_url } : null
+    ].filter(Boolean),
+    raw: item
+  };
+}
+
 async function loadActivityHistory(forceRefresh = false) {
   const container = document.getElementById("history-list-container");
   const refreshBtn = document.getElementById("btn-refresh-history");
@@ -14161,99 +14257,9 @@ async function loadActivityHistory(forceRefresh = false) {
 
     const [resVisit, resOnb, resGps] = await Promise.all([qVisit, qOnb, qGps]);
 
-    const visitLogs = (resVisit.data || []).map(item => {
-      const visitPhotos = [];
-      if (item.showroom_photo_url) {
-        visitPhotos.push({ label: "Selfie Kunjungan", url: item.showroom_photo_url, type: "image" });
-      }
-      if (item.onb_domisili_photo_url) {
-        visitPhotos.push({ label: "Foto Domisili", url: item.onb_domisili_photo_url, type: "image" });
-      }
-      if (Array.isArray(item.stock_media_urls)) {
-        item.stock_media_urls.forEach((mUrl, mIdx) => {
-          if (mUrl) {
-            const isVid = /\.(mp4|mov|webm|ogg|m4v)(\?|$)/i.test(mUrl) || String(mUrl).startsWith("data:video");
-            visitPhotos.push({
-              label: `${isVid ? "Video" : "Foto"} Stock #${mIdx + 1}`,
-              url: mUrl,
-              type: isVid ? "video" : "image"
-            });
-          }
-        });
-      }
-
-      const unitCountInfo = item.total_unit ? ` • ${item.total_unit} Unit` : "";
-      const notePreview = (item.catatan_visit && item.catatan_visit !== "-")
-        ? item.catatan_visit
-        : ((item.issue_digi && item.issue_digi !== "-") ? `Issue Digiasha: ${item.issue_digi}` : "Tidak ada catatan tambahan");
-
-      return {
-        id: item.visit_id,
-        type: "VISIT",
-        typeLabel: "Visit Mitra",
-        icon: "fa-clipboard-check",
-        iconColor: "text-blue-600 bg-blue-50 border-blue-200",
-        title: item.dealer_name || "Mitra",
-        subtitle: `Lokasi: ${item.lokasi || 'Showroom'} • Bertemu: ${item.bertemu_owner || '-'}${unitCountInfo}`,
-        notes: notePreview,
-        createdAt: item.created_at,
-        dateObj: new Date(item.created_at),
-        isToday: isTodayRecord(item.created_at),
-        nip: item.nip,
-        lat: item.lat,
-        long: item.long,
-        photos: visitPhotos,
-        raw: item
-      };
-    });
-
-    const onbLogs = (resOnb.data || []).map(item => {
-      const parsed = parseOnboardingRecord(item);
-      const selfieUrl = item.selfie_photo_url || item.foto_showroom_url || item.foto_ktp_url || null;
-      return {
-        id: item.onboarding_id,
-        type: "ONBOARDING",
-        typeLabel: "Visit Calon Mitra",
-        icon: "fa-user-plus",
-        iconColor: "text-teal-600 bg-teal-50 border-teal-200",
-        title: parsed.namaUsaha || parsed.namaPemohon || "Calon Mitra",
-        subtitle: `Pemohon: ${parsed.namaPemohon || '-'} • Tahapan: ${parsed.stages.join(' & ') || 'On-Process'}`,
-        notes: parsed.catatan || "-",
-        createdAt: item.created_at,
-        dateObj: new Date(item.created_at),
-        isToday: isTodayRecord(item.created_at),
-        nip: item.nip,
-        lat: item.lokasi_lat,
-        long: item.lokasi_long,
-        selfieUrl: selfieUrl,
-        photos: selfieUrl ? [{ label: "Foto Selfie Kunjungan", url: selfieUrl }] : [],
-        parsedOnb: parsed,
-        raw: item
-      };
-    });
-
-    const gpsLogs = (resGps.data || []).map(item => ({
-      id: item.maint_id,
-      type: "GPS",
-      typeLabel: "GPS Maintenance",
-      icon: "fa-satellite-dish",
-      iconColor: "text-emerald-600 bg-emerald-50 border-emerald-200",
-      title: `${item.nopol || 'Kendaraan'} (${item.dealer_name || 'Mitra'})`,
-      subtitle: `Aktivitas: ${item.act_type || 'Maintenance'} • No Fas: ${item.no_fasilitas || '-'}`,
-      notes: item.catatan_teknis || "-",
-      createdAt: item.created_at,
-      dateObj: new Date(item.created_at),
-      isToday: isTodayRecord(item.created_at),
-      nip: item.nip,
-      lat: item.lat,
-      long: item.long,
-      photos: [
-        item.foto_imei_lama_url ? { label: "IMEI Lama", url: item.foto_imei_lama_url } : null,
-        item.foto_imei_baru_url ? { label: "IMEI Baru", url: item.foto_imei_baru_url } : null,
-        item.foto_posisi_gps_url ? { label: "Posisi GPS", url: item.foto_posisi_gps_url } : null
-      ].filter(Boolean),
-      raw: item
-    }));
+    const visitLogs = (resVisit.data || []).map(mapVisitToHistoryItem);
+    const onbLogs = (resOnb.data || []).map(mapOnboardingToHistoryItem);
+    const gpsLogs = (resGps.data || []).map(mapGpsToHistoryItem);
 
     // Merge and sort DESC
     CACHED_HISTORY_DATA = [...visitLogs, ...onbLogs, ...gpsLogs].sort((a, b) => {
@@ -14809,11 +14815,12 @@ function onHistCustomDropdownBlur(uid) {
   }, 200);
 }
 
-async function openActivityDetailModal(type, id) {
+async function openActivityDetailModal(type, id, forceReadOnly = false) {
   const modal = document.getElementById("modal-history-detail");
   if (!modal) return;
 
-  const item = CACHED_HISTORY_DATA.find(x => x.type === type && String(x.id) === String(id));
+  const item = CACHED_HISTORY_DATA.find(x => x.type === type && String(x.id) === String(id))
+    || (Array.isArray(LAP_ACT_FILTERED_ITEMS) ? LAP_ACT_FILTERED_ITEMS.find(x => x.type === type && String(x.id) === String(id)) : null);
   if (!item) {
     alert("Data aktivitas tidak ditemukan.");
     return;
@@ -14832,7 +14839,9 @@ async function openActivityDetailModal(type, id) {
   if (modalTitle) modalTitle.innerText = `${item.typeLabel} - ${item.title}`;
   if (modalIcon) modalIcon.innerHTML = `<i class="fa-solid ${item.icon}"></i>`;
 
-  if (item.isToday) {
+  const canEdit = !forceReadOnly && item.isToday;
+
+  if (canEdit) {
     if (modalBadge) {
       modalBadge.className = "px-2 py-0.5 rounded text-[9px] font-bold inline-block mt-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30";
       modalBadge.innerHTML = "🟢 Mode Edit (Hari Ini)";
@@ -14847,13 +14856,15 @@ async function openActivityDetailModal(type, id) {
   } else {
     if (modalBadge) {
       modalBadge.className = "px-2 py-0.5 rounded text-[9px] font-bold inline-block mt-0.5 bg-slate-600 text-slate-300 border border-slate-500";
-      modalBadge.innerHTML = "🔒 Terkunci / Final";
+      modalBadge.innerHTML = forceReadOnly ? "👁️ Mode Monitoring (Read-Only)" : "🔒 Terkunci / Final";
     }
     if (statusAlert) {
       statusAlert.className = "p-2.5 rounded-xl text-[11px] leading-relaxed flex items-center space-x-2 bg-slate-100 text-slate-600 border border-slate-200";
     }
     if (statusMsg) {
-      statusMsg.innerHTML = `<strong>Status Final:</strong> Aktivitas ini dilakukan pada <em>${formatDisplayDate(item.createdAt)}</em> dan sudah melewati hari transaksi. Seluruh data bersifat Read-Only demi audit integritas.`;
+      statusMsg.innerHTML = forceReadOnly
+        ? `<strong>Mode Monitoring:</strong> Detail aktivitas kunjungan pada <em>${formatDisplayDate(item.createdAt)}</em> ditampilkan dalam mode Read-Only.`
+        : `<strong>Status Final:</strong> Aktivitas ini dilakukan pada <em>${formatDisplayDate(item.createdAt)}</em> dan sudah melewati hari transaksi. Seluruh data bersifat Read-Only demi audit integritas.`;
     }
     document.getElementById("btn-save-edit-act")?.classList.add("hidden");
   }
@@ -14861,9 +14872,13 @@ async function openActivityDetailModal(type, id) {
   // 2. Populate Header Details
   document.getElementById("dtl-hist-target").innerText = item.title;
   document.getElementById("dtl-hist-time").innerText = formatDisplayDate(item.createdAt);
-  const picDisplay = (CURRENT_USER && CURRENT_USER.nama && (!item.nip || String(CURRENT_USER.nip) === String(item.nip)))
-    ? `${CURRENT_USER.nama}${item.nip ? ' (' + item.nip + ')' : ''}`
-    : (item.nip || CURRENT_USER?.nama || "PIC Lapangan");
+  const empMatch = (Array.isArray(LAP_ACT_EMPLOYEES) ? LAP_ACT_EMPLOYEES : (Array.isArray(window.ALL_EMPLOYEES_CACHE) ? window.ALL_EMPLOYEES_CACHE : [])).find(e => String(e.nip) === String(item.nip));
+  const resolvedPicName = item.picName || empMatch?.nama_lengkap || empMatch?.nama || "";
+  const picDisplay = resolvedPicName
+    ? `${resolvedPicName}${item.nip ? ' (' + item.nip + ')' : ''}`
+    : ((CURRENT_USER && CURRENT_USER.nama && (!item.nip || String(CURRENT_USER.nip) === String(item.nip)))
+      ? `${CURRENT_USER.nama}${item.nip ? ' (' + item.nip + ')' : ''}`
+      : (item.nip || CURRENT_USER?.nama || "PIC Lapangan"));
   document.getElementById("dtl-hist-pic").innerText = picDisplay;
 
   // 3. Geotag (Read-Only)
@@ -14939,7 +14954,7 @@ async function openActivityDetailModal(type, id) {
   if (!fieldsContainer) return;
   fieldsContainer.innerHTML = '<div class="py-4 text-center text-xs text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-base block mb-1"></i>Memuat detail...</div>';
 
-  const isReadOnly = !item.isToday;
+  const isReadOnly = forceReadOnly || !item.isToday;
   const disabledAttr = isReadOnly ? 'disabled class="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-600 cursor-not-allowed"' : 'class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-slate-800"';
 
   if (type === "VISIT") {
@@ -16654,11 +16669,33 @@ let LAP_ACT_PIC_FILTER = "ALL";
 let LAP_ACT_LIST_TAB = "ALL";
 let LAP_ACT_RAW_VISITS = [];
 let LAP_ACT_RAW_ONBOARDINGS = [];
+let LAP_ACT_RAW_GPS = [];
 let LAP_ACT_RAW_UNIT_CHECKS = [];
 let LAP_ACT_RAW_DEALERS = [];
 let LAP_ACT_RAW_FACILITY_UNITS = [];
 let LAP_ACT_EMPLOYEES = [];
+let LAP_ACT_ORG_UNITS = [];
+let LAP_ACT_USER_SCOPE = "HO"; // "HO" | "AREA" | "CABANG"
+let LAP_ACT_ALLOWED_BRANCHES = [];
 let LAP_ACT_FILTERED_ITEMS = [];
+
+function stripActivityBranchPrefix(str) {
+  return String(str || "").trim().replace(/^(cabang|branch)\s+/i, "").trim();
+}
+
+function normalizeActivityBranchName(str) {
+  return stripActivityBranchPrefix(str).toLowerCase();
+}
+
+function isActivityBranchAllowed(branchStr) {
+  const norm = normalizeActivityBranchName(branchStr);
+  if (LAP_ACT_CABANG_FILTER && LAP_ACT_CABANG_FILTER !== "ALL") {
+    return norm === normalizeActivityBranchName(LAP_ACT_CABANG_FILTER);
+  }
+  if (LAP_ACT_USER_SCOPE === "HO") return true;
+  if (!norm) return false;
+  return LAP_ACT_ALLOWED_BRANCHES.includes(norm);
+}
 
 async function initLaporanActivityScreen() {
   const now = new Date();
@@ -16703,15 +16740,24 @@ function setActivityDatePreset(preset) {
 async function loadActivityFilterDropdowns() {
   try {
     let empList = [];
-    if (Array.isArray(window.ALL_EMPLOYEES_CACHE) && window.ALL_EMPLOYEES_CACHE.length > 0) {
+    const hasUnitIdInCache = Array.isArray(window.ALL_EMPLOYEES_CACHE)
+      && window.ALL_EMPLOYEES_CACHE.length > 0
+      && window.ALL_EMPLOYEES_CACHE.some(e => e.unit_id !== undefined);
+
+    if (hasUnitIdInCache) {
       empList = window.ALL_EMPLOYEES_CACHE;
     } else if (supabaseClient) {
-      const { data: rawList, error } = await supabaseClient.from("hr_employees").select("nip, name, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan), position_id").order("name", { ascending: true });
+      const { data: rawList, error } = await supabaseClient
+        .from("hr_employees")
+        .select("nip, name, location_id, hr_organization_units(id_unit, tipe_unit, nama_unit, parent_unit_id), hr_job_positions(nama_jabatan), position_id")
+        .order("name", { ascending: true });
       if (!error && Array.isArray(rawList)) {
         empList = rawList.map(e => ({
           nip: e.nip,
           nama_lengkap: e.name,
-          cabang: e.hr_organization_units?.nama_unit || "",
+          unit_id: e.location_id || e.hr_organization_units?.id_unit || "",
+          cabang: stripActivityBranchPrefix(e.hr_organization_units?.nama_unit || ""),
+          tipe_unit: e.hr_organization_units?.tipe_unit || "",
           jabatan: e.hr_job_positions?.nama_jabatan || "",
           role_id: e.position_id
         }));
@@ -16720,26 +16766,134 @@ async function loadActivityFilterDropdowns() {
     }
     LAP_ACT_EMPLOYEES = empList || [];
 
-    const branchSet = new Set();
-    LAP_ACT_EMPLOYEES.forEach(e => {
-      if (e.cabang && e.cabang.trim() && e.cabang !== "-") branchSet.add(e.cabang.trim());
-    });
+    // Fetch master hr_organization_units untuk menentukan hierarki HO / AREA / CABANG
+    if (supabaseClient && LAP_ACT_ORG_UNITS.length === 0) {
+      const { data: orgUnits } = await supabaseClient
+        .from("hr_organization_units")
+        .select("id_unit, tipe_unit, nama_unit, parent_unit_id, is_active")
+        .eq("is_active", true);
+      if (Array.isArray(orgUnits)) {
+        LAP_ACT_ORG_UNITS = orgUnits;
+      }
+    }
 
-    if (Array.isArray(MASTER_DEALER_PRIORITY_DATA)) {
-      MASTER_DEALER_PRIORITY_DATA.forEach(d => {
-        if (d.cabang && d.cabang.trim()) branchSet.add(d.cabang.trim());
+    // Tentukan Unit & Scope User yang sedang login
+    const currentEmp = LAP_ACT_EMPLOYEES.find(e => CURRENT_USER && String(e.nip) === String(CURRENT_USER.nip));
+    const userCabangRaw = String(CURRENT_USER?.cabang || currentEmp?.cabang || "").trim();
+    const userCabangNorm = normalizeActivityBranchName(userCabangRaw);
+    const userRoleStr = String(CURRENT_USER?.role || CURRENT_USER?.jabatan || currentEmp?.jabatan || "").toLowerCase();
+
+    const userOrgUnit = LAP_ACT_ORG_UNITS.find(u =>
+      (currentEmp?.unit_id && u.id_unit === currentEmp.unit_id)
+      || (userCabangNorm && normalizeActivityBranchName(u.nama_unit) === userCabangNorm)
+      || (userCabangNorm && normalizeActivityBranchName(u.id_unit) === userCabangNorm)
+    );
+
+    const isGlobalRole = userRoleStr.includes("super admin")
+      || userRoleStr.includes("coo")
+      || userRoleStr.includes("ceo")
+      || userRoleStr.includes("director")
+      || userRoleStr.includes("bod")
+      || userCabangNorm === "pusat"
+      || userCabangNorm === "kantor pusat"
+      || userCabangNorm === "head office"
+      || userCabangNorm === "ho"
+      || userCabangNorm === "board of director";
+
+    const branchMap = new Map(); // norm -> displayName
+    const addBranchToMap = (rawName) => {
+      const disp = stripActivityBranchPrefix(rawName);
+      const norm = normalizeActivityBranchName(disp);
+      if (disp && disp !== "-" && norm && !branchMap.has(norm)) {
+        branchMap.set(norm, disp);
+      }
+    };
+
+    let scopeLabel = "";
+
+    if (userOrgUnit?.tipe_unit === "HO" || (!userOrgUnit && isGlobalRole)) {
+      LAP_ACT_USER_SCOPE = "HO";
+      LAP_ACT_ALLOWED_BRANCHES = [];
+      scopeLabel = "Akses: HO • Semua Cabang";
+
+      LAP_ACT_ORG_UNITS.filter(u => u.tipe_unit === "CABANG").forEach(u => addBranchToMap(u.nama_unit));
+      LAP_ACT_EMPLOYEES.forEach(e => {
+        if (e.tipe_unit === "CABANG" || !["pusat", "head office", "ho", "board of director", "bussiness division", "business division", "credit unit", "risk operational departmet", "taxation unit"].includes(normalizeActivityBranchName(e.cabang))) {
+          if (!String(e.cabang || "").toLowerCase().startsWith("area ")) {
+            addBranchToMap(e.cabang);
+          }
+        }
       });
+      if (Array.isArray(MASTER_DEALER_PRIORITY_DATA)) {
+        MASTER_DEALER_PRIORITY_DATA.forEach(d => addBranchToMap(d.cabang));
+      }
+    } else if (userOrgUnit?.tipe_unit === "AREA" || userCabangNorm.startsWith("area ")) {
+      LAP_ACT_USER_SCOPE = "AREA";
+      const areaId = userOrgUnit?.id_unit || "";
+      const areaName = userOrgUnit?.nama_unit || userCabangRaw;
+      scopeLabel = `Akses: ${areaName}`;
+
+      const childBranches = LAP_ACT_ORG_UNITS.filter(u =>
+        u.parent_unit_id === areaId && u.tipe_unit === "CABANG"
+      );
+      childBranches.forEach(u => addBranchToMap(u.nama_unit));
+
+      LAP_ACT_ALLOWED_BRANCHES = Array.from(branchMap.keys());
+      // Sertakan juga nama unit area itu sendiri untuk pencocokan PIC yang melekat di level Area
+      if (userCabangNorm && !LAP_ACT_ALLOWED_BRANCHES.includes(userCabangNorm)) {
+        LAP_ACT_ALLOWED_BRANCHES.push(userCabangNorm);
+      }
+    } else {
+      LAP_ACT_USER_SCOPE = "CABANG";
+      const ownBranch = stripActivityBranchPrefix(userOrgUnit?.nama_unit || userCabangRaw || "Cabang");
+      addBranchToMap(ownBranch);
+      LAP_ACT_ALLOWED_BRANCHES = Array.from(branchMap.keys());
+      scopeLabel = `Akses: Cabang ${ownBranch}`;
+    }
+
+    const scopeBadge = document.getElementById("lap-act-scope-badge");
+    if (scopeBadge) {
+      scopeBadge.innerText = scopeLabel;
+      scopeBadge.classList.remove("hidden");
     }
 
     const cabangSelect = document.getElementById("lap-act-filter-cabang");
     if (cabangSelect) {
-      const sortedBranches = Array.from(branchSet).sort();
-      let optHtml = '<option value="ALL">Semua Cabang</option>';
-      sortedBranches.forEach(b => {
-        optHtml += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
-      });
-      cabangSelect.innerHTML = optHtml;
-      cabangSelect.value = LAP_ACT_CABANG_FILTER;
+      const sortedBranches = Array.from(branchMap.values()).sort();
+      let optHtml = "";
+      if (LAP_ACT_USER_SCOPE === "HO") {
+        optHtml = '<option value="ALL">Semua Cabang</option>';
+        sortedBranches.forEach(b => {
+          optHtml += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+        });
+        cabangSelect.innerHTML = optHtml;
+        cabangSelect.disabled = false;
+        cabangSelect.classList.remove("opacity-75", "cursor-not-allowed");
+        if (LAP_ACT_CABANG_FILTER !== "ALL" && !branchMap.has(normalizeActivityBranchName(LAP_ACT_CABANG_FILTER))) {
+          LAP_ACT_CABANG_FILTER = "ALL";
+        }
+        cabangSelect.value = LAP_ACT_CABANG_FILTER;
+      } else if (LAP_ACT_USER_SCOPE === "AREA") {
+        optHtml = `<option value="ALL">Semua Cabang di Area (${sortedBranches.length})</option>`;
+        sortedBranches.forEach(b => {
+          optHtml += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+        });
+        cabangSelect.innerHTML = optHtml;
+        cabangSelect.disabled = false;
+        cabangSelect.classList.remove("opacity-75", "cursor-not-allowed");
+        if (LAP_ACT_CABANG_FILTER !== "ALL" && !branchMap.has(normalizeActivityBranchName(LAP_ACT_CABANG_FILTER))) {
+          LAP_ACT_CABANG_FILTER = "ALL";
+        }
+        cabangSelect.value = LAP_ACT_CABANG_FILTER;
+      } else {
+        const ownBranch = sortedBranches[0] || stripActivityBranchPrefix(userCabangRaw);
+        optHtml = `<option value="${escapeHtml(ownBranch)}">${escapeHtml(ownBranch)}</option>`;
+        cabangSelect.innerHTML = optHtml;
+        LAP_ACT_CABANG_FILTER = ownBranch;
+        cabangSelect.value = ownBranch;
+        cabangSelect.disabled = true;
+        cabangSelect.classList.add("opacity-75", "cursor-not-allowed");
+      }
     }
 
     populateActivityPicOptions();
@@ -16761,7 +16915,10 @@ function populateActivityPicOptions() {
 
   let pics = LAP_ACT_EMPLOYEES;
   if (LAP_ACT_CABANG_FILTER && LAP_ACT_CABANG_FILTER !== "ALL") {
-    pics = pics.filter(e => String(e.cabang || "").trim().toLowerCase() === LAP_ACT_CABANG_FILTER.toLowerCase());
+    const targetNorm = normalizeActivityBranchName(LAP_ACT_CABANG_FILTER);
+    pics = pics.filter(e => normalizeActivityBranchName(e.cabang) === targetNorm);
+  } else if (LAP_ACT_USER_SCOPE !== "HO") {
+    pics = pics.filter(e => LAP_ACT_ALLOWED_BRANCHES.includes(normalizeActivityBranchName(e.cabang)));
   }
 
   let optHtml = '<option value="ALL">Semua PIC</option>';
@@ -16784,16 +16941,18 @@ async function fetchActivityReportData(forceRefresh = false) {
   }
 
   try {
-    const [resVisits, resOnb, resUnits, resDlr, resFac] = await Promise.all([
+    const [resVisits, resOnb, resGps, resUnits, resDlr, resFac] = await Promise.all([
       supabaseClient.from("tr_laporan_visit").select("*").order("created_at", { ascending: false }).limit(2000),
       supabaseClient.from("tr_onboarding_log").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabaseClient.from("tr_gps_maint").select("*").order("created_at", { ascending: false }).limit(1000),
       supabaseClient.from("tr_visit_unit_check").select("*").limit(5000),
       supabaseClient.from("m_dealer").select("dealer_id,dealer_name,cabang,status"),
-      supabaseClient.from("m_facility_unit").select("no_fasilitas,nopol,dealer_name,status_unit,cabang")
+      supabaseClient.from("m_facility_unit").select("no_fasilitas,nopol,dealer_name,contract_status")
     ]);
 
     LAP_ACT_RAW_VISITS = resVisits.data || [];
     LAP_ACT_RAW_ONBOARDINGS = resOnb.data || [];
+    LAP_ACT_RAW_GPS = resGps.data || [];
     LAP_ACT_RAW_UNIT_CHECKS = resUnits.data || [];
     LAP_ACT_RAW_DEALERS = resDlr.data || [];
     LAP_ACT_RAW_FACILITY_UNITS = resFac.data || [];
@@ -16841,12 +17000,9 @@ function applyActivityFilters() {
 
     if (LAP_ACT_PIC_FILTER !== "ALL" && v.nip !== LAP_ACT_PIC_FILTER) return false;
 
-    if (LAP_ACT_CABANG_FILTER !== "ALL") {
-      const picCabang = (empMap[v.nip]?.cabang || "").trim().toLowerCase();
-      const dlrCabang = (dealerMap[(v.dealer_name || "").trim().toLowerCase()]?.cabang || "").trim().toLowerCase();
-      const targetCabang = LAP_ACT_CABANG_FILTER.toLowerCase();
-      if (picCabang !== targetCabang && dlrCabang !== targetCabang) return false;
-    }
+    const picCabang = empMap[v.nip]?.cabang || "";
+    const dlrCabang = dealerMap[(v.dealer_name || "").trim().toLowerCase()]?.cabang || "";
+    if (!isActivityBranchAllowed(picCabang) && !isActivityBranchAllowed(dlrCabang)) return false;
 
     return true;
   });
@@ -16859,12 +17015,24 @@ function applyActivityFilters() {
 
     if (LAP_ACT_PIC_FILTER !== "ALL" && o.nip !== LAP_ACT_PIC_FILTER) return false;
 
-    if (LAP_ACT_CABANG_FILTER !== "ALL") {
-      const picCabang = (empMap[o.nip]?.cabang || "").trim().toLowerCase();
-      const oCabang = (o.cabang || "").trim().toLowerCase();
-      const targetCabang = LAP_ACT_CABANG_FILTER.toLowerCase();
-      if (picCabang !== targetCabang && oCabang !== targetCabang) return false;
-    }
+    const picCabang = empMap[o.nip]?.cabang || "";
+    const oCabang = o.cabang || "";
+    if (!isActivityBranchAllowed(picCabang) && !isActivityBranchAllowed(oCabang)) return false;
+
+    return true;
+  });
+
+  // Filter GPS Maintenance
+  const filteredGps = LAP_ACT_RAW_GPS.filter(g => {
+    const gDateStr = getLocalDateString(new Date(g.created_at));
+    if (LAP_ACT_START_DATE && gDateStr < LAP_ACT_START_DATE) return false;
+    if (LAP_ACT_END_DATE && gDateStr > LAP_ACT_END_DATE) return false;
+
+    if (LAP_ACT_PIC_FILTER !== "ALL" && g.nip !== LAP_ACT_PIC_FILTER) return false;
+
+    const picCabang = empMap[g.nip]?.cabang || "";
+    const dlrCabang = dealerMap[(g.dealer_name || "").trim().toLowerCase()]?.cabang || "";
+    if (!isActivityBranchAllowed(picCabang) && !isActivityBranchAllowed(dlrCabang)) return false;
 
     return true;
   });
@@ -16895,10 +17063,7 @@ function applyActivityFilters() {
     const st = String(d.status || "").toLowerCase();
     const isActive = st !== "non-aktif" && !st.includes("tutup");
     if (!isActive) return false;
-    if (LAP_ACT_CABANG_FILTER !== "ALL") {
-      return String(d.cabang || "").trim().toLowerCase() === LAP_ACT_CABANG_FILTER.toLowerCase();
-    }
-    return true;
+    return isActivityBranchAllowed(d.cabang);
   });
   const totalActiveDealers = activeDealersInScope.length || 0;
   const ratioMitraPct = totalActiveDealers > 0
@@ -16915,14 +17080,11 @@ function applyActivityFilters() {
 
   const liveFacilityMap = {};
   const liveUnitsInScope = LAP_ACT_RAW_FACILITY_UNITS.filter(u => {
-    const st = String(u.status_unit || "live").toLowerCase();
+    const st = String(u.contract_status || "live").toLowerCase();
     const isLive = !st || st.includes("live") || st.includes("aktif");
     if (!isLive) return false;
-    if (LAP_ACT_CABANG_FILTER !== "ALL") {
-      const uCabang = (u.cabang || dealerMap[(u.dealer_name || "").trim().toLowerCase()]?.cabang || "").trim().toLowerCase();
-      if (uCabang && uCabang !== LAP_ACT_CABANG_FILTER.toLowerCase()) return false;
-    }
-    return true;
+    const uCabang = dealerMap[(u.dealer_name || "").trim().toLowerCase()]?.cabang || "";
+    return isActivityBranchAllowed(uCabang);
   });
   liveUnitsInScope.forEach(u => {
     if (u.no_fasilitas) liveFacilityMap[u.no_fasilitas.trim().toLowerCase()] = u;
@@ -16961,7 +17123,7 @@ function applyActivityFilters() {
   renderActivityDailyMatrix(filteredVisits, filteredOnboardings);
 
   // 5. RENDER DRILL-DOWN ACTIVITY LIST
-  prepareActivityFilteredItems(filteredVisits, filteredOnboardings, empMap);
+  prepareActivityFilteredItems(filteredVisits, filteredOnboardings, filteredGps, empMap);
 }
 
 function renderActivityDailyMatrix(visits, onboardings) {
@@ -17133,53 +17295,38 @@ function renderActivityDailyMatrix(visits, onboardings) {
   tbody.innerHTML = row1Html + row2Html + row3Html;
 }
 
-function prepareActivityFilteredItems(visits, onboardings, empMap) {
+function prepareActivityFilteredItems(visits, onboardings, gpsLogs, empMap) {
   const list = [];
 
-  visits.forEach(v => {
+  (visits || []).forEach(v => {
     const emp = empMap[v.nip] || {};
-    list.push({
-      id: v.visit_id,
-      type: "VISIT",
-      typeLabel: "Visit Mitra",
-      icon: "fa-clipboard-check",
-      iconColor: "text-blue-600 bg-blue-50 border-blue-200",
-      title: v.dealer_name || "Mitra",
-      picName: emp.nama_lengkap || emp.nama || v.nip,
-      picNip: v.nip,
-      picCabang: emp.cabang || "-",
-      notes: v.catatan_visit || v.tindak_lanjut_concern || "-",
-      createdAt: v.created_at,
-      dateObj: new Date(v.created_at),
-      photoUrl: v.showroom_photo_url || null
-    });
+    const mapped = mapVisitToHistoryItem(v);
+    mapped.picName = emp.nama_lengkap || emp.nama || v.nip || "-";
+    mapped.picNip = v.nip || "-";
+    mapped.picCabang = emp.cabang || "-";
+    list.push(mapped);
   });
 
-  onboardings.forEach(o => {
+  (onboardings || []).forEach(o => {
     const emp = empMap[o.nip] || {};
-    const parsed = typeof parseOnboardingRecord === "function" ? parseOnboardingRecord(o) : {};
-    const title = o.nama_usaha || o.nama_pemohon || parsed.namaUsaha || "Calon Mitra";
-    const photoUrl = o.selfie_photo_url || o.foto_showroom_url || null;
+    const mapped = mapOnboardingToHistoryItem(o);
+    mapped.picName = emp.nama_lengkap || emp.nama || o.nip || "-";
+    mapped.picNip = o.nip || "-";
+    mapped.picCabang = emp.cabang || stripActivityBranchPrefix(o.cabang) || "-";
+    list.push(mapped);
+  });
 
-    list.push({
-      id: o.onboarding_id,
-      type: "ONBOARDING",
-      typeLabel: "Visit Calon Mitra",
-      icon: "fa-user-plus",
-      iconColor: "text-teal-600 bg-teal-50 border-teal-200",
-      title: title,
-      picName: emp.nama_lengkap || emp.nama || o.nip,
-      picNip: o.nip,
-      picCabang: emp.cabang || o.cabang || "-",
-      notes: o.catatan || parsed.catatan || "-",
-      createdAt: o.created_at,
-      dateObj: new Date(o.created_at),
-      photoUrl: photoUrl
-    });
+  (gpsLogs || []).forEach(g => {
+    const emp = empMap[g.nip] || {};
+    const mapped = mapGpsToHistoryItem(g);
+    mapped.picName = emp.nama_lengkap || emp.nama || g.nip || "-";
+    mapped.picNip = g.nip || "-";
+    mapped.picCabang = emp.cabang || "-";
+    list.push(mapped);
   });
 
   // Sort descending by created_at
-  list.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
+  list.sort((a, b) => (b.dateObj.getTime() || 0) - (a.dateObj.getTime() || 0));
   LAP_ACT_FILTERED_ITEMS = list;
 
   renderActivityDrilldownList();
@@ -17191,17 +17338,19 @@ function setActivityListTab(tab) {
   const btnAll = document.getElementById("tab-act-all");
   const btnVisit = document.getElementById("tab-act-visit");
   const btnOnb = document.getElementById("tab-act-onb");
+  const btnGps = document.getElementById("tab-act-gps");
 
   [
     { el: btnAll, id: "ALL" },
     { el: btnVisit, id: "VISIT" },
-    { el: btnOnb, id: "ONB" }
+    { el: btnOnb, id: "ONB" },
+    { el: btnGps, id: "GPS" }
   ].forEach(item => {
     if (!item.el) return;
     if (item.id === tab) {
-      item.el.className = "px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 text-white transition";
+      item.el.className = "py-1.5 px-2 rounded-xl bg-slate-900 text-white text-center shadow-xs transition truncate";
     } else {
-      item.el.className = "px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
+      item.el.className = "py-1.5 px-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 text-center transition truncate";
     }
   });
 
@@ -17218,9 +17367,11 @@ function renderActivityDrilldownList() {
     items = items.filter(i => i.type === "VISIT");
   } else if (LAP_ACT_LIST_TAB === "ONB") {
     items = items.filter(i => i.type === "ONBOARDING");
+  } else if (LAP_ACT_LIST_TAB === "GPS") {
+    items = items.filter(i => i.type === "GPS");
   }
 
-  if (countEl) countEl.innerText = `Menampilkan ${items.length} kunjungan`;
+  if (countEl) countEl.innerText = `Menampilkan ${items.length} aktivitas`;
 
   if (items.length === 0) {
     container.innerHTML = `
@@ -17235,47 +17386,47 @@ function renderActivityDrilldownList() {
 
   let html = "";
   items.slice(0, 50).forEach(item => {
-    const photoBadge = item.photoUrl
-      ? `<a href="${item.photoUrl}" target="_blank" class="w-10 h-10 rounded-xl overflow-hidden border border-slate-200 shrink-0 block hover:opacity-80 transition shadow-2xs">
-          <img src="${item.photoUrl}" alt="Bukti" class="w-full h-full object-cover" />
-         </a>`
-      : '';
-
     html += `
-      <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition space-y-2">
+      <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition space-y-2.5">
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center space-x-2.5 min-w-0">
-            <div class="w-8 h-8 rounded-xl ${item.iconColor} border flex items-center justify-center text-xs shrink-0">
+            <div class="w-9 h-9 rounded-xl ${item.iconColor} border flex items-center justify-center text-sm shrink-0">
               <i class="fa-solid ${item.icon}"></i>
             </div>
             <div class="min-w-0">
-              <div class="flex items-center space-x-1.5">
-                <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">${item.typeLabel}</span>
-                <span class="text-[9px] text-slate-400">•</span>
-                <span class="text-[9px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded">${item.picCabang}</span>
+              <div class="flex items-center space-x-1.5 flex-wrap">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${escapeHtml(item.typeLabel)}</span>
+                <span class="text-[10px] text-slate-300">•</span>
+                <span class="text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.2 rounded">${escapeHtml(item.picCabang)}</span>
               </div>
-              <h5 class="font-extrabold text-xs text-slate-900 truncate">${item.title}</h5>
+              <h5 class="font-bold text-xs text-slate-900 truncate leading-tight mt-0.5">${escapeHtml(item.title)}</h5>
             </div>
           </div>
-          ${photoBadge}
-        </div>
-
-        <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 flex items-center justify-between text-[10px]">
-          <div class="flex items-center space-x-1.5 text-slate-600 truncate">
-            <i class="fa-solid fa-user text-slate-400"></i>
-            <span class="font-bold text-slate-800">${item.picName}</span>
-            <span class="text-slate-400 font-mono">(${item.picNip})</span>
-          </div>
-          <div class="text-slate-400 shrink-0 font-medium ml-2">
-            ${formatDisplayDate(item.createdAt)}
+          <div class="text-right shrink-0">
+            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200 inline-flex items-center space-x-1">
+              <i class="fa-solid fa-user text-[8px] text-slate-400"></i>
+              <span>${escapeHtml(item.picName)}</span>
+            </span>
           </div>
         </div>
 
-        ${item.notes && item.notes !== '-' ? `
-          <div class="text-[10px] text-slate-500 line-clamp-2 italic px-1">
-            "${item.notes}"
+        <div class="text-[11px] text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <div class="font-medium text-slate-800 truncate">${escapeHtml(item.subtitle || "-")}</div>
+          <div class="text-[10px] text-slate-500 line-clamp-2 italic">${escapeHtml(item.notes || "-")}</div>
+        </div>
+
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+          <div class="flex items-center space-x-1">
+            <i class="fa-regular fa-clock"></i>
+            <span>${formatDisplayDate(item.createdAt)}</span>
+            <span class="text-slate-300">•</span>
+            <span class="font-mono">${escapeHtml(item.picNip)}</span>
           </div>
-        ` : ''}
+          <button type="button" onclick="openActivityDetailModal('${item.type}', '${item.id}', true)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 flex items-center space-x-1 transition">
+            <i class="fa-solid fa-eye text-[10px]"></i>
+            <span>Lihat Detail</span>
+          </button>
+        </div>
       </div>
     `;
   });
@@ -26964,8 +27115,10 @@ let COVER_AREA_LIST = [];
 let COVER_AREA_SELECTED = null;
 let COVER_AREA_BRANCH_DEALERS = [];
 let COVER_AREA_PIC_OPTIONS = [];
-let COVER_AREA_USER_UNIT = null; // { id_unit, nama_unit }
+let COVER_AREA_USER_UNIT = null; // { id_unit, nama_unit, tipe_unit }
 let COVER_AREA_DOWNLINE_BRANCHES = []; // Array of { id_unit, nama_unit, tipe_unit }
+let COVER_AREA_USER_SCOPE = "CABANG"; // "HO" | "AREA" | "CABANG"
+let COVER_AREA_ALLOWED_UNIT_IDS = [];
 
 // Helper: Menelusuri cabang-cabang di bawah unit tertentu secara rekursif (Downline Organization)
 async function getDownlineBranches(rootUnitId) {
@@ -27086,18 +27239,31 @@ async function resolveCoverAreaUserBranch() {
   const branchLabel = document.getElementById("cover-area-user-branch");
   COVER_AREA_USER_UNIT = null;
   COVER_AREA_DOWNLINE_BRANCHES = [];
+  COVER_AREA_USER_SCOPE = "CABANG";
+  COVER_AREA_ALLOWED_UNIT_IDS = [];
 
   try {
     if (!supabaseClient) return;
 
-    // 1. Cek dari location_id user di hr_employees jika ada
-    let unitId = CURRENT_USER.location_id || CURRENT_USER.unit_id || null;
+    // Pastikan ORG_UNITS_DATA terisi
+    if (!Array.isArray(ORG_UNITS_DATA) || ORG_UNITS_DATA.length === 0) {
+      const { data: orgData } = await supabaseClient
+        .from("hr_organization_units")
+        .select("id_unit, nama_unit, tipe_unit, parent_unit_id, is_active");
+      if (Array.isArray(orgData)) {
+        ORG_UNITS_DATA = orgData;
+      }
+    }
+
+    // 1. Cek unit user dari hr_employees
+    let unitId = CURRENT_USER.unit_id || CURRENT_USER.location_id || null;
     let unitName = CURRENT_USER.cabang || CURRENT_USER.unit || "";
+    let unitType = "";
 
     if (CURRENT_USER.nip) {
       const { data: empData } = await supabaseClient
         .from("hr_employees")
-        .select("id, nip, location_id, hr_organization_units(id_unit, nama_unit)")
+        .select("id, nip, location_id, hr_organization_units(id_unit, nama_unit, tipe_unit, parent_unit_id)")
         .eq("nip", CURRENT_USER.nip)
         .maybeSingle();
 
@@ -27105,78 +27271,100 @@ async function resolveCoverAreaUserBranch() {
         if (empData.hr_organization_units) {
           unitId = empData.hr_organization_units.id_unit;
           unitName = empData.hr_organization_units.nama_unit;
+          unitType = empData.hr_organization_units.tipe_unit || "";
         } else if (empData.location_id) {
           unitId = empData.location_id;
         }
       }
     }
 
-    // Jika belum ketemu unitId, cari di hr_organization_units berdasarkan nama cabang
-    if (!unitId && unitName) {
-      const { data: matchedUnit } = await supabaseClient
-        .from("hr_organization_units")
-        .select("id_unit, nama_unit")
-        .ilike("nama_unit", `%${unitName.trim()}%`)
-        .limit(1)
-        .maybeSingle();
+    // Cocokkan dengan ORG_UNITS_DATA
+    let matchedUnit = (ORG_UNITS_DATA || []).find(u =>
+      (unitId && String(u.id_unit).toUpperCase() === String(unitId).toUpperCase())
+      || (unitName && String(u.nama_unit).trim().toLowerCase() === String(unitName).trim().toLowerCase())
+    );
 
-      if (matchedUnit) {
-        unitId = matchedUnit.id_unit;
-        unitName = matchedUnit.nama_unit;
-      }
+    if (matchedUnit) {
+      unitId = matchedUnit.id_unit;
+      unitName = matchedUnit.nama_unit;
+      unitType = matchedUnit.tipe_unit || unitType;
     }
 
-    // Fallback: Jika super admin / HO tanpa cabang spesifik, ambil cabang pertama
-    if (!unitId) {
-      const { data: firstUnit } = await supabaseClient
-        .from("hr_organization_units")
-        .select("id_unit, nama_unit")
-        .eq("tipe_unit", "CABANG")
-        .limit(1)
-        .maybeSingle();
+    const userRoleStr = String(CURRENT_USER?.role || CURRENT_USER?.jabatan || "").toLowerCase();
+    const unitNameLow = String(unitName || "").trim().toLowerCase();
+    const isHoRole = unitType === "HO"
+      || userRoleStr.includes("super admin")
+      || userRoleStr.includes("coo")
+      || userRoleStr.includes("ceo")
+      || userRoleStr.includes("director")
+      || userRoleStr.includes("bod")
+      || unitNameLow === "pusat"
+      || unitNameLow === "kantor pusat"
+      || unitNameLow === "head office"
+      || unitNameLow === "ho"
+      || unitNameLow === "board of director";
 
-      if (firstUnit) {
-        unitId = firstUnit.id_unit;
-        unitName = firstUnit.nama_unit;
+    if (isHoRole) {
+      COVER_AREA_USER_SCOPE = "HO";
+      COVER_AREA_USER_UNIT = {
+        id_unit: unitId || "HO",
+        nama_unit: unitName || "Head Office",
+        tipe_unit: "HO"
+      };
+      COVER_AREA_DOWNLINE_BRANCHES = (ORG_UNITS_DATA || []).filter(u =>
+        u.is_active !== false && String(u.tipe_unit || "").toUpperCase() === "CABANG"
+      );
+      COVER_AREA_ALLOWED_UNIT_IDS = []; // HO melihat semua unit
+      if (branchLabel) branchLabel.innerText = "Akses: HO (Semua Cabang)";
+    } else if (unitType === "AREA" || unitNameLow.startsWith("area ")) {
+      COVER_AREA_USER_SCOPE = "AREA";
+      COVER_AREA_USER_UNIT = {
+        id_unit: unitId,
+        nama_unit: unitName,
+        tipe_unit: "AREA"
+      };
+      COVER_AREA_DOWNLINE_BRANCHES = await getDownlineBranches(unitId);
+      if (COVER_AREA_DOWNLINE_BRANCHES.length === 0) {
+        COVER_AREA_DOWNLINE_BRANCHES = (ORG_UNITS_DATA || []).filter(u =>
+          u.is_active !== false && String(u.parent_unit_id || "").toUpperCase() === String(unitId).toUpperCase()
+        );
       }
-    }
-
-    COVER_AREA_USER_UNIT = {
-      id_unit: unitId || "CABANG_DEFAULT",
-      nama_unit: unitName || "Cabang Utama"
-    };
-
-    // Ambil seluruh cabang downline organisasi user
-    COVER_AREA_DOWNLINE_BRANCHES = await getDownlineBranches(COVER_AREA_USER_UNIT.id_unit);
-
-    // Jika list downline kosong, masukkan minimal COVER_AREA_USER_UNIT sebagai opsi
-    if (COVER_AREA_DOWNLINE_BRANCHES.length === 0) {
+      COVER_AREA_ALLOWED_UNIT_IDS = Array.from(new Set([
+        unitId,
+        ...COVER_AREA_DOWNLINE_BRANCHES.map(b => b.id_unit)
+      ].filter(Boolean)));
+      if (branchLabel) {
+        branchLabel.innerText = `Wilayah: ${unitName} (${COVER_AREA_DOWNLINE_BRANCHES.length} Cabang)`;
+      }
+    } else {
+      COVER_AREA_USER_SCOPE = "CABANG";
+      COVER_AREA_USER_UNIT = {
+        id_unit: unitId || "CABANG_DEFAULT",
+        nama_unit: unitName || "Cabang",
+        tipe_unit: "CABANG"
+      };
       COVER_AREA_DOWNLINE_BRANCHES = [{
         id_unit: COVER_AREA_USER_UNIT.id_unit,
         nama_unit: COVER_AREA_USER_UNIT.nama_unit,
         tipe_unit: "CABANG"
       }];
-    }
-
-    if (branchLabel) {
-      const branchCount = COVER_AREA_DOWNLINE_BRANCHES.length;
-      if (branchCount > 1) {
-        branchLabel.innerText = `Wilayah: ${COVER_AREA_USER_UNIT.nama_unit} (${branchCount} Cabang)`;
-      } else {
-        branchLabel.innerText = `Cabang: ${COVER_AREA_USER_UNIT.nama_unit}`;
-      }
+      COVER_AREA_ALLOWED_UNIT_IDS = [COVER_AREA_USER_UNIT.id_unit].filter(Boolean);
+      if (branchLabel) branchLabel.innerText = `Cabang: ${COVER_AREA_USER_UNIT.nama_unit}`;
     }
   } catch (err) {
     console.warn("Gagal resolve branch user cover area:", err);
+    COVER_AREA_USER_SCOPE = "CABANG";
     COVER_AREA_USER_UNIT = {
       id_unit: "CABANG_DEFAULT",
-      nama_unit: CURRENT_USER.cabang || "Cabang"
+      nama_unit: CURRENT_USER.cabang || "Cabang",
+      tipe_unit: "CABANG"
     };
     COVER_AREA_DOWNLINE_BRANCHES = [{
       id_unit: COVER_AREA_USER_UNIT.id_unit,
       nama_unit: COVER_AREA_USER_UNIT.nama_unit,
       tipe_unit: "CABANG"
     }];
+    COVER_AREA_ALLOWED_UNIT_IDS = [COVER_AREA_USER_UNIT.id_unit];
     if (branchLabel) branchLabel.innerText = `Cabang: ${COVER_AREA_USER_UNIT.nama_unit}`;
   }
 }
@@ -27188,39 +27376,47 @@ async function loadCoverAreaPicOptions() {
     if (supabaseClient && CURRENT_USER) {
       const { data: rawList, error } = await supabaseClient
         .from("hr_employees")
-        .select("id, nip, name, supervisor_id, hr_organization_units(nama_unit), hr_job_positions(nama_jabatan)")
+        .select("id, nip, name, location_id, status_kerja, deleted_at, hr_organization_units(id_unit, nama_unit, tipe_unit, parent_unit_id), hr_job_positions(nama_jabatan)")
         .order("name", { ascending: true });
 
       if (!error && Array.isArray(rawList)) {
-        const myNip = String(CURRENT_USER.nip || "").trim();
-        const me = rawList.find(e => String(e.nip || "").trim() === myNip || e.id === CURRENT_USER.id);
+        const activeList = rawList.filter(e => e.deleted_at === null && e.status_kerja !== "NONAKTIF");
+        const allowedSet = new Set((COVER_AREA_ALLOWED_UNIT_IDS || []).map(id => String(id).toUpperCase()));
 
-        if (me) {
-          // Logika rekursif penarikan bawahan hierarkis (sama seperti REKAP_TIM)
-          function getRecursiveSubordinates(supervisorId, list) {
-            const direct = list.filter(e => e.supervisor_id === supervisorId);
-            let result = [...direct];
-            for (const sub of direct) {
-              result = result.concat(getRecursiveSubordinates(sub.id, list));
-            }
-            return result;
-          }
+        let scopedEmployees = [];
+        if (COVER_AREA_USER_SCOPE === "HO") {
+          // 1. HO: Seluruh karyawan aktif
+          scopedEmployees = activeList;
+        } else if (COVER_AREA_USER_SCOPE === "AREA") {
+          // 2. Area: Seluruh karyawan yang ada di unit Area tersebut dan cabang-cabang di bawah areanya
+          const areaUnitIdNorm = String(COVER_AREA_USER_UNIT?.id_unit || "").toUpperCase();
+          scopedEmployees = activeList.filter(e => {
+            const empUnitId = String(e.location_id || e.hr_organization_units?.id_unit || "").toUpperCase();
+            const empParentId = String(e.hr_organization_units?.parent_unit_id || "").toUpperCase();
+            return (empUnitId && allowedSet.has(empUnitId)) || (areaUnitIdNorm && empParentId === areaUnitIdNorm);
+          });
+        } else {
+          // 3. Cabang: Seluruh karyawan di cabangnya dia
+          const ownUnitIdNorm = String(COVER_AREA_USER_UNIT?.id_unit || "").toUpperCase();
+          const ownUnitNameNorm = String(COVER_AREA_USER_UNIT?.nama_unit || "").trim().toLowerCase();
+          scopedEmployees = activeList.filter(e => {
+            const empUnitId = String(e.location_id || e.hr_organization_units?.id_unit || "").toUpperCase();
+            const empUnitName = String(e.hr_organization_units?.nama_unit || "").trim().toLowerCase();
+            return (ownUnitIdNorm && empUnitId === ownUnitIdNorm) || (ownUnitNameNorm && empUnitName === ownUnitNameNorm);
+          });
+        }
 
-          const subordinates = getRecursiveSubordinates(me.id, rawList);
-          const combined = [me, ...subordinates];
-
-          const seen = new Set();
-          for (const emp of combined) {
-            if (!seen.has(emp.id)) {
-              seen.add(emp.id);
-              COVER_AREA_PIC_OPTIONS.push({
-                id: emp.id,
-                nip: emp.nip,
-                nama: emp.name || emp.nip || "Karyawan",
-                jabatan: emp.hr_job_positions?.nama_jabatan || "Staff",
-                cabang: emp.hr_organization_units?.nama_unit || "-"
-              });
-            }
+        const seen = new Set();
+        for (const emp of scopedEmployees) {
+          if (!seen.has(emp.id)) {
+            seen.add(emp.id);
+            COVER_AREA_PIC_OPTIONS.push({
+              id: emp.id,
+              nip: emp.nip,
+              nama: emp.name || emp.nip || "Karyawan",
+              jabatan: emp.hr_job_positions?.nama_jabatan || "Staff",
+              cabang: emp.hr_organization_units?.nama_unit || "-"
+            });
           }
         }
       }
@@ -27243,19 +27439,154 @@ async function loadCoverAreaPicOptions() {
   renderCoverAreaPicSelectDropdown();
 }
 
-function renderCoverAreaPicSelectDropdown() {
-  const facSelect = document.getElementById("assign-pic-fac-select");
-  const mktSelect = document.getElementById("assign-pic-marketing-select");
+function formatCoverAreaPicDisplay(pic) {
+  if (!pic) return "";
+  const isMe = (CURRENT_USER && (pic.id === CURRENT_USER.id || (pic.nip && pic.nip === CURRENT_USER.nip)));
+  const meBadge = isMe ? " (Saya Sendiri)" : "";
+  const cabangTag = (pic.cabang && pic.cabang !== "-") ? ` (${pic.cabang})` : "";
+  return `${pic.nama}${meBadge} - ${pic.jabatan}${cabangTag}`;
+}
 
-  let html = `<option value="">-- Tanpa PIC / Kosongkan --</option>`;
-  COVER_AREA_PIC_OPTIONS.forEach(pic => {
-    const isMe = (CURRENT_USER && (pic.id === CURRENT_USER.id || (pic.nip && pic.nip === CURRENT_USER.nip)));
-    const meBadge = isMe ? " (Saya Sendiri)" : "";
-    html += `<option value="${pic.id}">${escapeHtml(pic.nama)}${meBadge} - ${escapeHtml(pic.jabatan)}</option>`;
+function renderCoverAreaPicSelectDropdown() {
+  initCoverAreaPicSearchableDropdown("fac");
+  initCoverAreaPicSearchableDropdown("marketing");
+}
+
+function initCoverAreaPicSearchableDropdown(prefix) {
+  const input = document.getElementById(`assign-pic-${prefix}-search-input`);
+  const dropdown = document.getElementById(`assign-pic-${prefix}-dropdown`);
+  const wrapper = document.getElementById(`assign-pic-${prefix}-wrapper`);
+  if (!input || !dropdown || !wrapper) return;
+
+  if (input.dataset.bound === "1") return;
+  input.dataset.bound = "1";
+
+  input.addEventListener("focus", () => {
+    // Saat fokus, jika input sama dengan label terpilih, kosongkan sementara atau tampilkan semua agar mudah ganti
+    const hiddenEl = document.getElementById(`assign-pic-${prefix}-select`);
+    const selectedPic = hiddenEl?.value ? COVER_AREA_PIC_OPTIONS.find(p => p.id === hiddenEl.value) : null;
+    const currentText = input.value.trim();
+    const query = (selectedPic && currentText === formatCoverAreaPicDisplay(selectedPic)) ? "" : currentText;
+    renderCoverAreaPicDropdownList(prefix, query);
+    dropdown.classList.remove("hidden");
   });
 
-  if (facSelect) facSelect.innerHTML = html;
-  if (mktSelect) mktSelect.innerHTML = html;
+  input.addEventListener("click", () => {
+    const hiddenEl = document.getElementById(`assign-pic-${prefix}-select`);
+    const selectedPic = hiddenEl?.value ? COVER_AREA_PIC_OPTIONS.find(p => p.id === hiddenEl.value) : null;
+    const currentText = input.value.trim();
+    const query = (selectedPic && currentText === formatCoverAreaPicDisplay(selectedPic)) ? "" : currentText;
+    renderCoverAreaPicDropdownList(prefix, query);
+    dropdown.classList.remove("hidden");
+  });
+
+  input.addEventListener("input", () => {
+    const clearBtn = document.getElementById(`assign-pic-${prefix}-clear-btn`);
+    if (clearBtn) {
+      clearBtn.classList.toggle("hidden", input.value.trim() === "");
+    }
+    renderCoverAreaPicDropdownList(prefix, input.value);
+    dropdown.classList.remove("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!wrapper.contains(e.target)) {
+      dropdown.classList.add("hidden");
+      // Kembalikan teks input ke PIC terpilih jika user tidak jadi memilih
+      const hiddenEl = document.getElementById(`assign-pic-${prefix}-select`);
+      const selectedPic = hiddenEl?.value ? COVER_AREA_PIC_OPTIONS.find(p => p.id === hiddenEl.value) : null;
+      input.value = selectedPic ? formatCoverAreaPicDisplay(selectedPic) : "";
+      const clearBtn = document.getElementById(`assign-pic-${prefix}-clear-btn`);
+      if (clearBtn) clearBtn.classList.toggle("hidden", !selectedPic);
+    }
+  });
+}
+
+function renderCoverAreaPicDropdownList(prefix, query = "") {
+  const dropdown = document.getElementById(`assign-pic-${prefix}-dropdown`);
+  const hiddenEl = document.getElementById(`assign-pic-${prefix}-select`);
+  if (!dropdown) return;
+
+  const q = String(query || "").trim().toLowerCase();
+  const currentVal = hiddenEl ? hiddenEl.value : "";
+
+  const matches = COVER_AREA_PIC_OPTIONS.filter(pic => {
+    if (!q) return true;
+    return (pic.nama || "").toLowerCase().includes(q)
+      || (pic.jabatan || "").toLowerCase().includes(q)
+      || (pic.cabang || "").toLowerCase().includes(q)
+      || (pic.nip || "").toLowerCase().includes(q);
+  });
+
+  let html = "";
+  if (!q) {
+    html += `
+      <button type="button" onclick="selectCoverAreaPicOption('${prefix}', '')"
+        class="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-50 flex items-center space-x-2 text-slate-500 font-semibold ${!currentVal ? 'bg-slate-50' : ''}">
+        <i class="fa-solid fa-ban text-slate-400 text-[11px]"></i>
+        <span>-- Tanpa PIC / Kosongkan --</span>
+      </button>
+    `;
+  }
+
+  if (matches.length === 0) {
+    html += `
+      <div class="px-3 py-4 text-center text-[11px] text-slate-400">
+        Tidak ditemukan karyawan yang sesuai "${escapeHtml(query)}"
+      </div>
+    `;
+  } else {
+    matches.forEach(pic => {
+      const isSelected = String(currentVal) === String(pic.id);
+      const isMe = (CURRENT_USER && (pic.id === CURRENT_USER.id || (pic.nip && pic.nip === CURRENT_USER.nip)));
+      const meTag = isMe ? '<span class="ml-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700">Saya Sendiri</span>' : '';
+      html += `
+        <button type="button" onclick="selectCoverAreaPicOption('${prefix}', '${pic.id}')"
+          class="w-full text-left px-3 py-2.5 hover:bg-indigo-50/70 transition flex items-start justify-between gap-2 ${isSelected ? 'bg-indigo-50/90' : ''}">
+          <div class="min-w-0">
+            <div class="font-bold text-slate-900 text-xs truncate">${escapeHtml(pic.nama)}${meTag}</div>
+            <div class="text-[10px] text-slate-500 truncate mt-0.5">${escapeHtml(pic.jabatan)} • <span class="text-teal-700 font-semibold">${escapeHtml(pic.cabang || '-')}</span></div>
+          </div>
+          ${isSelected ? '<i class="fa-solid fa-check text-indigo-600 text-xs mt-1 shrink-0"></i>' : ''}
+        </button>
+      `;
+    });
+  }
+
+  dropdown.innerHTML = html;
+}
+
+function selectCoverAreaPicOption(prefix, picId) {
+  setCoverAreaPicSelection(prefix, picId);
+  const dropdown = document.getElementById(`assign-pic-${prefix}-dropdown`);
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function setCoverAreaPicSelection(prefix, picId) {
+  const hiddenEl = document.getElementById(`assign-pic-${prefix}-select`);
+  const input = document.getElementById(`assign-pic-${prefix}-search-input`);
+  const clearBtn = document.getElementById(`assign-pic-${prefix}-clear-btn`);
+
+  if (hiddenEl) hiddenEl.value = picId || "";
+
+  const pic = picId ? COVER_AREA_PIC_OPTIONS.find(p => String(p.id) === String(picId)) : null;
+  if (input) {
+    input.value = pic ? formatCoverAreaPicDisplay(pic) : "";
+  }
+  if (clearBtn) {
+    clearBtn.classList.toggle("hidden", !pic);
+  }
+}
+
+function clearCoverAreaPicSelection(prefix) {
+  setCoverAreaPicSelection(prefix, "");
+  const input = document.getElementById(`assign-pic-${prefix}-search-input`);
+  const dropdown = document.getElementById(`assign-pic-${prefix}-dropdown`);
+  if (input) input.focus();
+  if (dropdown) {
+    renderCoverAreaPicDropdownList(prefix, "");
+    dropdown.classList.remove("hidden");
+  }
 }
 
 async function loadCoverAreaManagementData() {
@@ -27271,20 +27602,22 @@ async function loadCoverAreaManagementData() {
   }
 
   try {
-    // Kumpulkan seluruh unit_id dari downline branches (termasuk user unit itu sendiri)
-    const downlineUnitIds = Array.from(new Set([
-      COVER_AREA_USER_UNIT.id_unit,
-      ...(COVER_AREA_DOWNLINE_BRANCHES || []).map(b => b.id_unit)
-    ])).filter(Boolean);
+    // 1. Ambil cover area sesuai cakupan unit user (HO: semua, Area: cabang di areanya, Cabang: cabangnya saja)
+    const downlineUnitIds = COVER_AREA_USER_SCOPE === "HO"
+      ? []
+      : Array.from(new Set([
+          COVER_AREA_USER_UNIT.id_unit,
+          ...(COVER_AREA_ALLOWED_UNIT_IDS || []),
+          ...(COVER_AREA_DOWNLINE_BRANCHES || []).map(b => b.id_unit)
+        ])).filter(Boolean);
 
-    // 1. Ambil seluruh cover area milik unit/cabang downline user
     // Query pic_fac_id & pic_marketing_id (setelah migrasi 21_add_pic_marketing_to_cover_area.sql)
     let areaQuery = supabaseClient
       .from("m_cover_area")
       .select("id_area, nama_area, unit_id, pic_fac_id, pic_marketing_id, is_active, hr_organization_units(id_unit, nama_unit)")
       .eq("is_active", true);
 
-    if (downlineUnitIds.length > 0) {
+    if (COVER_AREA_USER_SCOPE !== "HO" && downlineUnitIds.length > 0) {
       areaQuery = areaQuery.in("unit_id", downlineUnitIds);
     }
 
@@ -27297,7 +27630,7 @@ async function loadCoverAreaManagementData() {
         .from("m_cover_area")
         .select("id_area, nama_area, unit_id, pic_id, is_active, hr_organization_units(id_unit, nama_unit)")
         .eq("is_active", true);
-      if (downlineUnitIds.length > 0) {
+      if (COVER_AREA_USER_SCOPE !== "HO" && downlineUnitIds.length > 0) {
         fallbackQuery = fallbackQuery.in("unit_id", downlineUnitIds);
       }
       const resFallback = await fallbackQuery.order("nama_area", { ascending: true });
@@ -27707,7 +28040,7 @@ async function openKelolaMitraModal(areaId, areaName) {
 
     let q = supabaseClient
       .from("m_dealer")
-      .select("dealer_id, dealer_name, owner_name, cabang, area_cover, cover_area_id, status")
+      .select("dealer_id, dealer_name, owner_name, cabang, area_cover, cover_area_id, productivity")
       .is("cover_area_id", null);
 
     if (branchName && !branchName.toLowerCase().includes("head office")) {
@@ -27747,18 +28080,35 @@ function filterKelolaMitraTable(query = "") {
   renderKelolaMitraTable(query);
 }
 
+function matchesCoverAreaDealerSearch(d, query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return true;
+  return (d.dealer_name || "").toLowerCase().includes(q) ||
+    (d.owner_name || "").toLowerCase().includes(q) ||
+    (d.cabang || "").toLowerCase().includes(q) ||
+    (d.productivity || "").toLowerCase().includes(q) ||
+    (d.area_cover || "").toLowerCase().includes(q);
+}
+
+function getCoverAreaProductivityBadge(prod) {
+  const label = String(prod || "-").trim() || "-";
+  const low = label.toLowerCase();
+  let cls = "bg-slate-100 text-slate-600 border-slate-200";
+  if (low.includes("closed") || low.includes("dormant")) {
+    cls = "bg-rose-50 text-rose-700 border-rose-200";
+  } else if (low.includes("prime") || low.includes("super") || low.includes("aktif") || low.includes("active") || low.includes("1.")) {
+    cls = "bg-emerald-50 text-emerald-700 border-emerald-200";
+  } else if (low.includes("potensi") || low.includes("2.") || low.includes("3.")) {
+    cls = "bg-amber-50 text-amber-700 border-amber-200";
+  }
+  return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold border ${cls}">${escapeHtml(label)}</span>`;
+}
+
 function renderKelolaMitraTable(filterText = "") {
   const tableBody = document.getElementById("kelola-mitra-table-body");
   if (!tableBody) return;
 
-  const q = String(filterText || "").trim().toLowerCase();
-  const filtered = KELOLA_MITRA_DEALERS_LIST.filter(d => {
-    if (!q) return true;
-    return (d.dealer_name || "").toLowerCase().includes(q) ||
-      (d.owner_name || "").toLowerCase().includes(q) ||
-      (d.cabang || "").toLowerCase().includes(q) ||
-      (d.area_cover || "").toLowerCase().includes(q);
-  });
+  const filtered = KELOLA_MITRA_DEALERS_LIST.filter(d => matchesCoverAreaDealerSearch(d, filterText));
 
   if (filtered.length === 0) {
     tableBody.innerHTML = `
@@ -27792,9 +28142,7 @@ function renderKelolaMitraTable(filterText = "") {
             <i class="fa-regular fa-building mr-1.5 text-slate-400"></i>${escapeHtml(dealer.cabang || '-')}
           </div>
           <div class="text-[11px] text-slate-500 mt-1 flex items-center">
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-              ${escapeHtml(dealer.status || 'AKTIF')}
-            </span>
+            ${getCoverAreaProductivityBadge(dealer.productivity)}
           </div>
         </td>
       </tr>
@@ -27823,15 +28171,7 @@ function toggleMitraRowCheckbox(dealerId) {
 
 function toggleSelectAllMitra(checked) {
   const searchInput = document.getElementById("manage-mitra-search");
-  const q = String(searchInput?.value || "").trim().toLowerCase();
-
-  const currentVisibleDealers = KELOLA_MITRA_DEALERS_LIST.filter(d => {
-    if (!q) return true;
-    return (d.dealer_name || "").toLowerCase().includes(q) ||
-      (d.owner_name || "").toLowerCase().includes(q) ||
-      (d.cabang || "").toLowerCase().includes(q) ||
-      (d.area_cover || "").toLowerCase().includes(q);
-  });
+  const currentVisibleDealers = KELOLA_MITRA_DEALERS_LIST.filter(d => matchesCoverAreaDealerSearch(d, searchInput?.value || ""));
 
   currentVisibleDealers.forEach(d => {
     const chk = document.getElementById(`chk-mitra-${d.dealer_id}`);
@@ -27859,11 +28199,15 @@ function updateSelectedMitraCount() {
     btnTextEl.innerText = `Simpan (${count} Terpilih)`;
   }
 
-  // Update check all state
-  if (chkAll && KELOLA_MITRA_DEALERS_LIST.length > 0) {
-    const total = KELOLA_MITRA_DEALERS_LIST.length;
-    chkAll.checked = count === total && total > 0;
-    chkAll.indeterminate = count > 0 && count < total;
+  // Update check all state berdasarkan item yang sedang terlihat (hasil filter pencarian)
+  if (chkAll) {
+    const searchInput = document.getElementById("manage-mitra-search");
+    const visibleDealers = KELOLA_MITRA_DEALERS_LIST.filter(d => matchesCoverAreaDealerSearch(d, searchInput?.value || ""));
+    const visibleTotal = visibleDealers.length;
+    const visibleSelectedCount = visibleDealers.filter(d => KELOLA_MITRA_SELECTED_IDS.has(d.dealer_id)).length;
+
+    chkAll.checked = visibleTotal > 0 && visibleSelectedCount === visibleTotal;
+    chkAll.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < visibleTotal;
   }
 }
 
@@ -27926,21 +28270,29 @@ async function saveKelolaMitraAssignment() {
 let VIEW_MITRA_AREA_ID = null;
 let VIEW_MITRA_AREA_NAME = "";
 let VIEW_MITRA_DEALERS_LIST = [];
+let VIEW_MITRA_SELECTED_IDS = new Set();
 
 async function openViewMitraAreaModal(areaId, areaName) {
   VIEW_MITRA_AREA_ID = areaId;
   VIEW_MITRA_AREA_NAME = areaName || "Area";
   VIEW_MITRA_DEALERS_LIST = [];
+  VIEW_MITRA_SELECTED_IDS.clear();
 
   const modal = document.getElementById("modal-view-mitra-area");
   const header = document.getElementById("modal-view-mitra-header");
   const searchInput = document.getElementById("view-mitra-search");
   const tableBody = document.getElementById("view-mitra-table-body");
   const countEl = document.getElementById("view-mitra-total-count");
+  const chkAll = document.getElementById("chk-select-all-view-mitra");
 
   if (header) header.innerText = `Daftar Mitra — ${VIEW_MITRA_AREA_NAME}`;
   if (searchInput) searchInput.value = "";
   if (countEl) countEl.innerText = "Memuat data...";
+  if (chkAll) {
+    chkAll.checked = false;
+    chkAll.indeterminate = false;
+  }
+  updateSelectedViewMitraCount();
 
   if (tableBody) {
     tableBody.innerHTML = `
@@ -27959,7 +28311,7 @@ async function openViewMitraAreaModal(areaId, areaName) {
     // Ambil mitra yang cover_area_id === areaId
     const { data: dealers, error } = await supabaseClient
       .from("m_dealer")
-      .select("dealer_id, dealer_name, owner_name, cabang, area_cover, cover_area_id, status")
+      .select("dealer_id, dealer_name, owner_name, cabang, area_cover, cover_area_id, productivity")
       .eq("cover_area_id", areaId)
       .order("dealer_name", { ascending: true });
 
@@ -27988,6 +28340,7 @@ function closeViewMitraAreaModal() {
   if (modal) modal.classList.add("hidden");
   VIEW_MITRA_AREA_ID = null;
   VIEW_MITRA_DEALERS_LIST = [];
+  VIEW_MITRA_SELECTED_IDS.clear();
 }
 
 function filterViewMitraAreaTable(query = "") {
@@ -27999,14 +28352,7 @@ function renderViewMitraAreaTable(filterText = "") {
   const countEl = document.getElementById("view-mitra-total-count");
   if (!tableBody) return;
 
-  const q = String(filterText || "").trim().toLowerCase();
-  const filtered = VIEW_MITRA_DEALERS_LIST.filter(d => {
-    if (!q) return true;
-    return (d.dealer_name || "").toLowerCase().includes(q) ||
-      (d.owner_name || "").toLowerCase().includes(q) ||
-      (d.cabang || "").toLowerCase().includes(q) ||
-      (d.area_cover || "").toLowerCase().includes(q);
-  });
+  const filtered = VIEW_MITRA_DEALERS_LIST.filter(d => matchesCoverAreaDealerSearch(d, filterText));
 
   if (countEl) {
     countEl.innerText = `Total: ${VIEW_MITRA_DEALERS_LIST.length} Mitra`;
@@ -28021,15 +28367,17 @@ function renderViewMitraAreaTable(filterText = "") {
         </td>
       </tr>
     `;
+    updateSelectedViewMitraCount();
     return;
   }
 
   let html = "";
-  filtered.forEach((dealer, idx) => {
+  filtered.forEach(dealer => {
+    const isChecked = VIEW_MITRA_SELECTED_IDS.has(dealer.dealer_id);
     html += `
-      <tr class="hover:bg-slate-50/80 transition">
-        <td class="p-3 text-center text-slate-400 font-bold border-r border-slate-100 w-10">
-          ${idx + 1}
+      <tr onclick="toggleViewMitraRowCheckbox('${dealer.dealer_id}')" class="hover:bg-rose-50/40 transition cursor-pointer has-[:checked]:bg-rose-50/70 group">
+        <td class="p-3 text-center border-r border-slate-100">
+          <input type="checkbox" id="chk-view-mitra-${dealer.dealer_id}" value="${dealer.dealer_id}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-600 cursor-pointer pointer-events-none">
         </td>
         <td class="p-3">
           <div class="font-bold text-slate-900 text-[13px]">${escapeHtml(dealer.dealer_name)}</div>
@@ -28042,13 +28390,11 @@ function renderViewMitraAreaTable(filterText = "") {
             <i class="fa-regular fa-building mr-1.5 text-slate-400"></i>${escapeHtml(dealer.cabang || '-')}
           </div>
           <div class="text-[11px] text-slate-500 mt-1 flex items-center">
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              ${escapeHtml(dealer.status || 'AKTIF')}
-            </span>
+            ${getCoverAreaProductivityBadge(dealer.productivity)}
           </div>
         </td>
         <td class="p-3 text-right">
-          <button type="button" onclick="unassignMitraFromArea('${dealer.dealer_id}', '${escapeHtml(dealer.dealer_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold border border-rose-200 transition active:scale-95 inline-flex items-center space-x-1" title="Lepas mitra dari area ini">
+          <button type="button" onclick="event.stopPropagation(); unassignMitraFromArea('${dealer.dealer_id}', '${escapeHtml(dealer.dealer_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold border border-rose-200 transition active:scale-95 inline-flex items-center space-x-1" title="Lepas mitra dari area ini">
             <i class="fa-solid fa-link-slash text-[10px]"></i>
             <span>Lepas</span>
           </button>
@@ -28058,13 +28404,72 @@ function renderViewMitraAreaTable(filterText = "") {
   });
 
   tableBody.innerHTML = html;
+  updateSelectedViewMitraCount();
+}
+
+function toggleViewMitraRowCheckbox(dealerId) {
+  const chk = document.getElementById(`chk-view-mitra-${dealerId}`);
+  if (!chk) return;
+
+  const newState = !chk.checked;
+  chk.checked = newState;
+
+  if (newState) {
+    VIEW_MITRA_SELECTED_IDS.add(dealerId);
+  } else {
+    VIEW_MITRA_SELECTED_IDS.delete(dealerId);
+  }
+
+  updateSelectedViewMitraCount();
+}
+
+function toggleSelectAllViewMitra(checked) {
+  const searchInput = document.getElementById("view-mitra-search");
+  const currentVisibleDealers = VIEW_MITRA_DEALERS_LIST.filter(d => matchesCoverAreaDealerSearch(d, searchInput?.value || ""));
+
+  currentVisibleDealers.forEach(d => {
+    const chk = document.getElementById(`chk-view-mitra-${d.dealer_id}`);
+    if (chk) chk.checked = checked;
+    if (checked) {
+      VIEW_MITRA_SELECTED_IDS.add(d.dealer_id);
+    } else {
+      VIEW_MITRA_SELECTED_IDS.delete(d.dealer_id);
+    }
+  });
+
+  updateSelectedViewMitraCount();
+}
+
+function updateSelectedViewMitraCount() {
+  const count = VIEW_MITRA_SELECTED_IDS.size;
+  const statusEl = document.getElementById("view-mitra-selected-text");
+  const btnEl = document.getElementById("btn-bulk-unassign-mitra");
+  const btnTextEl = document.getElementById("btn-bulk-unassign-text");
+  const chkAll = document.getElementById("chk-select-all-view-mitra");
+
+  if (statusEl) {
+    statusEl.innerText = `${count} mitra terpilih`;
+  }
+  if (btnEl) {
+    btnEl.disabled = count === 0;
+  }
+  if (btnTextEl) {
+    btnTextEl.innerText = `Lepas Terpilih (${count})`;
+  }
+
+  if (chkAll) {
+    const searchInput = document.getElementById("view-mitra-search");
+    const visibleDealers = VIEW_MITRA_DEALERS_LIST.filter(d => matchesCoverAreaDealerSearch(d, searchInput?.value || ""));
+    const visibleTotal = visibleDealers.length;
+    const visibleSelectedCount = visibleDealers.filter(d => VIEW_MITRA_SELECTED_IDS.has(d.dealer_id)).length;
+
+    chkAll.checked = visibleTotal > 0 && visibleSelectedCount === visibleTotal;
+    chkAll.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < visibleTotal;
+  }
 }
 
 async function unassignMitraFromArea(dealerId, dealerName) {
   if (!supabaseClient || !dealerId) return;
-
-  const confirmed = window.confirm(`Apakah Anda yakin ingin melepas mitra "${dealerName}" dari ${VIEW_MITRA_AREA_NAME}?`);
-  if (!confirmed) return;
 
   try {
     const { error } = await supabaseClient
@@ -28078,9 +28483,11 @@ async function unassignMitraFromArea(dealerId, dealerName) {
       showToast(`Mitra "${dealerName}" berhasil dilepas dari cover area!`, "success", 2000);
     }
 
-    // Refresh daftar mitra di modal
+    // Refresh daftar mitra di modal dengan mempertahankan filter pencarian
+    VIEW_MITRA_SELECTED_IDS.delete(dealerId);
     VIEW_MITRA_DEALERS_LIST = VIEW_MITRA_DEALERS_LIST.filter(d => d.dealer_id !== dealerId);
-    renderViewMitraAreaTable();
+    const currentSearch = document.getElementById("view-mitra-search")?.value || "";
+    renderViewMitraAreaTable(currentSearch);
 
     // Refresh cards cover area di latar belakang
     await loadCoverAreaManagementData();
@@ -28088,6 +28495,49 @@ async function unassignMitraFromArea(dealerId, dealerName) {
     console.error("Gagal melepas mitra dari area:", err);
     if (typeof showToast === "function") {
       showToast("Gagal melepas mitra: " + (err.message || err), "error");
+    }
+  }
+}
+
+async function bulkUnassignMitraFromArea() {
+  if (!supabaseClient) return;
+  const selectedIds = Array.from(VIEW_MITRA_SELECTED_IDS);
+  if (selectedIds.length === 0) return;
+
+  const btn = document.getElementById("btn-bulk-unassign-mitra");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-[11px]"></i> <span>Melepas...</span>';
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("m_dealer")
+      .update({ cover_area_id: null, area_cover: "" })
+      .in("dealer_id", selectedIds);
+
+    if (error) throw error;
+
+    if (typeof showToast === "function") {
+      showToast(`Berhasil melepas ${selectedIds.length} mitra dari cover area!`, "success", 2000);
+    }
+
+    const removedSet = new Set(selectedIds);
+    VIEW_MITRA_SELECTED_IDS.clear();
+    VIEW_MITRA_DEALERS_LIST = VIEW_MITRA_DEALERS_LIST.filter(d => !removedSet.has(d.dealer_id));
+    const currentSearch = document.getElementById("view-mitra-search")?.value || "";
+    renderViewMitraAreaTable(currentSearch);
+
+    await loadCoverAreaManagementData();
+  } catch (err) {
+    console.error("Gagal bulk melepas mitra dari area:", err);
+    if (typeof showToast === "function") {
+      showToast("Gagal melepas mitra: " + (err.message || err), "error");
+    }
+  } finally {
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-link-slash text-[11px]"></i> <span id="btn-bulk-unassign-text">Lepas Terpilih (0)</span>';
+      updateSelectedViewMitraCount();
     }
   }
 }
@@ -28188,16 +28638,16 @@ function openAssignPicModal(areaId) {
   ASSIGN_PIC_ACTIVE_AREA_ID = areaId;
   const modal = document.getElementById("modal-assign-pic-area");
   const areaNameEl = document.getElementById("assign-pic-modal-area-name");
-  const facSelect = document.getElementById("assign-pic-fac-select");
-  const mktSelect = document.getElementById("assign-pic-marketing-select");
 
   if (areaNameEl) areaNameEl.innerText = `Area: ${area.nama_area}`;
-  if (facSelect) {
-    facSelect.value = area.pic_fac_id || area.pic_id || "";
-  }
-  if (mktSelect) {
-    mktSelect.value = area.pic_marketing_id || "";
-  }
+
+  initCoverAreaPicSearchableDropdown("fac");
+  initCoverAreaPicSearchableDropdown("marketing");
+  setCoverAreaPicSelection("fac", area.pic_fac_id || area.pic_id || "");
+  setCoverAreaPicSelection("marketing", area.pic_marketing_id || "");
+
+  document.getElementById("assign-pic-fac-dropdown")?.classList.add("hidden");
+  document.getElementById("assign-pic-marketing-dropdown")?.classList.add("hidden");
 
   if (modal) modal.classList.remove("hidden");
 }
@@ -28267,3 +28717,9 @@ async function handleAssignPicSubmit(e) {
     }
   }
 }
+
+
+
+
+
+

@@ -173,4 +173,37 @@
     </div>
   </div>
 
+  <!-- 4. DETAIL AKTIVITAS KUNJUNGAN (DRILL-DOWN SEPERTI RIWAYAT) -->
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center space-x-2">
+        <div class="w-2.5 h-4 bg-indigo-600 rounded-full"></div>
+        <div>
+          <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider">Detail Aktivitas Kunjungan</h4>
+          <p class="text-[10px] text-slate-400">Daftar seluruh aktivitas visit PIC sesuai cakupan cabang & periode</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span id="lap-act-scope-badge" class="hidden text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full"></span>
+        <span id="lap-act-list-count" class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">Menampilkan 0 aktivitas</span>
+      </div>
+    </div>
+
+    <!-- Filter Tabs Jenis Aktivitas -->
+    <div class="grid grid-cols-4 gap-1.5 text-[11px] font-bold">
+      <button type="button" onclick="setActivityListTab('ALL')" id="tab-act-all" class="py-1.5 px-2 rounded-xl bg-slate-900 text-white text-center shadow-xs transition truncate">Semua</button>
+      <button type="button" onclick="setActivityListTab('VISIT')" id="tab-act-visit" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 text-center transition truncate">Visit Mitra</button>
+      <button type="button" onclick="setActivityListTab('ONB')" id="tab-act-onb" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 text-center transition truncate">Calon Mitra</button>
+      <button type="button" onclick="setActivityListTab('GPS')" id="tab-act-gps" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 text-center transition truncate">GPS Maint.</button>
+    </div>
+
+    <!-- List Cards Container -->
+    <div id="lap-act-cards-container" class="space-y-2.5">
+      <div class="py-8 text-center text-xs text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-base block mb-1 text-indigo-600"></i>
+        Memuat detail aktivitas kunjungan...
+      </div>
+    </div>
+  </div>
+
 </div>

@@ -440,3 +440,4 @@ $$;
 
 -- Jalankan kalkulasi ulang prioritas langsung setelah fungsi diperbarui
 SELECT public.recalculate_all_priorities();
+

@@ -3257,7 +3257,7 @@
         <div class="relative">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input type="text" id="manage-mitra-search" oninput="filterKelolaMitraTable(this.value)"
-            placeholder="Cari nama dealer, owner, cabang..."
+            placeholder="Cari nama dealer, owner, cabang, productivity..."
             class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600" />
         </div>
       </div>
@@ -3274,7 +3274,7 @@
                 </label>
               </th>
               <th class="p-3 font-bold">Nama Mitra & Owner</th>
-              <th class="p-3 font-bold">Cabang / Status</th>
+              <th class="p-3 font-bold">Cabang / Productivity</th>
             </tr>
           </thead>
           <tbody id="kelola-mitra-table-body" class="divide-y divide-slate-100">
@@ -3323,7 +3323,7 @@
         <div class="relative flex-1">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input type="text" id="view-mitra-search" oninput="filterViewMitraAreaTable(this.value)"
-            placeholder="Cari nama dealer, owner, cabang..."
+            placeholder="Cari nama dealer, owner, cabang, productivity..."
             class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600" />
         </div>
         <span id="view-mitra-total-count"
@@ -3336,9 +3336,14 @@
         <table class="w-full text-left text-xs border-collapse">
           <thead class="bg-slate-100 border-b border-slate-200 sticky top-0 z-10 shadow-sm text-[11px] text-slate-600">
             <tr>
-              <th class="p-3 w-10 text-center border-r border-slate-200/50">#</th>
+              <th class="p-3 w-12 text-center border-r border-slate-200/50">
+                <label class="flex justify-center items-center cursor-pointer">
+                  <input type="checkbox" id="chk-select-all-view-mitra" onchange="toggleSelectAllViewMitra(this.checked)"
+                    class="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-600 cursor-pointer">
+                </label>
+              </th>
               <th class="p-3 font-bold">Nama Mitra & Owner</th>
-              <th class="p-3 font-bold">Cabang / Status</th>
+              <th class="p-3 font-bold">Cabang / Productivity</th>
               <th class="p-3 font-bold text-right w-24">Aksi</th>
             </tr>
           </thead>
@@ -3349,9 +3354,17 @@
       </div>
 
       <!-- Footer Modal -->
-      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end shrink-0">
-        <button type="button" onclick="closeViewMitraAreaModal()"
-          class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-sm">Tutup</button>
+      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+        <span class="text-[11px] text-slate-500 font-medium" id="view-mitra-selected-text">0 mitra terpilih</span>
+        <div class="flex items-center space-x-2">
+          <button type="button" id="btn-bulk-unassign-mitra" onclick="bulkUnassignMitraFromArea()" disabled
+            class="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs shadow-sm transition active:scale-95 flex items-center space-x-1.5">
+            <i class="fa-solid fa-link-slash text-[11px]"></i>
+            <span id="btn-bulk-unassign-text">Lepas Terpilih (0)</span>
+          </button>
+          <button type="button" onclick="closeViewMitraAreaModal()"
+            class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-sm">Tutup</button>
+        </div>
       </div>
     </div>
   </div>
@@ -3360,8 +3373,8 @@
   <div id="modal-assign-pic-area"
     class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div
-      class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+      class="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-visible animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center rounded-t-3xl">
         <div class="flex items-center space-x-2">
           <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm">
             <i class="fa-solid fa-user-gear"></i>
@@ -3378,19 +3391,41 @@
       <form id="form-assign-pic-area" onsubmit="handleAssignPicSubmit(event)" class="p-5 space-y-4 text-xs">
         <div>
           <label class="block font-bold text-slate-700 mb-1">PIC Field Action Coordinator (FAC)</label>
-          <select id="assign-pic-fac-select"
-            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition">
-            <option value="">-- Tanpa PIC / Kosongkan --</option>
-          </select>
+          <input type="hidden" id="assign-pic-fac-select" value="" />
+          <div class="relative" id="assign-pic-fac-wrapper">
+            <i class="fa-solid fa-user-shield absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 text-xs pointer-events-none"></i>
+            <input type="text" id="assign-pic-fac-search-input" autocomplete="off"
+              placeholder="Cari atau pilih PIC FAC..."
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-14 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition" />
+            <button type="button" id="assign-pic-fac-clear-btn" onclick="clearCoverAreaPicSelection('fac')"
+              class="hidden absolute right-7 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-1 text-xs" title="Kosongkan PIC">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] pointer-events-none"></i>
+            <div id="assign-pic-fac-dropdown"
+              class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+            </div>
+          </div>
           <p class="text-[10px] text-slate-400 mt-1">PIC Operasional penanganan & kunjungan diler.</p>
         </div>
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">PIC Marketing Officer</label>
-          <select id="assign-pic-marketing-select"
-            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition">
-            <option value="">-- Tanpa PIC / Kosongkan --</option>
-          </select>
+          <input type="hidden" id="assign-pic-marketing-select" value="" />
+          <div class="relative" id="assign-pic-marketing-wrapper">
+            <i class="fa-solid fa-bullhorn absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs pointer-events-none"></i>
+            <input type="text" id="assign-pic-marketing-search-input" autocomplete="off"
+              placeholder="Cari atau pilih PIC Marketing..."
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-14 py-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition" />
+            <button type="button" id="assign-pic-marketing-clear-btn" onclick="clearCoverAreaPicSelection('marketing')"
+              class="hidden absolute right-7 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-1 text-xs" title="Kosongkan PIC">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] pointer-events-none"></i>
+            <div id="assign-pic-marketing-dropdown"
+              class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+            </div>
+          </div>
           <p class="text-[10px] text-slate-400 mt-1">PIC Bisnis & pengembangan relasi kemitraan.</p>
         </div>
 
@@ -3404,6 +3439,111 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL DETAIL & EDIT AKTIVITAS TERPROTEKSI (GLOBAL: HISTORY & LAPORAN ACTIVITY) -->
+  <div id="modal-history-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Modal Header -->
+      <div id="modal-history-header" class="p-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-2 min-w-0">
+          <div id="modal-history-icon" class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-amber-400 shrink-0">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </div>
+          <div class="min-w-0">
+            <h4 id="modal-history-title" class="font-bold text-xs truncate">Detail Aktivitas</h4>
+            <span id="modal-history-badge" class="px-2 py-0.5 rounded text-[9px] font-bold inline-block mt-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">🟢 Bisa Diedit</span>
+          </div>
+        </div>
+        <button onclick="closeHistoryDetailModal()" class="text-white/80 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <!-- Modal Content (Scrollable) -->
+      <div class="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs">
+        
+        <!-- Alert Status Hari Ini / Final -->
+        <div id="modal-history-status-alert" class="p-2.5 rounded-xl text-[11px] leading-relaxed flex items-center space-x-2">
+          <i class="fa-solid fa-circle-info text-base shrink-0"></i>
+          <span id="modal-history-status-msg">-</span>
+        </div>
+
+        <!-- Informasi Dasar Transaksi -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+          <div class="flex justify-between items-start">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase">Mitra / Target:</span>
+            <span id="dtl-hist-target" class="font-bold text-slate-900 text-right">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase">Waktu Input:</span>
+            <span id="dtl-hist-time" class="font-medium text-slate-700">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase">PIC Petugas:</span>
+            <span id="dtl-hist-pic" class="font-medium text-slate-700">-</span>
+          </div>
+        </div>
+
+        <!-- SECTION 1: TAGGING LOKASI (READ-ONLY TERKUNCI) -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-1.5 text-slate-700 font-bold text-xs">
+              <i class="fa-solid fa-lock text-slate-400"></i>
+              <span>Tagging Lokasi GPS</span>
+            </div>
+            <span class="text-[9px] font-bold text-slate-400 uppercase bg-slate-200 px-1.5 py-0.5 rounded">Terkunci</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Latitude:</span>
+              <span id="dtl-hist-lat" class="font-mono text-slate-800 font-semibold">-</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Longitude:</span>
+              <span id="dtl-hist-long" class="font-mono text-slate-800 font-semibold">-</span>
+            </div>
+          </div>
+          <div id="box-hist-maps-link" class="pt-1">
+            <a id="dtl-hist-maps-btn" href="#" target="_blank" class="inline-flex items-center space-x-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline">
+              <i class="fa-solid fa-location-dot"></i>
+              <span>Buka di Google Maps</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- SECTION 2: FOTO BUKTI AWAL (READ-ONLY TERKUNCI) -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-1.5 text-slate-700 font-bold text-xs">
+              <i class="fa-solid fa-lock text-slate-400"></i>
+              <span id="hist-photos-section-title">Foto Bukti Fisik Awal</span>
+            </div>
+            <span class="text-[9px] font-bold text-slate-400 uppercase bg-slate-200 px-1.5 py-0.5 rounded">Terkunci</span>
+          </div>
+          <div id="dtl-hist-photos-container" class="grid grid-cols-3 gap-2">
+            <!-- Foto-foto bukti ter-render di sini -->
+          </div>
+        </div>
+
+        <!-- SECTION 3: FORM EDITABLE (DAPAT DIEDIT JIKA TRANSAKSI HARI INI) -->
+        <form id="form-history-edit" onsubmit="handleSaveEditActivity(event)" class="space-y-3">
+          <input type="hidden" id="edit-act-type" value="" />
+          <input type="hidden" id="edit-act-id" value="" />
+
+          <div id="dynamic-edit-fields-container" class="space-y-3">
+            <!-- Form dinamis ter-render sesuai jenis aktivitas -->
+          </div>
+
+          <div id="box-edit-actions" class="pt-2 border-t border-slate-200 flex space-x-2">
+            <button type="button" onclick="closeHistoryDetailModal()" class="w-1/3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Batal</button>
+            <button type="submit" id="btn-save-edit-act" class="w-2/3 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center space-x-1.5 transition">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Simpan Perubahan</span>
+            </button>
+          </div>
+        </form>
+
+      </div>
     </div>
   </div>
 
@@ -3428,7 +3568,7 @@
       document.body.appendChild(scConfig);
 
       const scApp = document.createElement("script");
-      scApp.src = "/app.js?v=" + dailyVer + "_v202";
+      scApp.src = "/app.js?v=" + dailyVer + "_v210";
       document.body.appendChild(scApp);
     })();
   </script>
