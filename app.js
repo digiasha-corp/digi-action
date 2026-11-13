@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261112_v210";
+const APP_BUILD_VERSION = "20261113_v211";
 const screenCache = {};
 
 function escapeHtml(str) {
