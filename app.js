@@ -1338,7 +1338,9 @@ async function supabaseSubmitGpsMaintenance(data) {
         .update({
           imei_gps: data.imei_baru,
           gps_status: "Normal",
-          last_visit_date: new Date().toISOString().slice(0, 10)
+          aging_gps_maint: 0,
+          last_visit_date: new Date().toISOString().slice(0, 10),
+          updated_at: new Date().toISOString()
         })
         .eq("no_fasilitas", data.no_fasilitas);
     } else if (data.act_type === "Cabut GPS") {
@@ -1346,13 +1348,16 @@ async function supabaseSubmitGpsMaintenance(data) {
         .update({
           imei_gps: "",
           gps_status: "Tidak Pasang",
-          last_visit_date: new Date().toISOString().slice(0, 10)
+          aging_gps_maint: 0,
+          last_visit_date: new Date().toISOString().slice(0, 10),
+          updated_at: new Date().toISOString()
         })
         .eq("no_fasilitas", data.no_fasilitas);
     }
   }
 
   const officeStockLoc = data.work_location_name || "Kantor Pusat";
+  const installedPos = data.nopol ? `Terpasang di ${data.nopol}` : (data.dealer_name || "Armada Mitra");
   if (data.act_type === "Ganti GPS") {
     if (data.imei_lama && data.imei_lama !== "-") {
       await supabaseClient.from("gps_devices")
@@ -1360,7 +1365,7 @@ async function supabaseSubmitGpsMaintenance(data) {
     }
     if (data.imei_baru) {
       await supabaseClient.from("gps_devices")
-        .upsert({ imei: data.imei_baru, status_device: `Terpasang di ${data.nopol}`, posisi_stock: data.dealer_name, last_updated: new Date().toISOString() });
+        .upsert({ imei: data.imei_baru, status_device: "TERPASANG", posisi_stock: installedPos, last_updated: new Date().toISOString() });
     }
   } else if (data.act_type === "Cabut GPS") {
     if (data.imei_lama && data.imei_lama !== "-") {
@@ -1370,7 +1375,7 @@ async function supabaseSubmitGpsMaintenance(data) {
   } else if (data.act_type === "Pasang GPS") {
     if (data.imei_baru) {
       await supabaseClient.from("gps_devices")
-        .upsert({ imei: data.imei_baru, status_device: `Terpasang di ${data.nopol}`, posisi_stock: data.dealer_name, last_updated: new Date().toISOString() });
+        .upsert({ imei: data.imei_baru, status_device: "TERPASANG", posisi_stock: installedPos, last_updated: new Date().toISOString() });
     }
   }
 
@@ -11830,13 +11835,13 @@ function initFacMonitoringData() {
   FAC_GPS_MONITORING_DATA = eligibleUnits.map((u, i) => {
     let codes = [];
     const gpsStatusRaw = String(u.gps_status || "").trim().toLowerCase();
-    if (gpsStatusRaw === "tidak pasang") codes = ["1"];
-    else if (gpsStatusRaw === "belum lepas") codes = ["2"];
-    else if (gpsStatusRaw === "belum pasang") codes = ["3"];
-    else if (gpsStatusRaw === "baterai lemah") codes = ["4"];
-    else if (gpsStatusRaw === "geser") codes = ["5"];
-    else if (gpsStatusRaw === "pelepasan") codes = ["6"];
-    else if (gpsStatusRaw === "offline") codes = ["7"];
+    if (gpsStatusRaw.includes("tidak pasang")) codes.push("1");
+    if (gpsStatusRaw.includes("belum lepas")) codes.push("2");
+    if (gpsStatusRaw.includes("belum pasang")) codes.push("3");
+    if (gpsStatusRaw.includes("baterai lemah")) codes.push("4");
+    if (gpsStatusRaw.includes("geser")) codes.push("5");
+    if (gpsStatusRaw.includes("pelepasan")) codes.push("6");
+    if (gpsStatusRaw.includes("offline")) codes.push("7");
 
     const cStatus = String(u.contract_status || "LIVE").toUpperCase();
     const normalizedContractStatus = cStatus.includes("EXPIRED") ? "EXPIRED" : (cStatus.includes("LIVE") ? "LIVE" : cStatus);

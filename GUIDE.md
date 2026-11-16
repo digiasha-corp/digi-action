@@ -489,10 +489,12 @@ await supabaseClient
 
 > ✅ UPDATE: Fungsi `trg_hr_transaction_generate_nip` telah diperbarui. Penentuan urutan NIP otomatis kini sepenuhnya merujuk pada tabel `hr_employees` (dan `hr_employee_transactions`), meninggalkan tabel legacy `m_employee`. Logika sekuensial tetap dihitung secara tahunan (YY).
 
+> ✅ UPDATE: Modul GPS & FAC Monitoring disempurnakan (v212). Sinkronisasi inventori `gps_devices` (83 unit) dan pemetaan kendaraan `m_facility_unit` (59 unit terpasang, 24 unit tersedia) selesai. Reset `aging_gps_maint: 0` dan standardisasi status/posisi stok saat submit maintenance GPS diaktifkan. Parser status FAC (`initFacMonitoringData`) kini mendukung multi-status anomali gabungan (seperti `Baterai Lemah, Offline`). Antrean tiket prioritas terpadu `t_priority_action` telah di-refresh dan terisi 107 tiket aktif.
+
 ---
 
-*Last updated: 2026-10-11 21:05 WIB*
+*Last updated: 2026-11-16 23:45 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
-*Active branch: `feature/fac-workflow` (development) → `main` (production)*
+*Active branch: `develop` (testing/preview)*
 
 
