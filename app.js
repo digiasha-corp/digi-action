@@ -11330,17 +11330,20 @@ function onGpsActivityChange(actType) {
       clearGpsDealerSearchSelection();
     } else {
       filterVehiclesByActivity(dealerVal, actType);
+      populateIdleImeiOptions();
     }
   } else {
     // Re-render dropdown list
     const searchInput = document.getElementById("gps-dealer-search-input");
     renderGpsDealerSearchDropdown(searchInput ? searchInput.value : "");
+    populateIdleImeiOptions();
   }
 }
 
 function onGpsDealerSelected(dealerId) {
   const actType = document.querySelector('input[name="gps_act_type"]:checked')?.value || "Ganti GPS";
   filterVehiclesByActivity(dealerId, actType);
+  populateIdleImeiOptions();
 }
 
 function filterVehiclesByActivity(dealerId, actType) {
@@ -11559,11 +11562,57 @@ function onGpsKendaraanSelected(nopol) {
   if (inputImeiLama) inputImeiLama.value = imeiLama || "-";
 }
 
+function getTargetGpsLocationForBranch(branchName) {
+  const b = String(branchName || "").toLowerCase();
+  if (b.includes("makassar") || b.includes("mks") || b.includes("sulsel") || b.includes("gowa")) {
+    return "Kantor Makassar";
+  }
+  if (b.includes("balikpapan") || b.includes("bpp") || b.includes("kaltim")) {
+    return "Kantor Balikpapan";
+  }
+  if (b.includes("tangerang") || b.includes("tgr") || b.includes("pusat") || b.includes("ho") || b.includes("jadetabek") || b.includes("head office")) {
+    return "Kantor Pusat";
+  }
+  return "";
+}
+
+function getFilteredIdleGpsList() {
+  const dealerSel = document.getElementById("gps-select-dealer");
+  const dealerVal = dealerSel?.value;
+  const d = (MASTER_DEALER_PRIORITY_DATA || []).find(item => item.dealer_id === dealerVal || item.id === dealerVal);
+
+  // Prioritaskan cabang dari mitra terpilih, fallback ke cabang user yang login
+  const targetBranch = d?.cabang || CURRENT_USER?.cabang || "";
+  const targetLocation = getTargetGpsLocationForBranch(targetBranch);
+
+  const allIdle = APP_STATE.idleGps || [];
+  if (!targetLocation) {
+    return allIdle;
+  }
+
+  const branchFiltered = allIdle.filter(g => {
+    const pos = String(g.posisi_stock || g.tipe || "").trim();
+    return pos.toLowerCase().includes(targetLocation.toLowerCase());
+  });
+
+  return branchFiltered;
+}
+
 function populateIdleImeiOptions() {
   const select = document.getElementById("gps-select-imei-baru");
+  const searchInput = document.getElementById("gps-search-imei");
+  const filteredIdle = getFilteredIdleGpsList();
+
+  const dealerSel = document.getElementById("gps-select-dealer");
+  const dealerVal = dealerSel?.value;
+  const d = (MASTER_DEALER_PRIORITY_DATA || []).find(item => item.dealer_id === dealerVal || item.id === dealerVal);
+  const targetBranch = d?.cabang || CURRENT_USER?.cabang || "";
+  const targetLocation = getTargetGpsLocationForBranch(targetBranch);
+
   if (select) {
-    select.innerHTML = '<option value="">-- Pilih dari Daftar Stok Idle Cabang --</option>';
-    (APP_STATE.idleGps || []).forEach(item => {
+    const locLabel = targetLocation ? ` (${targetLocation})` : "";
+    select.innerHTML = `<option value="">-- Pilih dari Daftar Stok Idle Cabang${locLabel} --</option>`;
+    filteredIdle.forEach(item => {
       const opt = document.createElement("option");
       opt.value = item.imei;
       const loc = item.posisi_stock || item.tipe || "Stok Cabang";
@@ -11571,6 +11620,21 @@ function populateIdleImeiOptions() {
       select.appendChild(opt);
     });
   }
+
+  if (searchInput && (!select || !select.value)) {
+    searchInput.placeholder = targetLocation
+      ? `Ketik nomor IMEI di ${targetLocation} (${filteredIdle.length} unit)...`
+      : "Ketik nomor IMEI atau cabang...";
+  }
+
+  // Jika IMEI yang sebelumnya dipilih tidak ada dalam daftar filtered yang baru, bersihkan
+  if (select && select.value) {
+    const isStillInList = filteredIdle.some(item => item.imei === select.value);
+    if (!isStillInList) {
+      clearGpsImeiSearchSelection();
+    }
+  }
+
   renderGpsImeiSearchDropdown("");
 }
 
@@ -11578,8 +11642,9 @@ function renderGpsImeiSearchDropdown(query = "") {
   const dropdown = document.getElementById("gps-imei-search-dropdown");
   if (!dropdown) return;
 
+  const filteredIdle = getFilteredIdleGpsList();
   const q = String(query || "").trim().toLowerCase();
-  const filtered = (APP_STATE.idleGps || []).filter(item => {
+  const filtered = filteredIdle.filter(item => {
     if (!q) return true;
     const imei = String(item.imei || "").toLowerCase();
     const pos = String(item.posisi_stock || item.tipe || "").toLowerCase();
@@ -11589,9 +11654,15 @@ function renderGpsImeiSearchDropdown(query = "") {
   dropdown.innerHTML = "";
 
   if (filtered.length === 0) {
+    const dealerSel = document.getElementById("gps-select-dealer");
+    const dealerVal = dealerSel?.value;
+    const d = (MASTER_DEALER_PRIORITY_DATA || []).find(item => item.dealer_id === dealerVal || item.id === dealerVal);
+    const targetBranch = d?.cabang || CURRENT_USER?.cabang || "";
+    const targetLocation = getTargetGpsLocationForBranch(targetBranch);
+
     const emptyDiv = document.createElement("div");
     emptyDiv.className = "p-3 text-center text-xs text-slate-400";
-    emptyDiv.innerHTML = '<i class="fa-solid fa-box-open mb-1 block text-slate-300"></i>Tidak ada stok GPS idle yang cocok';
+    emptyDiv.innerHTML = `<i class="fa-solid fa-box-open mb-1 block text-slate-300"></i>Tidak ada stok GPS idle yang tersedia di ${targetLocation || 'lokasi ini'}`;
     dropdown.appendChild(emptyDiv);
     return;
   }
