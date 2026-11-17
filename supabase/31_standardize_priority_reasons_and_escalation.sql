@@ -341,3 +341,24 @@ BEGIN
   );
 END;
 $$;
+
+
+-- ============================================================================
+-- 3. EKSEKUSI PEMBERSIHAN TOTAL & INISIALISASI ANTREAN BERSIH (FRESH LAUNCH)
+-- ============================================================================
+-- Kosongkan seluruh data sampah / riwayat uji coba agar tabel bersih 100%
+TRUNCATE TABLE t_priority_action;
+
+-- Jalankan pengisian antrean prioritas murni (42 Unit Fisik + 19 Dealer Murni)
+SELECT recalculate_all_priorities();
+
+-- Verifikasi hasil antrean tiket yang baru digenerate
+SELECT 
+  entity_type, 
+  priority_level, 
+  action_reason, 
+  COUNT(*) AS total_tiket
+FROM t_priority_action
+WHERE is_fu = false
+GROUP BY entity_type, priority_level, action_reason
+ORDER BY entity_type, priority_level;
