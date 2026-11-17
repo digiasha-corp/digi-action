@@ -3565,11 +3565,12 @@
 
       const scConfig = document.createElement("script");
       scConfig.src = "/config.js?v=" + dailyVer;
+      scConfig.onload = () => {
+        const scApp = document.createElement("script");
+        scApp.src = "/app.js?v=" + dailyVer + "_v215";
+        document.body.appendChild(scApp);
+      };
       document.body.appendChild(scConfig);
-
-      const scApp = document.createElement("script");
-      scApp.src = "/app.js?v=" + dailyVer + "_v214";
-      document.body.appendChild(scApp);
     })();
   </script>
 </body>

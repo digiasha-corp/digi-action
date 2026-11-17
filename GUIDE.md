@@ -494,11 +494,11 @@ await supabaseClient
 
 > ✅ UPDATE: Modul Priority Engine & Standardisasi Alasan Prioritas (Opsi A - In-Ticket Escalation). Mengatasi kendala duplikasi tiket harian akibat teks aging dinamis `(xx hr)`. Alasan kini dibuat statis murni (misal: `Aging Visit Mitra >= 31 hr`, `Aging Visit Unit > 21 hr`). Mengadopsi Opsi A: saat parameter entitas eskalasi, tiket aktif yang sudah ada langsung diperbarui in-place (skor, level, alasan, updated_at) dengan tetap mempertahankan `created_at` asli agar histori SLA tidak ter-reset dan tidak memunculkan baris tiket duplikat baru. Sebanyak 112 tiket aktif di `t_priority_action` telah dibersihkan dan diselaraskan.
 
-> ✅ UPDATE: Modul GPS Maintain & Filter Kontrak Unit (v214). Memperbaiki kriteria penyaringan unit kendaraan pada aktivitas "Pasang Baru": hanya menampilkan unit dengan status kontrak LIVE yang belum memiliki IMEI GPS terpasang (mengeliminasi unit EXPIRED dari daftar Pasang Baru). Untuk "Ganti GPS" dan "Cabut GPS", unit yang ditampilkan tetap unit yang memiliki IMEI GPS terpasang (memiliki fisik GPS untuk diganti atau dicabut).
+> ✅ UPDATE: Modul GPS Maintain & Pembacaan IMEI (v215). Memperbaiki pembacaan nomor IMEI kendaraan pada dropdown pencarian: menstandarkan pembacaan properti `imei_gps || imei` sehingga nomor IMEI fisik unit terbaca dengan jelas (tidak lagi '-' atau kosong). Mengatasi race condition pemuatan script `config.js` dan `app.js` menggunakan listener onload, serta mengisolasi sinkronisasi data master murni ke Supabase (menutup celah fallback ke Google Apps Script yang mengembalikan data inventori GPS usang).
 
 ---
 
-*Last updated: 2026-11-17 17:05 WIB*
+*Last updated: 2026-11-17 17:25 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `develop` (testing/preview)*
 

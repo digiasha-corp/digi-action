@@ -711,6 +711,12 @@ async function supabaseLogin(identifier, password) {
 }
 
 async function supabaseGetMasterData() {
+  if (!supabaseClient && typeof getSupabaseClient === "function") {
+    supabaseClient = getSupabaseClient();
+  }
+  if (!supabaseClient && window.supabase && typeof window.supabase.createClient === "function" && typeof CONFIG !== "undefined" && CONFIG.SUPABASE_URL) {
+    supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  }
   if (!supabaseClient) throw new Error("Supabase Client belum terinisialisasi");
 
   const [resLoc, resDlr, resFac, resGps] = await Promise.all([
@@ -861,6 +867,7 @@ async function supabaseGetMasterData() {
       overdue_days: u.overdue_days || 0,
       lifetime_days: u.lifetime_days || 0,
       imei_gps: u.imei_gps,
+      imei: u.imei_gps || u.imei || "",
       gps_status: u.gps_status || "Normal",
       last_visit_date: u.last_visit_date,
       aging_visit_unit: agingUnit,
@@ -1853,8 +1860,8 @@ async function callApi(action, data = {}) {
     }
   }
 
-  // 2. Fallback ke Google Apps Script (Hanya untuk action backend yang didukung)
-  if (typeof CONFIG !== "undefined" && CONFIG.API_URL && !CONFIG.API_URL.includes("MASUKKAN_URL")) {
+  // 2. Fallback ke Google Apps Script (Hanya untuk action backend legacy yang bukan getMasterData)
+  if (action !== "getMasterData" && typeof CONFIG !== "undefined" && CONFIG.API_URL && !CONFIG.API_URL.includes("MASUKKAN_URL")) {
     try {
       const payload = { action, ...data };
       const res = await fetch(CONFIG.API_URL, {
@@ -1952,6 +1959,7 @@ async function syncMasterDataFromApi() {
 
           return {
             ...u,
+            imei: u.imei_gps || u.imei || "",
             unit_concern: uAsg ? { urgency: uAsg.urgency_level, note: uAsg.instruksi, assignment_id: uAsg.assignment_id } : null
           };
         });
@@ -2157,7 +2165,14 @@ async function loadScreen(screenName, updateHistory = true) {
     }
     if (screenName === "onboarding" && typeof initOnboardingScreen === "function") initOnboardingScreen();
     if (screenName === "pipeline" && typeof initPipeline === "function") initPipeline();
-    if (screenName === "gps") initGpsScreen();
+    if (screenName === "gps") {
+      fetchUserCoverAreas().then(() => initGpsScreen());
+      if (!MASTER_DEALER_PRIORITY_DATA || MASTER_DEALER_PRIORITY_DATA.length === 0) {
+        Promise.all([syncMasterDataFromApi(), fetchUserCoverAreas()]).then(() => initGpsScreen());
+      } else {
+        initGpsScreen();
+      }
+    }
     if (screenName === "fac") {
       if (typeof initFacMonitoringData === "function") initFacMonitoringData();
       renderLegendFilters();
@@ -11398,7 +11413,7 @@ function filterVehiclesByActivity(dealerId, actType) {
     const opt = document.createElement("option");
     opt.value = v.nopol;
     opt.setAttribute("data-fasilitas", v.no_fasilitas || "");
-    opt.setAttribute("data-imei", v.imei || v.imei_gps || "");
+    opt.setAttribute("data-imei", v.imei_gps || v.imei || "");
     opt.setAttribute("data-unit", v.unit || "");
     opt.setAttribute("data-status", v.contract_status || "");
     opt.innerText = `${v.no_fasilitas ? v.no_fasilitas + ' | ' : ''}${v.nopol} | ${v.unit} (${v.contract_status})`;
@@ -11416,7 +11431,7 @@ function renderGpsKendaraanSearchDropdown(query = "") {
     const nopol = String(v.nopol || "").toLowerCase();
     const unit = String(v.unit || "").toLowerCase();
     const fas = String(v.no_fasilitas || "").toLowerCase();
-    const imei = String(v.imei || "").toLowerCase();
+    const imei = String(v.imei_gps || v.imei || "").toLowerCase();
     return nopol.includes(q) || unit.includes(q) || fas.includes(q) || imei.includes(q);
   });
 
@@ -11448,6 +11463,9 @@ function renderGpsKendaraanSearchDropdown(query = "") {
     const cStatus = v.contract_status || "LIVE";
     const badgeClass = contractBadgeStyles[cStatus] || "bg-slate-100 text-slate-600 border-slate-200";
 
+    const rawImei = String(v.imei_gps || v.imei || "").replace(/\D/g, "").trim();
+    const displayImei = (rawImei && rawImei.length >= 6) ? String(v.imei_gps || v.imei) : "-";
+
     item.innerHTML = `
       <div class="min-w-0 flex-1">
         <div class="font-bold text-slate-900 truncate">
@@ -11456,7 +11474,7 @@ function renderGpsKendaraanSearchDropdown(query = "") {
         </div>
         <div class="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
           ${v.no_fasilitas ? `<span>Fas: <strong class="font-mono text-slate-700">${v.no_fasilitas}</strong></span><span>•</span>` : ''}
-          <span>IMEI: <strong class="font-mono ${v.imei ? 'text-slate-700' : 'text-slate-400'}">${v.imei || '-'}</strong></span>
+          <span>IMEI: <strong class="font-mono ${displayImei !== '-' ? 'text-slate-700' : 'text-slate-400'}">${displayImei}</strong></span>
         </div>
       </div>
       <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeClass} shrink-0 uppercase">${cStatus}</span>
