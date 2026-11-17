@@ -11091,6 +11091,24 @@ function isUnitGpsInstalled(v) {
   return false;
 }
 
+function isUnitContractLive(v) {
+  if (!v) return false;
+  const c = String(v.contract_status || v.status_kontrak || v.status || "").trim().toUpperCase();
+  return c === "LIVE" || c.includes("LIVE");
+}
+
+function isVehicleEligibleForGpsActivity(v, actType) {
+  if (!v) return false;
+  if (actType === "Pasang GPS" || actType === "Pasang Baru") {
+    // Pasang Baru: Hanya unit kontrak LIVE yang belum memiliki IMEI GPS terpasang
+    return isUnitContractLive(v) && !isUnitGpsInstalled(v);
+  } else if (actType === "Ganti GPS" || actType === "Cabut GPS") {
+    // Ganti / Cabut GPS: Unit dengan GPS terpasang
+    return isUnitGpsInstalled(v);
+  }
+  return false;
+}
+
 function getVehiclesForDealer(dealerId) {
   if (!dealerId) return [];
   const d = (MASTER_DEALER_PRIORITY_DATA || []).find(item => item.dealer_id === dealerId || item.id === dealerId);
@@ -11117,15 +11135,7 @@ function getEligibleGpsDealers(actType) {
   return coveredDealers.filter(d => {
     const vehicles = getVehiclesForDealer(d.dealer_id);
     if (!vehicles || vehicles.length === 0) return false;
-
-    if (actType === "Ganti GPS" || actType === "Cabut GPS") {
-      // Hanya mitra yang memiliki unit dengan GPS TERPASANG
-      return vehicles.some(v => isUnitGpsInstalled(v));
-    } else if (actType === "Pasang GPS" || actType === "Pasang Baru") {
-      // Hanya mitra yang memiliki unit dengan status Belum Pasang atau Tidak Pasang GPS
-      return vehicles.some(v => !isUnitGpsInstalled(v));
-    }
-    return true;
+    return vehicles.some(v => isVehicleEligibleForGpsActivity(v, actType));
   });
 }
 
@@ -11197,10 +11207,7 @@ function renderGpsDealerSearchDropdown(query = "") {
 
     // Hitung unit yang sesuai kriteria actType
     const vehicles = getVehiclesForDealer(d.dealer_id);
-    const matchingUnits = vehicles.filter(v => {
-      if (actType === "Ganti GPS" || actType === "Cabut GPS") return isUnitGpsInstalled(v);
-      return !isUnitGpsInstalled(v);
-    });
+    const matchingUnits = vehicles.filter(v => isVehicleEligibleForGpsActivity(v, actType));
 
     item.innerHTML = `
       <div class="min-w-0 flex-1">
@@ -11356,14 +11363,7 @@ function filterVehiclesByActivity(dealerId, actType) {
     return;
   }
 
-  let filtered = [];
-  if (actType === "Ganti GPS" || actType === "Cabut GPS") {
-    // Unit dengan GPS TERPASANG
-    filtered = allVehicles.filter(v => isUnitGpsInstalled(v));
-  } else if (actType === "Pasang GPS" || actType === "Pasang Baru") {
-    // Unit dengan status Belum Pasang atau Tidak Pasang GPS
-    filtered = allVehicles.filter(v => !isUnitGpsInstalled(v));
-  }
+  const filtered = allVehicles.filter(v => isVehicleEligibleForGpsActivity(v, actType));
 
   CURRENT_GPS_FILTERED_VEHICLES = filtered;
 
