@@ -460,6 +460,7 @@ await supabaseClient
 | `19_update_priority_scoring_fac.sql` | ⏳ SIAP DIJALANKAN | Penyempurnaan parameter prioritas FAC: SP Terbit (OVD 3/6/9), Aging >= 3 & OVD >= 11, Aging visit diler (>= 61, >= 31, >= 21) |
 | `20_create_cover_area_management.sql` | ⏳ SIAP DIJALANKAN | Tabel m_cover_area (id_area, nama_area, unit_id, pic_id, is_active) & relasi cover_area_id di m_dealer |
 | `21_add_pic_marketing_to_cover_area.sql` | ⏳ SIAP DIJALANKAN | Tambah kolom pic_marketing_id dan rename pic_id -> pic_fac_id pada m_cover_area |
+| `31_standardize_priority_reasons_and_escalation.sql` | ⏳ SIAP DIJALANKAN | Standarisasi alasan prioritas statis (anti-dinamis) & implementasi Opsi A (In-Ticket Escalation) di recalculate_all_priorities() |
 
 > ✅ UPDATE: Modul Priority FAC. Layout diubah menjadi terpusat (max-w-2xl). Implementasi Dual-Approach Filtering: sistem membaca relasi `m_cover_area` secara real-time dari Supabase berdasarkan penugasan PIC (pic_fac_id). Jika PIC tidak terdaftar di cover area manapun, sistem menerapkan fallback hierarki cabang yang presisi: karyawan cabang (misal: Cabang Tangerang 1) HANYA dapat melihat mitra dari cabang mereka sendiri (tidak akan bocor ke cabang lain seperti Balikpapan). Header area kini dinamis.
 
@@ -491,9 +492,11 @@ await supabaseClient
 
 > ✅ UPDATE: Modul GPS & FAC Monitoring disempurnakan (v212). Sinkronisasi inventori `gps_devices` (83 unit) dan pemetaan kendaraan `m_facility_unit` (59 unit terpasang, 24 unit tersedia) selesai. Reset `aging_gps_maint: 0` dan standardisasi status/posisi stok saat submit maintenance GPS diaktifkan. Parser status FAC (`initFacMonitoringData`) kini mendukung multi-status anomali gabungan (seperti `Baterai Lemah, Offline`). Antrean tiket prioritas terpadu `t_priority_action` telah di-refresh dan terisi 107 tiket aktif.
 
+> ✅ UPDATE: Modul Priority Engine & Standardisasi Alasan Prioritas (Opsi A - In-Ticket Escalation). Mengatasi kendala duplikasi tiket harian akibat teks aging dinamis `(xx hr)`. Alasan kini dibuat statis murni (misal: `Aging Visit Mitra >= 31 hr`, `Aging Visit Unit > 21 hr`). Mengadopsi Opsi A: saat parameter entitas eskalasi, tiket aktif yang sudah ada langsung diperbarui in-place (skor, level, alasan, updated_at) dengan tetap mempertahankan `created_at` asli agar histori SLA tidak ter-reset dan tidak memunculkan baris tiket duplikat baru. Sebanyak 112 tiket aktif di `t_priority_action` telah dibersihkan dan diselaraskan.
+
 ---
 
-*Last updated: 2026-11-16 23:45 WIB*
+*Last updated: 2026-11-17 10:15 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `develop` (testing/preview)*
 
