@@ -1,7 +1,7 @@
 /**
  * CORE LOGIC & ENGINE DIGIASHA APP (PRODUCTION READY - GOOGLE SPREADSHEET API)
  */
-const APP_BUILD_VERSION = "20261113_v211";
+const APP_BUILD_VERSION = "20261117_v213";
 const screenCache = {};
 
 function escapeHtml(str) {
@@ -11070,39 +11070,60 @@ function isUnitContractLive(v) {
 
 function isUnitGpsInstalled(v) {
   if (!v) return false;
-  const imei = String(v.imei || v.imei_gps || "").replace(/\D/g, "").trim();
+  const imei = String(v.imei_gps || v.imei || "").replace(/\D/g, "").trim();
   const rawStatus = String(v.gps_status || "").trim().toLowerCase();
 
-  // Jika status menyebutkan tidak pasang atau belum pasang
-  if (rawStatus === "tidak pasang" || rawStatus === "tidak dipasang" || rawStatus === "belum pasang" || rawStatus === "belum_pasang") {
+  // Jika status secara eksplisit menyebutkan belum pasang / tidak pasang
+  if (rawStatus.includes("tidak pasang") || rawStatus.includes("tidak dipasang") || rawStatus.includes("belum pasang") || rawStatus.includes("belum_pasang")) {
     return false;
   }
 
-  // Jika memiliki nomor IMEI valid minimal 6 digit
+  // Unit dianggap TERPASANG jika memiliki nomor IMEI GPS valid (minimal 6 digit angka)
   if (imei.length >= 6) {
     return true;
   }
 
-  // Jika status GPS aktif/terpasang
-  if (rawStatus === "terpasang" || rawStatus === "normal" || rawStatus === "offline" || rawStatus === "baterai lemah" || rawStatus === "geser" || rawStatus === "pelepasan" || rawStatus === "belum lepas") {
+  // Jika status GPS secara spesifik terpasang/lepas (bukan default normal tanpa IMEI)
+  if (rawStatus === "terpasang" || rawStatus.includes("pelepasan") || rawStatus.includes("belum lepas")) {
     return true;
   }
 
   return false;
 }
 
+function getVehiclesForDealer(dealerId) {
+  if (!dealerId) return [];
+  const d = (MASTER_DEALER_PRIORITY_DATA || []).find(item => item.dealer_id === dealerId || item.id === dealerId);
+  if (d && Array.isArray(d.units) && d.units.length > 0) {
+    return d.units;
+  }
+  if (APP_STATE.masterVehiclesGps && APP_STATE.masterVehiclesGps[dealerId] && APP_STATE.masterVehiclesGps[dealerId].length > 0) {
+    return APP_STATE.masterVehiclesGps[dealerId];
+  }
+  if (Array.isArray(APP_STATE.units) && APP_STATE.units.length > 0) {
+    const dObj = (APP_STATE.dealers || []).find(item => item.dealer_id === dealerId);
+    const dName = dObj?.dealer_name || d?.dealer_name;
+    if (dName) {
+      const normalizeDlr = (str) => String(str || "").replace(/\s*\([^)]*\)\s*$/, "").trim().toUpperCase();
+      const norm = normalizeDlr(dName);
+      return APP_STATE.units.filter(u => normalizeDlr(u.dealer_name) === norm);
+    }
+  }
+  return [];
+}
+
 function getEligibleGpsDealers(actType) {
-  const coveredDealers = MASTER_DEALER_PRIORITY_DATA.filter(d => isDealerInUserCoverArea(d));
+  const coveredDealers = (MASTER_DEALER_PRIORITY_DATA || []).filter(d => isDealerInUserCoverArea(d));
   return coveredDealers.filter(d => {
-    const vehicles = APP_STATE.masterVehiclesGps[d.dealer_id] || d.units || [];
+    const vehicles = getVehiclesForDealer(d.dealer_id);
     if (!vehicles || vehicles.length === 0) return false;
 
     if (actType === "Ganti GPS" || actType === "Cabut GPS") {
       // Hanya mitra yang memiliki unit dengan GPS TERPASANG
       return vehicles.some(v => isUnitGpsInstalled(v));
     } else if (actType === "Pasang GPS" || actType === "Pasang Baru") {
-      // Hanya mitra yang memiliki unit LIVE dengan GPS BELUM TERPASANG & TIDAK DIPASANG
-      return vehicles.some(v => isUnitContractLive(v) && !isUnitGpsInstalled(v));
+      // Hanya mitra yang memiliki unit dengan status Belum Pasang atau Tidak Pasang GPS
+      return vehicles.some(v => !isUnitGpsInstalled(v));
     }
     return true;
   });
@@ -11175,10 +11196,10 @@ function renderGpsDealerSearchDropdown(query = "") {
     const badgeClass = urgencyBadgeStyles[lvl] || urgencyBadgeStyles["Normal"];
 
     // Hitung unit yang sesuai kriteria actType
-    const vehicles = APP_STATE.masterVehiclesGps[d.dealer_id] || d.units || [];
+    const vehicles = getVehiclesForDealer(d.dealer_id);
     const matchingUnits = vehicles.filter(v => {
       if (actType === "Ganti GPS" || actType === "Cabut GPS") return isUnitGpsInstalled(v);
-      return isUnitContractLive(v) && !isUnitGpsInstalled(v);
+      return !isUnitGpsInstalled(v);
     });
 
     item.innerHTML = `
@@ -11277,6 +11298,8 @@ function onGpsActivityChange(actType) {
     if (boxNew) boxNew.classList.remove("hidden");
   }
 
+  populateGpsDealerDropdown();
+
   // Cek apakah dealer yang saat ini dipilih masih eligible untuk actType yang baru
   if (dealerVal) {
     const eligibleDealers = getEligibleGpsDealers(actType);
@@ -11318,7 +11341,7 @@ function filterVehiclesByActivity(dealerId, actType) {
 
   closeGpsKendaraanSearchDropdown();
 
-  const allVehicles = (dealerId && APP_STATE.masterVehiclesGps[dealerId]) ? APP_STATE.masterVehiclesGps[dealerId] : [];
+  const allVehicles = getVehiclesForDealer(dealerId);
   if (!dealerId || allVehicles.length === 0) {
     if (searchInputKendaraan) {
       searchInputKendaraan.disabled = true;
@@ -11338,8 +11361,8 @@ function filterVehiclesByActivity(dealerId, actType) {
     // Unit dengan GPS TERPASANG
     filtered = allVehicles.filter(v => isUnitGpsInstalled(v));
   } else if (actType === "Pasang GPS" || actType === "Pasang Baru") {
-    // Unit LIVE dengan GPS BELUM TERPASANG & TIDAK DIPASANG
-    filtered = allVehicles.filter(v => isUnitContractLive(v) && !isUnitGpsInstalled(v));
+    // Unit dengan status Belum Pasang atau Tidak Pasang GPS
+    filtered = allVehicles.filter(v => !isUnitGpsInstalled(v));
   }
 
   CURRENT_GPS_FILTERED_VEHICLES = filtered;
@@ -11510,12 +11533,12 @@ function clearGpsKendaraanSearchSelection() {
 }
 
 function onGpsKendaraanSelected(nopol) {
+  const v = CURRENT_GPS_FILTERED_VEHICLES.find(item => item.nopol === nopol);
   const select = document.getElementById("gps-select-kendaraan");
-  if (!select) return;
-  const selectedOption = select.options[select.selectedIndex];
-  const imeiLama = selectedOption?.getAttribute("data-imei") || "-";
+  const selectedOption = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+  const imeiLama = v?.imei_gps || v?.imei || selectedOption?.getAttribute("data-imei") || "-";
   const inputImeiLama = document.getElementById("gps-input-imei-lama");
-  if (inputImeiLama) inputImeiLama.value = imeiLama;
+  if (inputImeiLama) inputImeiLama.value = imeiLama || "-";
 }
 
 function populateIdleImeiOptions() {
@@ -11782,22 +11805,7 @@ async function handleGpsSubmit(e) {
 // =========================================================================
 // FAC GPS AUDIT CONTROLLER
 // =========================================================================
-function isUnitGpsInstalled(u) {
-  if (!u) return false;
-  const imei = String(u.imei_gps || u.imei || "").trim();
-  const hasImei = imei !== "" && imei !== "-" && imei !== "0" && !imei.toLowerCase().includes("tidak") && !imei.toLowerCase().includes("belum");
-  const gpsStatus = String(u.gps_status || "").trim().toLowerCase();
-
-  if (gpsStatus === "tidak pasang" || gpsStatus === "belum pasang") {
-    return false;
-  }
-
-  if (["belum lepas", "baterai lemah", "geser", "pelepasan", "offline", "normal", "aktif"].includes(gpsStatus)) {
-    return true;
-  }
-
-  return hasImei;
-}
+// (isUnitGpsInstalled terpadu telah didefinisikan di bagian GPS MAINTENANCE CONTROLLER)
 
 function isUnitEligibleForFacMonitoring(u) {
   if (!u) return false;

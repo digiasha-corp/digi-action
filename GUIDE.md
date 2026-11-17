@@ -494,9 +494,11 @@ await supabaseClient
 
 > ✅ UPDATE: Modul Priority Engine & Standardisasi Alasan Prioritas (Opsi A - In-Ticket Escalation). Mengatasi kendala duplikasi tiket harian akibat teks aging dinamis `(xx hr)`. Alasan kini dibuat statis murni (misal: `Aging Visit Mitra >= 31 hr`, `Aging Visit Unit > 21 hr`). Mengadopsi Opsi A: saat parameter entitas eskalasi, tiket aktif yang sudah ada langsung diperbarui in-place (skor, level, alasan, updated_at) dengan tetap mempertahankan `created_at` asli agar histori SLA tidak ter-reset dan tidak memunculkan baris tiket duplikat baru. Sebanyak 112 tiket aktif di `t_priority_action` telah dibersihkan dan diselaraskan.
 
+> ✅ UPDATE: Modul GPS Maintain & Pemilihan Kendaraan disempurnakan (v213). Memperbaiki kriteria unit sesuai: untuk aktivitas "Ganti GPS" dan "Cabut GPS" hanya menyaring unit yang berstatus GPS TERPASANG (memiliki nomor IMEI GPS valid >= 6 digit angka); untuk aktivitas "Pasang Baru" menyaring unit yang statusnya Belum Pasang / Tidak Pasang GPS. Memperbaiki fungsi penarik kendaraan mitra (getVehiclesForDealer) sehingga dropdown "Pilih Kendaraan" menampilkan seluruh unit yang sesuai secara akurat dan tidak lagi kosong.
+
 ---
 
-*Last updated: 2026-11-17 10:15 WIB*
+*Last updated: 2026-11-17 16:50 WIB*
 *Project path: `c:\Users\DIGIASHA\.gemini\antigravity-ide\scratch\Digi-Action\`*
 *Active branch: `develop` (testing/preview)*
 
