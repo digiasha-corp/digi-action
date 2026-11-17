@@ -179,26 +179,21 @@ BEGIN
       CASE
         WHEN (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') THEN 0
         WHEN dc.concern_urgency = 'Sangat Penting' THEN 3
-        WHEN COALESCE(dua.max_unit_score, 0) = 3 THEN 3
         WHEN dc.calc_aging_visit >= 61 THEN 3
         WHEN dc.concern_urgency = 'Penting' THEN 2
-        WHEN COALESCE(dua.max_unit_score, 0) = 2 THEN 2
         WHEN dc.calc_aging_visit >= 31 THEN 2
+        WHEN dc.concern_urgency = 'Moderat' THEN 1
         WHEN dc.calc_aging_visit >= 21 THEN 1
-        WHEN COALESCE(dua.max_unit_score, 0) = 1 THEN 1
         ELSE 0
       END AS final_score,
 
-      -- REASON DEALER STATIS
+      -- REASON DEALER MURNI (TANPA PEMICU UNIT - PEMISAHAN TANGGUNG JAWAB DEALER VS UNIT)
       CASE
         WHEN (COALESCE(d.productivity, '') ILIKE '%Closed%' OR COALESCE(d.productivity, '') ILIKE '%Dormant%') THEN 'Normal (Mitra Closed / Dormant)'
         WHEN dc.concern_urgency IS NOT NULL THEN 'Concern Mitra: ' || COALESCE(dc.concern_note, '-')
-        WHEN COALESCE(dua.max_unit_score, 0) = 3 THEN 'Pemicu Unit: ' || COALESCE(dua.top_unit_reason, 'Unit Sangat Penting')
         WHEN dc.calc_aging_visit >= 61 THEN 'Aging Visit Mitra >= 61 hr'
-        WHEN COALESCE(dua.max_unit_score, 0) = 2 THEN 'Pemicu Unit: ' || COALESCE(dua.top_unit_reason, 'Unit Penting')
         WHEN dc.calc_aging_visit >= 31 THEN 'Aging Visit Mitra >= 31 hr'
         WHEN dc.calc_aging_visit >= 21 THEN 'Aging Visit Mitra >= 21 hr'
-        WHEN COALESCE(dua.max_unit_score, 0) = 1 THEN 'Pemicu Unit: ' || COALESCE(dua.top_unit_reason, 'Unit Moderat')
         ELSE 'Normal'
       END AS final_reason
     FROM m_dealer d
