@@ -1322,7 +1322,7 @@ async function supabaseSubmitGpsMaintenance(data) {
     data.foto_posisi_gps_base64 ? uploadToSupabaseStorage(data.foto_posisi_gps_base64, "gps", `GPS-POS-${data.nopol}`) : Promise.resolve("")
   ]);
 
-  await supabaseClient.from("gps_maintenance").insert([{
+  const { error: maintErr } = await supabaseClient.from("gps_maintenance").insert([{
     maint_id: maintId,
     nip: data.currentUser?.nip || null,
     dealer_name: data.dealer_name,
@@ -1338,10 +1338,11 @@ async function supabaseSubmitGpsMaintenance(data) {
     lat: data.lat,
     long: data.long
   }]);
+  if (maintErr) throw new Error(`Gagal menyimpan log maintenance GPS: ${maintErr.message}`);
 
   if (data.no_fasilitas) {
     if (data.act_type === "Ganti GPS" || data.act_type === "Pasang GPS") {
-      await supabaseClient.from("m_facility_unit")
+      const { error: unitErr } = await supabaseClient.from("m_facility_unit")
         .update({
           imei_gps: data.imei_baru,
           gps_status: "Normal",
@@ -1350,8 +1351,9 @@ async function supabaseSubmitGpsMaintenance(data) {
           updated_at: new Date().toISOString()
         })
         .eq("no_fasilitas", data.no_fasilitas);
+      if (unitErr) throw new Error(`Gagal memperbarui data unit fasilitas: ${unitErr.message}`);
     } else if (data.act_type === "Cabut GPS") {
-      await supabaseClient.from("m_facility_unit")
+      const { error: unitErr } = await supabaseClient.from("m_facility_unit")
         .update({
           imei_gps: "",
           gps_status: "Tidak Pasang",
@@ -1360,6 +1362,7 @@ async function supabaseSubmitGpsMaintenance(data) {
           updated_at: new Date().toISOString()
         })
         .eq("no_fasilitas", data.no_fasilitas);
+      if (unitErr) throw new Error(`Gagal memperbarui data unit fasilitas: ${unitErr.message}`);
     }
   }
 
@@ -11823,21 +11826,32 @@ function removeGpsPositionPhoto() {
 
 async function handleGpsSubmit(e) {
   e.preventDefault();
-  const actType = document.querySelector('input[name="gps_act_type"]:checked').value;
+  const actTypeEl = document.querySelector('input[name="gps_act_type"]:checked');
+  const actType = actTypeEl ? actTypeEl.value : "Ganti GPS";
   const dealerSelect = document.getElementById("gps-select-dealer");
-  const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text;
   const kendaraanSelect = document.getElementById("gps-select-kendaraan");
 
-  if (!kendaraanSelect.value) {
-    alert("Pilih kendaraan yang akan dimaintenance terlebih dahulu!");
+  if (!dealerSelect || !dealerSelect.value) {
+    alert("Pilih mitra dari daftar terlebih dahulu!");
+    document.getElementById("gps-dealer-search-input")?.focus();
     return;
   }
+
+  if (!kendaraanSelect || !kendaraanSelect.value) {
+    alert("Pilih kendaraan yang akan dimaintenance terlebih dahulu!");
+    document.getElementById("gps-kendaraan-search-input")?.focus();
+    return;
+  }
+
+  const dealerName = dealerSelect.options[dealerSelect.selectedIndex]?.text || "";
+  const selectedKendaraanOpt = kendaraanSelect.options[kendaraanSelect.selectedIndex];
   const nopol = kendaraanSelect.value;
-  const noFasilitas = kendaraanSelect.options[kendaraanSelect.selectedIndex].getAttribute("data-fasilitas") || "";
-  const unitDesc = kendaraanSelect.options[kendaraanSelect.selectedIndex].getAttribute("data-unit") || "";
-  const imeiLama = document.getElementById("gps-input-imei-lama").value;
-  const imeiBaru = document.getElementById("gps-select-imei-baru").value || document.getElementById("gps-search-imei").value;
-  const catatanTeknis = document.getElementById("gps-catatan-teknis").value.trim() || "-";
+  const noFasilitas = selectedKendaraanOpt?.getAttribute("data-fasilitas") || "";
+  const unitDesc = selectedKendaraanOpt?.getAttribute("data-unit") || "";
+  const imeiLama = document.getElementById("gps-input-imei-lama")?.value || "-";
+  const rawImeiBaru = document.getElementById("gps-select-imei-baru")?.value || document.getElementById("gps-search-imei")?.value || "";
+  const imeiBaru = String(rawImeiBaru).trim();
+  const catatanTeknis = document.getElementById("gps-catatan-teknis")?.value.trim() || "-";
 
   if (actType === "Ganti GPS" || actType === "Cabut GPS") {
     if (!GPS_PHOTO_OLD_BASE64) {
@@ -11849,6 +11863,7 @@ async function handleGpsSubmit(e) {
   if (actType === "Ganti GPS" || actType === "Pasang GPS") {
     if (!imeiBaru) {
       alert("Pilih nomor IMEI GPS baru yang terpasang!");
+      document.getElementById("gps-search-imei")?.focus();
       return;
     }
     if (!GPS_PHOTO_NEW_IMEI_BASE64) {
@@ -11861,6 +11876,9 @@ async function handleGpsSubmit(e) {
     }
   }
 
+  const hasValidGeo = CURRENT_USER_GEO && typeof CURRENT_USER_GEO.lat === "number" && !isNaN(CURRENT_USER_GEO.lat) && typeof CURRENT_USER_GEO.long === "number" && !isNaN(CURRENT_USER_GEO.long);
+  const geoText = hasValidGeo ? `${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}` : "-";
+
   let waText = `*LAPORAN AKTIVITAS GPS MAINTENANCE*\n------------------------------------\n*Aktivitas:* ${actType}\n*Mitra:* ${dealerName}\n*No Fasilitas:* ${noFasilitas || '-'}\n*Kendaraan:* ${nopol} - ${unitDesc}\n`;
   if (actType === "Ganti GPS") {
     waText += `• IMEI Dicabut: ${imeiLama} [Foto OK]\n• IMEI Baru: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
@@ -11869,26 +11887,48 @@ async function handleGpsSubmit(e) {
   } else if (actType === "Pasang GPS") {
     waText += `• IMEI Terpasang: ${imeiBaru} [Foto IMEI & Posisi OK]\n`;
   }
-  waText += `• Catatan Teknis: ${catatanTeknis}\n• Geotag: ${CURRENT_USER_GEO.lat.toFixed(5)}, ${CURRENT_USER_GEO.long.toFixed(5)}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
+  waText += `• Catatan Teknis: ${catatanTeknis}\n• Geotag: ${geoText}\n------------------------------------\n_Dikirim via Digiasha Field App_`;
 
-  callApi("submitGpsMaintenance", {
-    act_type: actType,
-    dealer_name: dealerName,
-    no_fasilitas: noFasilitas,
-    nopol: nopol,
-    imei_lama: imeiLama,
-    imei_baru: imeiBaru,
-    foto_imei_lama_base64: GPS_PHOTO_OLD_BASE64,
-    foto_imei_baru_base64: GPS_PHOTO_NEW_IMEI_BASE64,
-    foto_posisi_gps_base64: GPS_PHOTO_POSITION_BASE64,
-    catatan_teknis: catatanTeknis,
-    lat: CURRENT_USER_GEO.lat,
-    long: CURRENT_USER_GEO.long,
-    work_location_name: (CURRENT_USER_GEO && CURRENT_USER_GEO.nearestOffice) ? CURRENT_USER_GEO.nearestOffice.name : "",
-    currentUser: CURRENT_USER
-  });
+  const submitBtn = document.getElementById("btn-submit-gps-btn");
+  const origBtnHtml = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Menyimpan Maintenance GPS...</span>';
+  }
 
-  openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke clipboard", waText, "bg-emerald-600");
+  try {
+    const res = await callApi("submitGpsMaintenance", {
+      act_type: actType,
+      dealer_name: dealerName,
+      no_fasilitas: noFasilitas,
+      nopol: nopol,
+      imei_lama: imeiLama,
+      imei_baru: imeiBaru,
+      foto_imei_lama_base64: GPS_PHOTO_OLD_BASE64,
+      foto_imei_baru_base64: GPS_PHOTO_NEW_IMEI_BASE64,
+      foto_posisi_gps_base64: GPS_PHOTO_POSITION_BASE64,
+      catatan_teknis: catatanTeknis,
+      lat: hasValidGeo ? CURRENT_USER_GEO.lat : null,
+      long: hasValidGeo ? CURRENT_USER_GEO.long : null,
+      work_location_name: (CURRENT_USER_GEO && CURRENT_USER_GEO.nearestOffice) ? CURRENT_USER_GEO.nearestOffice.name : "",
+      currentUser: CURRENT_USER
+    });
+
+    if (!res || res.success === false) {
+      alert("Gagal menyimpan Maintenance GPS: " + (res?.message || "Terjadi kesalahan saat menyimpan ke server."));
+      return;
+    }
+
+    openSummaryModal("Laporan Berhasil Dibuat!", "Siap disalin ke clipboard", waText, "bg-emerald-600");
+  } catch (err) {
+    console.error("handleGpsSubmit error:", err);
+    alert("Gagal menyimpan Maintenance GPS: " + (err?.message || err));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
+  }
 }
 
 // =========================================================================
